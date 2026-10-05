@@ -1,5 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.5.10.1 – Version-only Pipeline-Performance-Test
+
+v0.5.10.1 ist ein reiner Hotfix zur Messung des permanenten Build- und GitHub-Releasepfads. Gegenüber v0.5.10.0 gibt es keine funktionale Produktänderung. Die Änderung beschränkt sich auf die kanonische Versions-/Release-Konfiguration und die daraus deterministisch erzeugten Release-Metadaten und Pakete.
+
+- Version von `0.5.10.0` auf `0.5.10.1` erhöht.
+- `releaseProfile` ist `version-only`.
+- Keine Änderung an Produkt-Runtime, Update-Verhalten, BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
+- Dieser Release dient ausdrücklich der End-to-End-Performance-Messung des permanenten Release-Orchestrators.
+
 ## v0.5.10.0 – Permanente Release-Pipeline und zentrale Versionierung
 
 v0.5.10.0 ist ein Build-/Release-Architekturpatch ohne neue Produktfunktion. Die App-Version wird ab dieser Version ausschließlich aus `version.json` abgeleitet; Runtime-, Paket-, Audit- und Transition-Builds verwenden dieselbe kanonische Quelle.
