@@ -1,4 +1,11 @@
-﻿function ConvertTo-RuntimeDiagnosticText {
+﻿function Get-RuntimeDiagnosticRole {
+    if ($BackgroundRefresh) { return 'background-refresh' }
+    if ($UpdateCheck) { return 'update-check' }
+    if ($UpdatePrepare) { return 'update-prepare' }
+    return 'tray'
+}
+
+function ConvertTo-RuntimeDiagnosticText {
     param([AllowNull()][string]$Text)
     if ($null -eq $Text) { return $null }
     $result = [string]$Text
@@ -56,8 +63,8 @@ function Initialize-RuntimeDiagnostics {
             }
         } catch { }
 
-        Write-RuntimeDiagnosticEvent -Event $(if ($BackgroundRefresh) { 'BACKGROUND_WORKER_STARTED' } else { 'SESSION_STARTED' }) -Stage 'startup' -Success $true -Data (New-RuntimeDiagnosticData @{
-            role = $(if ($BackgroundRefresh) { 'background-refresh' } else { 'tray' })
+        Write-RuntimeDiagnosticEvent -Event $(if ($BackgroundRefresh) { 'BACKGROUND_WORKER_STARTED' } elseif ($UpdateCheck) { 'UPDATE_CHECK_WORKER_STARTED' } elseif ($UpdatePrepare) { 'UPDATE_PREPARE_WORKER_STARTED' } else { 'SESSION_STARTED' }) -Stage 'startup' -Success $true -Data (New-RuntimeDiagnosticData @{
+            role = (Get-RuntimeDiagnosticRole)
             parentSession = [bool]([string]$RuntimeSessionId)
         })
     }
@@ -84,7 +91,7 @@ function Write-RuntimeDiagnosticEvent {
             sessionId = $script:RuntimeSessionId
             appVersion = $script:AppVersion
             processId = $PID
-            role = $(if ($BackgroundRefresh) { 'background-refresh' } else { 'tray' })
+            role = (Get-RuntimeDiagnosticRole)
             event = $Event
             stage = $Stage
             level = $Level
@@ -189,8 +196,8 @@ function Export-RuntimeDiagnosticPackage {
             process64Bit = [Environment]::Is64BitProcess
             powershellVersion = $PSVersionTable.PSVersion.ToString()
             clrVersion = [Environment]::Version.ToString()
-            role = $(if ($BackgroundRefresh) { 'background-refresh' } else { 'tray' })
-            lastBackgroundRefreshTiming = $script:BackgroundRefreshState.LastTiming
+            role = (Get-RuntimeDiagnosticRole)
+            lastBackgroundRefreshTiming = $(if ($script:BackgroundRefreshState) { $script:BackgroundRefreshState.LastTiming } else { $null })
         }
         [System.IO.File]::WriteAllText((Join-Path $stage 'environment.json'), ($environment | ConvertTo-Json -Depth 10), (New-Object System.Text.UTF8Encoding($false)))
 

@@ -1,18 +1,34 @@
 # Lenovo Boot Selector – Changelog
 
-## Repository-Pflege nach v0.5.4 – GitHub-README und aktuelles Build als Download
+## v0.5.5 – Manueller Self-Updater
 
-- Die frühere changelogartige `README.md` wurde in eine klassische GitHub-Projektübersicht überführt.
-- Die vollständige fortlaufende Versionshistorie wird ab jetzt in dieser `CHANGELOG.md` weitergeführt.
-- Neu ist der Ordner `downloads/`: Er dient als **Build-Revisionshistorie** für versionierte Release-ZIPs.
-- Aktuell enthalten: `LenovoBootMenuTray-v0.5.4.zip`, SHA-256 `d31be8d7768e436aebfb4d4b620770b7e71ab3a86159014142eaf7f71e1f0e7d`.
-- Bei jeder produktiven Source-Revision, die einen neuen Build erfordert, wird das neue versionierte ZIP zusätzlich abgelegt; ältere Builds bleiben unverändert historisch erhalten.
-- Reine Dokumentations-/Repository-Änderungen ohne produktive Source-Änderung erzeugen kein neues Build.
-- Diese Repository-Organisation ändert keine Runtime-, Boot-, Storage-, TaskBroker- oder Privilege-Logik.
+v0.5.5 führt einen explizit vom Benutzer gestarteten Self-Updater ein. Es gibt weiterhin keinerlei periodische oder automatische Update-Prüfung.
 
-# Lenovo Boot Selector v0.5.4
+Änderungen:
 
+- Im Tray-Kontextmenü unter **Wartung** stehen jetzt exakt **„Auf neue Version prüfen…“** und **„App aktualisieren…“** zur Verfügung.
+- **„App aktualisieren…“** ist zunächst deaktiviert und wird erst nach einer erfolgreichen Prüfung auf eine tatsächlich neuere, valide Version aktiv.
+- Die Update-Metadaten werden ausschließlich aus dem fest eingebauten öffentlichen Repository `SaschaP1980/LenovoBootSelector` gelesen.
+- `downloads/latest.json` ist das maschinenlesbare Manifest. Versionsformat, Dateiname, Git-Tag, Dateigröße, SHA-256 und die erwartete flache Paketdateiliste werden strikt validiert.
+- Das Release-ZIP wird vor dem Entpacken gegen Größe und SHA-256 geprüft. Abweichungen brechen das Update fail-closed ab.
+- Das ZIP muss flach sein; Verzeichnisse, `..`-Pfadbestandteile und unerwartete Dateien werden abgelehnt.
+- Download und Paketvorbereitung laufen in versteckten, unelevierten Worker-Prozessen, damit die Tray-UI nicht durch Netzwerkzugriffe blockiert wird.
+- Nach erfolgreicher Vorbereitung startet ein temporärer unelevierter Update-Helper. Er wartet auf das Ende der Tray-App, sichert alle verwalteten Release-Dateien, ersetzt sie atomar best-effort, startet die App über den vorhandenen VBS-Launcher neu und führt bei Installationsfehlern einen Rollback auf die gesicherten Dateien aus.
+- Einstellungen, Diagnosen und TaskBroker-Zustand unter `%LOCALAPPDATA%` bzw. `%ProgramData%` werden vom Updater nicht verändert.
+- Der Updater besitzt keinen `RunAs`-/SYSTEM-Pfad und führt weder `bcdedit` noch Scheduled-Task-Operationen aus. Falls eine zukünftige Version andere Systemfunktionen benötigt, greift nach dem Neustart weiterhin die bestehende TaskBroker-Kompatibilitäts-/Repair-Logik.
+- Update-Prüfung, Vorbereitung und Helper-Start werden in der bestehenden Runtime-Diagnose protokolliert.
+- Die Build-Revisionshistorie in `downloads/` bleibt erhalten. Jede gebaute produktive Source-Revision bekommt ein versioniertes ZIP; ältere ZIPs bleiben bestehen.
+- Jede gebaute Version erhält einen unveränderlichen Git-Tag `vX.Y.Z` auf den zugehörigen Source-Commit.
 
+### Native Windows-Abnahme erforderlich
+
+Zusätzlich zu den bisherigen Parser/Core/Refresh/Mutex/Soak/Maintenance/Drift-Tests muss `Test-UpdateCore.ps1` vollständig grün sein. Manuell sind mindestens „keine neue Version“, „neue Version gefunden“, fehlerhafter Hash/Download sowie ein erfolgreicher Self-Update-Pfad mit Neustart zu prüfen.
+
+## Repository-Pflege nach v0.5.4
+
+- `README.md` ist eine klassische GitHub-Projektübersicht; die fortlaufende Versionshistorie liegt in dieser `CHANGELOG.md`.
+- `downloads/` ist eine dauerhafte Build-Revisionshistorie, nicht nur ein Ordner für das jeweils neueste ZIP.
+- Architektur-Baselines und Catch-Audits sollen in einem späteren kontrollierten Cleanup aus dem Repository-Root nach `docs/architecture/` bzw. `audits/` verschoben werden; Tests/Buildpfade werden dabei gemeinsam migriert.
 
 ## Neu in v0.5.4 – USB-Startmedium klar benennen
 

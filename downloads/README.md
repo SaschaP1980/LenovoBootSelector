@@ -8,12 +8,12 @@ Dieser Ordner enthält die **historisch erhaltenen gebauten Releases** des Lenov
 - Das zugehörige versionierte Release-ZIP wird zusätzlich in diesem Ordner abgelegt.
 - Bereits vorhandene Builds werden nicht gelöscht oder durch neuere Versionen ersetzt.
 - Reine Dokumentations-/Repository-Änderungen ohne produktive Source-Änderung erzeugen kein neues Build.
-- Die SHA-256-Summe jedes Builds wird hier dokumentiert.
+- Jede gebaute Version erhält einen unveränderlichen Git-Tag `vX.Y.Z`.
+- `latest.json` ist das maschinenlesbare Manifest für die manuelle Update-Funktion; `releases.json` führt die Build-Historie.
 
 ## Builds
 
-| Version | Release | Größe | SHA-256 |
-| --- | --- | ---: | --- |
-| v0.5.4 | [LenovoBootMenuTray-v0.5.4.zip](LenovoBootMenuTray-v0.5.4.zip) | 108.509 Bytes | `d31be8d7768e436aebfb4d4b620770b7e71ab3a86159014142eaf7f71e1f0e7d` |
-
-Die neueste Version steht jeweils oben bzw. wird bei weiteren Releases an dieser Tabelle ergänzt.
+| Version | Release | Größe | SHA-256 | Git-Tag |
+| --- | --- | ---: | --- | --- |
+| v0.5.5 | [LenovoBootMenuTray-v0.5.5.zip](LenovoBootMenuTray-v0.5.5.zip) | 84.797 Bytes | `8720b71aa04a0a7f97d034225b137eea7472a13e329767dec1edc1db7910660d` | `v0.5.5` |
+| v0.5.4 | [LenovoBootMenuTray-v0.5.4.zip](LenovoBootMenuTray-v0.5.4.zip) | 108.509 Bytes | `d31be8d7768e436aebfb4d4b620770b7e71ab3a86159014142eaf7f71e1f0e7d` | `v0.5.4` |

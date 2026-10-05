@@ -8,26 +8,20 @@
 
 Die Anwendung läuft im Normalbetrieb **uneleviert**. Privilegierte Firmwareänderungen werden ausschließlich über fest definierte, allowgelistete Windows-Scheduled-Tasks ausgeführt. Permanente Änderungen an der UEFI-Bootreihenfolge gehören ausdrücklich nicht zum Produktmodell.
 
-**Aktueller Entwicklungsstand:** v0.5.4  
+**Aktueller Entwicklungsstand:** v0.5.5  
 **Technik:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads und Revisionshistorie
 
-Versionierte Builds liegen im Ordner [`downloads/`](downloads/).
+Versionierte Builds liegen im Ordner [`downloads/`](downloads/). Jede produktive Source-Revision, die einen neuen Build erfordert, bekommt ein neues versioniertes Release-ZIP. Bereits veröffentlichte Builds bleiben historisch erhalten.
 
-**Aktueller Build:** [LenovoBootMenuTray-v0.5.4.zip](downloads/LenovoBootMenuTray-v0.5.4.zip)  
-**SHA-256:** `d31be8d7768e436aebfb4d4b620770b7e71ab3a86159014142eaf7f71e1f0e7d`
-
-Der Ordner dient als **Build-Revisionshistorie**: Sobald sich die produktive Source so ändert, dass eine neue Version gebaut werden muss, wird das neue versionierte Release-ZIP zusätzlich in `downloads/` abgelegt. Bereits veröffentlichte Builds bleiben historisch erhalten und werden nicht durch neuere Versionen ersetzt.
-
-Reine Dokumentations- oder Repository-Pflege ohne Änderung der produktiven Source erzeugt kein künstliches neues Build. Die fachliche Versionshistorie wird zusätzlich im [CHANGELOG.md](CHANGELOG.md) fortgeführt.
+Die neueste maschinenlesbare Updateinformation liegt in [`downloads/latest.json`](downloads/latest.json). Die fachliche Versionshistorie steht in [CHANGELOG.md](CHANGELOG.md).
 
 ## Funktionen
 
 - Auswahl eines vorhandenen Firmware-Startziels für den **nächsten Start**
 - übersichtliche Tray-/Popup-Oberfläche im Lenovo-Schwarz/Rot-Stil
 - benutzerfreundliche Namen für bekannte Firmwareziele
-- Anzeige des aktuell gesetzten einmaligen Bootziels
 - persistentes Standard-Startziel über den abgesicherten TaskBroker
 - direkter Windows-Neustart aus der Anwendung
 - Autostart ohne sichtbares PowerShell-/CMD-Fenster
@@ -35,6 +29,15 @@ Reine Dokumentations- oder Repository-Pflege ohne Änderung der produktiven Sour
 - read-only Erkennung von Firmware-Zieldrift
 - read-only Storage-Kontext für interne NVMe- und USB-Medien
 - Diagnose-Export und Wartungsfunktionen
+- manueller Self-Updater mit **„Auf neue Version prüfen…“** und **„App aktualisieren…“**
+
+## Update-Funktion
+
+Der Updater arbeitet ausschließlich auf ausdrückliche Nutzeraktion. Es gibt **kein periodisches Polling und keinen automatischen Update-Check beim Start**.
+
+Die Prüfung liest `downloads/latest.json` aus dem fest eingebauten GitHub-Repository. Eine neue Version wird nur akzeptiert, wenn Manifest, semantische Version, Dateiname, Tag, Größe, SHA-256 und Paketdateiliste valide sind. Das heruntergeladene ZIP wird vor dem Entpacken nochmals gegen Größe und SHA-256 geprüft. Die Installation läuft uneleviert mit lokalem Backup und Rollback; anschließend startet die App über den vorhandenen VBS-Launcher neu.
+
+Der Updater verändert keine Firmware-, BCD- oder Scheduled-Task-Konfiguration. Änderungen an privilegierten Systemfunktionen bleiben weiterhin ausschließlich dem bestehenden expliziten Setup-/Repair-/Reinitialize-Pfad vorbehalten.
 
 ## Aktuelle Storage-Darstellung
 
@@ -45,22 +48,15 @@ Bei genau einer erkannten internen NVMe zeigt die aktuelle Version das physische
 - **NVMe-SSD 1** — `Interne SSD: KXG8AZNV2T04 LA KIOXIA`
 - **NVMe-SSD 2** — `Kein Laufwerk erkannt`
 
-Sind mehrere interne NVMe-Laufwerke vorhanden, rät die Anwendung keine unbelegte Zuordnung zwischen Windows-Disk und Firmware-Slot. Dafür ist zunächst eine belastbare Slotkorrelation erforderlich.
+Sind mehrere interne NVMe-Laufwerke vorhanden, rät die Anwendung keine unbelegte Zuordnung zwischen Windows-Disk und Firmware-Slot.
 
 ### USB-Startmedien
 
-Das Firmwareziel bleibt bewusst das generische **USB HDD**. Der physische Datenträger wird nur als read-only Storage-Befund angezeigt.
+Das Firmwareziel bleibt bewusst das generische **USB HDD**. Der physische Datenträger wird nur als read-only Storage-Befund angezeigt. Bei genau einem erkannten USB-Bootkandidaten erscheint beispielsweise `USB-Startmedium: SanDisk Extreme Pro USB4`.
 
-Bei genau einem erkannten USB-Bootkandidaten erscheint beispielsweise:
-
-- **Windows: Gaming**
-- `USB-Startmedium: SanDisk Extreme Pro USB4`
-
-Wichtig: Diese Anzeige bedeutet, dass das Medium eine erkannte Bootstruktur besitzt. Sie behauptet **keine direkte 1:1-Adressierbarkeit** dieses physischen USB-Geräts durch den generischen Firmwareeintrag `USB HDD`.
+Diese Anzeige behauptet **keine direkte 1:1-Adressierbarkeit** des physischen USB-Geräts durch den generischen Firmwareeintrag `USB HDD`.
 
 ## Sicherheitsmodell
-
-Der Lenovo Boot Selector trennt die normale Tray-Anwendung strikt von privilegierten Firmwareaktionen:
 
 - Die Tray-App läuft als normaler Benutzer.
 - Privilegierte Änderungen laufen nur über fest eingerichtete SYSTEM-Scheduled-Tasks.
@@ -68,7 +64,7 @@ Der Lenovo Boot Selector trennt die normale Tray-Anwendung strikt von privilegie
 - Es gibt keine eigene EXE, die als SYSTEM ausgeführt wird.
 - Bootänderungen verwenden ausschließlich einen **one-shot Next-Boot-Pfad**.
 - Die Anwendung ändert weder dauerhaft `{fwbootmgr} displayorder` noch die UEFI-`BootOrder`.
-- Erkannte Abweichungen führen nicht automatisch zu Reparatur- oder Firmwareaktionen.
+- Der Self-Updater ist vollständig uneleviert und besitzt keinen separaten privilegierten Updatekanal.
 
 ## Voraussetzungen
 
@@ -77,18 +73,13 @@ Der Lenovo Boot Selector trennt die normale Tray-Anwendung strikt von privilegie
 - Lenovo-System mit über Windows sichtbaren Firmware-Bootzielen
 - Administratorrechte nur für die einmalige Einrichtung bzw. Wartung der privilegierten Scheduled-Tasks
 
-Die normale Nutzung der Tray-App erfolgt anschließend ohne dauerhafte Administratorrechte.
-
 ## Schnellstart
 
-1. Repository herunterladen oder klonen.
-2. Die Dateien gemeinsam in einem Verzeichnis belassen.
-3. `Start-LenovoBootMenuTray.cmd` starten.
-4. Beim ersten Start die angebotene Einrichtung der Systemfunktionen über **Wartung** ausführen und die einmalige UAC-Abfrage bestätigen.
-5. Danach das gewünschte Startziel im Popup auswählen.
-6. Optional direkt über **Windows neu starten** neu booten.
-
-Der Launcher verwendet den enthaltenen VBS-Pfad, damit beim Start kein dauerhaft sichtbares PowerShell- oder CMD-Fenster stehen bleibt.
+1. Release-ZIP aus `downloads/` laden und vollständig in einen **beschreibbaren Benutzerordner** entpacken.
+2. `Start-LenovoBootMenuTray.cmd` starten.
+3. Beim ersten Start die angebotene Einrichtung der Systemfunktionen über **Wartung** ausführen und die UAC-Abfrage bestätigen.
+4. Danach das gewünschte Startziel im Popup auswählen.
+5. Updates bei Bedarf manuell über **Wartung → Auf neue Version prüfen…** prüfen.
 
 ## Projektstruktur
 
@@ -97,46 +88,18 @@ Der Launcher verwendet den enthaltenen VBS-Pfad, damit beim Start kein dauerhaft
 | `LenovoBootMenuTray.ps1` | deterministisch erzeugte Single-File-Runtime |
 | `src/Core/` | zustandsfreie Fachlogik / Functional Core |
 | `src/Application/` | Anwendungs- und Workflowlogik |
-| `src/Infrastructure/` | Windows-, Storage-, TaskBroker- und IO-Adapter |
+| `src/Infrastructure/` | Windows-, Storage-, Update-, TaskBroker- und IO-Adapter |
 | `src/UI/` | WinForms-Präsentation |
 | `tests/` | PowerShell- und Python-Regressions-/Boundary-Tests |
 | `tools/` | Build-, Packaging-, Audit- und Transition-Skripte |
-| `Install-LenovoBootMenuTasks.ps1` | Einrichtung der privilegierten Systemfunktionen |
-| `Uninstall-LenovoBootMenuTasks.ps1` | gezielte Entfernung der projektspezifischen Systemfunktionen |
-
-Die editierbare Source ist modular aufgebaut. Für das Release wird daraus weiterhin eine deterministische Single-File-Runtime erzeugt.
+| `downloads/` | historische versionierte Release-ZIPs und Update-Manifeste |
 
 ## Entwicklung und Tests
 
-Das Repository enthält unter anderem Tests für:
-
-- Functional Core
-- Refresh-Lifecycle
-- Single-Instance-Mutex
-- Maintenance-Lifecycle
-- Firmware-/Bootziel-Drift
-- Architektur-Soak
-- Windows-PowerShell-5.1-Kompatibilität
-- versionsspezifische Regression-, Core- und Boundary-Verträge
-
-Der zentrale native Test-Wrapper ist:
+Der zentrale native Windows-PowerShell-5.1-Testwrapper ist:
 
 ```powershell
 .\tests\Test-WindowsPowerShell51.ps1
 ```
 
-Build- und Packaging-Helfer liegen unter `tools/`.
-
-## Bekannte technische Grenze bei USB
-
-Auf dem untersuchten Lenovo-System zeigt das F12-Bootmenü physische USB-Laufwerke getrennt an. BCD, Standard-UEFI und die dokumentierten Lenovo-WMI-Schnittstellen exponieren softwareseitig jedoch nur das generische Ziel `USB HDD`.
-
-Der Lenovo Boot Selector implementiert deshalb **keine unsichere oder undokumentierte direkte USB-Geräteadressierung** und verwendet keine permanente BootOrder-Manipulation als Ersatz.
-
-## Versionshistorie
-
-Die ausführlichen historischen Versionsnotizen befinden sich in [CHANGELOG.md](CHANGELOG.md).
-
-## Hinweis zum Projektstatus
-
-v0.5.4 ist die aktuelle kanonische Entwicklungsbasis. Die Source-, Regression- und Packaging-Prüfungen sind abgeschlossen; die native Windows-Abnahme des aktuellen v0.5.4-Scopes bleibt separat durchzuführen.
+Build- und Packaging-Helfer liegen unter `tools/`. Die ausführliche Versionshistorie befindet sich in [CHANGELOG.md](CHANGELOG.md).

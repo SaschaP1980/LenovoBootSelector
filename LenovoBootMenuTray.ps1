@@ -6,6 +6,10 @@ param(
     [string]$BackgroundResultPath,
     [switch]$BackgroundRefreshStorage,
     [switch]$BackgroundRefreshFirmware,
+    [switch]$UpdateCheck,
+    [switch]$UpdatePrepare,
+    [string]$UpdateResultPath,
+    [string]$UpdateManifestPath,
     [string]$RuntimeSessionId
 )
 
@@ -874,7 +878,7 @@ $mutex = $null
 $mutexOwned = $false
 $singleInstanceMutexState = 'not-applicable'
 $singleInstanceGraceMs = 500
-if (-not $BackgroundRefresh) {
+if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     $singleInstanceMutexState = 'busy'
     $mutex = [System.Threading.Mutex]::new($false, 'Local\LenovoBootMenuTray')
     try {
@@ -916,7 +920,7 @@ if (-not $BackgroundRefresh) {
     }
 }
 
-$script:AppVersion = '0.5.4'
+$script:AppVersion = '0.5.5'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -968,6 +972,9 @@ $script:TaskBrokerReadyCachedUtc = [datetime]::MinValue
 $script:BackgroundRefreshState = $null
 $script:MaintenanceState = $null
 $script:BootTargetDriftState = $null
+$script:UpdateState = $null
+$script:UpdateCheckMenuItem = $null
+$script:UpdateInstallMenuItem = $null
 $script:RefreshButton = $null
 $script:RefreshButtonHovered = $false
 $script:HeaderTitleLabel = $null
@@ -1132,9 +1139,155 @@ function Set-BootTargetDriftNotificationShown {
     return $State
 }
 
+function ConvertTo-LenovoVersionCore {
+    param([Parameter(Mandatory=$true)][string]$Version)
+    $value = ([string]$Version).Trim()
+    if ($value -notmatch '^\d+\.\d+\.\d+$') { return $null }
+    try { return [version]$value } catch { return $null }
+}
+
+function Compare-LenovoAppVersionCore {
+    param(
+        [Parameter(Mandatory=$true)][string]$Current,
+        [Parameter(Mandatory=$true)][string]$Candidate
+    )
+    $currentVersion = ConvertTo-LenovoVersionCore -Version $Current
+    $candidateVersion = ConvertTo-LenovoVersionCore -Version $Candidate
+    if (-not $currentVersion -or -not $candidateVersion) { throw 'Ungültiges Versionsformat.' }
+    return $candidateVersion.CompareTo($currentVersion)
+}
+
+function Test-LenovoUpdateManifestCore {
+    param([AllowNull()]$Manifest)
+
+    $result = [ordered]@{
+        IsValid = $false
+        Error = ''
+        Version = ''
+        File = ''
+        Sha256 = ''
+        Size = 0
+        Tag = ''
+        PackageFiles = @()
+    }
+
+    if (-not $Manifest) { $result.Error = 'Update-Manifest fehlt.'; return [pscustomobject]$result }
+    if ([int]$Manifest.schemaVersion -ne 1) { $result.Error = 'Update-Manifest-Schema wird nicht unterstützt.'; return [pscustomobject]$result }
+
+    $version = ([string]$Manifest.version).Trim()
+    if (-not (ConvertTo-LenovoVersionCore -Version $version)) { $result.Error = 'Update-Version ist ungültig.'; return [pscustomobject]$result }
+
+    $expectedFile = ('LenovoBootMenuTray-v{0}.zip' -f $version)
+    $file = ([string]$Manifest.file).Trim()
+    if ($file -ne $expectedFile) { $result.Error = 'Update-Dateiname passt nicht zur Version.'; return [pscustomobject]$result }
+
+    $sha = ([string]$Manifest.sha256).Trim().ToLowerInvariant()
+    if ($sha -notmatch '^[0-9a-fA-F]{64}$') { $result.Error = 'Update-SHA-256 ist ungültig.'; return [pscustomobject]$result }
+
+    $size = 0L
+    try { $size = [int64]$Manifest.size } catch { $size = 0L }
+    if ($size -le 0) { $result.Error = 'Update-Dateigröße ist ungültig.'; return [pscustomobject]$result }
+
+    $tag = ([string]$Manifest.tag).Trim()
+    if ($tag -ne ('v{0}' -f $version)) { $result.Error = 'Update-Tag passt nicht zur Version.'; return [pscustomobject]$result }
+
+    $packageFiles = @($Manifest.packageFiles)
+    if ($packageFiles.Count -lt 1) { $result.Error = 'Update-Paketdateien fehlen.'; return [pscustomobject]$result }
+    $seen = @{}
+    $normalizedFiles = @()
+    foreach ($item in $packageFiles) {
+        $name = ([string]$item).Trim()
+        if (-not $name -or $name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
+            $result.Error = 'Update-Paket enthält einen ungültigen Dateinamen.'; return [pscustomobject]$result
+        }
+        $key = $name.ToLowerInvariant()
+        if ($seen.ContainsKey($key)) { $result.Error = 'Update-Paket enthält doppelte Dateinamen.'; return [pscustomobject]$result }
+        $seen[$key] = $true
+        $normalizedFiles += $name
+    }
+    foreach ($required in @('LenovoBootMenuTray.ps1','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Install-LenovoBootMenuTasks.ps1','Uninstall-LenovoBootMenuTasks.ps1')) {
+        if (-not $seen.ContainsKey($required.ToLowerInvariant())) {
+            $result.Error = 'Update-Paket ist unvollständig.'; return [pscustomobject]$result
+        }
+    }
+
+    $result.IsValid = $true
+    $result.Version = $version
+    $result.File = $file
+    $result.Sha256 = $sha
+    $result.Size = $size
+    $result.Tag = $tag
+    $result.PackageFiles = @($normalizedFiles)
+    return [pscustomobject]$result
+}
+
+function New-UpdateRuntimeState {
+    [pscustomobject]@{
+        Status = 'Idle'
+        AvailableManifest = $null
+        LastError = ''
+        CheckProcess = $null
+        CheckTimer = $null
+        CheckResultPath = $null
+        PrepareProcess = $null
+        PrepareTimer = $null
+        PrepareResultPath = $null
+        ManifestPath = $null
+    }
+}
+
+function Set-UpdateRuntimeChecking {
+    param([Parameter(Mandatory=$true)]$State)
+    $State.Status = 'Checking'
+    $State.AvailableManifest = $null
+    $State.LastError = ''
+    return $State
+}
+
+function Set-UpdateRuntimeIdle {
+    param([Parameter(Mandatory=$true)]$State)
+    $State.Status = 'Idle'
+    return $State
+}
+
+function Set-UpdateRuntimeAvailable {
+    param([Parameter(Mandatory=$true)]$State,[Parameter(Mandatory=$true)]$Manifest)
+    $State.Status = 'UpdateAvailable'
+    $State.AvailableManifest = $Manifest
+    $State.LastError = ''
+    return $State
+}
+
+function Set-UpdateRuntimePreparing {
+    param([Parameter(Mandatory=$true)]$State)
+    $State.Status = 'Preparing'
+    $State.LastError = ''
+    return $State
+}
+
+function Set-UpdateRuntimeReadyToInstall {
+    param([Parameter(Mandatory=$true)]$State)
+    $State.Status = 'ReadyToInstall'
+    return $State
+}
+
+function Set-UpdateRuntimeFailed {
+    param([Parameter(Mandatory=$true)]$State,[Parameter(Mandatory=$true)][string]$Message)
+    $State.Status = 'Failed'
+    $State.LastError = $Message
+    return $State
+}
+
+function Test-UpdateRuntimeBusy {
+    param([AllowNull()]$State)
+    if (-not $State) { return $false }
+    return @('Checking','Preparing','ReadyToInstall') -contains [string]$State.Status
+}
+
 
 $script:MaintenanceState = New-MaintenanceRuntimeState
 $script:BootTargetDriftState = New-BootTargetDriftRuntimeState
+$script:UpdateState = New-UpdateRuntimeState
 
 function Initialize-LenovoMenuAppearance {
     param(
@@ -1322,6 +1475,13 @@ function Update-RefreshButtonVisual {
 }
 
 
+function Get-RuntimeDiagnosticRole {
+    if ($BackgroundRefresh) { return 'background-refresh' }
+    if ($UpdateCheck) { return 'update-check' }
+    if ($UpdatePrepare) { return 'update-prepare' }
+    return 'tray'
+}
+
 function ConvertTo-RuntimeDiagnosticText {
     param([AllowNull()][string]$Text)
     if ($null -eq $Text) { return $null }
@@ -1380,8 +1540,8 @@ function Initialize-RuntimeDiagnostics {
             }
         } catch { }
 
-        Write-RuntimeDiagnosticEvent -Event $(if ($BackgroundRefresh) { 'BACKGROUND_WORKER_STARTED' } else { 'SESSION_STARTED' }) -Stage 'startup' -Success $true -Data (New-RuntimeDiagnosticData @{
-            role = $(if ($BackgroundRefresh) { 'background-refresh' } else { 'tray' })
+        Write-RuntimeDiagnosticEvent -Event $(if ($BackgroundRefresh) { 'BACKGROUND_WORKER_STARTED' } elseif ($UpdateCheck) { 'UPDATE_CHECK_WORKER_STARTED' } elseif ($UpdatePrepare) { 'UPDATE_PREPARE_WORKER_STARTED' } else { 'SESSION_STARTED' }) -Stage 'startup' -Success $true -Data (New-RuntimeDiagnosticData @{
+            role = (Get-RuntimeDiagnosticRole)
             parentSession = [bool]([string]$RuntimeSessionId)
         })
     }
@@ -1408,7 +1568,7 @@ function Write-RuntimeDiagnosticEvent {
             sessionId = $script:RuntimeSessionId
             appVersion = $script:AppVersion
             processId = $PID
-            role = $(if ($BackgroundRefresh) { 'background-refresh' } else { 'tray' })
+            role = (Get-RuntimeDiagnosticRole)
             event = $Event
             stage = $Stage
             level = $Level
@@ -1513,8 +1673,8 @@ function Export-RuntimeDiagnosticPackage {
             process64Bit = [Environment]::Is64BitProcess
             powershellVersion = $PSVersionTable.PSVersion.ToString()
             clrVersion = [Environment]::Version.ToString()
-            role = $(if ($BackgroundRefresh) { 'background-refresh' } else { 'tray' })
-            lastBackgroundRefreshTiming = $script:BackgroundRefreshState.LastTiming
+            role = (Get-RuntimeDiagnosticRole)
+            lastBackgroundRefreshTiming = $(if ($script:BackgroundRefreshState) { $script:BackgroundRefreshState.LastTiming } else { $null })
         }
         [System.IO.File]::WriteAllText((Join-Path $stage 'environment.json'), ($environment | ConvertTo-Json -Depth 10), (New-Object System.Text.UTF8Encoding($false)))
 
@@ -1578,6 +1738,277 @@ function Show-DiagnosticPackageInExplorer {
     }
 }
 
+function Get-LenovoUpdateManifestUri {
+    return 'https://raw.githubusercontent.com/SaschaP1980/LenovoBootSelector/main/downloads/latest.json'
+}
+
+function Get-LenovoUpdateDownloadBaseUri {
+    return 'https://raw.githubusercontent.com/SaschaP1980/LenovoBootSelector/main/downloads/'
+}
+
+function Enable-LenovoUpdateTls12 {
+    try {
+        $current = [System.Net.ServicePointManager]::SecurityProtocol
+        [System.Net.ServicePointManager]::SecurityProtocol = $current -bor [System.Net.SecurityProtocolType]::Tls12
+    } catch { }
+}
+
+function New-LenovoWebClient {
+    Enable-LenovoUpdateTls12
+    $client = New-Object System.Net.WebClient
+    $client.Headers['User-Agent'] = 'LenovoBootSelector/' + $script:AppVersion
+    $client.Headers['Cache-Control'] = 'no-cache'
+    return $client
+}
+
+function Get-LenovoUpdateManifestRemote {
+    $client = New-LenovoWebClient
+    try {
+        $json = $client.DownloadString((Get-LenovoUpdateManifestUri))
+        if ([string]::IsNullOrWhiteSpace($json)) { throw 'Update-Manifest ist leer.' }
+        return ($json | ConvertFrom-Json)
+    }
+    finally { $client.Dispose() }
+}
+
+function Get-LenovoSha256Hex {
+    param([Parameter(Mandatory=$true)][string]$Path)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $stream = [System.IO.File]::OpenRead($Path)
+        try { $hash = $sha.ComputeHash($stream) }
+        finally { $stream.Dispose() }
+        return (($hash | ForEach-Object { $_.ToString('x2') }) -join '')
+    }
+    finally { $sha.Dispose() }
+}
+
+function Write-LenovoUpdateWorkerResult {
+    param([Parameter(Mandatory=$true)][string]$Path,[Parameter(Mandatory=$true)]$Value)
+    $parent = Split-Path -Parent $Path
+    if ($parent -and -not (Test-Path -LiteralPath $parent)) { [void](New-Item -ItemType Directory -Path $parent -Force) }
+    $json = $Value | ConvertTo-Json -Depth 10
+    [System.IO.File]::WriteAllText($Path,$json,(New-Object System.Text.UTF8Encoding($false)))
+}
+
+function Invoke-UpdateCheckWorker {
+    $result = [ordered]@{ Success=$false; UpdateAvailable=$false; Manifest=$null; Error='' }
+    try {
+        $raw = Get-LenovoUpdateManifestRemote
+        $validated = Test-LenovoUpdateManifestCore -Manifest $raw
+        if (-not $validated.IsValid) { throw $validated.Error }
+        $comparison = Compare-LenovoAppVersionCore -Current $script:AppVersion -Candidate $validated.Version
+        $result.Success = $true
+        $result.UpdateAvailable = ($comparison -gt 0)
+        $result.Manifest = $validated
+    }
+    catch { $result.Error = $_.Exception.Message }
+    if ($UpdateResultPath) { Write-LenovoUpdateWorkerResult -Path $UpdateResultPath -Value ([pscustomobject]$result) }
+    return $(if ($result.Success) { 0 } else { 1 })
+}
+
+function Start-UpdateCheckWorkerProcess {
+    param([Parameter(Mandatory=$true)][string]$ResultPath,[string]$RuntimeSessionId)
+    $powershell = Join-Path $PSHOME 'powershell.exe'
+    if (-not (Test-Path -LiteralPath $powershell)) { $powershell = 'powershell.exe' }
+    $args = @('-NoProfile','-ExecutionPolicy','Bypass','-File',('"{0}"' -f $script:ScriptPath),'-UpdateCheck','-UpdateResultPath',('"{0}"' -f $ResultPath))
+    if ($RuntimeSessionId) { $args += @('-RuntimeSessionId',('"{0}"' -f $RuntimeSessionId)) }
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $powershell
+    $psi.Arguments = ($args -join ' ')
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+    return [System.Diagnostics.Process]::Start($psi)
+}
+
+function Test-LenovoUpdatePackageZip {
+    param([Parameter(Mandatory=$true)][string]$ZipPath,[Parameter(Mandatory=$true)]$Manifest)
+    Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($ZipPath)
+    try {
+        $names = @()
+        foreach ($entry in @($archive.Entries)) {
+            $name = [string]$entry.FullName
+            if ([string]::IsNullOrWhiteSpace($name)) { throw 'Update-ZIP enthält einen leeren Pfad.' }
+            if ($name.Contains('..') -or $name.Contains('/') -or $name.Contains('\')) { throw 'Update-ZIP enthält einen unzulässigen Pfad.' }
+            if ($entry.Length -lt 0) { throw 'Update-ZIP enthält einen ungültigen Eintrag.' }
+            $names += $name
+        }
+        $expected = @($Manifest.PackageFiles | Sort-Object)
+        $actual = @($names | Sort-Object)
+        if ($expected.Count -ne $actual.Count) { throw 'Update-ZIP enthält nicht die erwartete Anzahl Dateien.' }
+        for ($i=0;$i -lt $expected.Count;$i++) {
+            if ([string]$expected[$i] -ne [string]$actual[$i]) { throw 'Update-ZIP-Dateiliste stimmt nicht mit dem Manifest überein.' }
+        }
+    }
+    finally { $archive.Dispose() }
+}
+
+function Prepare-LenovoUpdatePackage {
+    param([Parameter(Mandatory=$true)]$Manifest)
+    $updateRoot = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray\Updates'
+    if (-not (Test-Path -LiteralPath $updateRoot)) { [void](New-Item -ItemType Directory -Path $updateRoot -Force) }
+    $work = Join-Path $updateRoot (('{0}-{1}' -f $Manifest.Version,([guid]::NewGuid().ToString('N'))))
+    $payload = Join-Path $work 'payload'
+    [void](New-Item -ItemType Directory -Path $payload -Force)
+    $zipPath = Join-Path $work ([string]$Manifest.File)
+    $manifestPath = Join-Path $work 'manifest.json'
+    [System.IO.File]::WriteAllText($manifestPath,($Manifest | ConvertTo-Json -Depth 10),(New-Object System.Text.UTF8Encoding($false)))
+
+    $client = New-LenovoWebClient
+    try {
+        $uri = (Get-LenovoUpdateDownloadBaseUri) + [Uri]::EscapeDataString([string]$Manifest.File)
+        $client.DownloadFile($uri,$zipPath)
+    }
+    finally { $client.Dispose() }
+
+    $length = (Get-Item -LiteralPath $zipPath).Length
+    if ([int64]$length -ne [int64]$Manifest.Size) { throw 'Update-Dateigröße stimmt nicht mit dem Manifest überein.' }
+    $actualSha = Get-LenovoSha256Hex -Path $zipPath
+    if ($actualSha -ne ([string]$Manifest.Sha256).ToLowerInvariant()) { throw 'Update-SHA-256 stimmt nicht mit dem Manifest überein.' }
+
+    Test-LenovoUpdatePackageZip -ZipPath $zipPath -Manifest $Manifest
+    Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($zipPath,$payload)
+
+    $runtimePath = Join-Path $payload 'LenovoBootMenuTray.ps1'
+    if (-not (Test-Path -LiteralPath $runtimePath -PathType Leaf)) { throw 'Update-Runtime fehlt im Paket.' }
+    $runtimeText = [System.IO.File]::ReadAllText($runtimePath,[System.Text.Encoding]::UTF8)
+    $versionNeedle = ('$script:AppVersion = ''{0}''' -f [string]$Manifest.Version)
+    if (-not $runtimeText.Contains($versionNeedle)) { throw 'Update-Runtime-Version stimmt nicht mit dem Manifest überein.' }
+
+    return [pscustomobject]@{ WorkDir=$work; PayloadDir=$payload; ManifestPath=$manifestPath; Version=[string]$Manifest.Version }
+}
+
+function Invoke-UpdatePrepareWorker {
+    $result = [ordered]@{ Success=$false; WorkDir=''; PayloadDir=''; ManifestPath=''; Version=''; Error='' }
+    try {
+        if (-not $UpdateManifestPath -or -not (Test-Path -LiteralPath $UpdateManifestPath -PathType Leaf)) { throw 'Update-Manifestdatei fehlt.' }
+        $raw = [System.IO.File]::ReadAllText($UpdateManifestPath,[System.Text.Encoding]::UTF8) | ConvertFrom-Json
+        $validated = Test-LenovoUpdateManifestCore -Manifest $raw
+        if (-not $validated.IsValid) { throw $validated.Error }
+        if ((Compare-LenovoAppVersionCore -Current $script:AppVersion -Candidate $validated.Version) -le 0) { throw 'Es liegt keine neuere Version vor.' }
+        $prepared = Prepare-LenovoUpdatePackage -Manifest $validated
+        $result.Success = $true
+        $result.WorkDir = $prepared.WorkDir
+        $result.PayloadDir = $prepared.PayloadDir
+        $result.ManifestPath = $prepared.ManifestPath
+        $result.Version = $prepared.Version
+    }
+    catch { $result.Error = $_.Exception.Message }
+    if ($UpdateResultPath) { Write-LenovoUpdateWorkerResult -Path $UpdateResultPath -Value ([pscustomobject]$result) }
+    return $(if ($result.Success) { 0 } else { 1 })
+}
+
+function Start-UpdatePrepareWorkerProcess {
+    param(
+        [Parameter(Mandatory=$true)][string]$ManifestPath,
+        [Parameter(Mandatory=$true)][string]$ResultPath,
+        [string]$RuntimeSessionId
+    )
+    $powershell = Join-Path $PSHOME 'powershell.exe'
+    if (-not (Test-Path -LiteralPath $powershell)) { $powershell = 'powershell.exe' }
+    $args = @('-NoProfile','-ExecutionPolicy','Bypass','-File',('"{0}"' -f $script:ScriptPath),'-UpdatePrepare','-UpdateManifestPath',('"{0}"' -f $ManifestPath),'-UpdateResultPath',('"{0}"' -f $ResultPath))
+    if ($RuntimeSessionId) { $args += @('-RuntimeSessionId',('"{0}"' -f $RuntimeSessionId)) }
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $powershell
+    $psi.Arguments = ($args -join ' ')
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+    return [System.Diagnostics.Process]::Start($psi)
+}
+
+function Test-UpdateInstallDirectoryWritable {
+    $probe = Join-Path $PSScriptRoot ('.lbs-update-write-{0}.tmp' -f ([guid]::NewGuid().ToString('N')))
+    try {
+        [System.IO.File]::WriteAllText($probe,'probe',(New-Object System.Text.UTF8Encoding($false)))
+        return $true
+    }
+    catch { return $false }
+    finally { try { if (Test-Path -LiteralPath $probe) { Remove-Item -LiteralPath $probe -Force } } catch { } }
+}
+
+function New-LenovoUpdateInstallerHelper {
+    param([Parameter(Mandatory=$true)][string]$WorkDir)
+    $helperPath = Join-Path ([System.IO.Path]::GetTempPath()) ('LenovoBootSelectorUpdate-{0}.ps1' -f ([guid]::NewGuid().ToString('N')))
+    $scriptText = @'
+param(
+    [Parameter(Mandatory=$true)][int]$ParentPid,
+    [Parameter(Mandatory=$true)][string]$InstallDir,
+    [Parameter(Mandatory=$true)][string]$WorkDir
+)
+$ErrorActionPreference = 'Stop'
+$backup = Join-Path $WorkDir 'backup'
+$payload = Join-Path $WorkDir 'payload'
+$manifestPath = Join-Path $WorkDir 'manifest.json'
+$resultPath = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray\Updates\last-update-result.json'
+function Write-Result([bool]$Success,[string]$Message) {
+    $obj=[ordered]@{ utc=[datetime]::UtcNow.ToString('o'); success=$Success; message=$Message }
+    [System.IO.File]::WriteAllText($resultPath,($obj|ConvertTo-Json -Compress),(New-Object System.Text.UTF8Encoding($false)))
+}
+function Show-UpdateError([string]$Message) {
+    try { Add-Type -AssemblyName System.Windows.Forms; [void][System.Windows.Forms.MessageBox]::Show($Message,'Lenovo Boot Selector – Update',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) } catch { }
+}
+try {
+    try { $parent=[System.Diagnostics.Process]::GetProcessById($ParentPid); [void]$parent.WaitForExit(30000) } catch { }
+    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw 'Manifest fehlt.' }
+    $manifest=[System.IO.File]::ReadAllText($manifestPath,[System.Text.Encoding]::UTF8)|ConvertFrom-Json
+    $files=@($manifest.packageFiles)
+    if ($files.Count -lt 1) { throw 'Paketdateien fehlen.' }
+    if (Test-Path -LiteralPath $backup) { Remove-Item -LiteralPath $backup -Recurse -Force }
+    [void](New-Item -ItemType Directory -Path $backup -Force)
+    $existing=@{}
+    foreach($name in $files) {
+        $source=Join-Path $payload ([string]$name); $target=Join-Path $InstallDir ([string]$name)
+        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "Paketdatei fehlt: $name" }
+        if (Test-Path -LiteralPath $target -PathType Leaf) { $existing[[string]$name]=$true; Copy-Item -LiteralPath $target -Destination (Join-Path $backup ([string]$name)) -Force }
+        else { $existing[[string]$name]=$false }
+    }
+    try {
+        foreach($name in $files) { Copy-Item -LiteralPath (Join-Path $payload ([string]$name)) -Destination (Join-Path $InstallDir ([string]$name)) -Force }
+        $launcher=Join-Path $InstallDir 'Start-LenovoBootMenuTray.vbs'
+        $wscript=Join-Path $env:SystemRoot 'System32\wscript.exe'
+        $psi=New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName=$wscript; $psi.Arguments=('"{0}"' -f $launcher); $psi.UseShellExecute = $false; $psi.CreateNoWindow=$true
+        [void][System.Diagnostics.Process]::Start($psi)
+    }
+    catch {
+        # ROLLBACK: restore every previous managed file and remove newly introduced files.
+        foreach($name in $files) {
+            $target=Join-Path $InstallDir ([string]$name); $saved=Join-Path $backup ([string]$name)
+            if ($existing[[string]$name] -and (Test-Path -LiteralPath $saved -PathType Leaf)) { Copy-Item -LiteralPath $saved -Destination $target -Force }
+            elseif (-not $existing[[string]$name] -and (Test-Path -LiteralPath $target -PathType Leaf)) { Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue }
+        }
+        throw
+    }
+    Write-Result $true ('Update auf v' + [string]$manifest.version + ' installiert.')
+    try { Remove-Item -LiteralPath $WorkDir -Recurse -Force -ErrorAction SilentlyContinue } catch { }
+}
+catch {
+    Write-Result $false $_.Exception.Message
+    Show-UpdateError ('Update fehlgeschlagen: ' + $_.Exception.Message)
+}
+'@
+    [System.IO.File]::WriteAllText($helperPath,$scriptText,(New-Object System.Text.UTF8Encoding($true)))
+    return $helperPath
+}
+
+function Start-LenovoUpdateInstallerHelper {
+    param([Parameter(Mandatory=$true)][string]$WorkDir)
+    $helper = New-LenovoUpdateInstallerHelper -WorkDir $WorkDir
+    $powershell = Join-Path $PSHOME 'powershell.exe'
+    if (-not (Test-Path -LiteralPath $powershell)) { $powershell = 'powershell.exe' }
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $powershell
+    $psi.Arguments = ('-NoProfile -ExecutionPolicy Bypass -File "{0}" -ParentPid {1} -InstallDir "{2}" -WorkDir "{3}"' -f $helper,$PID,$PSScriptRoot,$WorkDir)
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+    return [System.Diagnostics.Process]::Start($psi)
+}
+
 
 function Save-RuntimeDiagnosticsFromUi {
     try {
@@ -1590,6 +2021,169 @@ function Save-RuntimeDiagnosticsFromUi {
         Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_EXPORT_FAILED' -Stage 'diagnostics' -Success $false -ErrorRecord $_ -Level error
         Show-LenovoNoticeDialog -Title 'Diagnose nicht gespeichert' -Heading 'Das Diagnosepaket konnte nicht erstellt werden.' -Message 'Bitte versuche es erneut.' -Kind Error
     }
+}
+
+function Update-UpdateMenuState {
+    # Manual update check only: there is intentionally no periodic or startup polling.
+    if (-not $script:UpdateState) { return }
+    $busy = Test-UpdateRuntimeBusy -State $script:UpdateState
+    if ($script:UpdateCheckMenuItem) { $script:UpdateCheckMenuItem.Enabled = -not $busy }
+    if ($script:UpdateInstallMenuItem) {
+        $script:UpdateInstallMenuItem.Text = 'App aktualisieren…'
+        $script:UpdateInstallMenuItem.Enabled = (-not $busy -and $null -ne $script:UpdateState.AvailableManifest)
+    }
+}
+
+function Stop-UpdateCheckUiWorker {
+    if ($script:UpdateState.CheckTimer) { try { $script:UpdateState.CheckTimer.Stop() } catch { }; try { $script:UpdateState.CheckTimer.Dispose() } catch { }; $script:UpdateState.CheckTimer=$null }
+    if ($script:UpdateState.CheckProcess) { try { $script:UpdateState.CheckProcess.Dispose() } catch { }; $script:UpdateState.CheckProcess=$null }
+}
+
+function Complete-ManualUpdateCheck {
+    Stop-UpdateCheckUiWorker
+    $path=[string]$script:UpdateState.CheckResultPath
+    try {
+        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Die Update-Prüfung hat kein Ergebnis geliefert.' }
+        $result=[System.IO.File]::ReadAllText($path,[System.Text.Encoding]::UTF8)|ConvertFrom-Json
+        if (-not $result.Success) { throw ([string]$result.Error) }
+        if ($result.UpdateAvailable) {
+            $validated=Test-LenovoUpdateManifestCore -Manifest $result.Manifest
+            if (-not $validated.IsValid) { throw $validated.Error }
+            [void](Set-UpdateRuntimeAvailable -State $script:UpdateState -Manifest $validated)
+            $script:LastStatusText = ('Neue Version verfügbar: v{0}' -f $validated.Version)
+            Show-LenovoNoticeDialog -Title 'Neue Version verfügbar' -Heading ('Lenovo Boot Selector v{0} ist verfügbar.' -f $validated.Version) -Message 'Du kannst die neue Version jetzt über „App aktualisieren…“ installieren.' -Kind Info
+            Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_COMPLETED' -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$true; availableVersion=$validated.Version })
+        }
+        else {
+            $script:UpdateState.AvailableManifest=$null
+            [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
+            $script:LastStatusText = ('Lenovo Boot Selector ist aktuell · v{0}' -f $script:AppVersion)
+            Show-LenovoNoticeDialog -Title 'Keine neue Version' -Heading ('Lenovo Boot Selector v{0} ist aktuell.' -f $script:AppVersion) -Message 'Es ist derzeit keine neuere Version verfügbar.' -Kind Info
+            Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_COMPLETED' -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$false })
+        }
+    }
+    catch {
+        [void](Set-UpdateRuntimeFailed -State $script:UpdateState -Message $_.Exception.Message)
+        $script:LastStatusText='Update-Prüfung fehlgeschlagen.'
+        Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_COMPLETED' -Stage 'update-check' -Success $false -ErrorRecord $_ -Level warning
+        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die Prüfung auf eine neue Version ist fehlgeschlagen.' -Message $_.Exception.Message -Kind Error
+    }
+    finally {
+        try { if ($path -and (Test-Path -LiteralPath $path)) { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue } } catch { }
+        $script:UpdateState.CheckResultPath=$null
+        if ($script:UpdateState.Status -eq 'Failed') { [void](Set-UpdateRuntimeIdle -State $script:UpdateState) }
+        Update-UpdateMenuState
+        if ($script:Popup -and -not $script:Popup.IsDisposed) { Update-PopupRows }
+    }
+}
+
+function Start-ManualUpdateCheck {
+    if (Test-MaintenanceBusy -or (Test-UpdateRuntimeBusy -State $script:UpdateState)) { return }
+    [void](Set-UpdateRuntimeChecking -State $script:UpdateState)
+    $resultPath=Join-Path ([System.IO.Path]::GetTempPath()) ('LenovoBootSelector-UpdateCheck-{0}.json' -f ([guid]::NewGuid().ToString('N')))
+    $script:UpdateState.CheckResultPath=$resultPath
+    try {
+        $proc=Start-UpdateCheckWorkerProcess -ResultPath $resultPath -RuntimeSessionId $script:RuntimeSessionId
+        if (-not $proc) { throw 'Update-Prüfung konnte nicht gestartet werden.' }
+        $script:UpdateState.CheckProcess=$proc
+        $timer=New-Object System.Windows.Forms.Timer; $timer.Interval=200
+        $timer.Add_Tick({
+            try {
+                if (-not $script:UpdateState.CheckProcess) { return }
+                $script:UpdateState.CheckProcess.Refresh()
+                if ($script:UpdateState.CheckProcess.HasExited) { Complete-ManualUpdateCheck }
+            } catch { Complete-ManualUpdateCheck }
+        })
+        $script:UpdateState.CheckTimer=$timer; $timer.Start()
+        $script:LastStatusText='Auf neue Version wird geprüft…'
+        Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_STARTED' -Stage 'update-check' -Success $true
+    }
+    catch {
+        [void](Set-UpdateRuntimeFailed -State $script:UpdateState -Message $_.Exception.Message)
+        Stop-UpdateCheckUiWorker
+        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die Prüfung konnte nicht gestartet werden.' -Message $_.Exception.Message -Kind Error
+        [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
+    }
+    Update-UpdateMenuState
+}
+
+function Stop-UpdatePrepareUiWorker {
+    if ($script:UpdateState.PrepareTimer) { try { $script:UpdateState.PrepareTimer.Stop() } catch { }; try { $script:UpdateState.PrepareTimer.Dispose() } catch { }; $script:UpdateState.PrepareTimer=$null }
+    if ($script:UpdateState.PrepareProcess) { try { $script:UpdateState.PrepareProcess.Dispose() } catch { }; $script:UpdateState.PrepareProcess=$null }
+}
+
+function Exit-TrayForPreparedUpdate {
+    param([Parameter(Mandatory=$true)][string]$WorkDir)
+    $helper=Start-LenovoUpdateInstallerHelper -WorkDir $WorkDir
+    if (-not $helper) { throw 'Update-Installer konnte nicht gestartet werden.' }
+    Write-RuntimeDiagnosticEvent -Event 'UPDATE_INSTALL_HELPER_STARTED' -Stage 'update-install' -Success $true -Data (New-RuntimeDiagnosticData @{ processId=$helper.Id; version=$script:UpdateState.AvailableManifest.Version })
+    try { $helper.Dispose() } catch { }
+    $script:ExitRequested=$true
+    try { if ($script:TrayIcon) { $script:TrayIcon.Visible=$false } } catch { }
+    try { if ($script:Popup -and -not $script:Popup.IsDisposed) { $script:Popup.Hide() } } catch { }
+    [System.Windows.Forms.Application]::ExitThread()
+}
+
+function Complete-ManualAppUpdatePrepare {
+    Stop-UpdatePrepareUiWorker
+    $path=[string]$script:UpdateState.PrepareResultPath
+    try {
+        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Die Update-Vorbereitung hat kein Ergebnis geliefert.' }
+        $result=[System.IO.File]::ReadAllText($path,[System.Text.Encoding]::UTF8)|ConvertFrom-Json
+        if (-not $result.Success) { throw ([string]$result.Error) }
+        [void](Set-UpdateRuntimeReadyToInstall -State $script:UpdateState)
+        Write-RuntimeDiagnosticEvent -Event 'UPDATE_PACKAGE_PREPARED' -Stage 'update-prepare' -Success $true -Data (New-RuntimeDiagnosticData @{ version=$result.Version })
+        Exit-TrayForPreparedUpdate -WorkDir ([string]$result.WorkDir)
+    }
+    catch {
+        [void](Set-UpdateRuntimeFailed -State $script:UpdateState -Message $_.Exception.Message)
+        Write-RuntimeDiagnosticEvent -Event 'UPDATE_PACKAGE_PREPARED' -Stage 'update-prepare' -Success $false -ErrorRecord $_ -Level error
+        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die App konnte nicht aktualisiert werden.' -Message $_.Exception.Message -Kind Error
+        [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
+    }
+    finally {
+        try { if ($path -and (Test-Path -LiteralPath $path)) { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue } } catch { }
+        try { if ($script:UpdateState.ManifestPath -and (Test-Path -LiteralPath $script:UpdateState.ManifestPath)) { Remove-Item -LiteralPath $script:UpdateState.ManifestPath -Force -ErrorAction SilentlyContinue } } catch { }
+        $script:UpdateState.PrepareResultPath=$null; $script:UpdateState.ManifestPath=$null
+        Update-UpdateMenuState
+    }
+}
+
+function Start-ManualAppUpdate {
+    if (Test-MaintenanceBusy -or (Test-UpdateRuntimeBusy -State $script:UpdateState)) { return }
+    $manifest=$script:UpdateState.AvailableManifest
+    if (-not $manifest) { return }
+    if (-not (Test-UpdateInstallDirectoryWritable)) {
+        Show-LenovoNoticeDialog -Title 'Update nicht möglich' -Heading 'Der App-Ordner ist nicht beschreibbar.' -Message 'Verschiebe Lenovo Boot Selector in einen Ordner, den dein Benutzerkonto ändern darf, und versuche es erneut.' -Kind Error
+        return
+    }
+    [void](Set-UpdateRuntimePreparing -State $script:UpdateState)
+    $manifestPath=Join-Path ([System.IO.Path]::GetTempPath()) ('LenovoBootSelector-UpdateManifest-{0}.json' -f ([guid]::NewGuid().ToString('N')))
+    $resultPath=Join-Path ([System.IO.Path]::GetTempPath()) ('LenovoBootSelector-UpdatePrepare-{0}.json' -f ([guid]::NewGuid().ToString('N')))
+    [System.IO.File]::WriteAllText($manifestPath,($manifest|ConvertTo-Json -Depth 10),(New-Object System.Text.UTF8Encoding($false)))
+    $script:UpdateState.ManifestPath=$manifestPath; $script:UpdateState.PrepareResultPath=$resultPath
+    try {
+        $proc=Start-UpdatePrepareWorkerProcess -ManifestPath $manifestPath -ResultPath $resultPath -RuntimeSessionId $script:RuntimeSessionId
+        if (-not $proc) { throw 'Update-Vorbereitung konnte nicht gestartet werden.' }
+        $script:UpdateState.PrepareProcess=$proc
+        $timer=New-Object System.Windows.Forms.Timer; $timer.Interval=200
+        $timer.Add_Tick({
+            try {
+                if (-not $script:UpdateState.PrepareProcess) { return }
+                $script:UpdateState.PrepareProcess.Refresh()
+                if ($script:UpdateState.PrepareProcess.HasExited) { Complete-ManualAppUpdatePrepare }
+            } catch { Complete-ManualAppUpdatePrepare }
+        })
+        $script:UpdateState.PrepareTimer=$timer; $timer.Start()
+        $script:LastStatusText=('Update auf v{0} wird vorbereitet…' -f $manifest.Version)
+        Write-RuntimeDiagnosticEvent -Event 'UPDATE_PREPARE_STARTED' -Stage 'update-prepare' -Success $true -Data (New-RuntimeDiagnosticData @{ version=$manifest.Version })
+    }
+    catch {
+        Stop-UpdatePrepareUiWorker
+        [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
+        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die App konnte nicht aktualisiert werden.' -Message $_.Exception.Message -Kind Error
+    }
+    Update-UpdateMenuState
 }
 
 
@@ -5611,6 +6205,14 @@ if ($BackgroundRefresh) {
     $exitCode = Invoke-BackgroundRefreshWorker
     exit $exitCode
 }
+if ($UpdateCheck) {
+    $exitCode = Invoke-UpdateCheckWorker
+    exit $exitCode
+}
+if ($UpdatePrepare) {
+    $exitCode = Invoke-UpdatePrepareWorker
+    exit $exitCode
+}
 
 try {
     [System.Windows.Forms.Application]::EnableVisualStyles()
@@ -5688,6 +6290,21 @@ try {
     $diagnosticItem.Add_Click({ Save-RuntimeDiagnosticsFromUi })
     $script:RuntimeDiagnosticMenuItem = $diagnosticItem
     [void]$maintenanceRoot.DropDownItems.Add($diagnosticItem)
+
+    [void]$maintenanceRoot.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+    $updateCheckItem = New-Object System.Windows.Forms.ToolStripMenuItem('Auf neue Version prüfen…')
+    $updateCheckItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $updateCheckItem.Add_Click({ Start-ManualUpdateCheck })
+    $script:UpdateCheckMenuItem = $updateCheckItem
+    [void]$maintenanceRoot.DropDownItems.Add($updateCheckItem)
+
+    $updateInstallItem = New-Object System.Windows.Forms.ToolStripMenuItem('App aktualisieren…')
+    $updateInstallItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $updateInstallItem.Enabled = $false
+    $updateInstallItem.Add_Click({ Start-ManualAppUpdate })
+    $script:UpdateInstallMenuItem = $updateInstallItem
+    [void]$maintenanceRoot.DropDownItems.Add($updateInstallItem)
+    Update-UpdateMenuState
 
     [void]$context.Items.Add($maintenanceRoot)
 
@@ -5782,6 +6399,10 @@ finally {
     if ($script:TaskBrokerRemoveTimer) {
         try { $script:TaskBrokerRemoveTimer.Stop() } catch { }
         try { $script:TaskBrokerRemoveTimer.Dispose() } catch { }
+    }
+    if ($script:UpdateState) {
+        try { Stop-UpdateCheckUiWorker } catch { }
+        try { Stop-UpdatePrepareUiWorker } catch { }
     }
     $backgroundRefreshContext = $null
     if ($script:BackgroundRefreshState) {

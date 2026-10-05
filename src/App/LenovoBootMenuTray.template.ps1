@@ -6,6 +6,10 @@ param(
     [string]$BackgroundResultPath,
     [switch]$BackgroundRefreshStorage,
     [switch]$BackgroundRefreshFirmware,
+    [switch]$UpdateCheck,
+    [switch]$UpdatePrepare,
+    [string]$UpdateResultPath,
+    [string]$UpdateManifestPath,
     [string]$RuntimeSessionId
 )
 
@@ -701,7 +705,7 @@ $mutex = $null
 $mutexOwned = $false
 $singleInstanceMutexState = 'not-applicable'
 $singleInstanceGraceMs = 500
-if (-not $BackgroundRefresh) {
+if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     $singleInstanceMutexState = 'busy'
     $mutex = [System.Threading.Mutex]::new($false, 'Local\LenovoBootMenuTray')
     try {
@@ -743,7 +747,7 @@ if (-not $BackgroundRefresh) {
     }
 }
 
-$script:AppVersion = '0.5.4'
+$script:AppVersion = '0.5.5'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -795,6 +799,9 @@ $script:TaskBrokerReadyCachedUtc = [datetime]::MinValue
 $script:BackgroundRefreshState = $null
 $script:MaintenanceState = $null
 $script:BootTargetDriftState = $null
+$script:UpdateState = $null
+$script:UpdateCheckMenuItem = $null
+$script:UpdateInstallMenuItem = $null
 $script:RefreshButton = $null
 $script:RefreshButtonHovered = $false
 $script:HeaderTitleLabel = $null
@@ -850,17 +857,22 @@ $script:MenuRenderer = New-Object LenovoMenuRenderer
 
 # @include src/Application/MaintenanceRuntime.ps1
 # @include src/Application/BootTargetDrift.ps1
+# @include src/Core/UpdateModel.ps1
+# @include src/Application/UpdateRuntime.ps1
 
 $script:MaintenanceState = New-MaintenanceRuntimeState
 $script:BootTargetDriftState = New-BootTargetDriftRuntimeState
+$script:UpdateState = New-UpdateRuntimeState
 
 # @include src/UI/MenuAppearance.ps1
 
 # @include src/UI/RefreshPresentation.ps1
 
 # @include src/Infrastructure/RuntimeDiagnostics.ps1
+# @include src/Infrastructure/UpdateClient.ps1
 
 # @include src/UI/DiagnosticsPresentation.ps1
+# @include src/UI/UpdatePresentation.ps1
 
 # @include src/Infrastructure/Autostart.ps1
 
@@ -1801,6 +1813,14 @@ if ($BackgroundRefresh) {
     $exitCode = Invoke-BackgroundRefreshWorker
     exit $exitCode
 }
+if ($UpdateCheck) {
+    $exitCode = Invoke-UpdateCheckWorker
+    exit $exitCode
+}
+if ($UpdatePrepare) {
+    $exitCode = Invoke-UpdatePrepareWorker
+    exit $exitCode
+}
 
 try {
     [System.Windows.Forms.Application]::EnableVisualStyles()
@@ -1878,6 +1898,21 @@ try {
     $diagnosticItem.Add_Click({ Save-RuntimeDiagnosticsFromUi })
     $script:RuntimeDiagnosticMenuItem = $diagnosticItem
     [void]$maintenanceRoot.DropDownItems.Add($diagnosticItem)
+
+    [void]$maintenanceRoot.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+    $updateCheckItem = New-Object System.Windows.Forms.ToolStripMenuItem('Auf neue Version prüfen…')
+    $updateCheckItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $updateCheckItem.Add_Click({ Start-ManualUpdateCheck })
+    $script:UpdateCheckMenuItem = $updateCheckItem
+    [void]$maintenanceRoot.DropDownItems.Add($updateCheckItem)
+
+    $updateInstallItem = New-Object System.Windows.Forms.ToolStripMenuItem('App aktualisieren…')
+    $updateInstallItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $updateInstallItem.Enabled = $false
+    $updateInstallItem.Add_Click({ Start-ManualAppUpdate })
+    $script:UpdateInstallMenuItem = $updateInstallItem
+    [void]$maintenanceRoot.DropDownItems.Add($updateInstallItem)
+    Update-UpdateMenuState
 
     [void]$context.Items.Add($maintenanceRoot)
 
@@ -1972,6 +2007,10 @@ finally {
     if ($script:TaskBrokerRemoveTimer) {
         try { $script:TaskBrokerRemoveTimer.Stop() } catch { }
         try { $script:TaskBrokerRemoveTimer.Dispose() } catch { }
+    }
+    if ($script:UpdateState) {
+        try { Stop-UpdateCheckUiWorker } catch { }
+        try { Stop-UpdatePrepareUiWorker } catch { }
     }
     $backgroundRefreshContext = $null
     if ($script:BackgroundRefreshState) {
