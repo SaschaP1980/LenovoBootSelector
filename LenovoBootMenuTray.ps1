@@ -920,7 +920,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.5.8.1'
+$script:AppVersion = '0.5.9.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -2277,7 +2277,7 @@ function Complete-ManualUpdateCheck {
             if (-not $validated.IsValid) { throw $validated.Error }
             [void](Set-UpdateRuntimeAvailable -State $script:UpdateState -Manifest $validated)
             $script:LastStatusText = ('Neue Version verfügbar: v{0}' -f $validated.Version)
-            Show-LenovoNoticeDialog -Title 'Neue Version verfügbar' -Heading ('Lenovo Boot Selector v{0} ist verfügbar.' -f $validated.Version) -Message 'Du kannst die neue Version jetzt über „App aktualisieren…“ installieren.' -Kind Info
+            Show-LenovoNoticeDialog -Title 'Neue Version verfügbar' -Heading ('Lenovo Boot Selector v{0} ist verfügbar.' -f $validated.Version) -Message 'Du kannst die neue Version jetzt direkt installieren. Später findest du die Aktualisierung im Tray-Menü unter „Wartung“ → „App aktualisieren…“.' -Kind Info -SecondaryButtonText 'Jetzt aktualisieren' -SecondaryAction { Start-ManualAppUpdate }
             Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_COMPLETED' -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$true; availableVersion=$validated.Version })
         }
         else {

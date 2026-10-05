@@ -1,5 +1,19 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.5.9.0 – Update direkt aus dem Verfügbarkeitsdialog starten
+
+v0.5.9.0 verbessert ausschließlich den manuellen Update-Einstieg nach einer erfolgreichen Prüfung auf eine neue Version. Der vorhandene Updatepfad, die Netzwerk-/Hashprüfung und die Privilege Boundary bleiben unverändert.
+
+Änderungen:
+
+- Der Dialog **„Neue Version verfügbar“** besitzt zusätzlich den Button **„Jetzt aktualisieren“**.
+- Der Button ruft direkt den bereits bestehenden `Start-ManualAppUpdate`-Pfad auf; es entsteht kein zweiter Installations- oder Downloadpfad.
+- Der Hinweistext lautet: **„Du kannst die neue Version jetzt direkt installieren. Später findest du die Aktualisierung im Tray-Menü unter ‚Wartung‘ → ‚App aktualisieren…‘.“**
+- **OK** bleibt als nicht installierende Aktion erhalten; der bestehende Menüeintrag **Wartung → App aktualisieren…** bleibt unverändert verfügbar.
+- Keine Änderung an Downloadquelle, Update-Netzwerklogik, SHA-256-/Paketvalidierung, Backup/Rollback, Restart-Ergebnislogik, BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
+
+**Native Prüfung erforderlich:** Dialog nach einer realen Updateprüfung visuell prüfen, **„Jetzt aktualisieren“** auslösen und bestätigen, dass derselbe bestehende Updateprozess startet; anschließend **OK** regressiv als reines Schließen prüfen.
+
 ## v0.5.8.1 – Legacy-Updater-Ergebnis beim Neustart kompatibel auswerten
 
 v0.5.8.1 ist ein enger Hotfix auf Basis der kanonischen v0.5.8.0-Source. Der reale Web-Update-Test v0.5.7.2 → v0.5.8.0 installierte v0.5.8.0 erfolgreich, zeigte nach dem Neustart jedoch fälschlich **„Update fehlgeschlagen – Unbekannter Update-Ergebnisstatus: <leer>“**. Ursache war der Formatwechsel des persistenten Restart-Ergebnisses: Der noch aus v0.5.7.2 laufende Helper schrieb `{ utc, success, message }`, während v0.5.8.0 bereits das neue Statusformat mit `status/sourceVersion/targetVersion/rollback...` erwartete.
