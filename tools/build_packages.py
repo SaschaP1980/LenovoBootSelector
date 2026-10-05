@@ -1,10 +1,10 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 from __future__ import annotations
 from pathlib import Path
 import argparse, subprocess, sys, zipfile
 
 ROOT_DEFAULT=Path(__file__).resolve().parents[1]
-VERSION='0.5.9.0'
+VERSION='0.5.9.1'
 STAMP=(2026,10,5,0,0,0)
 RELEASE_NAMES=[
     'BUILD_INTEGRITY.txt','icon-preview.png','Install-LenovoBootMenuTasks.ps1','LenovoBootMenuTray.ico',
