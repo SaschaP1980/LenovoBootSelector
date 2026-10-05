@@ -1,0 +1,107 @@
+{
+  "version": "0.4.2",
+  "basis": "0.4.1",
+  "intent": "Behavior-preserving TaskBroker/Boot-Service boundary; remove historical Invoke-BcdEdit pseudo-API; keep fixed-task privilege boundary",
+  "metrics": {
+    "tray_lines": 4939,
+    "function_count": 117,
+    "script_state_distinct": 113,
+    "script_state_references": 878,
+    "catch_blocks": 120,
+    "empty_catch_blocks": 79,
+    "template_lines": 4235,
+    "template_function_count": 84,
+    "core_lines": 343,
+    "core_function_count": 12,
+    "core_script_state_references": 0,
+    "infrastructure_lines": 329,
+    "infrastructure_function_count": 19,
+    "infrastructure_script_state_references": 49,
+    "application_lines": 32,
+    "application_function_count": 2,
+    "application_script_state_references": 0,
+    "largest_functions": [
+      {
+        "name": "Update-PopupRows",
+        "lines": 506
+      },
+      {
+        "name": "New-PopupForm",
+        "lines": 382
+      },
+      {
+        "name": "Get-FriendlyBootEntryCore",
+        "lines": 138
+      },
+      {
+        "name": "Show-LenovoSystemFunctionsDialog",
+        "lines": 110
+      },
+      {
+        "name": "Show-LenovoNoticeDialog",
+        "lines": 95
+      },
+      {
+        "name": "Show-LenovoRestartDialog",
+        "lines": 92
+      },
+      {
+        "name": "Get-StorageContextCore",
+        "lines": 84
+      },
+      {
+        "name": "Complete-BackgroundBootRefresh",
+        "lines": 79
+      },
+      {
+        "name": "Export-RuntimeDiagnosticPackage",
+        "lines": 78
+      },
+      {
+        "name": "Start-BackgroundBootRefresh",
+        "lines": 74
+      },
+      {
+        "name": "Start-TaskBrokerInstall",
+        "lines": 68
+      },
+      {
+        "name": "Get-FirmwareBootState",
+        "lines": 50
+      }
+    ],
+    "refactored_shell_functions": {
+      "Get-AppSettings": 13,
+      "Get-OrderedEntriesForUi": 10,
+      "Get-FriendlyBootEntry": 33,
+      "Get-FirmwareBootState": 50,
+      "Set-BootNextTarget": 15,
+      "Set-DefaultGuid": 42,
+      "Refresh-SystemDefaultState": 13
+    }
+  },
+  "core_modules": [
+    "src/Core/EntryPreferences.ps1",
+    "src/Core/FirmwareParsing.ps1",
+    "src/Core/BootTargetModel.ps1"
+  ],
+  "application_modules": [
+    "src/Application/BootService.ps1"
+  ],
+  "infrastructure_modules": [
+    "src/Infrastructure/TaskBroker.ps1"
+  ],
+  "constraints": [
+    "Core contains no global script state, WinForms, filesystem, registry, Scheduled Task, process-start, TaskBroker, or BCDEdit dependency",
+    "Application BootService contains no script-global state, WinForms, direct Scheduled Task start, or generic privileged command interface",
+    "Generic exact-task runner is infrastructure-internal; template/application do not call it directly",
+    "Tray remains unelevated",
+    "Privileged actions only through fixed allowlisted SYSTEM Scheduled Tasks",
+    "No free commands/arguments/GUIDs across privilege boundary",
+    "Only {fwbootmgr} bootsequence mutation; never permanent displayorder mutation",
+    "No custom EXE as SYSTEM",
+    "Cleanup restricted to explicit project tasks/prefixes",
+    "Popup-first: show UI before slow refresh",
+    "v0.3.4 full-width hover/selected, red separators, eye/pencil tooltips remain frozen regression contracts"
+  ]
+}

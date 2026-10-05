@@ -1,0 +1,85 @@
+{
+  "version": "0.4.2.1",
+  "basis": "0.4.2",
+  "intent": "Targeted startup-failure UX/taskbar patch plus Windows PowerShell 5.1 source encoding compatibility; no Boot/TaskBroker behavior change",
+  "metrics": {
+    "tray_lines": 5108,
+    "function_count": 118,
+    "script_state_distinct": 114,
+    "script_state_references": 880,
+    "catch_blocks": 124,
+    "empty_catch_blocks": 81,
+    "template_lines": 4404,
+    "template_function_count": 85,
+    "core_lines": 343,
+    "core_function_count": 12,
+    "core_script_state_references": 0,
+    "application_lines": 32,
+    "application_function_count": 2,
+    "application_script_state_references": 0,
+    "infrastructure_lines": 329,
+    "infrastructure_function_count": 19,
+    "infrastructure_script_state_references": 47,
+    "largest_functions": [
+      {
+        "name": "Update-PopupRows",
+        "lines": 506
+      },
+      {
+        "name": "New-PopupForm",
+        "lines": 382
+      },
+      {
+        "name": "Show-FatalMessage",
+        "lines": 173
+      },
+      {
+        "name": "Get-FriendlyBootEntryCore",
+        "lines": 138
+      },
+      {
+        "name": "Show-LenovoSystemFunctionsDialog",
+        "lines": 110
+      },
+      {
+        "name": "Show-LenovoNoticeDialog",
+        "lines": 95
+      },
+      {
+        "name": "Show-LenovoRestartDialog",
+        "lines": 92
+      },
+      {
+        "name": "Get-StorageContextCore",
+        "lines": 84
+      },
+      {
+        "name": "Complete-BackgroundBootRefresh",
+        "lines": 79
+      },
+      {
+        "name": "Export-RuntimeDiagnosticPackage",
+        "lines": 78
+      },
+      {
+        "name": "Start-BackgroundBootRefresh",
+        "lines": 74
+      },
+      {
+        "name": "Start-TaskBrokerInstall",
+        "lines": 68
+      }
+    ]
+  },
+  "constraints": [
+    "Tray remains unelevated",
+    "Privileged actions only through fixed allowlisted SYSTEM Scheduled Tasks",
+    "No free commands/arguments/GUIDs across privilege boundary",
+    "Only {fwbootmgr} bootsequence mutation; never permanent displayorder mutation",
+    "No custom EXE as SYSTEM",
+    "Popup-first preserved",
+    "v0.3.4 full-width hover/selected, red separators, eye/pencil tooltips remain closed regression contracts",
+    "Startup failure UI must not create a taskbar entry",
+    "Non-ASCII PowerShell source must carry UTF-8 BOM for Windows PowerShell 5.1"
+  ]
+}

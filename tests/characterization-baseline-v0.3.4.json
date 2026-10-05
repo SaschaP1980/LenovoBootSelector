@@ -1,0 +1,111 @@
+{
+  "baseline_version": "0.3.4",
+  "source_sha256": {
+    "Install-LenovoBootMenuTasks.ps1": "6de32e668b2a5535e963842712274160aabdd357c7ef513eba209b3202354662",
+    "LenovoBootMenuTray.ico": "e6b4dcb643b770e523f95365804bbbfda62884b362cd49318509d952dddbdda3",
+    "Start-LenovoBootMenuTray.cmd": "05b1f997cfb2be13c915c67e76cc8c62f6f9acf9095c37b43ec3801bdde8ad41",
+    "Start-LenovoBootMenuTray.vbs": "ef0ed39201596eff9bf9e944acf2fe7ac7ea5f904f97ec001c13566dbf546eb3",
+    "Uninstall-LenovoBootMenuTasks.cmd": "5cea4b67899373ff5b1e92f1dd9d0b2265c6dd4baaff43beb136e45f560d6507",
+    "Uninstall-LenovoBootMenuTasks.ps1": "9a01de0414023b17a84b109f3a5f912ac3f99bc917512ec481c72e0ba28b56f5",
+    "icon-preview.png": "43c301063a4dd9851544bb49f48d50f204dd242231303150d8449ad131529eb1",
+    "LenovoBootMenuTray.ps1": "6d8d97769d89cf11ee081084cda528e3f590857a7e6d983295ad247cfbd0f71b"
+  },
+  "critical_fragment_sha256": {
+    "ps:Ensure-DarkActionTooltip": "6ebc5c9d61226ec44e0c86decf76e0fb327a79b7e3e557b1c4839ca20be1db06",
+    "ps:Show-DarkActionTooltip": "eb22af75bd31dba5fbb7062723132ee851acdc15de022f11452c6cd20f26f242",
+    "ps:Hide-DarkActionTooltip": "dddf53d20faecf806f91c198f37637bcba32398da1c52af02b04a822ba04f6fa",
+    "ps:Show-DiagnosticPackageInExplorer": "1449d07759b5ffcca11158c6e35b1e1ab70729a0811740d0398f79bfa7497691",
+    "ps:Save-RuntimeDiagnosticsFromUi": "2bff12eceeb0b380053bbc05b63cbae1c766eebb8e340b65b5acb3408e025d2a",
+    "ps:Show-LenovoNoticeDialog": "0ac90b3c652755819b1f405434b473d4149eea2288f3420e6f865f0a20c577c6",
+    "ps:Export-RuntimeDiagnosticPackage": "57fc08cf0d7a54b1b675e0e4534621c7a5fd6f00ff6726f8b3a91adc1208e6d4",
+    "ps:Set-BootSequence": "380fc8f152dd85a86a397236f9e4f14eda112ec51f0437ea84794d88a56696f6",
+    "ps:Test-TaskBrokerReady": "c4a746030787a4c5332c4cf68eeb849fa30741f11fb46b7e7162688c7177f8ed",
+    "ps:Invoke-AuthorizedTask": "38629c4e52d223fb07e0af399dcc9645d8194807af1db33709daf0b0b1e17615",
+    "ps:Invoke-BcdEdit": "9e691144a346cf1f056d3833d3d09b22daf2cafa981374939d81a977896135d3",
+    "ps:Start-BackgroundBootRefresh": "cc081be521daba955c753883106de15cebb41c5ed8f085f357618ccc1acf4479",
+    "ps:Complete-BackgroundBootRefresh": "e5e4b73d6ce7bdd71001d70196b41d75206ab3e5ecab68232f7d680e9d680b69",
+    "ps:Show-OrTogglePopup": "b3d04b71db09d69be5b08d9655308e853996156ef2343b28d19aefedfe629899",
+    "ps:Get-AppSettings": "abff0b05a656358e23b7cdd9743abbc28a2990fead24bfcd1c9fa2f80cdc7415",
+    "ps:Save-AppSettings": "01f0b00c010d9749043ba23fc33a647fc9818ea56c86a77a94e10deb518a91da",
+    "ps:Load-AppSettings": "bc9122d9ba5de2152176da8bc7981e782e2f91a297529a4d11ee116f3e709388",
+    "ps:Get-FirmwareBootState": "ffd5ebe10c2cc68dd2028529a1b3817dd32237b98e431cce57ca6cc07592dae1",
+    "ps:Get-FriendlyBootEntry": "3323ea7f13f9323a3f37cba3e3cee230df1f0029c2ce5b994dbc39439aa43c43",
+    "ps:Update-PopupRows": "36c954b677374307dac7830d9644ceaaa8f9f851bd084556016986ce270eda94",
+    "ps:New-PopupForm": "08912c1946913ba1f331fed59c91066b3f358ea0e2e1290ae652f9038537e8a7",
+    "cs:protected override void OnRenderToolStripBackground": "4ac158d225b13b349f18628c7a8d8a9ae78f69586f8d34394144f67403b0c3e3",
+    "cs:protected override void OnRenderMenuItemBackground": "ca197b6ff6a8b514ddca4c8a8bcb2e1828cd9869c758e2f8e59972ef5124db9a",
+    "cs:protected override void OnRenderSeparator": "908a427b87d6a265664df690361b6699e0c593def442f83cba262dc698d87ece",
+    "cs:public static ToolStripItem HitTestRow": "c7fc304c2dd7e00264c7f256b628b7764e78f991ff7e601c177b6d3961519f9e",
+    "cs:public static ToolStripMenuItem GetVisualHotItem": "70273a9e7dc29850e554f8315ea9093a8444038739e239481d144884f90bc338"
+  },
+  "architecture_metrics": {
+    "tray_lines": 4811,
+    "function_count": 103,
+    "script_state_distinct": 113,
+    "script_state_references": 885,
+    "catch_blocks": 120,
+    "empty_catch_blocks": 79,
+    "largest_functions": [
+      {
+        "name": "Update-PopupRows",
+        "start_line": 3393,
+        "lines": 506
+      },
+      {
+        "name": "New-PopupForm",
+        "start_line": 4161,
+        "lines": 382
+      },
+      {
+        "name": "Get-FriendlyBootEntry",
+        "start_line": 3055,
+        "lines": 138
+      },
+      {
+        "name": "Show-LenovoSystemFunctionsDialog",
+        "start_line": 2071,
+        "lines": 110
+      },
+      {
+        "name": "Get-FirmwareBootState",
+        "start_line": 3201,
+        "lines": 110
+      },
+      {
+        "name": "Show-LenovoNoticeDialog",
+        "start_line": 1975,
+        "lines": 95
+      },
+      {
+        "name": "Show-LenovoRestartDialog",
+        "start_line": 2182,
+        "lines": 92
+      },
+      {
+        "name": "Complete-BackgroundBootRefresh",
+        "start_line": 3955,
+        "lines": 85
+      },
+      {
+        "name": "Get-StorageContextCore",
+        "start_line": 2949,
+        "lines": 84
+      },
+      {
+        "name": "Export-RuntimeDiagnosticPackage",
+        "start_line": 1164,
+        "lines": 78
+      },
+      {
+        "name": "Start-BackgroundBootRefresh",
+        "start_line": 4041,
+        "lines": 74
+      },
+      {
+        "name": "Start-TaskBrokerInstall",
+        "start_line": 2625,
+        "lines": 68
+      }
+    ]
+  }
+}

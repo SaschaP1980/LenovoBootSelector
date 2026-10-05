@@ -1,0 +1,54 @@
+{
+  "version": "0.4.7",
+  "runtime": {
+    "lines": 5565,
+    "functions": 149,
+    "script_state_variables": 104,
+    "script_state_references": 863,
+    "catch_blocks": 125,
+    "empty_or_best_effort_catch_literal": 81
+  },
+  "app_template": {
+    "lines": 1940,
+    "functions": 31,
+    "script_refs": 329
+  },
+  "layers": {
+    "core": {
+      "files": 3,
+      "lines": 343,
+      "functions": 12,
+      "script_refs": 0
+    },
+    "application": {
+      "files": 4,
+      "lines": 247,
+      "functions": 22,
+      "script_refs": 15
+    },
+    "infrastructure": {
+      "files": 6,
+      "lines": 870,
+      "functions": 41,
+      "script_refs": 91
+    },
+    "ui": {
+      "files": 13,
+      "lines": 2165,
+      "functions": 43,
+      "script_refs": 428
+    }
+  },
+  "maintenance": {
+    "application_module": "src/Application/MaintenanceRuntime.ps1",
+    "ui_module": "src/UI/MaintenancePresentation.ps1",
+    "central_first_run_cta": true,
+    "background_refresh_suppressed_while_busy": true,
+    "success_dialogs": true,
+    "soak_settings_parameter_fix": true
+  },
+  "catch_audit": {
+    "file": "CATCH_AUDIT_v0.4.7.json",
+    "count": 81
+  }
+}

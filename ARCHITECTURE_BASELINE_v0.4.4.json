@@ -1,0 +1,72 @@
+{
+  "version": "0.4.4",
+  "runtime": {
+    "lines": 5335,
+    "functions": 135,
+    "script_state_variables": 106,
+    "script_state_references": 845,
+    "catch_blocks": 129,
+    "empty_or_best_effort_catch_literal": 83
+  },
+  "app_template": {
+    "lines": 2510,
+    "functions": 53
+  },
+  "ui": {
+    "files": 10,
+    "lines": 1945,
+    "functions": 34,
+    "modules": {
+      "src/UI/BootEntryList.ps1": {
+        "lines": 566,
+        "functions": 4,
+        "script_refs": 95
+      },
+      "src/UI/DefaultTargetMenu.ps1": {
+        "lines": 44,
+        "functions": 2,
+        "script_refs": 10
+      },
+      "src/UI/DefaultTargetPresentation.ps1": {
+        "lines": 23,
+        "functions": 2,
+        "script_refs": 14
+      },
+      "src/UI/Dialogs.ps1": {
+        "lines": 299,
+        "functions": 3,
+        "script_refs": 39
+      },
+      "src/UI/ManageEntries.ps1": {
+        "lines": 182,
+        "functions": 10,
+        "script_refs": 80
+      },
+      "src/UI/ManageEntriesState.ps1": {
+        "lines": 39,
+        "functions": 2,
+        "script_refs": 17
+      },
+      "src/UI/MenuAppearance.ps1": {
+        "lines": 143,
+        "functions": 4,
+        "script_refs": 19
+      },
+      "src/UI/Popup.ps1": {
+        "lines": 447,
+        "functions": 4,
+        "script_refs": 96
+      },
+      "src/UI/RefreshPresentation.ps1": {
+        "lines": 29,
+        "functions": 2,
+        "script_refs": 15
+      },
+      "src/UI/StartupRecoveryDialog.ps1": {
+        "lines": 173,
+        "functions": 1,
+        "script_refs": 0
+      }
+    }
+  }
+}

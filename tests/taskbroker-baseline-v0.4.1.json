@@ -1,0 +1,24 @@
+{
+  "version": "0.4.1",
+  "functions": {
+    "Get-TaskBrokerMetadata": "ae3d40df57bad877ba16dfe1b8ac0198571f93976d486ad7283cd53ca1292f9f",
+    "Get-TaskBrokerTarget": "0b76e30078f59370ca2e664140dd6624a9e74e6f89005647c9e8101e9e958540",
+    "Invoke-AuthorizedTask": "38629c4e52d223fb07e0af399dcc9645d8194807af1db33709daf0b0b1e17615",
+    "Read-TaskBrokerTextFile": "cf110d11e5a68b3937a41c9289ba3178af2dff91b460f1bb138d3f48b25504e2",
+    "Refresh-ManagerCache": "0096306045e1f921a690443f8842468f83f6479c7700c6a1d72b1d9639280cfb",
+    "Refresh-FirmwareCache": "cdd21c78f3bd64404beb609f46545e47a0a7fe40b497e75f91cebf57d5b8ded3",
+    "Test-TaskBrokerMetadataCompatible": "34ccb8077ef67c4dfc86e152c68624b2769c435cb89c777a6c96242744308c89",
+    "Get-TaskBrokerInteractiveReady": "32f2444d28738b542eba953a3c0df13b19d8c1d070fc5b9ab12255fc9f5ad6f1",
+    "Reset-TaskBrokerReadyCache": "bc814008d0a235358c0ef611a6704cba1c80b9081afe50276eb01fe83e1037cb",
+    "Test-TaskBrokerReady": "c4a746030787a4c5332c4cf68eeb849fa30741f11fb46b7e7162688c7177f8ed",
+    "Test-TaskBrokerInstallationPresent": "0ff1d4c1684afb56d4792afe44af09fcaa2c4c53b44d2e2e8308d31fa956d05f",
+    "Get-LatestTaskBrokerDiagnosticPath": "545366c715f5d88d1ffd6c7133b9de6eecf99d430dde4c54d8fcc499b02d1526",
+    "Invoke-BcdEdit": "9e691144a346cf1f056d3833d3d09b22daf2cafa981374939d81a977896135d3",
+    "Get-FirmwareBootState": "b02fbc5288579d1dc44122fb7774a85e21c52343a7bdc60f15e75442c8eb2710",
+    "Set-BootSequence": "380fc8f152dd85a86a397236f9e4f14eda112ec51f0437ea84794d88a56696f6",
+    "Refresh-SystemDefaultState": "98d45d34e38cd69b42fa128f52c1e5c065f87007854280622d64a3427077a63c",
+    "Set-DefaultGuid": "fc27d89bd564c30248e04fdb2e85465b478951374fb10b305f494e16c46d07b4",
+    "Invoke-BackgroundRefreshWorker": "5e5de62f2e927f72e88ed60f516a5d246a1c4c024a8ce470d141de3bd43533b3",
+    "Complete-BackgroundBootRefresh": "e5e4b73d6ce7bdd71001d70196b41d75206ab3e5ecab68232f7d680e9d680b69"
+  }
+}

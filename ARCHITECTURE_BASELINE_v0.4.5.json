@@ -1,0 +1,48 @@
+{
+  "version": "0.4.5",
+  "runtime": {
+    "lines": 5365,
+    "functions": 138,
+    "script_state_variables": 106,
+    "script_state_references": 843,
+    "catch_blocks": 129,
+    "empty_or_best_effort_catch_literal": 83
+  },
+  "app_template": {
+    "lines": 2068,
+    "functions": 34,
+    "script_refs": 332
+  },
+  "infrastructure_adapters": {
+    "src/Infrastructure/SettingsRepository.ps1": {
+      "lines": 33,
+      "functions": 3,
+      "script_refs": 0
+    },
+    "src/Application/SettingsService.ps1": {
+      "lines": 46,
+      "functions": 3,
+      "script_refs": 15
+    },
+    "src/Infrastructure/Autostart.ps1": {
+      "lines": 74,
+      "functions": 6,
+      "script_refs": 8
+    },
+    "src/UI/AutostartPresentation.ps1": {
+      "lines": 52,
+      "functions": 2,
+      "script_refs": 20
+    },
+    "src/Infrastructure/RuntimeDiagnostics.ps1": {
+      "lines": 255,
+      "functions": 7,
+      "script_refs": 36
+    },
+    "src/UI/DiagnosticsPresentation.ps1": {
+      "lines": 12,
+      "functions": 1,
+      "script_refs": 0
+    }
+  }
+}

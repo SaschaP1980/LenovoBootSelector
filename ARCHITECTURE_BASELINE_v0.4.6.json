@@ -1,0 +1,53 @@
+{
+  "version": "0.4.6",
+  "runtime": {
+    "lines": 5265,
+    "functions": 134,
+    "script_state_variables": 103,
+    "script_state_references": 834,
+    "catch_blocks": 125,
+    "empty_or_best_effort_catch_literal": 81
+  },
+  "app_template": {
+    "lines": 1852,
+    "functions": 28,
+    "script_refs": 329
+  },
+  "layers": {
+    "core": {"files": 3, "lines": 343, "functions": 12, "script_refs": 0},
+    "application": {"files": 3, "lines": 209, "functions": 17, "script_refs": 15},
+    "infrastructure": {"files": 6, "lines": 870, "functions": 41, "script_refs": 91},
+    "ui": {"files": 12, "lines": 1991, "functions": 36, "script_refs": 399}
+  },
+  "cleanup": {
+    "removed_dead_functions": [
+      "Test-IsAdministrator",
+      "Get-PresentDiskPnpInfo",
+      "Find-MatchingPnpDisk",
+      "Show-ManageEntriesMode"
+    ],
+    "removed_dead_script_globals": [
+      "AutostartTaskName",
+      "ColorBorder",
+      "ColorFrame"
+    ],
+    "storage_module": "src/Infrastructure/Storage.ps1",
+    "storage_function_bodies_unchanged_from_v0.4.5": true
+  },
+  "catch_audit": {
+    "file": "CATCH_AUDIT_v0.4.6.json",
+    "count": 81,
+    "categories": {
+      "cleanup_best_effort": 28,
+      "presentation_best_effort": 23,
+      "lifecycle_race_best_effort": 19,
+      "telemetry_best_effort": 3,
+      "cache_metadata_best_effort": 3,
+      "migration_persistence_best_effort": 1,
+      "migration_autostart_best_effort": 1,
+      "self_repair_best_effort": 1,
+      "legacy_cleanup_best_effort": 1,
+      "optional_probe_best_effort": 1
+    }
+  }
+}

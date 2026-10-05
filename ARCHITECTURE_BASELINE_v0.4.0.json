@@ -1,0 +1,85 @@
+{
+  "version": "0.4.0",
+  "basis": "0.3.4",
+  "intent": "Refactoring Safety Baseline; no intentional production behavior change",
+  "metrics": {
+    "tray_lines": 4811,
+    "function_count": 103,
+    "script_state_distinct": 113,
+    "script_state_references": 885,
+    "catch_blocks": 120,
+    "empty_catch_blocks": 79,
+    "largest_functions": [
+      {
+        "name": "Update-PopupRows",
+        "start_line": 3393,
+        "lines": 506
+      },
+      {
+        "name": "New-PopupForm",
+        "start_line": 4161,
+        "lines": 382
+      },
+      {
+        "name": "Get-FriendlyBootEntry",
+        "start_line": 3055,
+        "lines": 138
+      },
+      {
+        "name": "Show-LenovoSystemFunctionsDialog",
+        "start_line": 2071,
+        "lines": 110
+      },
+      {
+        "name": "Get-FirmwareBootState",
+        "start_line": 3201,
+        "lines": 110
+      },
+      {
+        "name": "Show-LenovoNoticeDialog",
+        "start_line": 1975,
+        "lines": 95
+      },
+      {
+        "name": "Show-LenovoRestartDialog",
+        "start_line": 2182,
+        "lines": 92
+      },
+      {
+        "name": "Complete-BackgroundBootRefresh",
+        "start_line": 3955,
+        "lines": 85
+      },
+      {
+        "name": "Get-StorageContextCore",
+        "start_line": 2949,
+        "lines": 84
+      },
+      {
+        "name": "Export-RuntimeDiagnosticPackage",
+        "start_line": 1164,
+        "lines": 78
+      },
+      {
+        "name": "Start-BackgroundBootRefresh",
+        "start_line": 4041,
+        "lines": 74
+      },
+      {
+        "name": "Start-TaskBrokerInstall",
+        "start_line": 2625,
+        "lines": 68
+      }
+    ]
+  },
+  "constraints": [
+    "Tray remains unelevated",
+    "Privileged actions only through fixed allowlisted SYSTEM Scheduled Tasks",
+    "No free commands/arguments/GUIDs across privilege boundary",
+    "Only {fwbootmgr} bootsequence mutation; never permanent displayorder mutation",
+    "No custom EXE as SYSTEM",
+    "Cleanup restricted to explicit project tasks/prefixes",
+    "Popup-first: show UI before slow refresh",
+    "v0.3.4 full-width hover/selected, red separators, eye/pencil tooltips are protected regression contracts"
+  ]
+}
