@@ -63,6 +63,10 @@ jobs:
           python3 tests/validate_boundary.py --root .
           python3 tests/validate_regression.py --root . --basis-root /tmp/lbs-basis --release-zip "/tmp/lbs-release/LenovoBootMenuTray-v$VERSION.zip"
 
+          # Remove interpreter caches before deriving any Git source state.
+          find . -type d -name '__pycache__' -prune -exec rm -rf {} +
+          find . -type f -name '*.pyc' -delete
+
           # Derive the exact ZIP-free source commit without a helper branch.
           git add -A
           SOURCE_INDEX=/tmp/lbs-source.index
@@ -73,6 +77,10 @@ jobs:
           SOURCE_COMMIT=$(printf '%s\n' "Lenovo Boot Selector v$VERSION exact source" | git commit-tree "$SOURCE_TREE" -p "$PREVIOUS_SOURCE")
           if git ls-tree -r --name-only "$SOURCE_COMMIT" | grep -E '\.zip$'; then
             echo "Exact source commit contains ZIP files." >&2
+            exit 1
+          fi
+          if git ls-tree -r --name-only "$SOURCE_COMMIT" | grep -E '(^|/)(__pycache__/|.*\.pyc$)'; then
+            echo "Exact source commit contains Python cache artifacts." >&2
             exit 1
           fi
 
