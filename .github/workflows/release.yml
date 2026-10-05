@@ -75,54 +75,7 @@ jobs:
           SOURCE_TREE=$(GIT_INDEX_FILE="$SOURCE_INDEX" git write-tree)
           PREVIOUS_SOURCE=$(git rev-parse "v$PREVIOUS_VERSION^{commit}")
           SOURCE_COMMIT=$(printf '%s\n' "Lenovo Boot Selector v$VERSION exact source" | git commit-tree "$SOURCE_TREE" -p "$PREVIOUS_SOURCE")
-          if git ls-tree -r --name-only "$SOURCE_COMMIT" | grep -E '\.zip
-
-          # Add exactly one new historical release ZIP to the same release branch.
-          RELEASE="/tmp/lbs-release/LenovoBootMenuTray-v$VERSION.zip"
-          cp "$RELEASE" "downloads/LenovoBootMenuTray-v$VERSION.zip"
-          git add -A
-          ZIP_DIFF=$(git diff --cached --name-status origin/main -- 'downloads/*.zip')
-          EXPECTED_ZIP_DIFF=$(printf 'A\tdownloads/LenovoBootMenuTray-v%s.zip' "$VERSION")
-          test "$ZIP_DIFF" = "$EXPECTED_ZIP_DIFF"
-          if git diff --cached --name-status origin/main | grep '^D'; then
-            echo "Release unexpectedly deletes repository files." >&2
-            exit 1
-          fi
-
-          git commit -m "Publish Lenovo Boot Selector v$VERSION"
-          FINAL_SHA=$(git rev-parse HEAD)
-          git push origin HEAD:"refs/heads/$EXPECTED_BRANCH"
-
-          # Attach permanent gate results directly to the final PR head.
-          status_ok() {
-            gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$FINAL_SHA" \
-              -f state=success -f context="$1" -f description="$2" >/dev/null
-          }
-          status_ok 'release/source-integrity' 'ZIP-free exact source commit verified'
-          status_ok 'release/core' 'Permanent core suite passed'
-          status_ok 'release/boundary' 'Privilege and architecture boundaries passed'
-          status_ok 'release/regression' 'Release-profile regression suite passed'
-          status_ok 'release/package' 'Release package integrity passed'
-          status_ok 'release/reproducibility' 'Independent GitHub rebuild is byte-identical'
-          status_ok 'release/history' 'Historical release ZIPs are unchanged'
-
-          PR_URL=$(gh pr create \
-            --repo "$GITHUB_REPOSITORY" \
-            --base main \
-            --head "$EXPECTED_BRANCH" \
-            --title "Publish Lenovo Boot Selector v$VERSION" \
-            --body "One release branch, one PR and one merge. GitHub independently rebuilt and verified the release before this PR. Historical ZIPs are unchanged and exactly one new release ZIP is added.")
-
-          # Tag only after all gates and successful PR creation, but before merge.
-          git tag -a "v$VERSION" "$SOURCE_COMMIT" -m "Lenovo Boot Selector v$VERSION"
-          git push origin "refs/tags/v$VERSION"
-          test "$(git rev-parse "v$VERSION^{commit}")" = "$SOURCE_COMMIT"
-          status_ok 'release/tag' 'Annotated ZIP-free source tag verified'
-
-          gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --merge --delete-branch
-          git fetch origin main --force
-          test "$(git show origin/main:downloads/latest.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")" = "$VERSION"
-; then
+          if git ls-tree -r --name-only "$SOURCE_COMMIT" | grep -E '\.zip$'; then
             echo "Exact source commit contains ZIP files." >&2
             exit 1
           fi
