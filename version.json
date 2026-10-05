@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "0.5.10.0",
-  "releaseProfile": "release-architecture",
-  "publishedUtc": "2026-10-05T16:52:28Z"
+  "version": "0.5.10.1",
+  "releaseProfile": "version-only",
+  "publishedUtc": "2026-10-05T18:17:24Z"
 }
