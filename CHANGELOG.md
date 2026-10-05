@@ -1,5 +1,24 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.5.10.0 – Permanente Release-Pipeline und zentrale Versionierung
+
+v0.5.10.0 ist ein Build-/Release-Architekturpatch ohne neue Produktfunktion. Die App-Version wird ab dieser Version ausschließlich aus `version.json` abgeleitet; Runtime-, Paket-, Audit- und Transition-Builds verwenden dieselbe kanonische Quelle.
+
+Änderungen:
+
+- Neue kanonische `version.json` mit Version, Release-Profil und deterministischem Veröffentlichungszeitpunkt.
+- `LenovoBootMenuTray.template.ps1` enthält nur noch den Build-Token `@APP_VERSION@`; `tools/build_runtime.py` injiziert die kanonische Version deterministisch.
+- `build_packages.py`, `build_transition.py` und `build_catch_audit.py` enthalten keine hart codierte Releaseversion mehr.
+- Neue permanente Werkzeuge `release_common.py`, `prepare_release.py` und `build_architecture_baseline.py`.
+- Catch-Audit und Architektur-Baseline werden ab dieser Version unter den kanonischen Dateinamen `CATCH_AUDIT.json` und `ARCHITECTURE_BASELINE.json` fortgeführt; historische versionierte Snapshots bleiben unverändert erhalten.
+- Permanente Validatoren `validate_release.py`, `validate_core.py`, `validate_boundary.py` und `validate_regression.py` ersetzen künftige versionsspezifische Testkopien. Historische Validatoren bleiben als frühere Releasebelege bestehen.
+- Permanenter GitHub-Releasepfad: genau ein `release/v<version>`-Branch, genau ein PR und genau ein Merge. Kein Base64-Patchtransport, kein separater Source-Branch und kein notwendiger Post-Merge-Finalizer.
+- Der einzige permanente GitHub-Orchestrator reproduziert das Release und führt Release-/Core-/Boundary-/Regression-Gates selbst aus. Die grünen Gate-Status werden auf den finalen PR-Head geschrieben; ein separater `pull_request`-Workflow entfällt bewusst, weil durch `GITHUB_TOKEN` erzeugte PR-Ereignisse keinen rekursiven Workflow starten. Der ZIP-freie annotierte Source-Tag wird erst nach erfolgreichen Gates und erfolgreicher PR-Erstellung, aber vor dem Merge gesetzt.
+- Bestehende historische `downloads/*.zip` bleiben unveränderlich; pro Release darf genau ein neues ZIP ergänzt werden.
+- Produkt-Runtime, Update-Verhalten, BootService, TaskBroker, Storage, Firmware-/BCD-Pfade und Privilege Boundary bleiben gegenüber v0.5.9.1 funktional unverändert.
+
+**Performance-Ziel für den anschließenden Version-only-Test:** Ziel <= 5 Minuten, harte Erwartungsgrenze 10 Minuten vom Start bis zum gemergten PR, sofern keine externe GitHub-Störung vorliegt.
+
 ## v0.5.9.1 – Versions-Hotfix ohne Funktionsänderung
 
 v0.5.9.1 dient ausschließlich der Verifikation des vereinfachten Build-/GitHub-Release-Prozesses. Gegenüber v0.5.9.0 gibt es keine funktionale Produktänderung; die Laufzeitlogik bleibt byteidentisch, abgesehen von der App-Versionszeile.

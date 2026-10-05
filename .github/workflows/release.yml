@@ -1,0 +1,123 @@
+name: Release Orchestrator
+
+on:
+  push:
+    branches:
+      - 'release/**'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Build, verify, publish and merge
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION=$(python3 -c "import json; print(json.load(open('version.json',encoding='utf-8'))['version'])")
+          EXPECTED_BRANCH="release/v$VERSION"
+          test "${GITHUB_REF_NAME}" = "$EXPECTED_BRANCH"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main --tags --force
+
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "Tag v$VERSION already exists; refusing to overwrite." >&2
+            exit 1
+          fi
+
+          if git cat-file -e origin/main:version.json 2>/dev/null; then
+            PREVIOUS_VERSION=$(git show origin/main:version.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+          else
+            PREVIOUS_VERSION=$(git show origin/main:downloads/latest.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+          fi
+
+          rm -rf /tmp/lbs-release /tmp/lbs-release-check /tmp/lbs-basis
+          mkdir -p /tmp/lbs-release /tmp/lbs-release-check
+          git worktree add --detach /tmp/lbs-basis "v$PREVIOUS_VERSION^{commit}"
+
+          # GitHub independently recreates all generated source and both packages.
+          python3 tools/prepare_release.py --root . --output-dir /tmp/lbs-release
+          python3 tools/prepare_release.py --root . --output-dir /tmp/lbs-release-check --check
+          cmp "/tmp/lbs-release/LenovoBootMenuTray-v$VERSION.zip" "/tmp/lbs-release-check/LenovoBootMenuTray-v$VERSION.zip"
+          cmp "/tmp/lbs-release/Lenovo-Boot-Selector-Source-v$VERSION.zip" "/tmp/lbs-release-check/Lenovo-Boot-Selector-Source-v$VERSION.zip"
+
+          # Run the permanent gates before any PR or tag exists.
+          python3 tests/validate_release.py --root .
+          python3 tests/validate_core.py --root .
+          python3 tests/validate_boundary.py --root .
+          python3 tests/validate_regression.py --root . --basis-root /tmp/lbs-basis --release-zip "/tmp/lbs-release/LenovoBootMenuTray-v$VERSION.zip"
+
+          # Derive the exact ZIP-free source commit without a helper branch.
+          git add -A
+          SOURCE_INDEX=/tmp/lbs-source.index
+          cp "$(git rev-parse --git-path index)" "$SOURCE_INDEX"
+          GIT_INDEX_FILE="$SOURCE_INDEX" git rm -q --cached --ignore-unmatch downloads/*.zip
+          SOURCE_TREE=$(GIT_INDEX_FILE="$SOURCE_INDEX" git write-tree)
+          PREVIOUS_SOURCE=$(git rev-parse "v$PREVIOUS_VERSION^{commit}")
+          SOURCE_COMMIT=$(printf '%s\n' "Lenovo Boot Selector v$VERSION exact source" | git commit-tree "$SOURCE_TREE" -p "$PREVIOUS_SOURCE")
+          if git ls-tree -r --name-only "$SOURCE_COMMIT" | grep -E '\.zip$'; then
+            echo "Exact source commit contains ZIP files." >&2
+            exit 1
+          fi
+
+          # Add exactly one new historical release ZIP to the same release branch.
+          RELEASE="/tmp/lbs-release/LenovoBootMenuTray-v$VERSION.zip"
+          cp "$RELEASE" "downloads/LenovoBootMenuTray-v$VERSION.zip"
+          git add -A
+          ZIP_DIFF=$(git diff --cached --name-status origin/main -- 'downloads/*.zip')
+          EXPECTED_ZIP_DIFF=$(printf 'A\tdownloads/LenovoBootMenuTray-v%s.zip' "$VERSION")
+          test "$ZIP_DIFF" = "$EXPECTED_ZIP_DIFF"
+          if git diff --cached --name-status origin/main | grep '^D'; then
+            echo "Release unexpectedly deletes repository files." >&2
+            exit 1
+          fi
+
+          git commit -m "Publish Lenovo Boot Selector v$VERSION"
+          FINAL_SHA=$(git rev-parse HEAD)
+          git push origin HEAD:"refs/heads/$EXPECTED_BRANCH"
+
+          # Attach permanent gate results directly to the final PR head.
+          status_ok() {
+            gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$FINAL_SHA" \
+              -f state=success -f context="$1" -f description="$2" >/dev/null
+          }
+          status_ok 'release/source-integrity' 'ZIP-free exact source commit verified'
+          status_ok 'release/core' 'Permanent core suite passed'
+          status_ok 'release/boundary' 'Privilege and architecture boundaries passed'
+          status_ok 'release/regression' 'Release-profile regression suite passed'
+          status_ok 'release/package' 'Release package integrity passed'
+          status_ok 'release/reproducibility' 'Independent GitHub rebuild is byte-identical'
+          status_ok 'release/history' 'Historical release ZIPs are unchanged'
+
+          PR_URL=$(gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$EXPECTED_BRANCH" \
+            --title "Publish Lenovo Boot Selector v$VERSION" \
+            --body "One release branch, one PR and one merge. GitHub independently rebuilt and verified the release before this PR. Historical ZIPs are unchanged and exactly one new release ZIP is added.")
+
+          # Tag only after all gates and successful PR creation, but before merge.
+          git tag -a "v$VERSION" "$SOURCE_COMMIT" -m "Lenovo Boot Selector v$VERSION"
+          git push origin "refs/tags/v$VERSION"
+          test "$(git rev-parse "v$VERSION^{commit}")" = "$SOURCE_COMMIT"
+          status_ok 'release/tag' 'Annotated ZIP-free source tag verified'
+
+          gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --merge --delete-branch
+          git fetch origin main --force
+          test "$(git show origin/main:downloads/latest.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")" = "$VERSION"
