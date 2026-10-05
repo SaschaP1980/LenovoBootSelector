@@ -13,18 +13,23 @@ def load_release_config(root: Path) -> dict:
     if not path.is_file():
         raise RuntimeError(f'missing canonical version file: {path}')
     data = json.loads(path.read_text(encoding='utf-8'))
-    if data.get('schemaVersion') != 1:
-        raise RuntimeError('version.json schemaVersion must be 1')
+    schema = data.get('schemaVersion')
+    if schema not in {1,2}:
+        raise RuntimeError('version.json schemaVersion must be 1 or 2')
     version = str(data.get('version','')).strip()
     if not VERSION_RE.fullmatch(version):
         raise RuntimeError(f'invalid four-part version: {version!r}')
     profile = str(data.get('releaseProfile','')).strip()
     if profile not in VALID_PROFILES:
         raise RuntimeError(f'invalid releaseProfile: {profile!r}')
-    published = str(data.get('publishedUtc','')).strip()
-    if not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', published):
-        raise RuntimeError(f'invalid publishedUtc: {published!r}')
-    return {'schemaVersion':1,'version':version,'releaseProfile':profile,'publishedUtc':published}
+    published = None
+    if schema == 1:
+        published = str(data.get('publishedUtc','')).strip()
+        if not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', published):
+            raise RuntimeError(f'invalid publishedUtc: {published!r}')
+    elif 'publishedUtc' in data:
+        raise RuntimeError('version.json schemaVersion 2 must not contain publishedUtc; GitHub owns publication time')
+    return {'schemaVersion':schema,'version':version,'releaseProfile':profile,'publishedUtc':published}
 
 
 def load_version(root: Path) -> str:

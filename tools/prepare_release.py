@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 from pathlib import Path
-import argparse,hashlib,json,subprocess,sys,tempfile
+import argparse,hashlib,json,re,subprocess,sys,tempfile
 from release_common import load_release_config,release_zip_name,source_zip_name
 
 ROOT_DEFAULT=Path(__file__).resolve().parents[1]
@@ -24,10 +24,16 @@ def require_changelog(root:Path,version:str):
 def run(*args):
     cp=subprocess.run([sys.executable,*map(str,args)]); 
     if cp.returncode: raise RuntimeError(f'command failed: {args}')
-def update_download_metadata(root:Path,cfg:dict,release_hash:str,release_size:int,check:bool):
+def resolve_published_utc(cfg:dict,explicit:str|None)->str:
+    published=(explicit or cfg.get('publishedUtc') or '').strip()
+    if not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z',published):
+        raise RuntimeError('publishedUtc must be supplied explicitly for schemaVersion 2')
+    return published
+
+def update_download_metadata(root:Path,cfg:dict,published_utc:str,release_hash:str,release_size:int,check:bool):
     version=cfg['version']; tag=f'v{version}'; file=release_zip_name(version)
     latest_path=root/'downloads/latest.json'; latest=json.loads(latest_path.read_text(encoding='utf-8'))
-    expected=dict(latest); expected.update(version=version,tag=tag,file=file,sha256=release_hash,size=release_size,publishedUtc=cfg['publishedUtc'])
+    expected=dict(latest); expected.update(version=version,tag=tag,file=file,sha256=release_hash,size=release_size,publishedUtc=published_utc)
     if check:
         for k in ['version','tag','file','sha256','size','publishedUtc']:
             if latest.get(k)!=expected[k]: raise RuntimeError(f'downloads/latest.json mismatch for {k}')
@@ -41,9 +47,9 @@ def update_download_metadata(root:Path,cfg:dict,release_hash:str,release_size:in
         if text!=rendered: raise RuntimeError('downloads/README.md is not canonical')
     else: readme_path.write_text(rendered,encoding='utf-8-sig')
 def main()->int:
-    ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); ap.add_argument('--output-dir',type=Path,required=True); ap.add_argument('--check',action='store_true'); args=ap.parse_args(); root=args.root.resolve(); out=args.output_dir.resolve(); out.mkdir(parents=True,exist_ok=True); cfg=load_release_config(root); version=cfg['version']
+    ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); ap.add_argument('--output-dir',type=Path,required=True); ap.add_argument('--published-utc'); ap.add_argument('--check',action='store_true'); args=ap.parse_args(); root=args.root.resolve(); out=args.output_dir.resolve(); out.mkdir(parents=True,exist_ok=True); cfg=load_release_config(root); version=cfg['version']
     try:
-        require_changelog(root,version); update_readme(root,version,args.check)
+        published_utc=resolve_published_utc(cfg,args.published_utc); require_changelog(root,version); update_readme(root,version,args.check)
         if args.check:
             run(root/'tools/build_runtime.py','--root',root,'--check'); run(root/'tools/build_catch_audit.py','--root',root,'--check'); run(root/'tools/build_architecture_baseline.py','--root',root,'--check')
             expected_integrity=render_integrity(root,version)
@@ -52,12 +58,12 @@ def main()->int:
             run(root/'tools/build_runtime.py','--root',root); run(root/'tools/build_catch_audit.py','--root',root); run(root/'tools/build_architecture_baseline.py','--root',root); (root/'BUILD_INTEGRITY.txt').write_bytes(render_integrity(root,version))
         run(root/'tools/build_packages.py','--root',root,'--output-dir',out,'--kind','release')
         release=out/release_zip_name(version); release_hash=sha(release); release_size=release.stat().st_size
-        update_download_metadata(root,cfg,release_hash,release_size,args.check)
+        update_download_metadata(root,cfg,published_utc,release_hash,release_size,args.check)
         if not args.check:
             # Metadata changed after release creation but is not part of the runtime package. Build source only after metadata is canonical.
             pass
         run(root/'tools/build_packages.py','--root',root,'--output-dir',out,'--kind','source')
-        source=out/source_zip_name(version); summary={'version':version,'releaseProfile':cfg['releaseProfile'],'publishedUtc':cfg['publishedUtc'],'release':{'file':release.name,'sha256':release_hash,'size':release_size},'source':{'file':source.name,'sha256':sha(source),'size':source.stat().st_size}}
+        source=out/source_zip_name(version); summary={'version':version,'releaseProfile':cfg['releaseProfile'],'publishedUtc':published_utc,'release':{'file':release.name,'sha256':release_hash,'size':release_size},'source':{'file':source.name,'sha256':sha(source),'size':source.stat().st_size}}
         (out/'release-build.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2)+'\n',encoding='utf-8'); print(json.dumps(summary,ensure_ascii=False)); return 0
     except Exception as e:
         print(f'FAIL prepare_release: {e}',file=sys.stderr); return 1
