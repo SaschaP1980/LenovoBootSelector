@@ -1,4 +1,4 @@
-# Lenovo Boot Selector
+﻿# Lenovo Boot Selector
 
 <p align="center">
   <img src="icon-preview.png" alt="Lenovo Boot Selector" width="96">
@@ -8,7 +8,7 @@
 
 Die Anwendung läuft im Normalbetrieb **uneleviert**. Privilegierte Firmwareänderungen werden ausschließlich über fest definierte, allowgelistete Windows-Scheduled-Tasks ausgeführt. Permanente Änderungen an der UEFI-Bootreihenfolge gehören ausdrücklich nicht zum Produktmodell.
 
-**Aktueller Entwicklungsstand:** v0.5.7  
+**Aktueller Entwicklungsstand:** v0.5.7.1  
 **Technik:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads und Revisionshistorie
@@ -16,6 +16,8 @@ Die Anwendung läuft im Normalbetrieb **uneleviert**. Privilegierte Firmwareänd
 Versionierte Builds liegen im Ordner [`downloads/`](downloads/). Jede produktive Source-Revision, die einen neuen Build erfordert, bekommt ein neues versioniertes Release-ZIP. Bereits veröffentlichte Builds bleiben historisch erhalten.
 
 Die neueste maschinenlesbare Updateinformation liegt in [`downloads/latest.json`](downloads/latest.json). Die fachliche Versionshistorie steht in [CHANGELOG.md](CHANGELOG.md).
+
+Versionsschema: **MAJOR.MINOR.PATCH.HOTFIX**. Historische dreiteilige Versionen werden für Vergleiche als `HOTFIX = 0` behandelt.
 
 ## Funktionen
 

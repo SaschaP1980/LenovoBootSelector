@@ -1,4 +1,8 @@
-# Lenovo Boot Selector – Changelog
+﻿# Lenovo Boot Selector – Changelog
+
+## v0.5.7.1 – Vierstufiges Versionsschema für Web-Updates
+
+v0.5.7.1 ist ein bewusst minimaler Test-Release für das Versionsschema **MAJOR.MINOR.PATCH.HOTFIX**. Der Update-Parser akzeptiert jetzt drei- und vierteilige Versionen; historische dreiteilige Versionen werden intern mit `HOTFIX = 0` verglichen. Darüber hinaus enthält dieser Test-Release keine funktionalen Produktänderungen. Auf ausdrücklichen Wunsch wurden für dieses Release keine Tests und kein Handover erzeugt.
 
 ## v0.5.7 – Update-Manifest-Roundtrip korrigiert
 

@@ -920,7 +920,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.5.7'
+$script:AppVersion = '0.5.7.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -1142,7 +1142,8 @@ function Set-BootTargetDriftNotificationShown {
 function ConvertTo-LenovoVersionCore {
     param([Parameter(Mandatory=$true)][string]$Version)
     $value = ([string]$Version).Trim()
-    if ($value -notmatch '^\d+\.\d+\.\d+$') { return $null }
+    if ($value -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?$') { return $null }
+    if ($value -match '^\d+\.\d+\.\d+$') { $value += '.0' }
     try { return [version]$value } catch { return $null }
 }
 
