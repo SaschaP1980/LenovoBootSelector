@@ -4,9 +4,10 @@
 
 - Die frühere changelogartige `README.md` wurde in eine klassische GitHub-Projektübersicht überführt.
 - Die vollständige fortlaufende Versionshistorie wird ab jetzt in dieser `CHANGELOG.md` weitergeführt.
-- Neu ist der Ordner `downloads/`: Dort wird immer das **aktuell gebaute Release-ZIP** angeboten.
+- Neu ist der Ordner `downloads/`: Er dient als **Build-Revisionshistorie** für versionierte Release-ZIPs.
 - Aktuell enthalten: `LenovoBootMenuTray-v0.5.4.zip`, SHA-256 `d31be8d7768e436aebfb4d4b620770b7e71ab3a86159014142eaf7f71e1f0e7d`.
-- Bei zukünftigen Builds wird das bisherige ZIP im Download-Ordner durch das neue aktuelle Build ersetzt; historische Builds werden dort nicht gesammelt.
+- Bei jeder produktiven Source-Revision, die einen neuen Build erfordert, wird das neue versionierte ZIP zusätzlich abgelegt; ältere Builds bleiben unverändert historisch erhalten.
+- Reine Dokumentations-/Repository-Änderungen ohne produktive Source-Änderung erzeugen kein neues Build.
 - Diese Repository-Organisation ändert keine Runtime-, Boot-, Storage-, TaskBroker- oder Privilege-Logik.
 
 # Lenovo Boot Selector v0.5.4
