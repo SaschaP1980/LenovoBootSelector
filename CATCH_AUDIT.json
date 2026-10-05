@@ -1,5 +1,5 @@
 {
-  "version": "0.5.10.0",
+  "version": "0.5.10.1",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
