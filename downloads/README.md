@@ -1,4 +1,4 @@
-# Build-Revisionshistorie
+﻿# Build-Revisionshistorie
 
 Dieser Ordner enthält die **historisch erhaltenen gebauten Releases** des Lenovo Boot Selector.
 
@@ -15,6 +15,7 @@ Dieser Ordner enthält die **historisch erhaltenen gebauten Releases** des Lenov
 
 | Version | Release | Größe | SHA-256 | Git-Tag |
 | --- | --- | ---: | --- | --- |
+| v0.5.7.2 | [LenovoBootMenuTray-v0.5.7.2.zip](LenovoBootMenuTray-v0.5.7.2.zip) | 84.909 Bytes | `01b5f2e2af26b64f473ae14547780301ca9b7e6f065af1b1a19ec9c4d38a985c` | `v0.5.7.2` |
 | v0.5.7.1 | [LenovoBootMenuTray-v0.5.7.1.zip](LenovoBootMenuTray-v0.5.7.1.zip) | 84.906 Bytes | `275aa4177188253fadc983f80dde87c9d950d56f229fb0be12f5aca37d414a90` | `v0.5.7.1` |
 | v0.5.7 | [LenovoBootMenuTray-v0.5.7.zip](LenovoBootMenuTray-v0.5.7.zip) | 84.801 Bytes | `a5eab1a2a902f1572dbecea00093e75e625453b9a6683573215652e05e8d0f8f` | `v0.5.7` |
 | v0.5.6 | [LenovoBootMenuTray-v0.5.6.zip](LenovoBootMenuTray-v0.5.6.zip) | 84.794 Bytes | `105f565acab53b1b3f142cdcfcb6bcd6433d330ae117c52b221aab472dab0ffc` | `v0.5.6` |
