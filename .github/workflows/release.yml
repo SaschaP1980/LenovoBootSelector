@@ -26,6 +26,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          PYTHONDONTWRITEBYTECODE: '1'
         run: |
           set -euo pipefail
           VERSION=$(python3 -c "import json; print(json.load(open('version.json',encoding='utf-8'))['version'])")
@@ -47,21 +48,27 @@ jobs:
             PREVIOUS_VERSION=$(git show origin/main:downloads/latest.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
           fi
 
+          # GitHub owns publication time. Capture it only after the hosted runner is actually executing
+          # the release job, never during local preparation. Reuse the exact same value for both
+          # deterministic rebuilds.
+          PUBLISHED_UTC=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          echo "GitHub publication timestamp: $PUBLISHED_UTC"
+
           rm -rf /tmp/lbs-release /tmp/lbs-release-check /tmp/lbs-basis
           mkdir -p /tmp/lbs-release /tmp/lbs-release-check
           git worktree add --detach /tmp/lbs-basis "v$PREVIOUS_VERSION^{commit}"
 
           # GitHub independently recreates all generated source and both packages.
-          python3 tools/prepare_release.py --root . --output-dir /tmp/lbs-release
-          python3 tools/prepare_release.py --root . --output-dir /tmp/lbs-release-check --check
+          python3 -B tools/prepare_release.py --root . --output-dir /tmp/lbs-release --published-utc "$PUBLISHED_UTC"
+          python3 -B tools/prepare_release.py --root . --output-dir /tmp/lbs-release-check --published-utc "$PUBLISHED_UTC" --check
           cmp "/tmp/lbs-release/LenovoBootMenuTray-v$VERSION.zip" "/tmp/lbs-release-check/LenovoBootMenuTray-v$VERSION.zip"
           cmp "/tmp/lbs-release/Lenovo-Boot-Selector-Source-v$VERSION.zip" "/tmp/lbs-release-check/Lenovo-Boot-Selector-Source-v$VERSION.zip"
 
           # Run the permanent gates before any PR or tag exists.
-          python3 tests/validate_release.py --root .
-          python3 tests/validate_core.py --root .
-          python3 tests/validate_boundary.py --root .
-          python3 tests/validate_regression.py --root . --basis-root /tmp/lbs-basis --release-zip "/tmp/lbs-release/LenovoBootMenuTray-v$VERSION.zip"
+          python3 -B tests/validate_release.py --root .
+          python3 -B tests/validate_core.py --root .
+          python3 -B tests/validate_boundary.py --root .
+          python3 -B tests/validate_regression.py --root . --basis-root /tmp/lbs-basis --release-zip "/tmp/lbs-release/LenovoBootMenuTray-v$VERSION.zip"
 
           # Remove interpreter caches before deriving any Git source state.
           find . -type d -name '__pycache__' -prune -exec rm -rf {} +

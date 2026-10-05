@@ -1,5 +1,19 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.0.0 – GitHub-eigener Veröffentlichungszeitpunkt und Release-Zyklus-Härtung
+
+v0.6.0.0 ist eine Minor-Version des Release-Systems. Die Produkt-Runtime bleibt bis auf die Versionsnummer unverändert.
+
+- `version.json` wechselt auf Schema 2 und enthält keinen vorab gesetzten `publishedUtc` mehr.
+- Das Releaseprofil bleibt `version-only`, weil alle Produktmodule byteidentisch zur v0.5.10.4-Basis bleiben und nur Release-Tooling geändert wird.
+- Der GitHub Release Orchestrator erzeugt den kanonischen `publishedUtc` erst, wenn der Hosted Runner den Veröffentlichungsjob tatsächlich ausführt.
+- Beide deterministischen GitHub-Rebuilds erhalten exakt denselben GitHub-seitig erzeugten Zeitstempel.
+- `tools/prepare_release.py` verlangt für Schema 2 einen expliziten `--published-utc`; lokale Werte sind ausschließlich provisorische Build-Metadaten.
+- Legacy-Schema 1 bleibt für ältere Source-Stände lesbar.
+- Python-Aufrufe im Release-Workflow verwenden `-B`, damit keine Interpreter-Caches in den Arbeitsbaum geschrieben werden.
+- Die vereinbarte Runner-Queue-Policy ist dokumentiert: maximal 60 Sekunden interaktiv warten, danach kein Cancel/Retry/Doppeltrigger; spätere Kontrolle per `Github Status`.
+- LBS-9 ist damit umgesetzt.
+
 ## v0.5.10.4 – Version-only Performance-Optimierungstest 3
 
 v0.5.10.4 ist ein reiner Hotfix zur Messung des weiter optimierten End-to-End-Releasepfads. Gegenüber v0.5.10.3 gibt es keine funktionale Produktänderung.

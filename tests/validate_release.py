@@ -28,7 +28,9 @@ def main():
     if vp.is_file():
         try: meta=json.loads(vp.read_text(encoding='utf-8'))
         except Exception: meta={}
-    version=str(meta.get('version','')); profile=str(meta.get('releaseProfile',''))
+    version=str(meta.get('version','')); profile=str(meta.get('releaseProfile','')); schema=meta.get('schemaVersion')
+    s.c('Canonical version schema is v2',schema==2,schema)
+    s.c('Canonical version input excludes publishedUtc','publishedUtc' not in meta)
     s.c('Canonical version is four numeric components',bool(re.fullmatch(r'\d+\.\d+\.\d+\.\d+',version)),version)
     s.c('Release profile declared',profile in {'version-only','release-architecture','patch'},profile)
     tray=txt(root/'LenovoBootMenuTray.ps1') if (root/'LenovoBootMenuTray.ps1').is_file() else ''
@@ -43,6 +45,12 @@ def main():
         s.no(f'{rel} has no hard-coded VERSION constant',t,"VERSION='")
         s.has(f'{rel} uses release_common version source',t,'release_common')
     s.c('Persistent prepare_release tool exists',(root/'tools/prepare_release.py').is_file())
+    prepare=txt(root/'tools/prepare_release.py') if (root/'tools/prepare_release.py').is_file() else ''
+    common=txt(root/'tools/release_common.py') if (root/'tools/release_common.py').is_file() else ''
+    s.has('Prepare tool accepts explicit publication timestamp',prepare,"ap.add_argument('--published-utc')")
+    s.has('Prepare tool rejects missing schema-v2 publication timestamp',prepare,'publishedUtc must be supplied explicitly for schemaVersion 2')
+    s.has('Release config keeps legacy schema 1 readable',common,"schema not in {1,2}")
+    s.has('Release config forbids publishedUtc in schema 2',common,'schemaVersion 2 must not contain publishedUtc')
     s.c('Canonical catch audit exists',(root/'CATCH_AUDIT.json').is_file())
     s.c('Canonical architecture baseline exists',(root/'ARCHITECTURE_BASELINE.json').is_file())
     s.c('Persistent release workflow exists',(root/'.github/workflows/release.yml').is_file())
@@ -50,6 +58,10 @@ def main():
     if (root/'.github/workflows/release.yml').is_file():
         w=txt(root/'.github/workflows/release.yml')
         s.has('Release workflow targets one release branch family',w,'release/**')
+        s.has('Release workflow captures GitHub publication timestamp',w,"PUBLISHED_UTC=$(date -u +'%Y-%m-%dT%H:%M:%SZ')")
+        s.eq('Release workflow passes publication timestamp to both rebuilds',w.count('--published-utc "$PUBLISHED_UTC"'),2)
+        s.has('Release workflow uses Python no-bytecode mode',w,'python3 -B tools/prepare_release.py')
+        s.has('Release workflow disables child-process bytecode writes',w,"PYTHONDONTWRITEBYTECODE: '1'")
         s.has('Release workflow can create PRs',w,'pull-requests: write')
         s.has('Release workflow creates exactly one PR',w,'gh pr create')
         s.has('Release workflow writes final-head gate statuses',w,'statuses/$FINAL_SHA')
