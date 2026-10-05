@@ -747,7 +747,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.5.9.1'
+$script:AppVersion = '@APP_VERSION@'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
