@@ -18,12 +18,12 @@ Assert-True 'Invalid version returns null' ($null -eq (ConvertTo-LenovoVersionCo
 $threw=$false; try { [void](Compare-LenovoAppVersionCore -Current '0.5.7' -Candidate 'dev') } catch { $threw=$true }; Assert-True 'Invalid compare throws' $threw
 
 $files=@('BUILD_INTEGRITY.txt','icon-preview.png','Install-LenovoBootMenuTasks.ps1','LenovoBootMenuTray.ico','LenovoBootMenuTray.ps1','README.md','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','Uninstall-LenovoBootMenuTasks.ps1')
-$valid=[pscustomobject]@{schemaVersion=1;version='0.5.8.0';file='LenovoBootMenuTray-v0.5.8.0.zip';sha256=('a'*64);size=123;tag='v0.5.8.0';packageFiles=$files}
+$valid=[pscustomobject]@{schemaVersion=1;version='0.5.8.1';file='LenovoBootMenuTray-v0.5.8.1.zip';sha256=('a'*64);size=123;tag='v0.5.8.1';packageFiles=$files}
 $r=Test-LenovoUpdateManifestCore -Manifest $valid
 Assert-True 'Valid manifest accepted' $r.IsValid
 Assert-Equal 'Normalized manifest schema version' 1 $r.SchemaVersion
-Assert-Equal 'Normalized manifest version' '0.5.8.0' $r.Version
-Assert-Equal 'Normalized manifest filename' 'LenovoBootMenuTray-v0.5.8.0.zip' $r.File
+Assert-Equal 'Normalized manifest version' '0.5.8.1' $r.Version
+Assert-Equal 'Normalized manifest filename' 'LenovoBootMenuTray-v0.5.8.1.zip' $r.File
 Assert-Equal 'Normalized manifest file count' 10 @($r.PackageFiles).Count
 $json=$r | ConvertTo-Json -Depth 10; $round=$json | ConvertFrom-Json; $roundResult=Test-LenovoUpdateManifestCore -Manifest $round; Assert-True 'Manifest survives worker JSON roundtrip' $roundResult.IsValid
 
@@ -41,5 +41,35 @@ $x=$valid.psobject.Copy(); $x.packageFiles=@($files | Where-Object { $_ -ne 'Sta
 $x=$valid.psobject.Copy(); $x.packageFiles=@($files | Where-Object { $_ -ne 'Install-LenovoBootMenuTasks.ps1' }); Assert-True 'Missing installer rejected' (-not (Test-LenovoUpdateManifestCore -Manifest $x).IsValid)
 $x=$valid.psobject.Copy(); $x.packageFiles=@($files | Where-Object { $_ -ne 'Uninstall-LenovoBootMenuTasks.ps1' }); Assert-True 'Missing uninstaller rejected' (-not (Test-LenovoUpdateManifestCore -Manifest $x).IsValid)
 Assert-True 'Null manifest rejected' (-not (Test-LenovoUpdateManifestCore -Manifest $null).IsValid)
-Write-Host "UPDATE TOTAL $checks/30"
-if ($checks -ne 30) { throw "Unexpected update test count $checks" }
+
+$legacyOk=[pscustomobject]@{utc='2026-10-05T11:00:00Z';success=$true;message='Update auf v0.5.8.1 installiert.'}
+$rr=Resolve-LenovoUpdateRestartResultCore -Result $legacyOk -RunningVersion '0.5.8.1'
+Assert-Equal 'Legacy success format detected' 'legacy-success' $rr.ResultFormat
+Assert-True 'Legacy success is successful' $rr.Success
+Assert-Equal 'Legacy success display uses running version' '0.5.8.1' $rr.DisplayVersion
+Assert-Equal 'Legacy success does not invent target version' '' $rr.TargetVersion
+Assert-True 'Legacy success message reports actual running version' ($rr.Message -match 'Aktuell läuft v0\.5\.8\.1')
+
+$legacyFail=[pscustomobject]@{utc='2026-10-05T11:00:00Z';success=$false;message='Legacy install failed'}
+$rr=Resolve-LenovoUpdateRestartResultCore -Result $legacyFail -RunningVersion '0.5.8.1'
+Assert-Equal 'Legacy failure format detected' 'legacy-success' $rr.ResultFormat
+Assert-True 'Legacy false remains failure' (-not $rr.Success)
+Assert-Equal 'Legacy failure keeps helper message' 'Legacy install failed' $rr.Message
+
+$newPending=[pscustomobject]@{schemaVersion=1;status='pending-verification';sourceVersion='0.5.8.0';targetVersion='0.5.8.1';utc='2026-10-05T11:00:00Z';message='pending';rollbackAttempted=$false;rollbackSucceeded=$false}
+$rr=Resolve-LenovoUpdateRestartResultCore -Result $newPending -RunningVersion '0.5.8.1'
+Assert-Equal 'Status format remains primary' 'status' $rr.ResultFormat
+Assert-True 'Pending verification succeeds on exact running target' $rr.Success
+Assert-Equal 'Pending verification preserves target version' '0.5.8.1' $rr.TargetVersion
+
+$mixed=[pscustomobject]@{status='failed';success=$true;message='new format wins';rollbackAttempted=$false;rollbackSucceeded=$false}
+$rr=Resolve-LenovoUpdateRestartResultCore -Result $mixed -RunningVersion '0.5.8.1'
+Assert-Equal 'Status wins over legacy success field' 'status' $rr.ResultFormat
+Assert-True 'Failed status wins over legacy success true' (-not $rr.Success)
+
+$malformed=[pscustomobject]@{success='true';message='not a Boolean'}
+$rr=Resolve-LenovoUpdateRestartResultCore -Result $malformed -RunningVersion '0.5.8.1'
+Assert-Equal 'Non-Boolean legacy success is rejected' 'unknown' $rr.ResultFormat
+Assert-True 'Malformed legacy result fails closed' (-not $rr.Success)
+Write-Host "UPDATE TOTAL $checks/44"
+if ($checks -ne 44) { throw "Unexpected update test count $checks" }

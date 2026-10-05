@@ -1,5 +1,23 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.5.8.1 – Legacy-Updater-Ergebnis beim Neustart kompatibel auswerten
+
+v0.5.8.1 ist ein enger Hotfix auf Basis der kanonischen v0.5.8.0-Source. Der reale Web-Update-Test v0.5.7.2 → v0.5.8.0 installierte v0.5.8.0 erfolgreich, zeigte nach dem Neustart jedoch fälschlich **„Update fehlgeschlagen – Unbekannter Update-Ergebnisstatus: <leer>“**. Ursache war der Formatwechsel des persistenten Restart-Ergebnisses: Der noch aus v0.5.7.2 laufende Helper schrieb `{ utc, success, message }`, während v0.5.8.0 bereits das neue Statusformat mit `status/sourceVersion/targetVersion/rollback...` erwartete.
+
+Änderungen:
+
+- Die Restart-Auswertung normalisiert das Ergebnis jetzt über `Resolve-LenovoUpdateRestartResultCore`.
+- Das Legacy-Format wird ausschließlich erkannt, wenn `status` fehlt und `success` als echter Boolean vorliegt. Dadurch wird insbesondere `success=false` korrekt erkannt, ohne dass beschädigte String-/Pseudo-Boolean-Werte akzeptiert werden.
+- Legacy `success=true` führt einmalig zu **„Update erfolgreich“**. Da das alte Format keine belastbare `targetVersion` speichert, wird diagnostisch keine Zielversion erfunden; angezeigt wird ausschließlich die tatsächlich laufende App-Version.
+- Legacy `success=false` führt einmalig zu **„Update fehlgeschlagen“** und übernimmt die gespeicherte Legacy-Fehlermeldung bzw. einen neutralen Fallback.
+- Sobald `status` vorhanden ist, hat das v0.5.8.x-Statusformat Vorrang; `pending-verification`, exakte Zielversionsprüfung, `failed` und Rollbackdarstellung bleiben unverändert.
+- `UPDATE_RESTART_RESULT` enthält zusätzlich `resultFormat` und bei Legacy-Ergebnissen `legacySuccess`, damit die Kompatibilitätsauswertung diagnostisch eindeutig erkennbar ist.
+- Unbekannte bzw. beschädigte Ergebnisformen bleiben fail-closed und erzeugen weiterhin **„Unbekannter Update-Ergebnisstatus“**.
+- Das Ergebnis wird weiterhin vor dem modalen Dialog konsumiert und deshalb höchstens einmal angezeigt.
+- Keine Änderung an Downloadquelle, Netzwerklogik, SHA-256-/Paketprüfung, Backup/Rollback, BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
+
+**Native Prüfung erforderlich:** den neuen Resolver unter Windows PowerShell 5.1 vollständig prüfen und einen realen Übergang von einem Helper mit Legacy-Ergebnisformat auf v0.5.8.1 bzw. einen kontrollierten Legacy-Fixture-Fall bestätigen. Das neue Statusformat muss regressiv unverändert funktionieren.
+
 ## v0.5.8.0 – Update-Ergebnis nach Neustart bestätigen
 
 v0.5.8.0 erweitert den manuellen Self-Updater um eine persistente Abschlussbestätigung über den Prozessneustart hinweg. Der erfolgreiche reale Web-Update-Test v0.5.7.1 → v0.5.7.2 hat gezeigt, dass der Updatepfad selbst funktioniert; die vorherige Runtime-Diagnose endete jedoch mit der alten Sitzung und zeigte dem Nutzer nach dem Neustart keine explizite Abschlussmeldung.
