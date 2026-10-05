@@ -1,5 +1,18 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.5.9.1 – Versions-Hotfix ohne Funktionsänderung
+
+v0.5.9.1 dient ausschließlich der Verifikation des vereinfachten Build-/GitHub-Release-Prozesses. Gegenüber v0.5.9.0 gibt es keine funktionale Produktänderung; die Laufzeitlogik bleibt byteidentisch, abgesehen von der App-Versionszeile.
+
+Änderungen:
+
+- App-Version von `0.5.9.0` auf `0.5.9.1` angehoben.
+- Versionsbezogene Build-, Audit-, Download- und Revisionsmetadaten auf v0.5.9.1 fortgeschrieben.
+- Keine Änderung an Update-Dialog, Update-Netzwerklogik, BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
+- Releaseprozess wird als **1 Build = 1 Release-Branch = 1 PR** geprüft; Source-Tag und reproduzierbare Paketprüfung müssen vor dem Merge abgeschlossen sein.
+
+**Native Prüfung:** keine neue Funktionsprüfung erforderlich; ein Start der App mit angezeigter Version v0.5.9.1 genügt als Smoke-Test.
+
 ## v0.5.9.0 – Update direkt aus dem Verfügbarkeitsdialog starten
 
 v0.5.9.0 verbessert ausschließlich den manuellen Update-Einstieg nach einer erfolgreichen Prüfung auf eine neue Version. Der vorhandene Updatepfad, die Netzwerk-/Hashprüfung und die Privilege Boundary bleiben unverändert.
