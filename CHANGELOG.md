@@ -1,4 +1,15 @@
-﻿# Lenovo Boot Selector v0.5.4
+# Lenovo Boot Selector – Changelog
+
+## Repository-Pflege nach v0.5.4 – GitHub-README und aktuelles Build als Download
+
+- Die frühere changelogartige `README.md` wurde in eine klassische GitHub-Projektübersicht überführt.
+- Die vollständige fortlaufende Versionshistorie wird ab jetzt in dieser `CHANGELOG.md` weitergeführt.
+- Neu ist der Ordner `downloads/`: Dort wird immer das **aktuell gebaute Release-ZIP** angeboten.
+- Aktuell enthalten: `LenovoBootMenuTray-v0.5.4.zip`, SHA-256 `d31be8d7768e436aebfb4d4b620770b7e71ab3a86159014142eaf7f71e1f0e7d`.
+- Bei zukünftigen Builds wird das bisherige ZIP im Download-Ordner durch das neue aktuelle Build ersetzt; historische Builds werden dort nicht gesammelt.
+- Diese Repository-Organisation ändert keine Runtime-, Boot-, Storage-, TaskBroker- oder Privilege-Logik.
+
+# Lenovo Boot Selector v0.5.4
 
 
 
