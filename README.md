@@ -11,14 +11,16 @@ Die Anwendung läuft im Normalbetrieb **uneleviert**. Privilegierte Firmwareänd
 **Aktueller Entwicklungsstand:** v0.5.4  
 **Technik:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
-## Download
+## Downloads und Revisionshistorie
 
-Das jeweils **aktuelle gebaute Release** liegt als ZIP im Ordner [`downloads/`](downloads/).
+Versionierte Builds liegen im Ordner [`downloads/`](downloads/).
 
-**Aktuelles Build:** [LenovoBootMenuTray-v0.5.4.zip](downloads/LenovoBootMenuTray-v0.5.4.zip)  
+**Aktueller Build:** [LenovoBootMenuTray-v0.5.4.zip](downloads/LenovoBootMenuTray-v0.5.4.zip)  
 **SHA-256:** `d31be8d7768e436aebfb4d4b620770b7e71ab3a86159014142eaf7f71e1f0e7d`
 
-Bei jeder neuen gebauten Version wird dieser Ordner auf das neue aktuelle Release aktualisiert. Historische Builds werden dort nicht gesammelt; die Versionshistorie bleibt im [CHANGELOG.md](CHANGELOG.md).
+Der Ordner dient als **Build-Revisionshistorie**: Sobald sich die produktive Source so ändert, dass eine neue Version gebaut werden muss, wird das neue versionierte Release-ZIP zusätzlich in `downloads/` abgelegt. Bereits veröffentlichte Builds bleiben historisch erhalten und werden nicht durch neuere Versionen ersetzt.
+
+Reine Dokumentations- oder Repository-Pflege ohne Änderung der produktiven Source erzeugt kein künstliches neues Build. Die fachliche Versionshistorie wird zusätzlich im [CHANGELOG.md](CHANGELOG.md) fortgeführt.
 
 ## Funktionen
 
