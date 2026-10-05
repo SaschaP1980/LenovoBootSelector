@@ -6,6 +6,40 @@ function Get-LenovoUpdateDownloadBaseUri {
     return 'https://raw.githubusercontent.com/SaschaP1980/LenovoBootSelector/main/downloads/'
 }
 
+function Get-LenovoUpdateResultPath {
+    $root = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray\Updates'
+    return (Join-Path $root 'last-update-result.json')
+}
+
+function Read-LenovoUpdateResult {
+    $path = Get-LenovoUpdateResultPath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
+    try {
+        $json = [System.IO.File]::ReadAllText($path,[System.Text.Encoding]::UTF8)
+        if ([string]::IsNullOrWhiteSpace($json)) { return $null }
+        return ($json | ConvertFrom-Json)
+    }
+    catch {
+        return [pscustomobject]@{
+            schemaVersion = 1
+            status = 'failed'
+            sourceVersion = ''
+            targetVersion = ''
+            utc = [datetime]::UtcNow.ToString('o')
+            message = ('Update-Ergebnis konnte nicht gelesen werden: ' + $_.Exception.Message)
+            rollbackAttempted = $false
+            rollbackSucceeded = $false
+        }
+    }
+}
+
+function Remove-LenovoUpdateResult {
+    $path = Get-LenovoUpdateResultPath
+    try {
+        if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue }
+    } catch { }
+}
+
 function Enable-LenovoUpdateTls12 {
     try {
         $current = [System.Net.ServicePointManager]::SecurityProtocol
@@ -197,16 +231,42 @@ function New-LenovoUpdateInstallerHelper {
 param(
     [Parameter(Mandatory=$true)][int]$ParentPid,
     [Parameter(Mandatory=$true)][string]$InstallDir,
-    [Parameter(Mandatory=$true)][string]$WorkDir
+    [Parameter(Mandatory=$true)][string]$WorkDir,
+    [Parameter(Mandatory=$true)][string]$SourceVersion
 )
 $ErrorActionPreference = 'Stop'
 $backup = Join-Path $WorkDir 'backup'
 $payload = Join-Path $WorkDir 'payload'
 $manifestPath = Join-Path $WorkDir 'manifest.json'
 $resultPath = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray\Updates\last-update-result.json'
-function Write-Result([bool]$Success,[string]$Message) {
-    $obj=[ordered]@{ utc=[datetime]::UtcNow.ToString('o'); success=$Success; message=$Message }
+$targetVersion = ''
+$rollbackAttempted = $false
+$rollbackSucceeded = $false
+function Write-Result([string]$Status,[string]$Message) {
+    $parent = Split-Path -Parent $resultPath
+    if ($parent -and -not (Test-Path -LiteralPath $parent)) { [void](New-Item -ItemType Directory -Path $parent -Force) }
+    $obj=[ordered]@{
+        schemaVersion=1
+        utc=[datetime]::UtcNow.ToString('o')
+        status=$Status
+        sourceVersion=$SourceVersion
+        targetVersion=$targetVersion
+        message=$Message
+        rollbackAttempted=[bool]$rollbackAttempted
+        rollbackSucceeded=[bool]$rollbackSucceeded
+    }
     [System.IO.File]::WriteAllText($resultPath,($obj|ConvertTo-Json -Compress),(New-Object System.Text.UTF8Encoding($false)))
+}
+function Restart-InstalledApp {
+    $launcher=Join-Path $InstallDir 'Start-LenovoBootMenuTray.vbs'
+    if (-not (Test-Path -LiteralPath $launcher -PathType Leaf)) { throw 'Launcher fehlt nach dem Update.' }
+    $wscript=Join-Path $env:SystemRoot 'System32\wscript.exe'
+    $psi=New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName=$wscript
+    $psi.Arguments=('"{0}"' -f $launcher)
+    $psi.UseShellExecute=$false
+    $psi.CreateNoWindow=$true
+    return [System.Diagnostics.Process]::Start($psi)
 }
 function Show-UpdateError([string]$Message) {
     try { Add-Type -AssemblyName System.Windows.Forms; [void][System.Windows.Forms.MessageBox]::Show($Message,'Lenovo Boot Selector – Update',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) } catch { }
@@ -215,40 +275,72 @@ try {
     try { $parent=[System.Diagnostics.Process]::GetProcessById($ParentPid); [void]$parent.WaitForExit(30000) } catch { }
     if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw 'Manifest fehlt.' }
     $manifest=[System.IO.File]::ReadAllText($manifestPath,[System.Text.Encoding]::UTF8)|ConvertFrom-Json
+    $targetVersion=[string]$manifest.version
     $files=@($manifest.packageFiles)
     if ($files.Count -lt 1) { throw 'Paketdateien fehlen.' }
     if (Test-Path -LiteralPath $backup) { Remove-Item -LiteralPath $backup -Recurse -Force }
     [void](New-Item -ItemType Directory -Path $backup -Force)
     $existing=@{}
     foreach($name in $files) {
-        $source=Join-Path $payload ([string]$name); $target=Join-Path $InstallDir ([string]$name)
+        $source=Join-Path $payload ([string]$name)
+        $target=Join-Path $InstallDir ([string]$name)
         if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "Paketdatei fehlt: $name" }
-        if (Test-Path -LiteralPath $target -PathType Leaf) { $existing[[string]$name]=$true; Copy-Item -LiteralPath $target -Destination (Join-Path $backup ([string]$name)) -Force }
+        if (Test-Path -LiteralPath $target -PathType Leaf) {
+            $existing[[string]$name]=$true
+            Copy-Item -LiteralPath $target -Destination (Join-Path $backup ([string]$name)) -Force
+        }
         else { $existing[[string]$name]=$false }
     }
     try {
-        foreach($name in $files) { Copy-Item -LiteralPath (Join-Path $payload ([string]$name)) -Destination (Join-Path $InstallDir ([string]$name)) -Force }
-        $launcher=Join-Path $InstallDir 'Start-LenovoBootMenuTray.vbs'
-        $wscript=Join-Path $env:SystemRoot 'System32\wscript.exe'
-        $psi=New-Object System.Diagnostics.ProcessStartInfo
-        $psi.FileName=$wscript; $psi.Arguments=('"{0}"' -f $launcher); $psi.UseShellExecute = $false; $psi.CreateNoWindow=$true
-        [void][System.Diagnostics.Process]::Start($psi)
+        foreach($name in $files) {
+            Copy-Item -LiteralPath (Join-Path $payload ([string]$name)) -Destination (Join-Path $InstallDir ([string]$name)) -Force
+        }
+        # Success is intentionally not declared here. The restarted tray must prove
+        # that the expected target version is actually running before showing success.
+        Write-Result 'pending-verification' ('Update auf v' + $targetVersion + ' installiert; Neustart-Verifikation ausstehend.')
+        $started = Restart-InstalledApp
+        if (-not $started) { throw 'Lenovo Boot Selector konnte nach dem Update nicht neu gestartet werden.' }
+        try { $started.Dispose() } catch { }
     }
     catch {
+        $installError=$_.Exception.Message
         # ROLLBACK: restore every previous managed file and remove newly introduced files.
-        foreach($name in $files) {
-            $target=Join-Path $InstallDir ([string]$name); $saved=Join-Path $backup ([string]$name)
-            if ($existing[[string]$name] -and (Test-Path -LiteralPath $saved -PathType Leaf)) { Copy-Item -LiteralPath $saved -Destination $target -Force }
-            elseif (-not $existing[[string]$name] -and (Test-Path -LiteralPath $target -PathType Leaf)) { Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue }
+        $rollbackAttempted=$true
+        try {
+            foreach($name in $files) {
+                $target=Join-Path $InstallDir ([string]$name)
+                $saved=Join-Path $backup ([string]$name)
+                if ($existing[[string]$name] -and (Test-Path -LiteralPath $saved -PathType Leaf)) {
+                    Copy-Item -LiteralPath $saved -Destination $target -Force
+                }
+                elseif (-not $existing[[string]$name] -and (Test-Path -LiteralPath $target -PathType Leaf)) {
+                    Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+                }
+            }
+            $rollbackSucceeded=$true
         }
-        throw
+        catch {
+            $rollbackSucceeded=$false
+            throw ($installError + ' | Rollback fehlgeschlagen: ' + $_.Exception.Message)
+        }
+        throw $installError
     }
-    Write-Result $true ('Update auf v' + [string]$manifest.version + ' installiert.')
     try { Remove-Item -LiteralPath $WorkDir -Recurse -Force -ErrorAction SilentlyContinue } catch { }
 }
 catch {
-    Write-Result $false $_.Exception.Message
-    Show-UpdateError ('Update fehlgeschlagen: ' + $_.Exception.Message)
+    $failureMessage=$_.Exception.Message
+    Write-Result 'failed' $failureMessage
+    try {
+        $restart = Restart-InstalledApp
+        if ($restart) { try { $restart.Dispose() } catch { } }
+        else { throw 'Lenovo Boot Selector konnte nach dem fehlgeschlagenen Update nicht neu gestartet werden.' }
+    }
+    catch {
+        Show-UpdateError ('Update fehlgeschlagen: ' + $failureMessage + "`r`n`r`nDie App konnte nicht automatisch neu gestartet werden. Bitte starte Lenovo Boot Selector manuell.")
+    }
+}
+finally {
+    try { Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue } catch { }
 }
 '@
     [System.IO.File]::WriteAllText($helperPath,$scriptText,(New-Object System.Text.UTF8Encoding($true)))
@@ -256,13 +348,16 @@ catch {
 }
 
 function Start-LenovoUpdateInstallerHelper {
-    param([Parameter(Mandatory=$true)][string]$WorkDir)
+    param(
+        [Parameter(Mandatory=$true)][string]$WorkDir,
+        [Parameter(Mandatory=$true)][string]$SourceVersion
+    )
     $helper = New-LenovoUpdateInstallerHelper -WorkDir $WorkDir
     $powershell = Join-Path $PSHOME 'powershell.exe'
     if (-not (Test-Path -LiteralPath $powershell)) { $powershell = 'powershell.exe' }
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $powershell
-    $psi.Arguments = ('-NoProfile -ExecutionPolicy Bypass -File "{0}" -ParentPid {1} -InstallDir "{2}" -WorkDir "{3}"' -f $helper,$PID,$PSScriptRoot,$WorkDir)
+    $psi.Arguments = ('-NoProfile -ExecutionPolicy Bypass -File "{0}" -ParentPid {1} -InstallDir "{2}" -WorkDir "{3}" -SourceVersion "{4}"' -f $helper,$PID,$PSScriptRoot,$WorkDir,$SourceVersion)
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
     $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden

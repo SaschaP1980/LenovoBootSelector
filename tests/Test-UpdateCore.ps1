@@ -10,16 +10,20 @@ Assert-Equal 'Newer version compares positive' 1 (Compare-LenovoAppVersionCore -
 Assert-Equal 'Same version compares zero' 0 (Compare-LenovoAppVersionCore -Current '0.5.7' -Candidate '0.5.7')
 Assert-Equal 'Older version compares negative' -1 (Compare-LenovoAppVersionCore -Current '0.5.7' -Candidate '0.5.6')
 Assert-Equal 'Major version comparison' 1 (Compare-LenovoAppVersionCore -Current '0.9.9' -Candidate '1.0.0')
+Assert-Equal 'Legacy three-part equals explicit hotfix zero' 0 (Compare-LenovoAppVersionCore -Current '0.5.7' -Candidate '0.5.7.0')
+Assert-Equal 'Hotfix compares newer than legacy patch' 1 (Compare-LenovoAppVersionCore -Current '0.5.7' -Candidate '0.5.7.1')
+Assert-Equal 'Higher hotfix compares newer' 1 (Compare-LenovoAppVersionCore -Current '0.5.7.1' -Candidate '0.5.7.2')
+Assert-True 'Four-part version parses' ($null -ne (ConvertTo-LenovoVersionCore -Version '0.5.8.0'))
 Assert-True 'Invalid version returns null' ($null -eq (ConvertTo-LenovoVersionCore -Version '0.5'))
 $threw=$false; try { [void](Compare-LenovoAppVersionCore -Current '0.5.7' -Candidate 'dev') } catch { $threw=$true }; Assert-True 'Invalid compare throws' $threw
 
 $files=@('BUILD_INTEGRITY.txt','icon-preview.png','Install-LenovoBootMenuTasks.ps1','LenovoBootMenuTray.ico','LenovoBootMenuTray.ps1','README.md','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','Uninstall-LenovoBootMenuTasks.ps1')
-$valid=[pscustomobject]@{schemaVersion=1;version='0.5.7';file='LenovoBootMenuTray-v0.5.7.zip';sha256=('a'*64);size=123;tag='v0.5.7';packageFiles=$files}
+$valid=[pscustomobject]@{schemaVersion=1;version='0.5.8.0';file='LenovoBootMenuTray-v0.5.8.0.zip';sha256=('a'*64);size=123;tag='v0.5.8.0';packageFiles=$files}
 $r=Test-LenovoUpdateManifestCore -Manifest $valid
 Assert-True 'Valid manifest accepted' $r.IsValid
 Assert-Equal 'Normalized manifest schema version' 1 $r.SchemaVersion
-Assert-Equal 'Normalized manifest version' '0.5.7' $r.Version
-Assert-Equal 'Normalized manifest filename' 'LenovoBootMenuTray-v0.5.7.zip' $r.File
+Assert-Equal 'Normalized manifest version' '0.5.8.0' $r.Version
+Assert-Equal 'Normalized manifest filename' 'LenovoBootMenuTray-v0.5.8.0.zip' $r.File
 Assert-Equal 'Normalized manifest file count' 10 @($r.PackageFiles).Count
 $json=$r | ConvertTo-Json -Depth 10; $round=$json | ConvertFrom-Json; $roundResult=Test-LenovoUpdateManifestCore -Manifest $round; Assert-True 'Manifest survives worker JSON roundtrip' $roundResult.IsValid
 
@@ -37,5 +41,5 @@ $x=$valid.psobject.Copy(); $x.packageFiles=@($files | Where-Object { $_ -ne 'Sta
 $x=$valid.psobject.Copy(); $x.packageFiles=@($files | Where-Object { $_ -ne 'Install-LenovoBootMenuTasks.ps1' }); Assert-True 'Missing installer rejected' (-not (Test-LenovoUpdateManifestCore -Manifest $x).IsValid)
 $x=$valid.psobject.Copy(); $x.packageFiles=@($files | Where-Object { $_ -ne 'Uninstall-LenovoBootMenuTasks.ps1' }); Assert-True 'Missing uninstaller rejected' (-not (Test-LenovoUpdateManifestCore -Manifest $x).IsValid)
 Assert-True 'Null manifest rejected' (-not (Test-LenovoUpdateManifestCore -Manifest $null).IsValid)
-Write-Host "UPDATE TOTAL $checks/26"
-if ($checks -ne 26) { throw "Unexpected update test count $checks" }
+Write-Host "UPDATE TOTAL $checks/30"
+if ($checks -ne 30) { throw "Unexpected update test count $checks" }

@@ -1,4 +1,70 @@
-﻿function Update-UpdateMenuState {
+﻿function Show-PendingUpdateResultOnStartup {
+    $result = Read-LenovoUpdateResult
+    if (-not $result) { return $false }
+
+    $status = ([string]$result.status).Trim().ToLowerInvariant()
+    $sourceVersion = ([string]$result.sourceVersion).Trim()
+    $targetVersion = ([string]$result.targetVersion).Trim()
+    $storedMessage = ([string]$result.message).Trim()
+    $rollbackAttempted = [bool]$result.rollbackAttempted
+    $rollbackSucceeded = [bool]$result.rollbackSucceeded
+    $success = $false
+    $message = $storedMessage
+
+    if ($status -eq 'pending-verification') {
+        try {
+            if (-not $targetVersion) { throw 'Die erwartete Zielversion fehlt im Update-Ergebnis.' }
+            $comparison = Compare-LenovoAppVersionCore -Current $script:AppVersion -Candidate $targetVersion
+            $success = ($comparison -eq 0)
+            if ($success) {
+                $message = ('Lenovo Boot Selector wurde erfolgreich auf v{0} aktualisiert.' -f $targetVersion)
+            }
+            else {
+                $message = ('Die erwartete Zielversion v{0} wurde nach dem Neustart nicht erkannt. Aktuell läuft v{1}.' -f $targetVersion,$script:AppVersion)
+            }
+        }
+        catch {
+            $success = $false
+            $message = $_.Exception.Message
+        }
+    }
+    elseif ($status -eq 'failed') {
+        $success = $false
+        if ([string]::IsNullOrWhiteSpace($message)) { $message = 'Die Aktualisierung konnte nicht abgeschlossen werden.' }
+        if ($rollbackAttempted -and $rollbackSucceeded) {
+            $message = "Die Aktualisierung konnte nicht abgeschlossen werden. Die vorherige Version wurde wiederhergestellt.`r`n`r`nUrsache: $message"
+        }
+    }
+    else {
+        $success = $false
+        $message = ('Unbekannter Update-Ergebnisstatus: {0}' -f $(if ($status) { $status } else { '<leer>' }))
+    }
+
+    Write-RuntimeDiagnosticEvent -Event 'UPDATE_RESTART_RESULT' -Stage 'update-restart' -Success $success -Data (New-RuntimeDiagnosticData @{
+        resultUtc = [string]$result.utc
+        resultStatus = $status
+        sourceVersion = $sourceVersion
+        targetVersion = $targetVersion
+        runningVersion = $script:AppVersion
+        rollbackAttempted = $rollbackAttempted
+        rollbackSucceeded = $rollbackSucceeded
+        resultMessage = $storedMessage
+    }) -Level $(if ($success) { 'info' } else { 'error' })
+
+    # Consume before showing the modal dialog so this result is shown at most once,
+    # even if the process is terminated while the dialog is open.
+    Remove-LenovoUpdateResult
+
+    if ($success) {
+        Show-LenovoNoticeDialog -Title 'Update erfolgreich' -Heading ('Lenovo Boot Selector v{0} ist installiert.' -f $targetVersion) -Message $message -Kind Info
+    }
+    else {
+        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die App konnte nicht erfolgreich aktualisiert werden.' -Message $message -Kind Error
+    }
+    return $true
+}
+
+function Update-UpdateMenuState {
     # Manual update check only: there is intentionally no periodic or startup polling.
     if (-not $script:UpdateState) { return }
     $busy = Test-UpdateRuntimeBusy -State $script:UpdateState
@@ -89,7 +155,7 @@ function Stop-UpdatePrepareUiWorker {
 
 function Exit-TrayForPreparedUpdate {
     param([Parameter(Mandatory=$true)][string]$WorkDir)
-    $helper=Start-LenovoUpdateInstallerHelper -WorkDir $WorkDir
+    $helper=Start-LenovoUpdateInstallerHelper -WorkDir $WorkDir -SourceVersion $script:AppVersion
     if (-not $helper) { throw 'Update-Installer konnte nicht gestartet werden.' }
     Write-RuntimeDiagnosticEvent -Event 'UPDATE_INSTALL_HELPER_STARTED' -Stage 'update-install' -Success $true -Data (New-RuntimeDiagnosticData @{ processId=$helper.Id; version=$script:UpdateState.AvailableManifest.Version })
     try { $helper.Dispose() } catch { }

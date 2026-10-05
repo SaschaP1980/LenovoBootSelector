@@ -747,7 +747,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.5.7.2'
+$script:AppVersion = '0.5.8.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -1947,6 +1947,7 @@ try {
     }
 
     $script:TrayIcon.ContextMenuStrip = $context
+    [void](Show-PendingUpdateResultOnStartup)
     $script:TrayIcon.Add_MouseClick({
         param($sender, $eventArgs)
         if ($eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Left) {

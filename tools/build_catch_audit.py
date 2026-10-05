@@ -4,7 +4,7 @@ from pathlib import Path
 import argparse, json, re, sys
 
 ROOT_DEFAULT = Path(__file__).resolve().parents[1]
-OUTPUT_NAME = 'CATCH_AUDIT_v0.5.7.json'
+OUTPUT_NAME = 'CATCH_AUDIT_v0.5.8.json'
 ALLOWED = {
     'cleanup_best_effort',
     'presentation_best_effort',
@@ -54,7 +54,7 @@ def collect(root: Path) -> dict:
             category,reason=classify(rel,line.strip())
             entries.append({'source':rel,'line':no,'category':category,'reason':reason,'code':line.strip()})
     return {
-        'version':'0.5.7',
+        'version':'0.5.8',
         'scope':'Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.',
         'policy':'Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.',
         'allowed_categories':sorted(ALLOWED),

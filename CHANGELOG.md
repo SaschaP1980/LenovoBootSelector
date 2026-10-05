@@ -1,5 +1,23 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.5.8.0 – Update-Ergebnis nach Neustart bestätigen
+
+v0.5.8.0 erweitert den manuellen Self-Updater um eine persistente Abschlussbestätigung über den Prozessneustart hinweg. Der erfolgreiche reale Web-Update-Test v0.5.7.1 → v0.5.7.2 hat gezeigt, dass der Updatepfad selbst funktioniert; die vorherige Runtime-Diagnose endete jedoch mit der alten Sitzung und zeigte dem Nutzer nach dem Neustart keine explizite Abschlussmeldung.
+
+Änderungen:
+
+- Der unelevierte Installer-Helper schreibt vor dem Neustart ein persistentes Update-Ergebnis unter `%LOCALAPPDATA%\Lenovo Boot Menu Tray\Updates\last-update-result.json`.
+- Ein Update wird zunächst als `pending-verification` markiert. **Erfolg wird erst von der neu gestarteten Tray-App bestätigt**, wenn ihre laufende Version exakt der erwarteten Zielversion entspricht.
+- Nach erfolgreicher Verifikation erscheint einmalig **„Update erfolgreich“** mit der installierten Zielversion.
+- Bei Installations-/Restartfehlern wird weiterhin der bestehende Backup-/Rollback-Pfad verwendet. Der Helper speichert `failed` samt Rollbackstatus und versucht anschließend, die installierte bzw. wiederhergestellte App erneut zu starten.
+- Nach einem fehlgeschlagenen Update erscheint beim nächsten App-Start einmalig **„Update fehlgeschlagen“**; bei erfolgreichem Rollback wird dies ausdrücklich genannt.
+- Das konsumierte Ergebnis wird als `UPDATE_RESTART_RESULT` mit Quellversion, Zielversion, laufender Version und Rollbackstatus in die Runtime-Diagnose der neuen Sitzung übernommen.
+- Das Ergebnis wird vor Anzeige des modalen Dialogs konsumiert, damit dieselbe Abschlussmeldung höchstens einmal erscheint.
+- Versionsschema bleibt **MAJOR.MINOR.PATCH.HOTFIX**; v0.5.8.0 ist der nächste PATCH nach v0.5.7.2.
+- Keine Änderung an Firmware-/BCD-/TaskBroker-/Storage-Pfaden und kein neuer privilegierter Updatekanal.
+
+**Native Prüfung erforderlich:** Update von einer älteren installierten Version auf v0.5.8.0 durchführen und bestätigen, dass nach dem automatischen Neustart genau einmal **„Update erfolgreich“** erscheint. Zusätzlich ist ein kontrollierter Fehler-/Rollbacktest in einer disposable Kopie vorgesehen.
+
 ## v0.5.7.2 – Web-Update-Testrelease
 
 v0.5.7.2 ist ein bewusst minimaler Test-Release für den ersten echten Web-Update-Pfad von v0.5.7.1 auf v0.5.7.2. Gegenüber v0.5.7.1 wurde ausschließlich die Versionsnummer erhöht; es gibt keine weitere funktionale Produktänderung. Auf ausdrücklichen Wunsch wurden für dieses Release keine Tests und kein Handover erzeugt.
