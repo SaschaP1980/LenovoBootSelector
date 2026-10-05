@@ -920,7 +920,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.5.6'
+$script:AppVersion = '0.5.7'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -1163,6 +1163,7 @@ function Test-LenovoUpdateManifestCore {
     $result = [ordered]@{
         IsValid = $false
         Error = ''
+        SchemaVersion = 1
         Version = ''
         File = ''
         Sha256 = ''

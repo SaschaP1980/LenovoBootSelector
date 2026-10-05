@@ -1,5 +1,18 @@
 # Lenovo Boot Selector – Changelog
 
+## v0.5.7 – Update-Manifest-Roundtrip korrigiert
+
+v0.5.7 ist ein enger Updater-Bugfix auf Basis von v0.5.6. Der Fehler trat beim manuellen Update-Check auf: Das Remote-Manifest wurde im Check-Worker zunächst korrekt validiert, das normalisierte Ergebnis verlor jedoch `schemaVersion`. Die Tray-App validierte dieses Worker-Ergebnis ein zweites Mal und lehnte es deshalb mit **„Update-Manifest-Schema wird nicht unterstützt.“** ab.
+
+Änderungen:
+
+- `Test-LenovoUpdateManifestCore` erhält `SchemaVersion = 1` im normalisierten Manifest-Ergebnis.
+- Der Worker→JSON→Tray-Roundtrip bleibt damit vollständig und die zweite Validierung akzeptiert ein zuvor bereits valides Manifest.
+- `Test-UpdateCore.ps1` prüft nun explizit die normalisierte Schema-Version und einen vollständigen JSON-Roundtrip.
+- Downloadquelle, SHA-256-Gate, Paketvalidierung, Backup/Rollback, unelevierter Installer-Helper und alle Boot-/TaskBroker-/Storage-/Privilege-Pfade bleiben unverändert.
+
+**Native Prüfung erforderlich:** v0.5.7 manuell installieren, **„Auf neue Version prüfen…“** ausführen und bestätigen, dass bei aktuellem Stand **„Lenovo Boot Selector v0.5.7 ist aktuell.“** erscheint. Für den ersten echten Self-Update-Erfolg ist anschließend eine spätere Version erforderlich.
+
 ## v0.5.6 – Wartungsmenü thematisch geordnet
 
 v0.5.6 ist ein enger UI-/Menüstruktur-Patch auf Basis von v0.5.5. Die Update-, Boot-, Storage-, TaskBroker- und Privilege-Logik bleibt unverändert.

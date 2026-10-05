@@ -22,6 +22,7 @@ function Test-LenovoUpdateManifestCore {
     $result = [ordered]@{
         IsValid = $false
         Error = ''
+        SchemaVersion = 1
         Version = ''
         File = ''
         Sha256 = ''
