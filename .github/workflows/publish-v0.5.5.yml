@@ -1,0 +1,85 @@
+name: Publish Lenovo Boot Selector v0.5.5
+
+on:
+  push:
+    paths:
+      - '.publish-v0.5.5/READY'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout publishing head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and verify canonical source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .publish-v0.5.5/chunks/part-*.b64part > /tmp/source.zip.b64
+          base64 --decode /tmp/source.zip.b64 > /tmp/Lenovo-Boot-Selector-Source-v0.5.5.zip
+          echo "bc9bc266ac66e476e46eb53404856cf31a361619d26f7aaaf558d90592531bc9  /tmp/Lenovo-Boot-Selector-Source-v0.5.5.zip" | sha256sum -c -
+          test "$(unzip -Z1 /tmp/Lenovo-Boot-Selector-Source-v0.5.5.zip | wc -l)" -eq 132
+          rm -rf /tmp/v055-source /tmp/v055-build /tmp/v055-history
+          mkdir -p /tmp/v055-source /tmp/v055-build /tmp/v055-history
+          unzip -q /tmp/Lenovo-Boot-Selector-Source-v0.5.5.zip -d /tmp/v055-source
+
+      - name: Validate fresh source and deterministic build
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 /tmp/v055-source/tools/build_runtime.py --root /tmp/v055-source --check
+          python3 /tmp/v055-source/tools/build_catch_audit.py --root /tmp/v055-source --check
+          python3 /tmp/v055-source/tests/validate_v055.py --root /tmp/v055-source
+          python3 /tmp/v055-source/tests/validate_v055_core.py --root /tmp/v055-source
+          python3 /tmp/v055-source/tests/validate_v055_boundary.py --root /tmp/v055-source
+          python3 /tmp/v055-source/tools/build_packages.py --root /tmp/v055-source --output-dir /tmp/v055-build
+          echo "8720b71aa04a0a7f97d034225b137eea7472a13e329767dec1edc1db7910660d  /tmp/v055-build/LenovoBootMenuTray-v0.5.5.zip" | sha256sum -c -
+          echo "bc9bc266ac66e476e46eb53404856cf31a361619d26f7aaaf558d90592531bc9  /tmp/v055-build/Lenovo-Boot-Selector-Source-v0.5.5.zip" | sha256sum -c -
+
+      - name: Preserve historical release ZIPs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if compgen -G "downloads/*.zip" > /dev/null; then cp downloads/*.zip /tmp/v055-history/; fi
+          echo "d31be8d7768e436aebfb4d4b620770b7e71ab3a86159014142eaf7f71e1f0e7d  /tmp/v055-history/LenovoBootMenuTray-v0.5.4.zip" | sha256sum -c -
+
+      - name: Create exact v0.5.5 source commit and tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf -- {} +
+          unzip -q /tmp/Lenovo-Boot-Selector-Source-v0.5.5.zip -d .
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Release Lenovo Boot Selector v0.5.5 source"
+          source_commit="$(git rev-parse HEAD)"
+          git tag -a v0.5.5 "$source_commit" -m "Lenovo Boot Selector v0.5.5 | Release SHA256 8720b71aa04a0a7f97d034225b137eea7472a13e329767dec1edc1db7910660d | Source SHA256 bc9bc266ac66e476e46eb53404856cf31a361619d26f7aaaf558d90592531bc9"
+          echo "SOURCE_COMMIT=$source_commit" >> "$GITHUB_ENV"
+
+      - name: Restore build revision history and publish v0.5.5 ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p downloads
+          if compgen -G "/tmp/v055-history/*.zip" > /dev/null; then cp /tmp/v055-history/*.zip downloads/; fi
+          cp /tmp/v055-build/LenovoBootMenuTray-v0.5.5.zip downloads/
+          echo "d31be8d7768e436aebfb4d4b620770b7e71ab3a86159014142eaf7f71e1f0e7d  downloads/LenovoBootMenuTray-v0.5.4.zip" | sha256sum -c -
+          echo "8720b71aa04a0a7f97d034225b137eea7472a13e329767dec1edc1db7910660d  downloads/LenovoBootMenuTray-v0.5.5.zip" | sha256sum -c -
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('downloads/latest.json').read_text())
+          assert data['version']=='0.5.5'
+          assert data['sha256']=='8720b71aa04a0a7f97d034225b137eea7472a13e329767dec1edc1db7910660d'
+          assert data['size']==84797
+          PY
+          git add downloads
+          git commit -m "Publish Lenovo Boot Selector v0.5.5 release"
+          git push --atomic origin HEAD:main refs/tags/v0.5.5
