@@ -2,3 +2,4 @@ source_sha256=c9b84c29c973e7692569febcca52f9ef3c9e5d7c29768631387fe6f1c0ff0ba1
 release_sha256=275aa4177188253fadc983f80dde87c9d950d56f229fb0be12f5aca37d414a90
 source_files=144
 release_size=84906
+retry=1
