@@ -8,7 +8,7 @@
 
 Die Anwendung läuft im Normalbetrieb **uneleviert**. Privilegierte Firmwareänderungen werden ausschließlich über fest definierte, allowgelistete Windows-Scheduled-Tasks ausgeführt. Permanente Änderungen an der UEFI-Bootreihenfolge gehören ausdrücklich nicht zum Produktmodell.
 
-**Aktueller Entwicklungsstand:** v0.5.8.0  
+**Aktueller Entwicklungsstand:** v0.5.8.1  
 **Technik:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads und Revisionshistorie
@@ -39,7 +39,7 @@ Der Updater arbeitet ausschließlich auf ausdrückliche Nutzeraktion. Es gibt **
 
 Die Prüfung liest `downloads/latest.json` aus dem fest eingebauten GitHub-Repository. Eine neue Version wird nur akzeptiert, wenn Manifest, semantische Version, Dateiname, Tag, Größe, SHA-256 und Paketdateiliste valide sind. Das heruntergeladene ZIP wird vor dem Entpacken nochmals gegen Größe und SHA-256 geprüft. Die Installation läuft uneleviert mit lokalem Backup und Rollback; anschließend startet die App über den vorhandenen VBS-Launcher neu.
 
-Ab v0.5.8.0 wird das Ergebnis eines Updateversuchs über den Prozessneustart hinweg gespeichert. Die neu gestartete App bestätigt einen Erfolg erst dann, wenn die tatsächlich laufende Version exakt der erwarteten Zielversion entspricht. Danach erscheint einmalig **„Update erfolgreich“**. Bei einem Installationsfehler wird nach Möglichkeit auf die vorherige Version zurückgerollt, diese erneut gestartet und einmalig **„Update fehlgeschlagen“** angezeigt. Das Ergebnis wird zusätzlich in die Runtime-Diagnose der neuen Sitzung übernommen.
+Ab v0.5.8.0 wird das Ergebnis eines Updateversuchs über den Prozessneustart hinweg gespeichert. Die neu gestartete App bestätigt einen Erfolg erst dann, wenn die tatsächlich laufende Version exakt der erwarteten Zielversion entspricht. Danach erscheint einmalig **„Update erfolgreich“**. Bei einem Installationsfehler wird nach Möglichkeit auf die vorherige Version zurückgerollt, diese erneut gestartet und einmalig **„Update fehlgeschlagen“** angezeigt. Das Ergebnis wird zusätzlich in die Runtime-Diagnose der neuen Sitzung übernommen. v0.5.8.1 ergänzt dabei die einmalige Rückwärtskompatibilität für das von älteren Updater-Helpern geschriebene Legacy-Ergebnisformat `success/message/utc`; ein Legacy-Erfolg wird nur bei einem echten Boolean-`success` akzeptiert, ohne eine nicht gespeicherte Zielversion zu erfinden.
 
 Der Updater verändert keine Firmware-, BCD- oder Scheduled-Task-Konfiguration. Änderungen an privilegierten Systemfunktionen bleiben weiterhin ausschließlich dem bestehenden expliziten Setup-/Repair-/Reinitialize-Pfad vorbehalten.
 

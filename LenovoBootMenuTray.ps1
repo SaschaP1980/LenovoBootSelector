@@ -920,7 +920,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.5.8.0'
+$script:AppVersion = '0.5.8.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -1156,6 +1156,103 @@ function Compare-LenovoAppVersionCore {
     $candidateVersion = ConvertTo-LenovoVersionCore -Version $Candidate
     if (-not $currentVersion -or -not $candidateVersion) { throw 'Ungültiges Versionsformat.' }
     return $candidateVersion.CompareTo($currentVersion)
+}
+
+function Resolve-LenovoUpdateRestartResultCore {
+    param(
+        [AllowNull()]$Result,
+        [Parameter(Mandatory=$true)][string]$RunningVersion
+    )
+
+    $running = ([string]$RunningVersion).Trim()
+    if (-not (ConvertTo-LenovoVersionCore -Version $running)) { throw 'Ungültige laufende App-Version.' }
+
+    $status = ''
+    $sourceVersion = ''
+    $targetVersion = ''
+    $storedMessage = ''
+    $resultUtc = ''
+    $rollbackAttempted = $false
+    $rollbackSucceeded = $false
+    $legacySuccessProperty = $null
+    if ($Result) {
+        $status = ([string]$Result.status).Trim().ToLowerInvariant()
+        $sourceVersion = ([string]$Result.sourceVersion).Trim()
+        $targetVersion = ([string]$Result.targetVersion).Trim()
+        $storedMessage = ([string]$Result.message).Trim()
+        $resultUtc = [string]$Result.utc
+        $rollbackAttempted = [bool]$Result.rollbackAttempted
+        $rollbackSucceeded = [bool]$Result.rollbackSucceeded
+        $legacySuccessProperty = $Result.PSObject.Properties['success']
+    }
+
+    # v0.5.7.2 and older updater helpers persisted { utc, success, message }.
+    # Treat that shape as legacy only when status is absent and success is a real Boolean.
+    # If a status exists, the v0.5.8.x status contract always wins.
+    $isLegacyResult = (-not $status -and $null -ne $legacySuccessProperty -and ($legacySuccessProperty.Value -is [bool]))
+    $resultFormat = $(if ($status) { 'status' } elseif ($isLegacyResult) { 'legacy-success' } else { 'unknown' })
+    $legacySuccess = $null
+    $success = $false
+    $message = $storedMessage
+    $displayVersion = $targetVersion
+
+    if ($status -eq 'pending-verification') {
+        try {
+            if (-not $targetVersion) { throw 'Die erwartete Zielversion fehlt im Update-Ergebnis.' }
+            $comparison = Compare-LenovoAppVersionCore -Current $running -Candidate $targetVersion
+            $success = ($comparison -eq 0)
+            if ($success) {
+                $message = ('Lenovo Boot Selector wurde erfolgreich auf v{0} aktualisiert.' -f $targetVersion)
+            }
+            else {
+                $message = ('Die erwartete Zielversion v{0} wurde nach dem Neustart nicht erkannt. Aktuell läuft v{1}.' -f $targetVersion,$running)
+            }
+        }
+        catch {
+            $success = $false
+            $message = $_.Exception.Message
+        }
+    }
+    elseif ($status -eq 'failed') {
+        $success = $false
+        if ([string]::IsNullOrWhiteSpace($message)) { $message = 'Die Aktualisierung konnte nicht abgeschlossen werden.' }
+        if ($rollbackAttempted -and $rollbackSucceeded) {
+            $message = "Die Aktualisierung konnte nicht abgeschlossen werden. Die vorherige Version wurde wiederhergestellt.`r`n`r`nUrsache: $message"
+        }
+    }
+    elseif ($isLegacyResult) {
+        $legacySuccess = [bool]$legacySuccessProperty.Value
+        $success = $legacySuccess
+        if ($success) {
+            # Legacy records carry no trustworthy targetVersion. Report only the version
+            # that is demonstrably running and leave TargetVersion empty in diagnostics.
+            $displayVersion = $running
+            $message = ('Lenovo Boot Selector wurde erfolgreich aktualisiert. Aktuell läuft v{0}.' -f $running)
+        }
+        elseif ([string]::IsNullOrWhiteSpace($message)) {
+            $message = 'Die Aktualisierung konnte nicht abgeschlossen werden.'
+        }
+    }
+    else {
+        $success = $false
+        $message = ('Unbekannter Update-Ergebnisstatus: {0}' -f $(if ($status) { $status } else { '<leer>' }))
+    }
+
+    return [pscustomobject][ordered]@{
+        Success = $success
+        Message = $message
+        DisplayVersion = $displayVersion
+        ResultFormat = $resultFormat
+        LegacySuccess = $legacySuccess
+        ResultUtc = $resultUtc
+        ResultStatus = $status
+        SourceVersion = $sourceVersion
+        TargetVersion = $targetVersion
+        RunningVersion = $running
+        RollbackAttempted = $rollbackAttempted
+        RollbackSucceeded = $rollbackSucceeded
+        StoredMessage = $storedMessage
+    }
 }
 
 function Test-LenovoUpdateManifestCore {
@@ -2124,64 +2221,30 @@ function Show-PendingUpdateResultOnStartup {
     $result = Read-LenovoUpdateResult
     if (-not $result) { return $false }
 
-    $status = ([string]$result.status).Trim().ToLowerInvariant()
-    $sourceVersion = ([string]$result.sourceVersion).Trim()
-    $targetVersion = ([string]$result.targetVersion).Trim()
-    $storedMessage = ([string]$result.message).Trim()
-    $rollbackAttempted = [bool]$result.rollbackAttempted
-    $rollbackSucceeded = [bool]$result.rollbackSucceeded
-    $success = $false
-    $message = $storedMessage
+    $resolved = Resolve-LenovoUpdateRestartResultCore -Result $result -RunningVersion $script:AppVersion
 
-    if ($status -eq 'pending-verification') {
-        try {
-            if (-not $targetVersion) { throw 'Die erwartete Zielversion fehlt im Update-Ergebnis.' }
-            $comparison = Compare-LenovoAppVersionCore -Current $script:AppVersion -Candidate $targetVersion
-            $success = ($comparison -eq 0)
-            if ($success) {
-                $message = ('Lenovo Boot Selector wurde erfolgreich auf v{0} aktualisiert.' -f $targetVersion)
-            }
-            else {
-                $message = ('Die erwartete Zielversion v{0} wurde nach dem Neustart nicht erkannt. Aktuell läuft v{1}.' -f $targetVersion,$script:AppVersion)
-            }
-        }
-        catch {
-            $success = $false
-            $message = $_.Exception.Message
-        }
-    }
-    elseif ($status -eq 'failed') {
-        $success = $false
-        if ([string]::IsNullOrWhiteSpace($message)) { $message = 'Die Aktualisierung konnte nicht abgeschlossen werden.' }
-        if ($rollbackAttempted -and $rollbackSucceeded) {
-            $message = "Die Aktualisierung konnte nicht abgeschlossen werden. Die vorherige Version wurde wiederhergestellt.`r`n`r`nUrsache: $message"
-        }
-    }
-    else {
-        $success = $false
-        $message = ('Unbekannter Update-Ergebnisstatus: {0}' -f $(if ($status) { $status } else { '<leer>' }))
-    }
-
-    Write-RuntimeDiagnosticEvent -Event 'UPDATE_RESTART_RESULT' -Stage 'update-restart' -Success $success -Data (New-RuntimeDiagnosticData @{
-        resultUtc = [string]$result.utc
-        resultStatus = $status
-        sourceVersion = $sourceVersion
-        targetVersion = $targetVersion
-        runningVersion = $script:AppVersion
-        rollbackAttempted = $rollbackAttempted
-        rollbackSucceeded = $rollbackSucceeded
-        resultMessage = $storedMessage
-    }) -Level $(if ($success) { 'info' } else { 'error' })
+    Write-RuntimeDiagnosticEvent -Event 'UPDATE_RESTART_RESULT' -Stage 'update-restart' -Success $resolved.Success -Data (New-RuntimeDiagnosticData @{
+        resultUtc = $resolved.ResultUtc
+        resultStatus = $resolved.ResultStatus
+        resultFormat = $resolved.ResultFormat
+        legacySuccess = $resolved.LegacySuccess
+        sourceVersion = $resolved.SourceVersion
+        targetVersion = $resolved.TargetVersion
+        runningVersion = $resolved.RunningVersion
+        rollbackAttempted = $resolved.RollbackAttempted
+        rollbackSucceeded = $resolved.RollbackSucceeded
+        resultMessage = $resolved.StoredMessage
+    }) -Level $(if ($resolved.Success) { 'info' } else { 'error' })
 
     # Consume before showing the modal dialog so this result is shown at most once,
     # even if the process is terminated while the dialog is open.
     Remove-LenovoUpdateResult
 
-    if ($success) {
-        Show-LenovoNoticeDialog -Title 'Update erfolgreich' -Heading ('Lenovo Boot Selector v{0} ist installiert.' -f $targetVersion) -Message $message -Kind Info
+    if ($resolved.Success) {
+        Show-LenovoNoticeDialog -Title 'Update erfolgreich' -Heading ('Lenovo Boot Selector v{0} ist installiert.' -f $resolved.DisplayVersion) -Message $resolved.Message -Kind Info
     }
     else {
-        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die App konnte nicht erfolgreich aktualisiert werden.' -Message $message -Kind Error
+        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die App konnte nicht erfolgreich aktualisiert werden.' -Message $resolved.Message -Kind Error
     }
     return $true
 }
