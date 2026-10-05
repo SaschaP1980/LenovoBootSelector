@@ -1,5 +1,15 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.5.10.3 – Version-only Performance-Optimierungstest 2
+
+v0.5.10.3 ist ein reiner Hotfix zur Messung des weiter optimierten End-to-End-Releasepfads. Gegenüber v0.5.10.2 gibt es keine funktionale Produktänderung.
+
+- Version von `0.5.10.2` auf `0.5.10.3` erhöht.
+- `releaseProfile` bleibt `version-only`.
+- LBS-8 / Squash Merge ist ausdrücklich nicht Bestandteil dieses Builds.
+- Keine Änderung an Produkt-Runtime, Update-Verhalten, BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
+- Der Lauf misst alle Schritte, protokolliert Fehler und Retries und nutzt den verifizierten v0.5.10.2-Source-Cache.
+
 ## v0.5.10.2 – Version-only Performance-Optimierungstest
 
 v0.5.10.2 ist ein reiner Hotfix zur erneuten End-to-End-Performance-Messung des permanenten Releasepfads. Gegenüber v0.5.10.1 gibt es keine funktionale Produktänderung.
