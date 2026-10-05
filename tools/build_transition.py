@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import argparse, hashlib, zipfile
 
-VERSION='0.5.5'
+VERSION='0.5.6'
 STAMP=(2026,10,5,0,0,0)
 HANDOVER_NAMES=[
     f'Lenovo-Boot-Menu-Tray-Validation-v{VERSION}.txt',

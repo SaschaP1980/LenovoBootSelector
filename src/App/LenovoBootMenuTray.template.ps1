@@ -747,7 +747,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.5.5'
+$script:AppVersion = '0.5.6'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -1893,13 +1893,6 @@ try {
     [void]$maintenanceRoot.DropDownItems.Add($removeTasksItem)
 
     [void]$maintenanceRoot.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
-    $diagnosticItem = New-Object System.Windows.Forms.ToolStripMenuItem('Diagnose speichern…')
-    $diagnosticItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
-    $diagnosticItem.Add_Click({ Save-RuntimeDiagnosticsFromUi })
-    $script:RuntimeDiagnosticMenuItem = $diagnosticItem
-    [void]$maintenanceRoot.DropDownItems.Add($diagnosticItem)
-
-    [void]$maintenanceRoot.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
     $updateCheckItem = New-Object System.Windows.Forms.ToolStripMenuItem('Auf neue Version prüfen…')
     $updateCheckItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
     $updateCheckItem.Add_Click({ Start-ManualUpdateCheck })
@@ -1913,6 +1906,13 @@ try {
     $script:UpdateInstallMenuItem = $updateInstallItem
     [void]$maintenanceRoot.DropDownItems.Add($updateInstallItem)
     Update-UpdateMenuState
+
+    [void]$maintenanceRoot.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+    $diagnosticItem = New-Object System.Windows.Forms.ToolStripMenuItem('Diagnose speichern…')
+    $diagnosticItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $diagnosticItem.Add_Click({ Save-RuntimeDiagnosticsFromUi })
+    $script:RuntimeDiagnosticMenuItem = $diagnosticItem
+    [void]$maintenanceRoot.DropDownItems.Add($diagnosticItem)
 
     [void]$context.Items.Add($maintenanceRoot)
 

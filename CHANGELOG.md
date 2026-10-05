@@ -1,5 +1,19 @@
 # Lenovo Boot Selector – Changelog
 
+## v0.5.6 – Wartungsmenü thematisch geordnet
+
+v0.5.6 ist ein enger UI-/Menüstruktur-Patch auf Basis von v0.5.5. Die Update-, Boot-, Storage-, TaskBroker- und Privilege-Logik bleibt unverändert.
+
+Änderungen:
+
+- Im Untermenü **Wartung** bleiben die thematischen Blöcke erhalten und werden jetzt klar in der Reihenfolge **Systemfunktionen → Updates → Diagnose** dargestellt.
+- **„Diagnose speichern…“** steht als letzter Eintrag ganz unten im Wartungs-Untermenü.
+- Zwischen Systemfunktionen und Updates sowie zwischen Updates und Diagnose steht jeweils genau ein Separator.
+- **„Auf neue Version prüfen…“** und **„App aktualisieren…“** behalten ihre v0.5.5-Funktion und -Semantik unverändert bei.
+- Keine Änderung an Self-Updater-Download/Hash/Backup/Rollback, Firmware-/BCD-Pfaden, Scheduled Tasks, Storage-Erkennung oder Bootziel-Logik.
+
+**Native Prüfung erforderlich:** Wartungs-Untermenü öffnen und die Reihenfolge Systemfunktionen → Updates → Diagnose sowie die beiden Separatoren visuell bestätigen. Die v0.5.5-Updater-Funktion kurz regressiv prüfen.
+
 ## v0.5.5 – Manueller Self-Updater
 
 v0.5.5 führt einen explizit vom Benutzer gestarteten Self-Updater ein. Es gibt weiterhin keinerlei periodische oder automatische Update-Prüfung.
