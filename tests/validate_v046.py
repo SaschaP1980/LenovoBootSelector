@@ -115,7 +115,7 @@ def main():
     for name in DEAD_GLOBALS:
         s.no(f'Dead script global removed: {name}',tray,f'$script:{name}')
 
-    audit=root/'CATCH_AUDIT_v0.4.6.json'; s.c('Catch audit exists',audit.is_file())
+    audit=root/'audits/CATCH_AUDIT_v0.4.6.json'; s.c('Catch audit exists',audit.is_file())
     if audit.is_file():
         data=json.loads(audit.read_text(encoding='utf-8'))
         s.eq('Catch audit version',data.get('version'),'0.4.6')

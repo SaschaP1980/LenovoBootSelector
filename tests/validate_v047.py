@@ -175,8 +175,8 @@ def main():
     s.eq('PowerShell source count is 36',len(list(root.rglob('*.ps1'))),36)
 
     # Catch audit and build generators updated.
-    audit=root/'CATCH_AUDIT_v0.4.7.json'; s.c('v0.4.7 catch audit exists',audit.is_file())
-    s.c('v0.4.6 catch audit removed',not (root/'CATCH_AUDIT_v0.4.6.json').exists())
+    audit=root/'audits/CATCH_AUDIT_v0.4.7.json'; s.c('v0.4.7 catch audit exists',audit.is_file())
+    s.c('v0.4.6 catch audit removed',not (root/'audits/CATCH_AUDIT_v0.4.6.json').exists())
     if audit.is_file():
         data=json.loads(audit.read_text(encoding='utf-8')); s.eq('Catch audit version',data.get('version'),'0.4.7'); s.eq('Catch audit count is entries',data.get('count'),len(data.get('entries',[])))
     cp=subprocess.run([sys.executable,str(root/'tools/build_catch_audit.py'),'--root',str(root),'--check'],capture_output=True,text=True); s.eq('Catch audit deterministic',cp.returncode,0)
