@@ -4,11 +4,13 @@
   <img src="bin/icon-preview.png" alt="Lenovo Boot Selector" width="96">
 </p>
 
+## Overview
+
 **Lenovo Boot Selector** is a Windows tray application for Lenovo systems with two complementary boot-selection modes: choose any existing firmware target as the **one-time target for the next boot**, or configure a **persistent default boot target** that is automatically prepared again for the following boot after every Windows system start.
 
 The persistent default is restored by a fixed SYSTEM Scheduled Task and therefore does **not require a user to log on**. When every participating Windows installation is configured this way, a target such as the Lenovo Boot Menu can effectively become the recurring hand-off point for subsequent boots—without permanently rewriting the UEFI boot order.
 
-## Why this tool exists
+## Motivation
 
 The project was created to solve a very specific problem: on the Lenovo laptop used for development, **F12** and sometimes **Enter** are not always detected reliably during the early boot phase. This affects both the internal laptop keyboard and keyboards connected through a USB dongle. If the key press is missed during that short window, the expected boot menu does not appear—instead, the first regular boot target starts immediately, typically the Windows installation on the first NVMe SSD.
 
@@ -34,6 +36,22 @@ The tool deliberately follows three technical goals:
 
 Lenovo Boot Selector is therefore not a BIOS/UEFI replacement and not a bootloader. It is a Windows interface for a controlled **One-Shot Next Boot** workflow and for systems where classic pre-boot keyboard selection is not reliable enough.
 
+## Features
+
+- select an existing firmware boot target for the **next boot**
+- clear tray/popup UI in a Lenovo black/red visual style
+- friendly names for known firmware targets
+- persistent default boot target through the hardened TaskBroker, restored at Windows system startup without requiring user logon
+- restart Windows directly from the application
+- autostart without a visible PowerShell/CMD window
+- manage ordering and visibility of displayed boot targets
+- read-only firmware-target drift detection
+- read-only storage context for internal NVMe and USB media
+- diagnostic export and maintenance functions
+- manual self-updater with the current German UI actions `Auf neue Version prüfen…` and `App aktualisieren…`
+
+## Security and maintenance notes
+
 The application runs **unelevated** during normal operation. Privileged firmware mutations are executed only through fixed, allowlisted Windows Scheduled Tasks. Permanent changes to the UEFI boot order are explicitly outside the product model.
 
 Since v0.6.4.0 this boundary is additionally hardened fail-closed: the runtime TaskBroker no longer accepts arbitrary task names and instead accepts only fixed operation types; target-specific task names are derived only from validated, installed firmware GUIDs. TaskBroker state and metadata are read-only for normal users, and the task DACL is validated/repaired to Read+Execute only. The canonical contract is documented in [docs/SECURITY_BOUNDARY.md](docs/SECURITY_BOUNDARY.md).
@@ -52,20 +70,6 @@ Versioned builds are stored under [`downloads/`](downloads/). Every product sour
 The latest machine-readable update metadata is stored in [`downloads/latest.json`](downloads/latest.json). The product version history is maintained in [CHANGELOG.md](CHANGELOG.md).
 
 Version format: **MAJOR.MINOR.PATCH.HOTFIX**. Historical three-component versions are compared as if `HOTFIX = 0`.
-
-## Features
-
-- select an existing firmware boot target for the **next boot**
-- clear tray/popup UI in a Lenovo black/red visual style
-- friendly names for known firmware targets
-- persistent default boot target through the hardened TaskBroker, restored at Windows system startup without requiring user logon
-- restart Windows directly from the application
-- autostart without a visible PowerShell/CMD window
-- manage ordering and visibility of displayed boot targets
-- read-only firmware-target drift detection
-- read-only storage context for internal NVMe and USB media
-- diagnostic export and maintenance functions
-- manual self-updater with the current German UI actions `Auf neue Version prüfen…` and `App aktualisieren…`
 
 ## Update function
 
