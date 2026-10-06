@@ -1,4 +1,51 @@
-# GitHub How-To for Lenovo Boot Selector
+# GitHub How-To
+
+## Bootstrap für einen neuen Chat
+
+Wenn ein neuer Chat die Entwicklung, einen Build, einen Hotfix oder ein GitHub-Release für Lenovo Boot Selector übernimmt, darf er **nicht** aus Gesprächserinnerung oder einem alten Handover heraus direkt handeln. Zuerst muss der aktuelle kanonische Repository-Zustand rekonstruiert werden.
+
+Verbindliche Reihenfolge:
+
+1. **Aktuellen `main`-Stand lesen und SHA/Tree festhalten.**
+2. **Diese `docs/GITHUB_HOWTO.md` vollständig aus dem aktuellen `main` lesen.**
+3. **`docs/RELEASE_PROCESS.md` vollständig lesen.**
+4. Bei Issue-getriebener Arbeit das **aktuelle GitHub Issue** inklusive Status, Labels, Kommentare und Akzeptanzkriterien lesen.
+5. **`bin/version.json`** lesen und aktuelle Version, `releaseProfile`, `protectedFragmentIntent` und `repositoryDeleteIntent` prüfen.
+6. Die relevanten ausführbaren Verträge gegenlesen:
+   - `.github/workflows/candidate-preflight.yml`
+   - `.github/workflows/release.yml`
+   - `tools/candidate_preflight.py`
+   - `tools/release_verification.py`
+   - die vier permanenten Validatoren unter `tests/`
+7. Erst danach Scope, Zielversion und Implementierungs-/Releaseplan festlegen und Änderungen vorbereiten.
+
+### Autoritätsreihenfolge
+
+Bei Widersprüchen gilt:
+
+1. aktueller GitHub-`main` einschließlich ausführbarer Workflows/Tools;
+2. normative aktuelle Dokumente `docs/GITHUB_HOWTO.md` und `docs/RELEASE_PROCESS.md`;
+3. aktuelle GitHub Issues und deren Kommentare;
+4. Handover-Dokumente und Chat-Historie.
+
+Ein Handover ist damit **Einstiegshilfe, nicht Source of Truth**. Vor jeder tatsächlichen Änderung muss der neue Chat den aktuellen GitHub-Zustand erneut prüfen.
+
+### Minimaler Startcheck vor jeder Umsetzung
+
+Bevor Code oder Release-Refs erzeugt werden, muss der neue Chat mindestens beantworten können:
+
+- Welcher SHA ist aktuelles `main`?
+- Welche Produktversion ist aktuell?
+- Welches Issue bzw. welcher Hotfix-Scope autorisiert die Änderung?
+- Ist dafür Major, Minor, Patch oder Hotfix vorgesehen?
+- Welches Releaseprofil ist korrekt: `version-only` oder `patch`?
+- Welche Dateien dürfen sich fachlich ändern?
+- Welche Candidate-/Release-Gates müssen anschließend GREEN sein?
+- Welche nativen Windows-Tests wurden tatsächlich ausgeführt und welche nur statisch/CI-seitig geprüft?
+
+Wenn eine dieser Grundlagen unklar ist, zuerst Repository/Issue nachlesen statt zu raten.
+
+ for Lenovo Boot Selector
 
 This document is the operational playbook for ChatGPT when maintaining and publishing **Lenovo Boot Selector** with the user.
 
