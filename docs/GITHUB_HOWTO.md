@@ -139,6 +139,32 @@ GitHub owns the canonical `publishedUtc`; a local timestamp is never the publica
 
 If native Windows/PowerShell/WinForms tests have not actually been executed on Windows, never report them as passed. Static/source-contract coverage is not a substitute for a native pass.
 
+## Candidate-tree preflight before release branch creation
+
+The four permanent validators are not only GitHub publication gates; they are a **hard precondition for creating `release/v<version>`**.
+
+The exact candidate tree that is about to become the release-branch head must first be materialized in a fresh workspace and run through:
+
+1. deterministic runtime/build preparation;
+2. `tests/validate_release.py`;
+3. `tests/validate_core.py`;
+4. `tests/validate_boundary.py`;
+5. `tests/validate_regression.py`.
+
+Do not create the release branch merely because the diff was visually inspected. A source-level diff can be correct while a characterization/frozen-fragment contract still requires an intentional update. This was demonstrated by v0.6.4.0 run #20: two deliberately changed security functions were still treated as frozen by the Core gate. The GitHub workflow correctly rejected the branch, but the same failure was deterministically detectable before the first release push.
+
+For connector-driven releases, this means the candidate Git tree/commit may be assembled first, but the visible `release/v<version>` ref must not be created until that exact candidate content has passed the local/fresh-workspace preflight.
+
+### Protected-fragment intent must be per-change, not a permanent bypass
+
+A permanent allowlist such as `INTENTIONALLY_CHANGED_FROZEN` must not become a long-term bypass for protected functions.
+
+If a protected/frozen function intentionally changes, the release tooling should compare the candidate against the **previous canonical basis** and require explicit change intent for exactly the protected fragments changed by that release. The declaration and the actual changed-fragment set should match exactly: no undeclared protected changes and no stale/extra declarations.
+
+After the release, future modifications to that function must again be detectable. Merely checking that its hash is “different from an old historical baseline” is insufficient because any later modification would continue to satisfy that condition.
+
+The GitHub Release Orchestrator keeps the same validators as a second, authoritative backstop; preflight reduces avoidable failed release runs but does not replace server-side verification.
+
 ## Canonical publication model
 
 For a product build:

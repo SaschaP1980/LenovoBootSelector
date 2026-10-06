@@ -19,6 +19,14 @@ Operational companion for ChatGPT/release supervision: [`GITHUB_HOWTO.md`](GITHU
 3. Run the four permanent validators: `validate_release.py`, `validate_core.py`, `validate_boundary.py`, `validate_regression.py`.
 4. Push the canonical input changes to `release/v<version>`; do not add the new release ZIP manually. Generated runtime/audit/metadata files may already be present from the local build, but GitHub recreates them deterministically before the PR commit.
 
+## Mandatory candidate preflight
+
+Before `release/v<version>` is created, the exact candidate tree must pass deterministic preparation plus all four permanent validators in a fresh workspace. This is a hard release-entry gate, not an optional confidence check.
+
+Protected/frozen-fragment exceptions must be scoped to the current candidate-versus-previous-canonical-basis delta. Do not turn an intentionally changed protected function into a permanent hash bypass: future changes to that function must remain detectable.
+
+This preflight would have caught the v0.6.4.0 run #20 Core-gate failure before the first release-branch push. GitHub repeats the gates authoritatively after push.
+
 ## GitHub publication
 
 `release.yml` runs on `release/**`. Once a hosted runner is actually executing the job, it captures the canonical `publishedUtc`, then deterministically recreates all generated release files from the canonical inputs plus that single GitHub-owned timestamp. It verifies a second in-run rebuild byte-for-byte, derives a ZIP-free source commit without creating a source branch, adds exactly one new historical release ZIP to the same release branch and opens exactly one pull request.
