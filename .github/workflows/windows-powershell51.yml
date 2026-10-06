@@ -1,0 +1,268 @@
+name: Windows PowerShell 5.1 Gate
+
+on:
+  workflow_call:
+    outputs:
+      summary:
+        description: Machine-readable Windows PowerShell 5.1 result summary.
+        value: ${{ jobs.windows.outputs.summary }}
+      started_utc:
+        description: UTC timestamp captured when the Windows runner starts executing.
+        value: ${{ jobs.windows.outputs.started_utc }}
+      completed_utc:
+        description: UTC timestamp captured after the Windows test suite completes.
+        value: ${{ jobs.windows.outputs.completed_utc }}
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  windows:
+    name: Windows PowerShell 5.1
+    runs-on: windows-2025
+    outputs:
+      summary: ${{ steps.run.outputs.summary }}
+      started_utc: ${{ steps.start.outputs.started_utc }}
+      completed_utc: ${{ steps.run.outputs.completed_utc }}
+    steps:
+      - name: Record Windows runner start
+        id: start
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $started = [DateTimeOffset]::UtcNow.ToString('o')
+          $utf8 = New-Object System.Text.UTF8Encoding -ArgumentList $false
+          [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "started_utc=$started`n", $utf8)
+          Write-Host "WINDOWS_RUNNER_STARTED_UTC=$started"
+
+          if ($env:GITHUB_EVENT_NAME -eq 'push') {
+              gh api --method POST "repos/$env:GITHUB_REPOSITORY/statuses/$env:GITHUB_SHA" -f "state=pending" -f "context=preflight/windows-powershell51" -f "description=Windows PowerShell 5.1 candidate gate is running" | Out-Null
+              if ($LASTEXITCODE -ne 0) { throw 'Unable to publish Windows preflight pending status.' }
+          }
+
+      - name: Checkout exact revision
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Initialize runtime and run Windows PowerShell 5.1 suite
+        id: run
+        shell: powershell
+        env:
+          STARTED_UTC: ${{ steps.start.outputs.started_utc }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $utf8 = New-Object System.Text.UTF8Encoding -ArgumentList $false
+
+          function Write-GitHubOutput([string]$Name, [string]$Value) {
+              [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "$Name=$Value`n", $utf8)
+          }
+
+          function Assert-ExitCode([string]$Action) {
+              if ($LASTEXITCODE -ne 0) {
+                  throw "$Action failed with exit code $LASTEXITCODE"
+              }
+          }
+
+          function Get-TestTotal([string]$Text, [string]$Pattern) {
+              $match = [regex]::Match(
+                  $Text,
+                  $Pattern,
+                  [System.Text.RegularExpressions.RegexOptions]::Multiline
+              )
+              if (-not $match.Success) {
+                  return [ordered]@{ found = $false; passed = 0; expected = 0 }
+              }
+              return [ordered]@{
+                  found = $true
+                  passed = [int]$match.Groups[1].Value
+                  expected = [int]$match.Groups[2].Value
+              }
+          }
+
+          $started = [DateTimeOffset]::Parse($env:STARTED_UTC)
+          $head = (& git rev-parse HEAD).Trim()
+          Assert-ExitCode 'git rev-parse HEAD'
+          if ($head -ne $env:GITHUB_SHA) {
+              throw "Windows checkout SHA mismatch: HEAD=$head GITHUB_SHA=$env:GITHUB_SHA"
+          }
+
+          $versionConfig = Get-Content -LiteralPath '.\bin\version.json' -Raw | ConvertFrom-Json
+          $version = [string]$versionConfig.version
+          if ($env:GITHUB_EVENT_NAME -eq 'push') {
+              $expectedRef = "candidate/v$version"
+              if ($env:GITHUB_REF_NAME -ne $expectedRef) {
+                  throw "Windows candidate ref mismatch: $($env:GITHUB_REF_NAME) != $expectedRef"
+              }
+          }
+
+          $psVersion = $PSVersionTable.PSVersion.ToString()
+          if ($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1) {
+              throw "Expected Windows PowerShell 5.1, got $psVersion"
+          }
+          Write-Host "WINDOWS_POWERSHELL_VERSION=$psVersion"
+
+          $runtimeStarted = [DateTimeOffset]::UtcNow
+          & python -B tools/build_runtime.py --root .
+          Assert-ExitCode 'Runtime generation'
+          & python -B tools/build_runtime.py --root . --check
+          Assert-ExitCode 'Runtime deterministic check'
+          $runtimeCompleted = [DateTimeOffset]::UtcNow
+
+          $unexpectedChanges = @(
+              & git status --porcelain --untracked-files=all |
+                  Where-Object { $_ -and ($_ -notmatch 'bin/LenovoBootMenuTray\.ps1$') }
+          )
+          if ($unexpectedChanges.Count -gt 0) {
+              throw "Windows initialization changed unexpected paths: $($unexpectedChanges -join '; ')"
+          }
+
+          $testStarted = [DateTimeOffset]::UtcNow
+          $logPath = Join-Path $PWD 'windows-powershell51.log'
+          $testFailure = $null
+          try {
+              & .\tests\Test-WindowsPowerShell51.ps1 *>&1 |
+                  Tee-Object -FilePath $logPath
+          }
+          catch {
+              $testFailure = $_.Exception.Message
+              ($_ | Out-String) | Tee-Object -FilePath $logPath -Append | Write-Host
+          }
+          $testCompleted = [DateTimeOffset]::UtcNow
+
+          $logText = if (Test-Path -LiteralPath $logPath) {
+              Get-Content -LiteralPath $logPath -Raw
+          } else {
+              ''
+          }
+
+          $totals = [ordered]@{
+              parser = Get-TestTotal $logText '^PARSER TOTAL\s+(\d+)/(\d+)\s*$'
+              functionalCore = Get-TestTotal $logText '^TOTAL\s+(\d+)/(\d+)\s*$'
+              refreshRuntime = Get-TestTotal $logText '^REFRESH TOTAL\s+(\d+)/(\d+)\s*$'
+              mutex = Get-TestTotal $logText '^MUTEX TOTAL\s+(\d+)/(\d+)\s*$'
+              architectureSoak = Get-TestTotal $logText '^SOAK TOTAL\s+(\d+)/(\d+)\s*$'
+              maintenance = Get-TestTotal $logText '^MAINTENANCE TOTAL\s+(\d+)/(\d+)\s*$'
+              bootTargetDrift = Get-TestTotal $logText '^DRIFT TOTAL\s+(\d+)/(\d+)\s*$'
+              taskBrokerBoundary = Get-TestTotal $logText '^TASKBROKER BOUNDARY TOTAL\s+(\d+)/(\d+)\s*$'
+              updateAssertionSource = Get-TestTotal $logText '^UPDATE ASSERTION SOURCE\s+(\d+)/(\d+)\s*$'
+              updateCore = Get-TestTotal $logText '^UPDATE TOTAL\s+(\d+)/(\d+)\s*$'
+          }
+
+          foreach ($name in @(
+              'parser',
+              'functionalCore',
+              'refreshRuntime',
+              'mutex',
+              'architectureSoak',
+              'maintenance',
+              'bootTargetDrift',
+              'taskBrokerBoundary',
+              'updateAssertionSource',
+              'updateCore'
+          )) {
+              $row = $totals[$name]
+              if (-not $row.found -or $row.passed -ne $row.expected) {
+                  if (-not $testFailure) {
+                      $testFailure = "Missing or failing test total: $name"
+                  }
+              }
+          }
+
+          $functionalPassed = (
+              $totals.functionalCore.passed +
+              $totals.refreshRuntime.passed +
+              $totals.mutex.passed +
+              $totals.architectureSoak.passed +
+              $totals.maintenance.passed +
+              $totals.bootTargetDrift.passed +
+              $totals.taskBrokerBoundary.passed +
+              $totals.updateCore.passed
+          )
+          $functionalExpected = (
+              $totals.functionalCore.expected +
+              $totals.refreshRuntime.expected +
+              $totals.mutex.expected +
+              $totals.architectureSoak.expected +
+              $totals.maintenance.expected +
+              $totals.bootTargetDrift.expected +
+              $totals.taskBrokerBoundary.expected +
+              $totals.updateCore.expected
+          )
+
+          $completed = [DateTimeOffset]::UtcNow
+          $mode = if ($env:GITHUB_EVENT_NAME -eq 'push') { 'required-candidate-gate' } else { 'manual-benchmark' }
+          $result = if ($testFailure) { 'FAIL' } else { 'PASS' }
+          $summary = [ordered]@{
+              schemaVersion = 1
+              result = $result
+              mode = $mode
+              candidateSha = $env:GITHUB_SHA
+              version = $version
+              powerShellVersion = $psVersion
+              runner = [ordered]@{
+                  os = $env:RUNNER_OS
+                  imageOS = $env:ImageOS
+                  imageVersion = $env:ImageVersion
+              }
+              totals = $totals
+              aggregate = [ordered]@{
+                  parserPassed = $totals.parser.passed
+                  parserExpected = $totals.parser.expected
+                  functionalPassed = $functionalPassed
+                  functionalExpected = $functionalExpected
+              }
+              timings = [ordered]@{
+                  startedUtc = $started.ToString('o')
+                  runtimeStartedUtc = $runtimeStarted.ToString('o')
+                  testStartedUtc = $testStarted.ToString('o')
+                  completedUtc = $completed.ToString('o')
+                  setupMs = [int][Math]::Round(($runtimeStarted - $started).TotalMilliseconds)
+                  runtimePreparationMs = [int][Math]::Round(($runtimeCompleted - $runtimeStarted).TotalMilliseconds)
+                  testMs = [int][Math]::Round(($testCompleted - $testStarted).TotalMilliseconds)
+                  totalMs = [int][Math]::Round(($completed - $started).TotalMilliseconds)
+              }
+          }
+          if ($testFailure) {
+              $summary.failure = $testFailure
+          }
+
+          $json = $summary | ConvertTo-Json -Compress -Depth 8
+          Write-GitHubOutput 'summary' $json
+          Write-GitHubOutput 'completed_utc' $completed.ToString('o')
+          Write-Host "WINDOWS_POWERSHELL51_SUMMARY=$json"
+
+          if ($testFailure) {
+              throw "Windows PowerShell 5.1 candidate gate failed: $testFailure"
+          }
+
+      - name: Upload Windows test log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-powershell51-${{ github.run_id }}-${{ github.run_attempt }}
+          path: windows-powershell51.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Publish Windows candidate status
+        if: ${{ always() && github.event_name == 'push' }}
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $state = if ($env:JOB_STATUS -eq 'success') { 'success' } else { 'failure' }
+          $description = if ($state -eq 'success') {
+              'Windows PowerShell 5.1 candidate gate passed'
+          } else {
+              'Windows PowerShell 5.1 candidate gate failed'
+          }
+
+          gh api --method POST "repos/$env:GITHUB_REPOSITORY/statuses/$env:GITHUB_SHA" -f "state=$state" -f "context=preflight/windows-powershell51" -f "description=$description" | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to publish Windows preflight final status.' }

@@ -14,6 +14,12 @@ EXPECTED_RELEASE_CONTEXTS=(
     'release/tag',
 )
 
+EXPECTED_CANDIDATE_CONTEXTS=(
+    'preflight/candidate',
+    'preflight/linux',
+    'preflight/windows-powershell51',
+)
+
 def run(args:list[str], *, cwd:Path|None=None, text:bool=True, check:bool=True):
     cp=subprocess.run(args,cwd=str(cwd) if cwd else None,capture_output=True,text=text)
     if check and cp.returncode:
@@ -52,6 +58,26 @@ def validate_release_statuses(payload:dict)->dict:
         'contexts':list(EXPECTED_RELEASE_CONTEXTS),
     }
 
+def candidate_status_map(payload:dict)->dict[str,str]:
+    latest={}
+    for row in payload.get('statuses',[]):
+        context=str(row.get('context',''))
+        if context in EXPECTED_CANDIDATE_CONTEXTS and context not in latest:
+            latest[context]=str(row.get('state',''))
+    return latest
+
+def validate_candidate_statuses(payload:dict)->dict:
+    latest=candidate_status_map(payload)
+    require(set(latest)==set(EXPECTED_CANDIDATE_CONTEXTS),
+            f'candidate status contexts mismatch: {sorted(latest)}')
+    failed={k:v for k,v in latest.items() if v!='success'}
+    require(not failed,f'candidate status contexts not successful: {failed}')
+    return {
+        'expected':len(EXPECTED_CANDIDATE_CONTEXTS),
+        'success':len(EXPECTED_CANDIDATE_CONTEXTS),
+        'contexts':list(EXPECTED_CANDIDATE_CONTEXTS),
+    }
+
 def branch_exists(root:Path,branch:str)->bool:
     cp=run(
         ['git','-C',str(root),'ls-remote','--exit-code','--heads','origin',f'refs/heads/{branch}'],
@@ -81,6 +107,16 @@ def self_test()->int:
         pass
     else:
         raise RuntimeError('self-test accepted missing release status')
+    candidate_good={'statuses':[{'context':c,'state':'success'} for c in EXPECTED_CANDIDATE_CONTEXTS]}
+    candidate_result=validate_candidate_statuses(candidate_good)
+    require(candidate_result['expected']==3 and candidate_result['success']==3,'self-test expected 3/3 candidate gates')
+    candidate_bad={'statuses':candidate_good['statuses'][:-1]}
+    try:
+        validate_candidate_statuses(candidate_bad)
+    except RuntimeError:
+        pass
+    else:
+        raise RuntimeError('self-test accepted missing candidate status')
     print('PASS release verification helper self-test')
     return 0
 
@@ -150,11 +186,7 @@ def main()->int:
         release_statuses=validate_release_statuses(final_status_payload)
 
         candidate_status_payload=gh_json(repo,f'commits/{args.candidate_sha}/status')
-        candidate_states=[
-            str(x.get('state','')) for x in candidate_status_payload.get('statuses',[])
-            if x.get('context')=='preflight/candidate'
-        ]
-        require(candidate_states and candidate_states[0]=='success','candidate preflight status is not success')
+        candidate_gates=validate_candidate_statuses(candidate_status_payload)
 
         source_tag=f'v{args.version}'
         tagged_source=git(root,'rev-parse',f'{source_tag}^{{commit}}')
@@ -203,6 +235,7 @@ def main()->int:
             'publishedUtc':args.published_utc,
             'candidateSha':args.candidate_sha,
             'candidatePreflight':True,
+            'candidateGates':candidate_gates,
             'finalPrHeadSha':args.final_sha,
             'prNumber':pr_number,
             'prUrl':args.pr_url,
@@ -248,6 +281,7 @@ def main()->int:
                 f.write(f'- Result: **PASS**\n')
                 f.write(f'- PR: #{pr_number}\n')
                 f.write(f'- Release gates: **8/8 success**\n')
+                f.write(f'- Candidate gates: **3/3 success**\n')
                 f.write(f'- Candidate SHA: `{args.candidate_sha}`\n')
                 f.write(f'- Source commit: `{args.source_commit}`\n')
                 f.write(f'- Main SHA: `{main_sha}`\n')

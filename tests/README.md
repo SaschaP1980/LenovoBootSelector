@@ -27,6 +27,12 @@ These four files are the permanent Python gates used by the GitHub Release Orche
 | `Test-ArchitectureSoak.ps1` | Soak | Repeated architecture/state stability |
 | `Test-WindowsPowerShell51.ps1` | Compatibility | Windows PowerShell 5.1 parser/encoding gate and native aggregate runner |
 
+From v0.6.9.0 onward, the aggregate wrapper is also executed automatically by `.github/workflows/windows-powershell51.yml` on a fresh GitHub-hosted `windows-2025` runner using the explicit `powershell` shell. The workflow verifies that the runtime is actually Windows PowerShell 5.1, deterministically regenerates/checks the candidate runtime, and emits a machine-readable `WINDOWS_POWERSHELL51_SUMMARY=<json>`.
+
+That GitHub-hosted execution is valid Windows contract-suite evidence. It is **not** physical Lenovo hardware/UEFI E2E and must be reported separately from tests performed on the target ThinkPad.
+
+The Candidate workflow initially treats this Windows gate as mandatory for every version while LBS-20 benchmark data is collected. Linux Candidate Preflight and the Windows gate run in parallel; promotion waits for both and emits `CANDIDATE_TIMING_SUMMARY=<json>` with critical-path data.
+
 ## Baseline data
 
 - `characterization-baseline-v0.3.4.json` — historical characterization basis.

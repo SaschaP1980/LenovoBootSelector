@@ -1,5 +1,17 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.9.0 – LBS-20 parallel Windows PowerShell 5.1 candidate gate
+
+- Candidate validation now runs the existing Linux exact-candidate preflight and a real GitHub-hosted Windows PowerShell 5.1 contract-suite gate in parallel on the same candidate SHA.
+- New reusable `.github/workflows/windows-powershell51.yml` runs on an ephemeral `windows-2025` runner, explicitly verifies Windows PowerShell 5.1, deterministically regenerates/checks the runtime, and executes `tests/Test-WindowsPowerShell51.ps1`.
+- The Windows gate emits `WINDOWS_POWERSHELL51_SUMMARY=<json>` with parser/suite totals plus setup, runtime-preparation, test, and total timings, and publishes `preflight/windows-powershell51`.
+- Linux Candidate Preflight publishes `preflight/linux`; neither validation job may promote a release.
+- A separate promotion job waits for both mandatory jobs, verifies both latest statuses on the exact candidate SHA, verifies the candidate ref and current-main ancestry, emits `CANDIDATE_TIMING_SUMMARY=<json>`, and only then writes `preflight/candidate`, creates the release ref, dispatches the Release Orchestrator, and deletes the candidate branch.
+- The Release Orchestrator and integrated post-release verifier require all 3/3 candidate contexts: `preflight/candidate`, `preflight/linux`, and `preflight/windows-powershell51`.
+- The Windows workflow also supports manual `workflow_dispatch` benchmark/retest runs. GitHub-hosted Windows results are explicitly distinguished from physical Lenovo hardware/UEFI E2E.
+- Initial LBS-20 policy is **always mandatory** for Major, Minor, Patch, and Hotfix releases while real timing data is collected; the permanent policy is selected from measured critical-path impact.
+- Product code under `src/**` is unchanged; v0.6.9.0 therefore uses `version-only`. BootService, TaskBroker, Storage, updater, firmware/BCD behavior, and the privilege boundary are unchanged.
+
 ## v0.6.8.1 – Tray tooltip simplified
 
 - Removes the historical German suffix `– Startziel wählen` from the Windows tray icon tooltip.

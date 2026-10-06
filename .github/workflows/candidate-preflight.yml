@@ -15,14 +15,32 @@ permissions:
   statuses: write
 
 jobs:
-  preflight:
+  linux-preflight:
+    name: Linux Candidate Preflight
     runs-on: ubuntu-latest
+    outputs:
+      started_utc: ${{ steps.start.outputs.started_utc }}
+      completed_utc: ${{ steps.preflight.outputs.completed_utc }}
     steps:
+      - name: Record Linux runner start
+        id: start
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          STARTED_UTC=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          echo "started_utc=$STARTED_UTC" >> "$GITHUB_OUTPUT"
+          echo "LINUX_RUNNER_STARTED_UTC=$STARTED_UTC"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA"             -f state=pending             -f context='preflight/linux'             -f description='Linux exact-candidate preflight is running' >/dev/null
+
       - name: Checkout exact candidate
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Preflight exact candidate and promote release ref
+
+      - name: Run exact Linux candidate preflight
+        id: preflight
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -34,21 +52,13 @@ jobs:
           EXPECTED_RELEASE="release/v$VERSION"
           test "$GITHUB_REF_NAME" = "$EXPECTED_CANDIDATE"
 
-          status_preflight() {
-            gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
-              -f state="$1" -f context='preflight/candidate' -f description="$2" >/dev/null
-          }
-
-          status_preflight pending 'Exact candidate preflight is running'
           git fetch origin main --tags --force
 
           if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
-            status_preflight failure "Tag v$VERSION already exists"
             echo "Tag v$VERSION already exists." >&2
             exit 1
           fi
           if git ls-remote --exit-code --heads origin "$EXPECTED_RELEASE" >/dev/null 2>&1; then
-            status_preflight failure "Release branch already exists"
             echo "Release branch $EXPECTED_RELEASE already exists." >&2
             exit 1
           fi
@@ -58,28 +68,179 @@ jobs:
           git worktree add --detach /tmp/lbs-candidate-basis "v$PREVIOUS_VERSION^{commit}"
 
           set +e
-          python3 -B tools/candidate_preflight.py \
-            --root . \
-            --basis-root /tmp/lbs-candidate-basis \
-            --main-ref origin/main \
-            --published-utc '2000-01-01T00:00:00Z'
+          python3 -B tools/candidate_preflight.py             --root .             --basis-root /tmp/lbs-candidate-basis             --main-ref origin/main             --published-utc '2000-01-01T00:00:00Z'
           PREFLIGHT_RC=$?
           set -e
 
-          if [ "$PREFLIGHT_RC" -ne 0 ]; then
-            status_preflight failure 'Exact candidate preflight failed'
-            exit "$PREFLIGHT_RC"
+          COMPLETED_UTC=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          echo "completed_utc=$COMPLETED_UTC" >> "$GITHUB_OUTPUT"
+          echo "LINUX_PREFLIGHT_COMPLETED_UTC=$COMPLETED_UTC"
+          exit "$PREFLIGHT_RC"
+
+      - name: Publish Linux candidate status
+        if: ${{ always() }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          if [ "$JOB_STATUS" = "success" ]; then
+            STATE=success
+            DESCRIPTION='Linux exact-candidate preflight passed'
+          else
+            STATE=failure
+            DESCRIPTION='Linux exact-candidate preflight failed'
+          fi
+          gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA"             -f state="$STATE"             -f context='preflight/linux'             -f description="$DESCRIPTION" >/dev/null
+
+  windows-powershell51:
+    name: Windows PowerShell 5.1 Gate
+    uses: ./.github/workflows/windows-powershell51.yml
+
+  promote:
+    name: Promote exact candidate
+    if: ${{ always() }}
+    needs:
+      - linux-preflight
+      - windows-powershell51
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all mandatory candidate gates
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINUX_RESULT: ${{ needs.linux-preflight.result }}
+          WINDOWS_RESULT: ${{ needs.windows-powershell51.result }}
+        run: |
+          set -euo pipefail
+          status_candidate() {
+            gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA"               -f state="$1"               -f context='preflight/candidate'               -f description="$2" >/dev/null
+          }
+
+          status_candidate pending 'Waiting for mandatory Linux and Windows candidate gates'
+
+          if [ "$LINUX_RESULT" != "success" ] || [ "$WINDOWS_RESULT" != "success" ]; then
+            status_candidate failure "Mandatory candidate gate failed: linux=$LINUX_RESULT windows=$WINDOWS_RESULT"
+            echo "Mandatory candidate gate failed: linux=$LINUX_RESULT windows=$WINDOWS_RESULT" >&2
+            exit 1
           fi
 
-          status_preflight success 'Exact candidate preflight passed'
+      - name: Checkout exact candidate for promotion
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact statuses, record timings, and promote
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONDONTWRITEBYTECODE: '1'
+          LINUX_STARTED_UTC: ${{ needs.linux-preflight.outputs.started_utc }}
+          LINUX_COMPLETED_UTC: ${{ needs.linux-preflight.outputs.completed_utc }}
+          WINDOWS_STARTED_UTC: ${{ needs.windows-powershell51.outputs.started_utc }}
+          WINDOWS_COMPLETED_UTC: ${{ needs.windows-powershell51.outputs.completed_utc }}
+          WINDOWS_SUMMARY: ${{ needs.windows-powershell51.outputs.summary }}
+        run: |
+          set -euo pipefail
+          VERSION=$(python3 -c "import json; print(json.load(open('bin/version.json',encoding='utf-8'))['version'])")
+          EXPECTED_CANDIDATE="candidate/v$VERSION"
+          EXPECTED_RELEASE="release/v$VERSION"
+          test "$GITHUB_REF_NAME" = "$EXPECTED_CANDIDATE"
+
+          status_candidate() {
+            gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA"               -f state="$1"               -f context='preflight/candidate'               -f description="$2" >/dev/null
+          }
+
+          git fetch origin main --tags --force
+          git merge-base --is-ancestor origin/main HEAD || {
+            status_candidate failure 'Candidate became stale before promotion'
+            echo 'Candidate became stale before promotion.' >&2
+            exit 1
+          }
+
+          REMOTE_CANDIDATE=$(git ls-remote --heads origin "$EXPECTED_CANDIDATE" | awk '{print $1}')
+          test "$REMOTE_CANDIDATE" = "$GITHUB_SHA" || {
+            status_candidate failure 'Candidate branch no longer points to this exact SHA'
+            echo "Candidate branch SHA mismatch: $REMOTE_CANDIDATE != $GITHUB_SHA" >&2
+            exit 1
+          }
+
+          STATUS_JSON=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/status")
+          LINUX_STATE=$(printf '%s' "$STATUS_JSON" | jq -r '[.statuses[] | select(.context=="preflight/linux")][0].state // ""')
+          WINDOWS_STATE=$(printf '%s' "$STATUS_JSON" | jq -r '[.statuses[] | select(.context=="preflight/windows-powershell51")][0].state // ""')
+          if [ "$LINUX_STATE" != "success" ] || [ "$WINDOWS_STATE" != "success" ]; then
+            status_candidate failure "Exact-SHA status mismatch: linux=$LINUX_STATE windows=$WINDOWS_STATE"
+            echo "Exact-SHA status mismatch: linux=$LINUX_STATE windows=$WINDOWS_STATE" >&2
+            exit 1
+          fi
+
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            status_candidate failure "Tag v$VERSION already exists"
+            exit 1
+          fi
+          if git ls-remote --exit-code --heads origin "$EXPECTED_RELEASE" >/dev/null 2>&1; then
+            status_candidate failure 'Release branch already exists'
+            exit 1
+          fi
+
+          RUN_CREATED_UTC=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '.created_at')
+          export RUN_CREATED_UTC LINUX_STARTED_UTC LINUX_COMPLETED_UTC WINDOWS_STARTED_UTC WINDOWS_COMPLETED_UTC WINDOWS_SUMMARY
+          TIMING_SUMMARY=$(python3 - <<'PY'
+          import datetime,json,os
+
+          def parse(value):
+              value=(value or '').strip()
+              if not value:
+                  raise SystemExit('missing candidate timing timestamp')
+              return datetime.datetime.fromisoformat(value.replace('Z','+00:00'))
+
+          created=parse(os.environ['RUN_CREATED_UTC'])
+          linux_started=parse(os.environ['LINUX_STARTED_UTC'])
+          linux_completed=parse(os.environ['LINUX_COMPLETED_UTC'])
+          windows_started=parse(os.environ['WINDOWS_STARTED_UTC'])
+          windows_completed=parse(os.environ['WINDOWS_COMPLETED_UTC'])
+          gate_completed=max(linux_completed,windows_completed)
+          windows_summary=json.loads(os.environ['WINDOWS_SUMMARY'])
+
+          def ms(delta):
+              return int(round(delta.total_seconds()*1000))
+
+          summary={
+              'schemaVersion':1,
+              'policy':'always',
+              'candidateSha':os.environ.get('GITHUB_SHA',''),
+              'runCreatedUtc':created.isoformat(),
+              'linux':{
+                  'queueMs':ms(linux_started-created),
+                  'durationMs':ms(linux_completed-linux_started),
+                  'completedUtc':linux_completed.isoformat(),
+              },
+              'windows':{
+                  'queueMs':ms(windows_started-created),
+                  'durationMs':ms(windows_completed-windows_started),
+                  'completedUtc':windows_completed.isoformat(),
+                  'summary':windows_summary,
+              },
+              'candidateGateElapsedMs':ms(gate_completed-created),
+              'criticalPathOwner':'windows' if windows_completed>linux_completed else 'linux',
+              'windowsCriticalPathDeltaMs':max(0,ms(windows_completed-linux_completed)),
+          }
+          print(json.dumps(summary,separators=(',',':'),sort_keys=True))
+          PY
+          )
+          echo "CANDIDATE_TIMING_SUMMARY=$TIMING_SUMMARY"
+          echo "## Candidate timing" >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          echo "$TIMING_SUMMARY" | jq . >> "$GITHUB_STEP_SUMMARY"
+
+          status_candidate success 'Linux and Windows candidate gates passed on exact SHA'
           git push origin "$GITHUB_SHA:refs/heads/$EXPECTED_RELEASE"
 
           # A push made with GITHUB_TOKEN does not recursively trigger another workflow.
           # workflow_dispatch is the explicit, supported handoff to the Release Orchestrator.
-          if ! gh api --method POST \
-            "repos/$GITHUB_REPOSITORY/actions/workflows/release.yml/dispatches" \
-            -f ref="$EXPECTED_RELEASE"; then
-            status_preflight failure 'Release workflow dispatch failed'
+          if ! gh api --method POST             "repos/$GITHUB_REPOSITORY/actions/workflows/release.yml/dispatches"             -f ref="$EXPECTED_RELEASE"; then
+            status_candidate failure 'Release workflow dispatch failed'
             git push origin --delete "$EXPECTED_RELEASE" || true
             exit 1
           fi

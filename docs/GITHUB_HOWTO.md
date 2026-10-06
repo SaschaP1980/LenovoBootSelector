@@ -15,6 +15,7 @@ Mandatory order:
 5. Read **`bin/version.json`** and verify current version, `releaseProfile`, `protectedFragmentIntent`, and `repositoryDeleteIntent`.
 6. Read the relevant executable contracts:
    - `.github/workflows/candidate-preflight.yml`
+   - `.github/workflows/windows-powershell51.yml`
    - `.github/workflows/release.yml`
    - `tools/candidate_preflight.py`
    - `tools/release_verification.py`
@@ -187,32 +188,45 @@ At minimum:
 
 GitHub owns the canonical `publishedUtc`; a local timestamp is never the publication timestamp.
 
-If native Windows/PowerShell/WinForms tests have not actually been executed on Windows, never report them as passed. Static/source-contract coverage is not a substitute for a native pass.
+If Windows/PowerShell tests have not actually been executed on Windows, never report them as passed. Static/source-contract coverage is not a substitute for a Windows pass. A GitHub-hosted Windows PowerShell 5.1 run is a real Windows test run for the contract suite, but it is **not** Lenovo hardware/UEFI E2E and must be reported separately from physical-machine acceptance.
 
 ## Candidate-tree preflight before release branch creation
 
 From v0.6.5.0 onward, a product release enters GitHub through a temporary **`candidate/v<version>`** branch, not directly through `release/v<version>`.
 
-The exact candidate SHA is processed by `.github/workflows/candidate-preflight.yml`. The workflow:
+From v0.6.9.0 onward, the exact candidate SHA is validated by two mandatory jobs that run in parallel after the candidate push:
 
-1. verifies the candidate branch/version pairing and current `main` ancestry;
-2. checks that the target release branch/tag do not already exist;
-3. materializes the immediately previous canonical source tag as the regression basis;
-4. runs `tools/candidate_preflight.py`;
-5. performs deterministic preparation and two byte-identical provisional builds;
-6. runs Release/Core/Boundary/Regression;
-7. validates protected-fragment intent and repository-delete intent;
-8. rejects any pre-publication modification of historical `downloads/*.zip`;
-9. writes commit status `preflight/candidate=success`;
-10. only then creates `release/v<version>` on **the identical SHA**;
-11. explicitly dispatches `release.yml` for that ref;
-12. deletes the temporary candidate branch.
+1. **Linux Candidate Preflight** on `ubuntu-latest`:
+   - verifies candidate branch/version pairing and current `main` ancestry;
+   - checks that the target release branch/tag do not already exist;
+   - materializes the immediately previous canonical source tag as the regression basis;
+   - runs `tools/candidate_preflight.py`;
+   - performs deterministic preparation and two byte-identical provisional builds;
+   - runs Release/Core/Boundary/Regression;
+   - validates protected-fragment intent and repository-delete intent;
+   - rejects any pre-publication modification of historical `downloads/*.zip`;
+   - writes `preflight/linux` on the exact candidate SHA.
+2. **Windows PowerShell 5.1 Gate** through `.github/workflows/windows-powershell51.yml` on a fresh GitHub-hosted `windows-2025` runner:
+   - checks out the same exact candidate SHA;
+   - explicitly verifies Windows PowerShell 5.1;
+   - deterministically regenerates/checks the runtime;
+   - runs `tests/Test-WindowsPowerShell51.ps1`;
+   - emits `WINDOWS_POWERSHELL51_SUMMARY=<json>` with parser/suite totals and setup/runtime/test/total timings;
+   - writes `preflight/windows-powershell51` on the exact candidate SHA.
 
-The explicit dispatch is required because GitHub deliberately prevents a normal push performed with `GITHUB_TOKEN` from recursively starting another workflow. `workflow_dispatch` is the supported handoff. If dispatch fails, Candidate Preflight overwrites its status to failure and deletes the just-created release branch again.
+A separate **promotion job** has `needs` dependencies on both jobs. It may create `release/v<version>` only if both jobs are successful, the latest `preflight/linux` and `preflight/windows-powershell51` statuses are successful on the same exact SHA, the candidate branch still points to that SHA, and current `main` is still an ancestor. Only then does it write `preflight/candidate=success`, create the release ref, explicitly dispatch `release.yml`, and delete the temporary candidate branch.
 
-The Release Orchestrator independently requires that exact SHA to carry a successful `preflight/candidate` status and that current `origin/main` is still its ancestor. A manually created or stale release branch therefore fails closed.
+The promotion job also emits `CANDIDATE_TIMING_SUMMARY=<json>`. It records Linux/Windows queue and execution durations, Windows setup/runtime-preparation/test timings, total time until both candidate gates are complete, and whether Linux or Windows owned the candidate critical path.
 
-If Candidate Preflight fails, **no release branch exists yet**. Keep the same `candidate/v<version>` branch, apply the minimal fast-forward correction, and let the normal push rerun the preflight. Do not create a parallel candidate or release branch.
+The explicit dispatch is required because GitHub deliberately prevents a normal push performed with `GITHUB_TOKEN` from recursively starting another workflow. `workflow_dispatch` is the supported handoff. If dispatch fails, promotion overwrites `preflight/candidate` to failure and deletes the just-created release branch again.
+
+The Release Orchestrator independently requires successful `preflight/candidate`, `preflight/linux`, and `preflight/windows-powershell51` statuses on the exact release SHA and also verifies that current `origin/main` remains its ancestor. A manually created, stale, or partially validated release branch therefore fails closed.
+
+The Windows workflow also supports manual `workflow_dispatch` runs for benchmark/retest purposes. Manual runs do not count as a candidate gate and must not be reported as firmware/hardware E2E.
+
+The initial LBS-20 policy is **always mandatory** for Major, Minor, Patch, and Hotfix releases while benchmark data is collected. The permanent policy is decided from measured critical-path impact; any later policy change must remain explicit, deterministic, tested, and documented.
+
+If either candidate gate fails, **no release branch exists yet**. Keep the same `candidate/v<version>` branch, apply the minimal fast-forward correction, and let the normal push rerun both mandatory paths. Do not create a parallel candidate or release branch.
 
 ### Protected-fragment intent is release-specific
 
@@ -284,7 +298,7 @@ Use phase snapshots:
 4. **Release observation:** after dispatch, avoid re-reading unchanged candidate facts. On terminal success, consume the single `RELEASE_VERIFICATION_SUMMARY=<json>` emitted by the Release Orchestrator.
 5. **Issue completion:** use the verified summary for the release facts, add the final Issue comment and close the Issue. Do not repeat individual PR/tag/status/latest/ZIP/source-tree reads merely to reconstruct facts already verified in the summary.
 
-`tools/release_verification.py` performs the complete server-side post-release aggregation after the merge. It verifies the merged PR, exactly one publication PR, 8/8 release statuses, candidate preflight status, annotated source tag/commit, ZIP-/cache-free source tree, `downloads/latest.json`, published release ZIP size/hash, candidate/release branch cleanup and the prior reproducibility marker.
+`tools/release_verification.py` performs the complete server-side post-release aggregation after the merge. It verifies the merged PR, exactly one publication PR, 8/8 release statuses, all 3/3 candidate statuses (`preflight/candidate`, `preflight/linux`, `preflight/windows-powershell51`), annotated source tag/commit, ZIP-/cache-free source tree, `downloads/latest.json`, published release ZIP size/hash, candidate/release branch cleanup and the prior reproducibility marker.
 
 The structured summary is an **aggregation of completed checks**, not a replacement for them. If the workflow is not terminal success, the summary is missing, `result != PASS`, or a requested fact is absent, fall back to the full direct post-release checklist below.
 

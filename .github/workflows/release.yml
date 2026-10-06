@@ -39,10 +39,20 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main --tags --force
 
-          PREFLIGHT_STATE=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/status" \
-            --jq '[.statuses[] | select(.context=="preflight/candidate")][0].state // ""')
+          PREFLIGHT_STATUS_JSON=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/status")
+          PREFLIGHT_STATE=$(printf '%s' "$PREFLIGHT_STATUS_JSON" | jq -r '[.statuses[] | select(.context=="preflight/candidate")][0].state // ""')
+          LINUX_PREFLIGHT_STATE=$(printf '%s' "$PREFLIGHT_STATUS_JSON" | jq -r '[.statuses[] | select(.context=="preflight/linux")][0].state // ""')
+          WINDOWS_PREFLIGHT_STATE=$(printf '%s' "$PREFLIGHT_STATUS_JSON" | jq -r '[.statuses[] | select(.context=="preflight/windows-powershell51")][0].state // ""')
           test "$PREFLIGHT_STATE" = "success" || {
             echo "Release SHA lacks successful preflight/candidate status." >&2
+            exit 1
+          }
+          test "$LINUX_PREFLIGHT_STATE" = "success" || {
+            echo "Release SHA lacks successful preflight/linux status." >&2
+            exit 1
+          }
+          test "$WINDOWS_PREFLIGHT_STATE" = "success" || {
+            echo "Release SHA lacks successful preflight/windows-powershell51 status." >&2
             exit 1
           }
           git merge-base --is-ancestor origin/main HEAD || {
