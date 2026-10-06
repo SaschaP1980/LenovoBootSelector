@@ -20,7 +20,7 @@ class Suite:
 
 def txt(p): return Path(p).read_text(encoding='utf-8-sig')
 def load_version(root):
-    p=root/'version.json'
+    p=root/'bin/version.json'
     if not p.is_file(): return None
     import json
     return str(json.loads(p.read_text(encoding='utf-8'))['version'])
@@ -33,9 +33,9 @@ def psfn(s,n):
 
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); a=ap.parse_args(); root=a.root
-    s=Suite(); tray=txt(root/'LenovoBootMenuTray.ps1'); template=txt(root/'src/App/LenovoBootMenuTray.template.ps1')
+    s=Suite(); tray=txt(root/'bin/LenovoBootMenuTray.ps1'); template=txt(root/'src/App/LenovoBootMenuTray.template.ps1')
     version=load_version(root)
-    s.check('version.json provides version',bool(version))
+    s.check('bin/version.json provides version',bool(version))
     expected=f"$script:AppVersion = '{version}'" if version else ''
     s.contains(f'App version is {version}',tray,expected)
     s.eq('App version declaration exactly once',tray.count(expected),1)
@@ -92,8 +92,8 @@ def main():
     # Installer/uninstaller and core remain unchanged from v0.4.1 inputs.
     base=json.loads((root/'tests/characterization-baseline-v0.3.4.json').read_text())
     for fn in ['Install-LenovoBootMenuTasks.ps1','LenovoBootMenuTray.ico','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','icon-preview.png']:
-        s.eq(f'Unrelated runtime asset still baseline-identical: {fn}',sha_file(root/fn),base['source_sha256'][fn])
-    uninstall_bytes=(root/'Uninstall-LenovoBootMenuTasks.ps1').read_bytes()
+        s.eq(f'Unrelated runtime asset still baseline-identical: {fn}',sha_file(root/'bin'/fn),base['source_sha256'][fn])
+    uninstall_bytes=(root/'bin/Uninstall-LenovoBootMenuTasks.ps1').read_bytes()
     s.check('Uninstaller now carries UTF-8 BOM for PS5.1',uninstall_bytes.startswith(b'\xef\xbb\xbf'))
     # v0.4.1 native test-harness parser finding is fixed in source.
     ntest=txt(root/'tests/Test-FunctionalCore.ps1')

@@ -29,7 +29,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE: '1'
         run: |
           set -euo pipefail
-          VERSION=$(python3 -c "import json; print(json.load(open('version.json',encoding='utf-8'))['version'])")
+          VERSION=$(python3 -c "import json; print(json.load(open('bin/version.json',encoding='utf-8'))['version'])")
           EXPECTED_BRANCH="release/v$VERSION"
           test "${GITHUB_REF_NAME}" = "$EXPECTED_BRANCH"
 
@@ -42,7 +42,10 @@ jobs:
             exit 1
           fi
 
-          if git cat-file -e origin/main:version.json 2>/dev/null; then
+          if git cat-file -e origin/main:bin/version.json 2>/dev/null; then
+            PREVIOUS_VERSION=$(git show origin/main:bin/version.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+          elif git cat-file -e origin/main:version.json 2>/dev/null; then
+            # One-release migration compatibility for pre-LBS-2 history only.
             PREVIOUS_VERSION=$(git show origin/main:version.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
           else
             PREVIOUS_VERSION=$(git show origin/main:downloads/latest.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
@@ -98,9 +101,36 @@ jobs:
           ZIP_DIFF=$(git diff --cached --name-status origin/main -- 'downloads/*.zip')
           EXPECTED_ZIP_DIFF=$(printf 'A\tdownloads/LenovoBootMenuTray-v%s.zip' "$VERSION")
           test "$ZIP_DIFF" = "$EXPECTED_ZIP_DIFF"
-          if git diff --cached --name-status origin/main | grep '^D'; then
-            echo "Release unexpectedly deletes repository files." >&2
-            exit 1
+          DELETED_PATHS=$(git diff --cached --name-only --diff-filter=D --no-renames origin/main || true)
+          if [ -n "$DELETED_PATHS" ]; then
+            if git cat-file -e origin/main:version.json 2>/dev/null && \
+               ! git cat-file -e origin/main:bin/version.json 2>/dev/null && \
+               test -f bin/version.json; then
+              EXPECTED_LBS2_DELETIONS=$(printf '%s\n' \
+                BUILD_INTEGRITY.txt \
+                icon-preview.png \
+                Install-LenovoBootMenuTasks.ps1 \
+                LenovoBootMenuTray.ico \
+                LenovoBootMenuTray.ps1 \
+                Start-LenovoBootMenuTray.cmd \
+                Start-LenovoBootMenuTray.vbs \
+                Uninstall-LenovoBootMenuTasks.cmd \
+                Uninstall-LenovoBootMenuTasks.ps1 \
+                version.json | sort)
+              ACTUAL_DELETIONS=$(printf '%s\n' "$DELETED_PATHS" | sort)
+              test "$ACTUAL_DELETIONS" = "$EXPECTED_LBS2_DELETIONS" || {
+                echo "LBS-2 migration delete set is not exact." >&2
+                printf '%s\n' "$DELETED_PATHS" >&2
+                exit 1
+              }
+              for path in BUILD_INTEGRITY.txt icon-preview.png Install-LenovoBootMenuTasks.ps1 LenovoBootMenuTray.ico LenovoBootMenuTray.ps1 Start-LenovoBootMenuTray.cmd Start-LenovoBootMenuTray.vbs Uninstall-LenovoBootMenuTasks.cmd Uninstall-LenovoBootMenuTasks.ps1 version.json; do
+                test -f "bin/$path" || { echo "LBS-2 migration target missing: bin/$path" >&2; exit 1; }
+              done
+            else
+              echo "Release unexpectedly deletes repository files." >&2
+              printf '%s\n' "$DELETED_PATHS" >&2
+              exit 1
+            fi
           fi
 
           git commit -m "Publish Lenovo Boot Selector v$VERSION"

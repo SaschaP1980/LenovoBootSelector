@@ -7,9 +7,12 @@ from release_common import load_release_config,release_zip_name,source_zip_name
 ROOT_DEFAULT=Path(__file__).resolve().parents[1]
 INTEGRITY_NAMES=['icon-preview.png','Install-LenovoBootMenuTasks.ps1','LenovoBootMenuTray.ico','LenovoBootMenuTray.ps1','README.md','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','Uninstall-LenovoBootMenuTasks.ps1']
 
+def release_source(root:Path,name:str)->Path:
+    return root/name if name=='README.md' else root/'bin'/name
+
 def sha(path:Path)->str: return hashlib.sha256(path.read_bytes()).hexdigest()
 def render_integrity(root:Path,version:str)->bytes:
-    lines=[f'Lenovo Boot Selector v{version} - Build Integrity','Generated: 2026-10-05','']+[f'{sha(root/n)}  {n}' for n in INTEGRITY_NAMES]
+    lines=[f'Lenovo Boot Selector v{version} - Build Integrity','Generated: 2026-10-05','']+[f'{sha(release_source(root,n))}  {n}' for n in INTEGRITY_NAMES]
     return ('\n'.join(lines)+'\n').encode('utf-8')
 def update_readme(root:Path,version:str,check:bool):
     p=root/'README.md'; s=p.read_text(encoding='utf-8-sig'); import re
@@ -53,9 +56,9 @@ def main()->int:
         if args.check:
             run(root/'tools/build_runtime.py','--root',root,'--check'); run(root/'tools/build_catch_audit.py','--root',root,'--check'); run(root/'tools/build_architecture_baseline.py','--root',root,'--check')
             expected_integrity=render_integrity(root,version)
-            if not (root/'BUILD_INTEGRITY.txt').is_file() or (root/'BUILD_INTEGRITY.txt').read_bytes()!=expected_integrity: raise RuntimeError('BUILD_INTEGRITY.txt is not canonical')
+            if not (root/'bin/BUILD_INTEGRITY.txt').is_file() or (root/'bin/BUILD_INTEGRITY.txt').read_bytes()!=expected_integrity: raise RuntimeError('BUILD_INTEGRITY.txt is not canonical')
         else:
-            run(root/'tools/build_runtime.py','--root',root); run(root/'tools/build_catch_audit.py','--root',root); run(root/'tools/build_architecture_baseline.py','--root',root); (root/'BUILD_INTEGRITY.txt').write_bytes(render_integrity(root,version))
+            run(root/'tools/build_runtime.py','--root',root); run(root/'tools/build_catch_audit.py','--root',root); run(root/'tools/build_architecture_baseline.py','--root',root); (root/'bin/BUILD_INTEGRITY.txt').write_bytes(render_integrity(root,version))
         run(root/'tools/build_packages.py','--root',root,'--output-dir',out,'--kind','release')
         release=out/release_zip_name(version); release_hash=sha(release); release_size=release.stat().st_size
         update_download_metadata(root,cfg,published_utc,release_hash,release_size,args.check)

@@ -36,7 +36,7 @@ def render(root: Path) -> bytes:
 
 def main()->int:
     ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); ap.add_argument('--check',action='store_true'); args=ap.parse_args()
-    root=args.root.resolve(); output=root/'LenovoBootMenuTray.ps1'; rendered=render(root)
+    root=args.root.resolve(); output=root/'bin/LenovoBootMenuTray.ps1'; rendered=render(root)
     if args.check:
         if not output.is_file() or output.read_bytes()!=rendered:
             print('FAIL generated LenovoBootMenuTray.ps1 differs from modular source',file=sys.stderr); return 1

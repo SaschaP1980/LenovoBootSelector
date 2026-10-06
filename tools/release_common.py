@@ -9,7 +9,7 @@ STAMP = (2026,10,5,0,0,0)
 
 
 def load_release_config(root: Path) -> dict:
-    path = root / 'version.json'
+    path = root / 'bin' / 'version.json'
     if not path.is_file():
         raise RuntimeError(f'missing canonical version file: {path}')
     data = json.loads(path.read_text(encoding='utf-8'))

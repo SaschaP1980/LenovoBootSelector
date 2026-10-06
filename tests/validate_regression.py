@@ -4,6 +4,9 @@ import argparse,hashlib,json,re,subprocess,sys,zipfile
 ROOT_DEFAULT=Path(__file__).resolve().parents[1]
 def sha(p): return hashlib.sha256(Path(p).read_bytes()).hexdigest()
 def txt(p): return Path(p).read_text(encoding='utf-8-sig')
+def basis_runtime_path(root:Path,name:str)->Path:
+    migrated=root/'bin'/name
+    return migrated if migrated.is_file() else root/name
 class S:
     def __init__(self): self.rows=[]
     def c(self,n,v,d=''): self.rows.append((n,bool(v),d))
@@ -17,8 +20,8 @@ class S:
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); ap.add_argument('--basis-root',type=Path,required=True); ap.add_argument('--release-zip',type=Path); a=ap.parse_args()
     root=a.root.resolve(); basis=a.basis_root.resolve(); s=S()
-    meta=json.loads((root/'version.json').read_text(encoding='utf-8')); version=str(meta['version']); profile=str(meta.get('releaseProfile','patch'))
-    basis_tray=txt(basis/'LenovoBootMenuTray.ps1'); tray=txt(root/'LenovoBootMenuTray.ps1')
+    meta=json.loads((root/'bin/version.json').read_text(encoding='utf-8')); version=str(meta['version']); profile=str(meta.get('releaseProfile','patch'))
+    basis_tray=txt(basis_runtime_path(basis,'LenovoBootMenuTray.ps1')); tray=txt(root/'bin/LenovoBootMenuTray.ps1')
     bm=re.search(r"\$script:AppVersion = '([^']+)'",basis_tray); basis_version=bm.group(1) if bm else ''
     s.has('Generated runtime uses canonical version',tray,f"$script:AppVersion = '{version}'")
     if profile in {'version-only','release-architecture'}:
@@ -32,7 +35,7 @@ def main():
             else:
                 s.eq(f'Product module byte-identical to basis: {rel}',sha(p),sha(basis/rel))
     for rel in ['Install-LenovoBootMenuTasks.ps1','Uninstall-LenovoBootMenuTasks.ps1','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','LenovoBootMenuTray.ico','icon-preview.png']:
-        s.eq(f'Runtime asset byte-identical to basis: {rel}',sha(root/rel),sha(basis/rel))
+        s.eq(f'Runtime asset byte-identical to basis: {rel}',sha(root/'bin'/rel),sha(basis_runtime_path(basis,rel)))
     ui=txt(root/'src/UI/UpdatePresentation.ps1'); infra=txt(root/'src/Infrastructure/UpdateClient.ps1')
     s.has('Update button unchanged',ui,"-SecondaryButtonText 'Jetzt aktualisieren' -SecondaryAction { Start-ManualAppUpdate }")
     s.has('Manual-only update policy unchanged',ui,'no periodic or startup polling')
@@ -49,6 +52,6 @@ def main():
     cp=subprocess.run([sys.executable,str(root/'tools/build_catch_audit.py'),'--root',str(root),'--check'],capture_output=True,text=True); s.eq('Catch audit deterministic',cp.returncode,0)
     if a.release_zip:
         with zipfile.ZipFile(a.release_zip) as z:
-            names=z.namelist(); s.eq('Release remains flat 10-file package',len(names),10); s.c('Release has no directories',all('/' not in n for n in names)); s.eq('Packaged runtime equals source runtime',z.read('LenovoBootMenuTray.ps1'),(root/'LenovoBootMenuTray.ps1').read_bytes())
+            names=z.namelist(); s.eq('Release remains flat 10-file package',len(names),10); s.c('Release has no directories',all('/' not in n for n in names)); s.eq('Packaged runtime equals source runtime',z.read('LenovoBootMenuTray.ps1'),(root/'bin/LenovoBootMenuTray.ps1').read_bytes())
     return s.done()
 if __name__=='__main__': raise SystemExit(main())
