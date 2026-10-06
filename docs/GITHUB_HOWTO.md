@@ -458,6 +458,21 @@ Do not describe such a documentation update as a product release.
 
 English is the canonical language for repository and durable GitHub documentation.
 
+### Machine-consumed documentation markers
+
+Release/build tooling must not depend on stale localized documentation markers.
+
+If a README heading, marker, or other documentation string is consumed by tooling and that string is renamed or translated, the consuming tooling and its permanent regression coverage must be updated in the **same candidate**. A documentation-language migration is not complete while release tooling still searches for the previous localized marker.
+
+The canonical README version marker is:
+
+`**Current development version:**`
+
+`tools/prepare_release.py` must use this English marker. The legacy German marker `Aktueller Entwicklungsstand` is forbidden in active release tooling and is protected by permanent Release/Regression gates.
+
+This rule was established by the v0.6.8.0 / LBS-18 Candidate Preflight finding: the first candidate was correctly blocked because the README had already been translated while `prepare_release.py` still searched for the German marker. The correction was made on the same candidate branch before release promotion.
+
+
 - Every tracked `*.md` file must use English prose, including files under `docs/**`, `tests/**`, `tests-history/**`, `README.md`, `CHANGELOG.md`, and `downloads/README.md`.
 - New Markdown files must be written in English.
 - GitHub Issue bodies/comments, Pull Request descriptions, release notes, workflow-facing explanations, and other durable project documentation must use English.
