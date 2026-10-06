@@ -1,0 +1,43 @@
+name: One-time stale work-branch cleanup
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/cleanup-stale-work-branches.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Delete only exact known stale work branches
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cleanup_exact_branch() {
+            branch="$1"
+            expected_sha="$2"
+            remote_sha=$(git ls-remote --heads origin "refs/heads/$branch" | awk '{print $1}')
+            if [ -z "$remote_sha" ]; then
+              echo "$branch already absent"
+              return
+            fi
+            test "$remote_sha" = "$expected_sha" || {
+              echo "Refusing stale-branch cleanup: $branch moved from $expected_sha to $remote_sha" >&2
+              exit 1
+            }
+            git push origin --delete "$branch"
+          }
+
+          cleanup_exact_branch 'work/LBS-17' '67794be3ec6e6291969b736160552cea49b6f63d'
+          cleanup_exact_branch 'work/LBS-23' '6be697e09278b59524b5ce0c7274bb3da704fc4d'

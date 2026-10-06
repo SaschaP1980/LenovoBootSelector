@@ -273,6 +273,12 @@ Use:
 
 Do not reconstruct fields already covered by a successful aggregate summary through many additional connector calls unless investigating an inconsistency.
 
+For any Candidate derived from a durable work branch, include exactly one unique candidate-history trailer:
+
+`Work-Branch: work/LBS-<issue>`
+
+Use `Work-Branch: none` only when no work branch exists. Candidate Preflight requires an exact tree match between the declared work branch and the Candidate. After successful publication, the Release Orchestrator rechecks the tree and deletes that work branch automatically. If the branch changed after Candidate creation, cleanup fails closed and preserves the branch. The final `RELEASE_VERIFICATION_SUMMARY` must confirm candidate, release, and declared work-branch cleanup.
+
 LBS-17 included several unnecessary repeated job-status reads and redundant post-release API verification calls even though the repository already had aggregated summaries.
 
 ## 12. LBS-17 pilot timing evidence
@@ -327,9 +333,9 @@ For a comparable feature, aim for:
 8. no manual incremental generated-runtime reconstruction;
 9. use the Work Checkpoint Gate for deterministic runtime synchronization and standardized checkpoint validation as soon as that hosted path exists;
 10. one development-completion validation gate using the real validators as closely as the environment permits;
-11. one release-ready Candidate;
+11. one release-ready Candidate carrying the exact `Work-Branch:` provenance trailer;
 12. normal Candidate/Release automation;
-13. work-branch cleanup.
+13. automatic, tree-verified work-branch cleanup after successful publication.
 
 Never optimize by weakening validation, safety boundaries, reproducibility, or release verification.
 

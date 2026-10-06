@@ -475,7 +475,7 @@ Use this procedure:
    - create one commit with the pinned current `main` commit as parent;
    - inspect the complete commit/diff before creating any visible Candidate ref.
 6. Re-read `main` immediately before exposing the Candidate branch. If `main` advanced, stop and rebuild/reconcile the candidate from the new canonical `main`; never force the stale candidate onto the new base.
-7. Use `candidate/v<version>` only after the exact candidate commit is complete and inspected. Candidate Preflight then performs the authoritative repository-wide Linux validation and GitHub-hosted Windows PowerShell 5.1 validation on that exact SHA.
+7. Use `candidate/v<version>` only after the exact candidate commit is complete and inspected. Its candidate-only history must carry exactly one `Work-Branch:` trailer as defined below so the release can safely clean durable work state. Candidate Preflight then performs the authoritative repository-wide Linux validation and GitHub-hosted Windows PowerShell 5.1 validation on that exact SHA.
 8. For documentation-only changes that do not touch product/runtime/release inputs, use the same connector-first reads and lease check, then make one atomic documentation commit directly on current `main` as allowed by the documentation-only policy.
 
 Local/container checks built from connector-fetched files may be used as focused prechecks, but they are **not** a substitute for the repository-wide Candidate/Release gates and must not be reported as such. Conversely, lack of a local clone must not block a valid implementation or release when the connector and GitHub workflows provide the required canonical reads, Git-object writes and authoritative tests.
@@ -499,16 +499,33 @@ If repository-archive materialization is unavailable and direct container GitHub
 
 LBS-17/v0.8.0.0 established this rule: the connector had no general archive action and the container could not resolve `github.com`; neither condition was caused by `work/LBS-17`.
 
-### Branch deletion limitation
+### Branch deletion and release-owned work-branch cleanup
 
-The currently available connector can create/read/move branch refs but does not expose a general delete-branch/delete-ref action.
+The currently available ChatGPT GitHub connector can create/read/move branch refs but does not expose a general delete-branch/delete-ref action. **Normal release cleanup must therefore be owned by GitHub Actions, not by the interactive connector.**
 
-Consequences:
+Candidate provenance is mandatory:
 
-- Do not create throwaway documentation/feature branches unless a workflow/merge path will delete them.
-- The v0.6.5.0 Candidate Preflight is an intentional exception: its temporary `candidate/**` branch is deleted server-side by the GitHub workflow after successful promotion, so it does not depend on a connector delete-ref action.
+- the candidate-only commit range relative to current `main` contains exactly one unique trailer `Work-Branch: work/LBS-<issue>` when a durable work branch was used;
+- use `Work-Branch: none` when no work branch exists;
+- same-candidate correction commits may omit the trailer, but they must not introduce a conflicting value;
+- Candidate Preflight verifies that a declared work branch exists and that its current tree exactly matches the exact Candidate tree.
+
+After successful publication/merge, the Release Orchestrator owns cleanup:
+
+1. it re-reads the declared `work/LBS-*` branch;
+2. it compares that branch's current tree with the released Candidate tree again;
+3. only an exact tree match may be deleted;
+4. if the branch advanced or diverged, deletion fails closed and the branch is preserved;
+5. `tools/release_verification.py` requires the declared work branch to be absent before emitting `RELEASE_VERIFICATION_SUMMARY=... PASS`.
+
+This makes a work branch durable recovery state **during development** and disposable state **only after its exact content has been published successfully**. Never force-delete an advanced work branch merely to satisfy cleanup.
+
+Other consequences remain:
+
+- Do not create throwaway documentation/feature branches unless a workflow/merge path owns their cleanup.
+- Temporary `candidate/**` branches are deleted server-side after successful promotion.
+- Temporary `release/**` branches are deleted by the publication merge path.
 - A branch push made by a GitHub Actions job with `GITHUB_TOKEN` does not normally trigger another workflow. Cross-workflow promotion therefore uses explicit `workflow_dispatch`; do not rely on recursive push triggering.
-- If another stale branch must be deleted and no workflow owns its cleanup, report the connector limitation rather than pretending it was removed.
 - A stale branch must never be reused merely to avoid creating a new branch.
 
 ### Bounded connector orchestration
@@ -585,7 +602,7 @@ A release report should distinguish:
 - which automated GitHub gates passed;
 - exact version, PR, `main` SHA and source-tag commit;
 - release ZIP size/SHA-256;
-- whether candidate and release branches were removed;
+- whether candidate, release, and declared work branches were removed;
 - whether the implementation Issue was closed;
 - which native Windows tests were actually executed versus only represented by source/static contracts.
 

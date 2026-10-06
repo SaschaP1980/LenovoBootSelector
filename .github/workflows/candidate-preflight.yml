@@ -54,6 +54,36 @@ jobs:
 
           git fetch origin main --tags --force
 
+          # Every candidate carries exactly one durable work-branch provenance marker
+          # across the candidate-only commit range. Same-branch correction commits may
+          # omit the trailer; the original candidate commit keeps the association.
+          WORK_BRANCH_VALUES=$(git log --format='%B' origin/main..HEAD | sed -n 's/^Work-Branch:[[:space:]]*//p' | sed '/^[[:space:]]*$/d' | sort -u)
+          WORK_BRANCH_COUNT=$(printf '%s\n' "$WORK_BRANCH_VALUES" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')
+          test "$WORK_BRANCH_COUNT" = "1" || {
+            echo "Candidate must contain exactly one unique Work-Branch trailer; found $WORK_BRANCH_COUNT." >&2
+            exit 1
+          }
+          WORK_BRANCH=$(printf '%s\n' "$WORK_BRANCH_VALUES" | head -n 1)
+          if [ "$WORK_BRANCH" != "none" ]; then
+            [[ "$WORK_BRANCH" =~ ^work/LBS-[0-9]+$ ]] || {
+              echo "Invalid Work-Branch trailer: $WORK_BRANCH" >&2
+              exit 1
+            }
+            REMOTE_WORK_SHA=$(git ls-remote --heads origin "refs/heads/$WORK_BRANCH" | awk '{print $1}')
+            test -n "$REMOTE_WORK_SHA" || {
+              echo "Declared work branch does not exist: $WORK_BRANCH" >&2
+              exit 1
+            }
+            git fetch origin "refs/heads/$WORK_BRANCH:refs/remotes/origin/$WORK_BRANCH" --force
+            CANDIDATE_TREE=$(git rev-parse "$GITHUB_SHA^{tree}")
+            WORK_TREE=$(git rev-parse "refs/remotes/origin/$WORK_BRANCH^{tree}")
+            test "$WORK_TREE" = "$CANDIDATE_TREE" || {
+              echo "Declared work branch tree does not match exact candidate tree: $WORK_BRANCH" >&2
+              exit 1
+            }
+          fi
+          echo "Candidate work branch: $WORK_BRANCH"
+
           if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
             echo "Tag v$VERSION already exists." >&2
             exit 1
