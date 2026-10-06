@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'release/**'
+  workflow_dispatch:
 
 concurrency:
   group: release-${{ github.ref }}
@@ -37,6 +38,17 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main --tags --force
 
+          PREFLIGHT_STATE=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/status" \
+            --jq '[.statuses[] | select(.context=="preflight/candidate")][0].state // ""')
+          test "$PREFLIGHT_STATE" = "success" || {
+            echo "Release SHA lacks successful preflight/candidate status." >&2
+            exit 1
+          }
+          git merge-base --is-ancestor origin/main HEAD || {
+            echo "Release candidate is stale: current main is not an ancestor." >&2
+            exit 1
+          }
+
           if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
             echo "Tag v$VERSION already exists; refusing to overwrite." >&2
             exit 1
@@ -69,7 +81,7 @@ jobs:
 
           # Run the permanent gates before any PR or tag exists.
           python3 -B tests/validate_release.py --root .
-          python3 -B tests/validate_core.py --root .
+          python3 -B tests/validate_core.py --root . --basis-root /tmp/lbs-basis
           python3 -B tests/validate_boundary.py --root .
           python3 -B tests/validate_regression.py --root . --basis-root /tmp/lbs-basis --release-zip "/tmp/lbs-release/LenovoBootMenuTray-v$VERSION.zip"
 

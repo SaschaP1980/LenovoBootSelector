@@ -26,21 +26,26 @@ For Issue-backed releases, the Issue is part of the audit trail: important imple
 
 1. Verify the version-level Issue prerequisite above.
 2. Change `bin/version.json` and add the corresponding `CHANGELOG.md` section.
-3. Run `python -B tools/prepare_release.py --root . --output-dir <dir> --published-utc <provisional-UTC>` for local validation only.
-4. Run the four permanent validators: `validate_release.py`, `validate_core.py`, `validate_boundary.py`, `validate_regression.py`.
-5. Push the canonical input changes to `release/v<version>`; do not add the new release ZIP manually. Generated runtime/audit/metadata files may already be present from the local build, but GitHub recreates them deterministically before the PR commit.
+3. Set `protectedFragmentIntent` to exactly the protected fragments intentionally changed by this version; normally `[]`.
+4. Set `repositoryDeleteIntent` to exactly the repository paths intentionally deleted by this version; normally `[]`.
+5. Prepare one exact candidate commit based on current `main`.
+6. Push that commit only as `candidate/v<version>`. Do **not** manually create `release/v<version>`.
 
 ## Mandatory candidate preflight
 
-Before `release/v<version>` is created, the exact candidate tree must pass deterministic preparation plus all four permanent validators in a fresh workspace. This is a hard release-entry gate, not an optional confidence check.
+`.github/workflows/candidate-preflight.yml` is the release-entry gate. It runs `tools/candidate_preflight.py` against the exact candidate SHA and the immediately previous canonical source tag.
 
-Protected/frozen-fragment exceptions must be scoped to the current candidate-versus-previous-canonical-basis delta. Do not turn an intentionally changed protected function into a permanent hash bypass: future changes to that function must remain detectable.
+The preflight performs deterministic preparation, two reproducibility builds, Release/Core/Boundary/Regression, protected-fragment intent, repository-delete intent and historical-ZIP checks. On success it writes `preflight/candidate=success`, creates `release/v<version>` at the same SHA, explicitly dispatches `release.yml`, and deletes the candidate branch. On failure no release branch is created; correct the same candidate branch and push again.
 
-This preflight would have caught the v0.6.4.0 run #20 Core-gate failure before the first release-branch push. GitHub repeats the gates authoritatively after push.
+The explicit `workflow_dispatch` is mandatory because a `GITHUB_TOKEN` branch push does not recursively trigger another workflow. If dispatch fails, Candidate Preflight marks the status failed and rolls the new release branch back.
+
+`release.yml` refuses a release SHA without the successful preflight status and also verifies that current `main` remains an ancestor. GitHub then reruns the authoritative publication gates.
 
 ## GitHub publication
 
-`release.yml` runs on `release/**`. Once a hosted runner is actually executing the job, it captures the canonical `publishedUtc`, then deterministically recreates all generated release files from the canonical inputs plus that single GitHub-owned timestamp. It verifies a second in-run rebuild byte-for-byte, derives a ZIP-free source commit without creating a source branch, adds exactly one new historical release ZIP to the same release branch and opens exactly one pull request.
+`candidate-preflight.yml` runs first on `candidate/**` and is the only normal path that promotes a candidate SHA to `release/v<version>`.
+
+`release.yml` runs on `release/**`. Once a hosted runner is actually executing the job, it first verifies the candidate preflight status/current-main ancestry, captures the canonical `publishedUtc`, then deterministically recreates all generated release files from the canonical inputs plus that single GitHub-owned timestamp. It verifies a second in-run rebuild byte-for-byte, derives a ZIP-free source commit without creating a source branch, adds exactly one new historical release ZIP to the same release branch and opens exactly one pull request.
 
 The single permanent `release.yml` workflow runs the full release/core/boundary/regression gates itself before PR creation, writes the successful gate states directly onto the final PR-head commit, creates the annotated ZIP-free source tag only after successful PR creation, then merges the PR and deletes the release branch. A separate `pull_request` workflow is intentionally not used: pull requests created with the repository `GITHUB_TOKEN` do not recursively start another workflow.
 
