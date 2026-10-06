@@ -60,7 +60,7 @@ Since v0.6.4.0 this boundary is additionally hardened fail-closed: the runtime T
 
 **Note about v0.6.4.0:** the repair path first shipped in that version could falsely fail at the `protect-state` step because the ACL check interpreted the allowed `ReadAndExecute` rights as writable through the composite `Modify` mask. v0.6.4.1 fixes only that check. A repair that failed under v0.6.4.0 can safely be run again with v0.6.4.1.
 
-**Current development version:** v0.6.9.0  
+**Current development version:** v0.6.9.1  
 **Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads and revision history
