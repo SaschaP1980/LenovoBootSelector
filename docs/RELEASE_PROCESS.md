@@ -48,23 +48,32 @@ This rule was empirically confirmed by the v0.6.7.1 release-cycle measurement.
 
 ## Mandatory candidate preflight
 
-`.github/workflows/candidate-preflight.yml` is the release-entry gate. It runs `tools/candidate_preflight.py` against the exact candidate SHA and the immediately previous canonical source tag.
+`.github/workflows/candidate-preflight.yml` is the release-entry gate. From v0.6.9.0 onward it runs two mandatory candidate paths in parallel on the exact same SHA:
 
-The preflight performs deterministic preparation, two reproducibility builds, Release/Core/Boundary/Regression, protected-fragment intent, repository-delete intent and historical-ZIP checks. On success it writes `preflight/candidate=success`, creates `release/v<version>` at the same SHA, explicitly dispatches `release.yml`, and deletes the candidate branch. On failure no release branch is created; correct the same candidate branch and push again.
+- **Linux Candidate Preflight** on `ubuntu-latest`, which runs `tools/candidate_preflight.py` against the immediately previous canonical source tag and performs deterministic preparation, two reproducibility builds, Release/Core/Boundary/Regression, protected-fragment intent, repository-delete intent and historical-ZIP checks. It writes `preflight/linux`.
+- **Windows PowerShell 5.1 Gate** through `.github/workflows/windows-powershell51.yml` on an ephemeral GitHub-hosted `windows-2025` runner. It verifies Windows PowerShell 5.1, deterministically regenerates/checks the candidate runtime, runs `tests/Test-WindowsPowerShell51.ps1`, emits `WINDOWS_POWERSHELL51_SUMMARY=<json>`, and writes `preflight/windows-powershell51`.
 
-The explicit `workflow_dispatch` is mandatory because a `GITHUB_TOKEN` branch push does not recursively trigger another workflow. If dispatch fails, Candidate Preflight marks the status failed and rolls the new release branch back.
+A separate promotion job depends on both jobs. It verifies that both latest statuses are successful on the exact candidate SHA, that the candidate branch still points to that SHA, and that current `main` remains an ancestor. Only then does it write `preflight/candidate=success`, create `release/v<version>` at the same SHA, explicitly dispatch `release.yml`, and delete the candidate branch.
 
-`release.yml` refuses a release SHA without the successful preflight status and also verifies that current `main` remains an ancestor. GitHub then reruns the authoritative publication gates.
+The promotion job emits `CANDIDATE_TIMING_SUMMARY=<json>` with Linux/Windows queue and duration data, Windows setup/runtime-preparation/test timings, total candidate-gate elapsed time, and the critical-path owner.
+
+The explicit `workflow_dispatch` is mandatory because a `GITHUB_TOKEN` branch push does not recursively trigger another workflow. If dispatch fails, promotion marks `preflight/candidate` failed and rolls the new release branch back.
+
+`release.yml` refuses a release SHA unless `preflight/candidate`, `preflight/linux`, and `preflight/windows-powershell51` are all successful and current `main` remains an ancestor. GitHub then reruns the authoritative publication gates.
+
+The Windows workflow also supports manual `workflow_dispatch` benchmark/retest runs. Those runs are Windows contract-suite evidence only; they are not physical Lenovo firmware/UEFI E2E.
+
+The initial LBS-20 execution policy is **always mandatory** while release-impact data is collected. The permanent policy is decided from measured critical-path impact and must remain explicit, deterministic, tested, and documented.
 
 ## GitHub publication
 
 `candidate-preflight.yml` runs first on `candidate/**` and is the only normal path that promotes a candidate SHA to `release/v<version>`.
 
-`release.yml` runs on `release/**`. Once a hosted runner is actually executing the job, it first verifies the candidate preflight status/current-main ancestry, captures the canonical `publishedUtc`, then deterministically recreates all generated release files from the canonical inputs plus that single GitHub-owned timestamp. It verifies a second in-run rebuild byte-for-byte, derives a ZIP-free source commit without creating a source branch, adds exactly one new historical release ZIP to the same release branch and opens exactly one pull request.
+`release.yml` runs on `release/**`. Once a hosted runner is actually executing the job, it first verifies all three candidate statuses (`preflight/candidate`, `preflight/linux`, `preflight/windows-powershell51`) plus current-main ancestry, captures the canonical `publishedUtc`, then deterministically recreates all generated release files from the canonical inputs plus that single GitHub-owned timestamp. It verifies a second in-run rebuild byte-for-byte, derives a ZIP-free source commit without creating a source branch, adds exactly one new historical release ZIP to the same release branch and opens exactly one pull request.
 
 The single permanent `release.yml` workflow runs the full release/core/boundary/regression gates itself before PR creation, writes the successful gate states directly onto the final PR-head commit, creates the annotated ZIP-free source tag only after successful PR creation, then merges the PR and deletes the release branch. A separate `pull_request` workflow is intentionally not used: pull requests created with the repository `GITHUB_TOKEN` do not recursively start another workflow.
 
-After the merge, the same workflow runs `tools/release_verification.py`. This integrated verifier checks PR/merge state, exactly one publication PR, 8/8 release statuses, candidate-preflight status, source tag/source tree, `downloads/latest.json`, published release ZIP hash/size, candidate/release branch cleanup and the completed reproducibility marker. It emits one machine-readable `RELEASE_VERIFICATION_SUMMARY=<json>` line and a human-readable GitHub Job Summary.
+After the merge, the same workflow runs `tools/release_verification.py`. This integrated verifier checks PR/merge state, exactly one publication PR, 8/8 release statuses, all 3/3 candidate statuses, source tag/source tree, `downloads/latest.json`, published release ZIP hash/size, candidate/release branch cleanup and the completed reproducibility marker. It emits one machine-readable `RELEASE_VERIFICATION_SUMMARY=<json>` line and a human-readable GitHub Job Summary.
 
 There is no version-specific workflow, separate PR-verification workflow, Base64 patch transport, helper source branch, separate required post-merge finalizer, or per-version validator copy.
 
@@ -76,6 +85,8 @@ Existing `downloads/*.zip` files are immutable. A release may add exactly one ne
 
 GitHub validation depth is not reduced for performance.
 
+- Linux Candidate Preflight and the Windows PowerShell 5.1 gate run in parallel; promotion waits for both.
+- Candidate timing is emitted as `CANDIDATE_TIMING_SUMMARY=<json>`, including queue/duration data and critical-path ownership.
 - Hosted Candidate Preflight + Release Orchestrator remain governed by their existing safety gates.
 - Once implementation is ready, a small conflict-free connector-supervised patch should target roughly **2–3 minutes interactive orchestration time**, excluding external runner queues/incidents.
 - Achieve this by batched initial reads, one atomic candidate commit, non-aggressive run observation and the aggregated `RELEASE_VERIFICATION_SUMMARY`; never by skipping gates or verification.

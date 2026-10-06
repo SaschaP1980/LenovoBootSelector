@@ -31,6 +31,7 @@ Before planning or implementing a product change:
    - `bin/version.json`
 4. Read the executable release contracts:
    - `.github/workflows/candidate-preflight.yml`
+   - `.github/workflows/windows-powershell51.yml`
    - `.github/workflows/release.yml`
    - `tools/candidate_preflight.py`
    - `tools/release_verification.py`
@@ -179,7 +180,11 @@ For normal releases, **never create `release/v<version>` manually**. Only a succ
 
 `.github/workflows/candidate-preflight.yml` is the release-entry gate.
 
-Among other things, it verifies:
+From v0.6.9.0 onward, one candidate push starts two mandatory paths in parallel on the same exact SHA:
+
+### Linux Candidate Preflight
+
+The `ubuntu-latest` job verifies:
 
 - the exact candidate SHA;
 - current `main` as a valid basis;
@@ -192,28 +197,42 @@ Among other things, it verifies:
 - no change to historical release ZIPs;
 - Runtime Closure/build contracts.
 
-On success:
+It emits `CANDIDATE_PREFLIGHT_SUMMARY=<json>` and writes `preflight/linux`.
 
-1. `preflight/candidate=success` is written;
-2. `release/v<version>` is created at the **same SHA**;
-3. `release.yml` is explicitly started through `workflow_dispatch`;
-4. the candidate branch is deleted.
+### Windows PowerShell 5.1 Gate
+
+The reusable `.github/workflows/windows-powershell51.yml` runs on a fresh GitHub-hosted `windows-2025` runner. It:
+
+- checks out the same exact SHA;
+- explicitly verifies Windows PowerShell 5.1;
+- deterministically regenerates and checks the runtime;
+- runs `tests/Test-WindowsPowerShell51.ps1`;
+- emits `WINDOWS_POWERSHELL51_SUMMARY=<json>` with suite totals and timing data;
+- writes `preflight/windows-powershell51`.
+
+### Promotion
+
+A separate promotion job depends on both candidate jobs. It revalidates their latest statuses on the same exact SHA, verifies the candidate ref has not moved and current `main` is still an ancestor, then:
+
+1. emits `CANDIDATE_TIMING_SUMMARY=<json>`;
+2. writes `preflight/candidate=success`;
+3. creates `release/v<version>` at the **same SHA**;
+4. explicitly starts `release.yml` through `workflow_dispatch`;
+5. deletes the candidate branch.
 
 The explicit dispatch is required because a push performed with `GITHUB_TOKEN` does not reliably trigger a recursive follow-up workflow.
 
-A successful preflight emits:
-
-`CANDIDATE_PREFLIGHT_SUMMARY=<json>`
+The initial LBS-20 policy is **always mandatory** while benchmark data is collected. A later policy change must be explicit, deterministic, tested, and documented.
 
 ### Candidate failures
 
-If Candidate Preflight fails:
+If either mandatory candidate job fails:
 
 - there must not yet be a normal release;
 - read the exact job log for the cause;
 - apply the smallest correction as a fast-forward on the **same candidate branch**;
 - do not create a parallel candidate or release branch;
-- let the normal preflight run again.
+- let the normal push rerun both required paths.
 
 ## 11. Release Orchestrator
 
@@ -222,6 +241,8 @@ If Candidate Preflight fails:
 It first requires:
 
 - successful `preflight/candidate` status;
+- successful `preflight/linux` status;
+- successful `preflight/windows-powershell51` status;
 - current `main` as an ancestor;
 - a not-yet-existing target tag.
 
@@ -303,7 +324,8 @@ Preferred orchestration:
 - reuse immutable facts within the same SHA phase;
 - prepare changes in one atomic candidate;
 - do not poll aggressively;
-- observe Candidate Preflight using a terminal read + summary where possible;
+- observe Candidate Preflight using the Linux summary, Windows summary, and `CANDIDATE_TIMING_SUMMARY` where relevant;
+- remember that Linux and Windows candidate jobs run in parallel and promotion waits for both;
 - observe the release using a terminal read + `RELEASE_VERIFICATION_SUMMARY`.
 
 Target for a small, conflict-free release when GitHub runners are available: roughly **2–3 minutes of interactive orchestration time**. The measured pipeline itself can be substantially faster.
@@ -346,15 +368,18 @@ The four permanent GitHub gates are:
 
 Historical validators are stored under `tests-history/` and are not part of active release selection.
 
-### Native Windows tests
+### Windows and hardware test evidence
 
-Native Windows/PowerShell-5.1 tests may be reported as **PASS** only when they were actually executed on Windows.
+Windows/PowerShell-5.1 tests may be reported as **PASS** only when they were actually executed on Windows.
 
-A Linux/GitHub static/contract gate is not a substitute for a native run. Final reports must explicitly distinguish:
+From v0.6.9.0 onward, the mandatory GitHub-hosted Windows gate executes `tests/Test-WindowsPowerShell51.ps1` on Windows PowerShell 5.1 and therefore counts as genuine Windows contract-suite execution.
 
-- automated GitHub/static tests;
-- native Windows tests actually executed;
-- native tests that remain outstanding.
+It does **not** count as physical Lenovo hardware/UEFI E2E. Final reports must explicitly distinguish:
+
+- automated Linux/GitHub static and release gates;
+- GitHub-hosted Windows PowerShell 5.1 contract-suite results;
+- physical Lenovo hardware/firmware tests actually executed;
+- physical hardware tests that remain outstanding.
 
 ## 17. GitHub Issue lifecycle
 
