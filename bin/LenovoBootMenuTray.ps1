@@ -920,7 +920,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.6.8.0'
+$script:AppVersion = '0.6.8.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -6834,7 +6834,7 @@ try {
     $script:Popup = New-PopupForm
     $script:TrayIcon = New-Object System.Windows.Forms.NotifyIcon
     $script:TrayIcon.Icon = Load-TrayIcon
-    $script:TrayIcon.Text = 'Lenovo Boot Selector – Startziel wählen'
+    $script:TrayIcon.Text = 'Lenovo Boot Selector'
     $script:TrayIcon.Visible = $true
 
     $context = New-Object LenovoContextMenuStrip
