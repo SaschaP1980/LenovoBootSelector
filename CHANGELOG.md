@@ -1,5 +1,16 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.3.0 – LBS-5 Updater-Netzwerklogik gekapselt und diagnostisch gehärtet
+
+- Neue Infrastrukturgrenze `src/Infrastructure/UpdateTransport.ps1`: feste GitHub-Quelle, TLS-1.2-Aktivierung, WebClient-Erzeugung sowie Manifest-/Pakettransport liegen nicht mehr im UpdateClient.
+- Netzwerkfehler werden strukturiert als `network` mit Stufen `manifest-download` bzw. `package-download` erfasst; der zugrunde liegende `WebExceptionStatus` bleibt in der Runtime-Diagnose erhalten.
+- Manifest-, Paket-, Größen- und SHA-256-Fehler besitzen getrennte Kategorien/Stufen. Insbesondere Hashfehler werden als `hash / package-hash` ausgewiesen.
+- Update-Check- und Prepare-Worker geben `ErrorCategory`, `FailureStage`, `ErrorClass` und `NetworkStatus` an die UI weiter; die Runtime-Diagnose protokolliert dieselben strukturierten Felder.
+- Persistente Installer-/Restart-Ergebnisse führen zusätzlich `failureCategory`, `failureStage` und `errorClass`, sodass Installations- und Restartfehler voneinander unterscheidbar bleiben.
+- Gezielte native Update-Tests decken DNS-, Timeout- und ConnectFailure-Klassifikation sowie die separate Hash-Kategorie ab.
+- Der einmalige read-only Startup-Versionscheck aus LBS-11 bleibt erhalten; Popup-Öffnen startet keinen weiteren Check und periodisches Polling bleibt ausgeschlossen.
+- Keine Änderung an BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
+
 ## v0.6.2.2 – Teststruktur aufgeräumt und einmaliger Start-Versionscheck
 
 ### LBS-13 – Teststruktur

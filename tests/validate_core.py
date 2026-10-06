@@ -170,6 +170,13 @@ def main():
     s.contains('Cleanup exact allowlist retained',uninstall,'$exactTaskNames = @(')
     s.contains('Cleanup owned prefixes retained',uninstall,'$ownedPrefixes = @(')
 
+    update_test=txt(root/'tests/Test-UpdateCore.ps1')
+    s.contains('LBS-5 update tests source transport module',update_test,"src\\Infrastructure\\UpdateTransport.ps1")
+    s.contains('LBS-5 update tests cover DNS failures',update_test,'NameResolutionFailure')
+    s.contains('LBS-5 update tests cover timeout failures',update_test,'WebExceptionStatus]::Timeout')
+    s.contains('LBS-5 update tests cover connection failures',update_test,'ConnectFailure')
+    s.contains('LBS-5 update tests cover separate hash category',update_test,"-Category 'hash' -Stage 'package-hash'")
+
     return s.finish()
 
 if __name__=='__main__': raise SystemExit(main())

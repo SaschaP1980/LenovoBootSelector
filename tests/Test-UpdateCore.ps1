@@ -3,6 +3,8 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 . (Join-Path $root 'src\Core\UpdateModel.ps1')
 . (Join-Path $root 'src\Application\UpdateRuntime.ps1')
+. (Join-Path $root 'src\Infrastructure\UpdateTransport.ps1')
+. (Join-Path $root 'src\Infrastructure\UpdateClient.ps1')
 $checks = 0
 function Assert-True([string]$Name,[bool]$Value) { if (-not $Value) { throw "FAIL $Name" }; $script:checks++; Write-Host "PASS  $Name" }
 function Assert-Equal([string]$Name,$Expected,$Actual) { if ($Expected -ne $Actual) { throw "FAIL $Name expected=[$Expected] actual=[$Actual]" }; $script:checks++; Write-Host "PASS  $Name" }
@@ -22,6 +24,36 @@ Assert-True 'Startup update check starts unattempted' (-not $runtime.StartupChec
 Assert-True 'Startup update check starts incomplete' (-not $runtime.StartupCheckCompleted)
 Assert-Equal 'Update check mode starts empty' '' $runtime.CheckMode
 $threw=$false; try { [void](Compare-LenovoAppVersionCore -Current '0.5.7' -Candidate 'dev') } catch { $threw=$true }; Assert-True 'Invalid compare throws' $threw
+
+$dnsError=[System.Net.WebException]::new('dns',[System.Net.WebExceptionStatus]::NameResolutionFailure)
+$failure=Get-LenovoUpdateFailureInfo -ErrorRecord $dnsError -DefaultCategory 'runtime' -DefaultStage 'fixture'
+Assert-Equal 'DNS failure classified as network' 'network' $failure.Category
+Assert-Equal 'DNS network status retained' 'NameResolutionFailure' $failure.NetworkStatus
+Assert-Equal 'DNS error class retained' 'System.Net.WebException' $failure.ErrorClass
+
+$timeoutError=[System.Net.WebException]::new('timeout',[System.Net.WebExceptionStatus]::Timeout)
+$failure=Get-LenovoUpdateFailureInfo -ErrorRecord $timeoutError -DefaultCategory 'runtime' -DefaultStage 'fixture'
+Assert-Equal 'Timeout failure classified as network' 'network' $failure.Category
+Assert-Equal 'Timeout network status retained' 'Timeout' $failure.NetworkStatus
+
+$connectError=[System.Net.WebException]::new('connect',[System.Net.WebExceptionStatus]::ConnectFailure)
+$failure=Get-LenovoUpdateFailureInfo -ErrorRecord $connectError -DefaultCategory 'runtime' -DefaultStage 'fixture'
+Assert-Equal 'Connect failure classified as network' 'network' $failure.Category
+Assert-Equal 'Connect network status retained' 'ConnectFailure' $failure.NetworkStatus
+
+$wrapped=New-LenovoUpdateFailureException -Category 'network' -Stage 'manifest-download' -Message 'Manifest transport failed' -InnerException $dnsError
+$failure=Get-LenovoUpdateFailureInfo -ErrorRecord $wrapped -DefaultCategory 'runtime' -DefaultStage 'fixture'
+Assert-Equal 'Wrapped transport keeps network category' 'network' $failure.Category
+Assert-Equal 'Wrapped transport keeps stage' 'manifest-download' $failure.Stage
+Assert-Equal 'Wrapped transport keeps network status' 'NameResolutionFailure' $failure.NetworkStatus
+Assert-Equal 'Wrapped transport exposes underlying error class' 'System.Net.WebException' $failure.ErrorClass
+Assert-Equal 'Wrapped transport keeps user-facing message' 'Manifest transport failed' $failure.Message
+
+$hashFailure=New-LenovoUpdateFailureException -Category 'hash' -Stage 'package-hash' -Message 'Hash mismatch'
+$failure=Get-LenovoUpdateFailureInfo -ErrorRecord $hashFailure -DefaultCategory 'runtime' -DefaultStage 'fixture'
+Assert-Equal 'Hash failure classified separately' 'hash' $failure.Category
+Assert-Equal 'Hash failure stage retained' 'package-hash' $failure.Stage
+
 
 $files=@('BUILD_INTEGRITY.txt','icon-preview.png','Install-LenovoBootMenuTasks.ps1','LenovoBootMenuTray.ico','LenovoBootMenuTray.ps1','README.md','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','Uninstall-LenovoBootMenuTasks.ps1')
 $valid=[pscustomobject]@{schemaVersion=1;version='0.5.8.1';file='LenovoBootMenuTray-v0.5.8.1.zip';sha256=('a'*64);size=123;tag='v0.5.8.1';packageFiles=$files}
@@ -77,5 +109,5 @@ $malformed=[pscustomobject]@{success='true';message='not a Boolean'}
 $rr=Resolve-LenovoUpdateRestartResultCore -Result $malformed -RunningVersion '0.5.8.1'
 Assert-Equal 'Non-Boolean legacy success is rejected' 'unknown' $rr.ResultFormat
 Assert-True 'Malformed legacy result fails closed' (-not $rr.Success)
-Write-Host "UPDATE TOTAL $checks/47"
-if ($checks -ne 47) { throw "Unexpected update test count $checks" }
+Write-Host "UPDATE TOTAL $checks/61"
+if ($checks -ne 61) { throw "Unexpected update test count $checks" }
