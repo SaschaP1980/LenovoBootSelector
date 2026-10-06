@@ -1,54 +1,58 @@
-# Teststruktur
+# Test structure
 
-`tests/` enthält ausschließlich die **aktiven, kanonischen Tests** und die von ihnen benötigten Baseline-Daten. Versionsgebundene historische Validatoren liegen getrennt unter [`../tests-history/`](../tests-history/).
+`tests/` contains only the **active canonical tests** and the baseline data they require. Version-specific historical validators are stored separately under [`../tests-history/`](../tests-history/).
 
-## Permanente Python-Gates
+## Permanent Python gates
 
-| Datei | Kategorie | Zweck |
+| File | Category | Purpose |
 | --- | --- | --- |
-| `validate_release.py` | Release | Release-, Packaging-, Source- und Repository-Invarianten |
-| `validate_core.py` | Core | fachliche Kernlogik und modulare Kernverträge |
-| `validate_boundary.py` | Boundary | Architektur-, Privilege- und Modulgrenzen |
-| `validate_regression.py` | Regression | Vergleich des aktuellen Stands mit der freigegebenen Basis |
+| `validate_release.py` | Release | Release, packaging, source, repository, and documentation invariants |
+| `validate_core.py` | Core | Functional core logic and modular core contracts |
+| `validate_boundary.py` | Boundary | Architecture, privilege, and module boundaries |
+| `validate_regression.py` | Regression | Comparison of the current state with the approved basis |
 
-Diese vier Dateien sind die permanenten Python-Gates des GitHub-Release-Orchestrators.
+These four files are the permanent Python gates used by the GitHub Release Orchestrator.
 
-## Native Windows-/PowerShell-Tests
+## Native Windows / PowerShell tests
 
-| Datei | Kategorie | Zweck |
+| File | Category | Purpose |
 | --- | --- | --- |
-| `Test-FunctionalCore.ps1` | Core | Parser, Settings und fachliche Kernfunktionen |
-| `Test-UpdateCore.ps1` | Core | Update-Modell, Transport-Fehlervertrag und Update-Verträge |
-| `Test-RefreshRuntime.ps1` | Runtime | Background-Refresh-State und Request-Lifecycle |
-| `Test-MaintenanceRuntime.ps1` | Runtime | Maintenance-State und Modi |
-| `Test-SingleInstanceMutex.ps1` | Runtime | Single-Instance-/Mutex-Lifecycle |
-| `Test-BootTargetDrift.ps1` | Safety | Drift-Erkennung und fail-closed Zustände |
-| `Test-TaskBrokerBoundary.ps1` | Safety | LBS-6 Fixed-Task-/Metadata-Boundary ohne privilegierte Ausführung |
-| `Test-ArchitectureSoak.ps1` | Soak | wiederholte Architektur-/State-Stabilität |
-| `Test-WindowsPowerShell51.ps1` | Compatibility | Windows PowerShell 5.1 Parser-/Encoding-Gate und nativer Sammelrunner |
+| `Test-FunctionalCore.ps1` | Core | Parsers, settings, and functional core behavior |
+| `Test-UpdateCore.ps1` | Core | Update model, transport failure contract, and update contracts |
+| `Test-RefreshRuntime.ps1` | Runtime | Background refresh state and request lifecycle |
+| `Test-MaintenanceRuntime.ps1` | Runtime | Maintenance state and modes |
+| `Test-SingleInstanceMutex.ps1` | Runtime | Single-instance / mutex lifecycle |
+| `Test-BootTargetDrift.ps1` | Safety | Drift detection and fail-closed states |
+| `Test-TaskBrokerBoundary.ps1` | Safety | LBS-6 fixed-task / metadata boundary without privileged execution |
+| `Test-ArchitectureSoak.ps1` | Soak | Repeated architecture/state stability |
+| `Test-WindowsPowerShell51.ps1` | Compatibility | Windows PowerShell 5.1 parser/encoding gate and native aggregate runner |
 
-## Baseline-Daten
+## Baseline data
 
-- `characterization-baseline-v0.3.4.json` – historische Characterization-Basis.
-- `taskbroker-baseline-v0.4.1.json` – TaskBroker-Basis.
-- `ui-baseline-v0.4.3.json` – UI-Basis.
+- `characterization-baseline-v0.3.4.json` — historical characterization basis.
+- `taskbroker-baseline-v0.4.1.json` — TaskBroker basis.
+- `ui-baseline-v0.4.3.json` — UI basis.
 
-Die Baselines bleiben bewusst in `tests/`, weil vorhandene historische Validatoren diese Pfade weiterhin verwenden.
+The baselines intentionally remain under `tests/` because existing historical validators still reference these paths.
 
-## Native Assertion-Count-Verträge
+## Native assertion-count contracts
 
-Native PowerShell-Suites verwenden bewusst unterschiedliche Count-Strategien; ein pauschaler Regex-/Call-Site-Zähler ist nicht für jede Suite korrekt.
+Native PowerShell suites intentionally use different count strategies; one generic regex/call-site counter is not correct for every suite.
 
-| Suite | Strategie |
+| Suite | Strategy |
 | --- | --- |
-| `Test-UpdateCore.ps1` | **AST-self-audit + fester Coverage-Guard.** PowerShell zählt die `Assert-True`-/`Assert-Equal`-Command-ASTs, vergleicht sie mit den tatsächlich ausgeführten `$checks` und verlangt zusätzlich bewusst exakt 62. Das permanente Release-Gate prüft denselben Vertrag statisch. |
-| `Test-RefreshRuntime.ps1` | Straight-line: fester Laufzeitzähler 18. |
-| `Test-TaskBrokerBoundary.ps1` | Straight-line: fester Laufzeitzähler 23. |
-| `Test-BootTargetDrift.ps1` | Straight-line: fester Laufzeitzähler 13. |
-| `Test-SingleInstanceMutex.ps1` | Explizite manuelle Inkremente; fester Fail-Guard 4. |
-| `Test-MaintenanceRuntime.ps1` | Loop-derived: 15 Laufzeitchecks aus statischen und pro Modus wiederholten Assertions. |
-| `Test-ArchitectureSoak.ps1` | Vier aggregierte Soak-Assertions; jede Assertion umfasst viele Iterationen. |
-| `Test-FunctionalCore.ps1` | Dynamische PASS-Zählung; derzeit kein separater Coverage-Sollzähler. |
-| `Test-WindowsPowerShell51.ps1` | Sammelrunner/Parser-Gate; Dateizahl ist dynamisch und kein Assertion-Coverage-Count. |
+| `Test-UpdateCore.ps1` | **AST self-audit + fixed coverage guard.** PowerShell counts the `Assert-True` / `Assert-Equal` command ASTs, compares them with the actually executed `$checks`, and additionally requires exactly 62. The permanent release gate validates the same contract statically. |
+| `Test-RefreshRuntime.ps1` | Straight-line: fixed runtime count of 18. |
+| `Test-TaskBrokerBoundary.ps1` | Straight-line: fixed runtime count of 23. |
+| `Test-BootTargetDrift.ps1` | Straight-line: fixed runtime count of 13. |
+| `Test-SingleInstanceMutex.ps1` | Explicit manual increments; fixed fail guard of 4. |
+| `Test-MaintenanceRuntime.ps1` | Loop-derived: 15 runtime checks from static assertions plus assertions repeated per mode. |
+| `Test-ArchitectureSoak.ps1` | Four aggregate soak assertions; each assertion covers many iterations. |
+| `Test-FunctionalCore.ps1` | Dynamic PASS counting; currently no separate coverage target count. |
+| `Test-WindowsPowerShell51.ps1` | Aggregate runner/parser gate; file count is dynamic and is not an assertion-coverage count. |
 
-Bei neuen Assertions muss der jeweilige Vertrag bewusst angepasst werden. Insbesondere darf beim Update-Test der feste `62`-Guard nicht automatisch aus der Source-Anzahl abgeleitet werden: Er ist ein zusätzlicher Change-Control-Guard, damit eine Suite-Erweiterung nicht unbemerkt durchrutscht.
+When assertions are added, the corresponding contract must be updated deliberately. In particular, the fixed `62` guard in the update test must not be derived automatically from the source count: it is an additional change-control guard so that a suite extension cannot pass unnoticed.
+
+## Repository documentation language
+
+English is the canonical language for all repository Markdown and durable GitHub documentation. The permanent release validation checks this policy pragmatically while allowing clearly delimited technical literals and exact UI strings.

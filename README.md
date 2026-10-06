@@ -4,151 +4,153 @@
   <img src="bin/icon-preview.png" alt="Lenovo Boot Selector" width="96">
 </p>
 
-**Lenovo Boot Selector** ist eine Windows-Tray-Anwendung für Lenovo-Systeme, mit der vorhandene Firmware-Startziele komfortabel als **einmaliges nächstes Bootziel** ausgewählt werden können.
+**Lenovo Boot Selector** is a Windows tray application for Lenovo systems that lets you conveniently select an existing firmware boot target as the **one-time target for the next boot**.
 
-## Warum dieses Tool existiert
+## Why this tool exists
 
-Das Projekt entstand aus einem sehr konkreten Problem: Auf dem verwendeten Lenovo-Laptop werden **F12** und teilweise auch **Enter** im frühen Startvorgang nicht immer zuverlässig erkannt. Das betrifft sowohl die interne Laptop-Tastatur als auch per USB-Dongle angeschlossene Tastaturen. Wird die Eingabe in diesem kurzen Zeitfenster verpasst, erscheint das gewünschte Boot-Menü nicht – stattdessen startet direkt das erste reguläre Startziel, typischerweise die Windows-Installation auf der ersten NVMe-SSD.
+The project was created to solve a very specific problem: on the Lenovo laptop used for development, **F12** and sometimes **Enter** are not always detected reliably during the early boot phase. This affects both the internal laptop keyboard and keyboards connected through a USB dongle. If the key press is missed during that short window, the expected boot menu does not appear—instead, the first regular boot target starts immediately, typically the Windows installation on the first NVMe SSD.
 
-Soll eigentlich von einer externen USB-HDD oder einem anderen vorhandenen System gestartet werden, bedeutet das im schlechtesten Fall: das falsche Windows startet, anschließend muss wieder heruntergefahren oder neu gestartet werden, und der Versuch mit F12 oder Enter beginnt von vorn. In der Praxis waren dafür teilweise **bis zu zehn Neustartversuche** nötig, bevor die Tastatur im richtigen Moment erkannt wurde.
+When the intended target is an external USB HDD or another installed system, the worst case is frustrating: the wrong Windows installation boots, it must be shut down or restarted again, and the F12/Enter attempt starts over. In practice this sometimes required **up to ten restart attempts** before the keyboard was detected at the right moment.
 
-Lenovo Boot Selector wurde entwickelt, um genau diese Abhängigkeit vom Tastatur-Timing zu beseitigen. Der gewünschte Start kann bereits **innerhalb von Windows** vorbereitet werden:
+Lenovo Boot Selector was built to remove that dependency on keyboard timing. The desired boot can be prepared **from within Windows**:
 
-- Ein vorhandenes Startziel kann als **einmaliges nächstes Bootziel** festgelegt werden.
-- Wenn die beteiligten Systeme entsprechend eingerichtet sind, kann zusätzlich das vorhandene **Boot-Menü als Standard-Startziel** verwendet werden.
-- Der nächste Neustart hängt damit nicht mehr davon ab, ob F12 oder Enter während weniger Sekunden rechtzeitig erkannt wird.
+- an existing boot target can be selected as the **one-time target for the next boot**;
+- when the participating systems are configured accordingly, the existing **boot menu can also be used as the default boot target**;
+- the next restart therefore no longer depends on F12 or Enter being detected within a few seconds of pre-boot time.
 
-Für den ursprünglichen Anwendungsfall bedeutet das: Soll beispielsweise von der externen USB-HDD gestartet werden, wird das gewünschte Ziel vorher ausgewählt und anschließend neu gestartet. Das versehentliche Starten der falschen NVMe-Windows-Installation und die anschließende Kette aus wiederholtem Herunterfahren und Neustarten entfällt.
+For the original use case, this means that when the external USB HDD should boot, the desired target is selected in advance and Windows is restarted. Accidentally booting the wrong NVMe Windows installation—and the resulting chain of repeated shutdowns and restarts—is avoided.
 
-Dieses Problem kann auch andere Systeme betreffen, wenn Tastaturen in der frühen Firmwarephase – etwa über USB, Funk-Dongles oder Docks – zu spät oder nicht zuverlässig genug verfügbar sind. Lenovo Boot Selector bietet dafür eine reproduzierbare Alternative zum wiederholten Versuch, den richtigen Tastendruck im richtigen Moment zu treffen.
+Other systems can suffer from the same class of problem when keyboards are initialized too late or unreliably during the firmware phase, especially through USB, wireless dongles, docks, or other initialization paths. Lenovo Boot Selector provides a reproducible alternative to repeatedly trying to hit the right key at the right moment.
 
-Das Tool verfolgt dabei bewusst drei technische Ziele:
+The tool deliberately follows three technical goals:
 
-- **schneller und deterministischer Wechsel:** vorhandene Startziele direkt aus dem Tray auswählen;
-- **keine dauerhafte Änderung der normalen UEFI-Reihenfolge:** die bestehende Firmware-Konfiguration bleibt unangetastet;
-- **möglichst kleine Privilege-Grenze:** die Oberfläche läuft uneleviert, privilegierte Aktionen sind auf fest definierte und validierte Operationen begrenzt.
+- **fast and deterministic switching:** select existing boot targets directly from the tray;
+- **no permanent change to the normal UEFI order:** the existing firmware configuration remains untouched;
+- **a minimal privilege boundary:** the UI runs unelevated and privileged actions are limited to fixed, validated operations.
 
-Damit ist Lenovo Boot Selector kein Ersatz für das BIOS/UEFI-Setup und kein Bootloader. Es ist eine Windows-Oberfläche für einen kontrollierten **One-Shot-Boot-Wechsel** und für Systeme, bei denen die klassische Pre-Boot-Tastaturauswahl nicht zuverlässig genug ist.
+Lenovo Boot Selector is therefore not a BIOS/UEFI replacement and not a bootloader. It is a Windows interface for a controlled **One-Shot Next Boot** workflow and for systems where classic pre-boot keyboard selection is not reliable enough.
 
-Die Anwendung läuft im Normalbetrieb **uneleviert**. Privilegierte Firmwareänderungen werden ausschließlich über fest definierte, allowgelistete Windows-Scheduled-Tasks ausgeführt. Permanente Änderungen an der UEFI-Bootreihenfolge gehören ausdrücklich nicht zum Produktmodell.
+The application runs **unelevated** during normal operation. Privileged firmware mutations are executed only through fixed, allowlisted Windows Scheduled Tasks. Permanent changes to the UEFI boot order are explicitly outside the product model.
 
-Ab v0.6.4.0 ist diese Grenze zusätzlich technisch fail-closed gehärtet: Der Runtime-TaskBroker akzeptiert keine freien Tasknamen mehr, sondern nur feste Operationsarten; zielbezogene Tasknamen werden ausschließlich aus validierten, installierten Firmware-GUIDs abgeleitet. TaskBroker-State und Metadaten sind für normale Benutzer read-only, und die Task-DACL wird auf ausschließlich Read+Execute geprüft bzw. repariert. Der kanonische Vertrag ist in [docs/SECURITY_BOUNDARY.md](docs/SECURITY_BOUNDARY.md) dokumentiert.
+Since v0.6.4.0 this boundary is additionally hardened fail-closed: the runtime TaskBroker no longer accepts arbitrary task names and instead accepts only fixed operation types; target-specific task names are derived only from validated, installed firmware GUIDs. TaskBroker state and metadata are read-only for normal users, and the task DACL is validated/repaired to Read+Execute only. The canonical contract is documented in [docs/SECURITY_BOUNDARY.md](docs/SECURITY_BOUNDARY.md).
 
-**Einmalige Wartung nach dem Update auf v0.6.4.1:** vorhandene TaskBroker-Installationen mit Schema 0.2.12 werden absichtlich nicht weiter vertraut. Unter **Wartung → Systemfunktionen reparieren…** muss einmal der erhöhte Reparaturpfad ausgeführt werden; dadurch werden Schema 0.2.13 und die gehärteten ACLs installiert.
+**One-time maintenance after updating to v0.6.4.1:** existing TaskBroker installations with schema 0.2.12 are intentionally no longer trusted. Run the existing system-functions repair action once and confirm the UAC prompt; this installs schema 0.2.13 and the hardened ACLs.
 
-**Hinweis zu v0.6.4.0:** Der dort erstmals ausgelieferte Repair konnte im Schritt `protect-state` fälschlich abbrechen, weil die ACL-Prüfung das erlaubte `ReadAndExecute` über die zusammengesetzte `Modify`-Maske als schreibbar interpretierte. v0.6.4.1 korrigiert ausschließlich diese Prüfung. Ein mit v0.6.4.0 fehlgeschlagener Repair kann mit v0.6.4.1 sicher erneut gestartet werden.
+**Note about v0.6.4.0:** the repair path first shipped in that version could falsely fail at the `protect-state` step because the ACL check interpreted the allowed `ReadAndExecute` rights as writable through the composite `Modify` mask. v0.6.4.1 fixes only that check. A repair that failed under v0.6.4.0 can safely be run again with v0.6.4.1.
 
-**Aktueller Entwicklungsstand:** v0.6.7.3  
-**Technik:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
+**Current development version:** v0.6.8.0  
+**Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
-## Downloads und Revisionshistorie
+## Downloads and revision history
 
-Versionierte Builds liegen im Ordner [`downloads/`](downloads/). Jede produktive Source-Revision, die einen neuen Build erfordert, bekommt ein neues versioniertes Release-ZIP. Bereits veröffentlichte Builds bleiben historisch erhalten.
+Versioned builds are stored under [`downloads/`](downloads/). Every product source revision that requires a new build receives a new versioned release ZIP. Previously published builds remain available as immutable historical artifacts.
 
-Die neueste maschinenlesbare Updateinformation liegt in [`downloads/latest.json`](downloads/latest.json). Die fachliche Versionshistorie steht in [CHANGELOG.md](CHANGELOG.md).
+The latest machine-readable update metadata is stored in [`downloads/latest.json`](downloads/latest.json). The product version history is maintained in [CHANGELOG.md](CHANGELOG.md).
 
-Versionsschema: **MAJOR.MINOR.PATCH.HOTFIX**. Historische dreiteilige Versionen werden für Vergleiche als `HOTFIX = 0` behandelt.
+Version format: **MAJOR.MINOR.PATCH.HOTFIX**. Historical three-component versions are compared as if `HOTFIX = 0`.
 
-## Funktionen
+## Features
 
-- Auswahl eines vorhandenen Firmware-Startziels für den **nächsten Start**
-- übersichtliche Tray-/Popup-Oberfläche im Lenovo-Schwarz/Rot-Stil
-- benutzerfreundliche Namen für bekannte Firmwareziele
-- persistentes Standard-Startziel über den abgesicherten TaskBroker
-- direkter Windows-Neustart aus der Anwendung
-- Autostart ohne sichtbares PowerShell-/CMD-Fenster
-- Verwaltung von Reihenfolge und Sichtbarkeit der angezeigten Startziele
-- read-only Erkennung von Firmware-Zieldrift
-- read-only Storage-Kontext für interne NVMe- und USB-Medien
-- Diagnose-Export und Wartungsfunktionen
-- manueller Self-Updater mit **„Auf neue Version prüfen…“** und **„App aktualisieren…“**
+- select an existing firmware boot target for the **next boot**
+- clear tray/popup UI in a Lenovo black/red visual style
+- friendly names for known firmware targets
+- persistent default boot target through the hardened TaskBroker
+- restart Windows directly from the application
+- autostart without a visible PowerShell/CMD window
+- manage ordering and visibility of displayed boot targets
+- read-only firmware-target drift detection
+- read-only storage context for internal NVMe and USB media
+- diagnostic export and maintenance functions
+- manual self-updater with the current German UI actions `Auf neue Version prüfen…` and `App aktualisieren…`
 
-## Update-Funktion
+## Update function
 
-Beim Start jedes neuen Tray-Prozesses wird **genau einmal** automatisch read-only geprüft, ob eine neuere App-Version verfügbar ist. Das erneute Öffnen des Popups löst keinen weiteren Check aus; es gibt weiterhin **kein periodisches Polling**. Wird eine neue Version gefunden, zeigt der Popup-Header – solange kein Bootziel-Refresh läuft – **„Neue App-Version verfügbar“**. Während eines Bootziel-Refreshs hat **„Aktualisiere Bootziele…“** Vorrang und danach erscheint die Update-Meldung wieder.
+At the start of every new tray process, the application performs **exactly one** automatic read-only check for a newer app version. Reopening the popup does not trigger another check, and there is still **no periodic polling**. When a newer version is available, the popup header shows the current German UI text `Neue App-Version verfügbar` as long as no boot-target refresh is active. During a boot-target refresh, `Aktualisiere Bootziele…` takes precedence; the update indication returns afterward.
 
-Die Prüfung liest `downloads/latest.json` aus dem fest eingebauten GitHub-Repository. Eine neue Version wird nur akzeptiert, wenn Manifest, semantische Version, Dateiname, Tag, Größe, SHA-256 und Paketdateiliste valide sind. Der automatische Startcheck lädt oder installiert nichts. Download und Installation bleiben ausschließlich explizite Nutzeraktionen über den bestehenden manuellen Updatepfad. Das heruntergeladene ZIP wird vor dem Entpacken nochmals gegen Größe und SHA-256 geprüft. Die Installation läuft uneleviert mit lokalem Backup und Rollback; anschließend startet die App über den vorhandenen VBS-Launcher neu.
+The check reads `downloads/latest.json` from the fixed GitHub repository. A newer version is accepted only when manifest, semantic version, filename, tag, size, SHA-256, and package file list are valid. The automatic startup check does not download or install anything. Download and installation remain explicit user actions through the existing manual update path. The downloaded ZIP is checked again for size and SHA-256 before extraction. Installation runs unelevated with a local backup and rollback; the app then restarts through the existing VBS launcher.
 
-Ab v0.6.3.1 ist **„Neue App-Version verfügbar“** im Popup-Header direkt bedienbar. Hover und Tastaturfokus heben den Hinweis Lenovo-rot hervor; Klick, Enter oder Leertaste öffnen den vorhandenen Dialog **„Neue App-Version verfügbar“**. Der Header verwendet dabei ausschließlich das bereits validierte Update-Manifest und startet keinen weiteren Versionscheck. Während eines Bootziel-Refreshs oder einer Wartungsaktion bleibt der Hinweis nicht interaktiv.
+Since v0.6.3.1, `Neue App-Version verfügbar` in the popup header is directly interactive. Hover and keyboard focus highlight the indicator in Lenovo red; click, Enter, or Space opens the existing update dialog. The header uses only the already validated update manifest and does not start another version check. The indicator is not interactive while a boot-target refresh or maintenance operation is active.
 
-Ab v0.6.3.0 ist die Netzwerkseite des Updaters in `src/Infrastructure/UpdateTransport.ps1` gekapselt. Runtime-Diagnosen unterscheiden Transportfehler strukturiert von Manifest-, Paket-, Hash-, Installations- und Restartfehlern. Bei Netzwerkfehlern werden zusätzlich Fehlerklasse und `WebExceptionStatus` erfasst. Der Sicherheitsvertrag bleibt unverändert: feste HTTPS-Quelle, fail-closed Manifest-/Paketprüfung, unelevierte Ausführung und kein periodisches Polling.
+Since v0.6.3.0, updater networking is encapsulated in `src/Infrastructure/UpdateTransport.ps1`. Runtime diagnostics distinguish transport failures structurally from manifest, package, hash, installation, and restart failures. Network failures also retain the error class and `WebExceptionStatus`. The security contract remains unchanged: fixed HTTPS source, fail-closed manifest/package validation, unelevated execution, and no periodic polling.
 
-Ab v0.5.8.0 wird das Ergebnis eines Updateversuchs über den Prozessneustart hinweg gespeichert. Die neu gestartete App bestätigt einen Erfolg erst dann, wenn die tatsächlich laufende Version exakt der erwarteten Zielversion entspricht. Danach erscheint einmalig **„Update erfolgreich“**. Bei einem Installationsfehler wird nach Möglichkeit auf die vorherige Version zurückgerollt, diese erneut gestartet und einmalig **„Update fehlgeschlagen“** angezeigt. Das Ergebnis wird zusätzlich in die Runtime-Diagnose der neuen Sitzung übernommen. v0.5.8.1 ergänzt dabei die einmalige Rückwärtskompatibilität für das von älteren Updater-Helpern geschriebene Legacy-Ergebnisformat `success/message/utc`; ein Legacy-Erfolg wird nur bei einem echten Boolean-`success` akzeptiert, ohne eine nicht gespeicherte Zielversion zu erfinden.
+Since v0.5.8.0, the result of an update attempt is persisted across process restart. The restarted app reports success only when the actually running version exactly matches the expected target version. The current German UI then shows `Update erfolgreich` once. On installation failure, the updater attempts to roll back to the previous version, restarts that version, and shows `Update fehlgeschlagen` once. The result is also copied into the runtime diagnostics of the new session. v0.5.8.1 adds one-time backward compatibility for the legacy `success/message/utc` result format written by older updater helpers; a legacy success is accepted only when `success` is a real Boolean, without inventing a target version that was never stored.
 
-Ab v0.5.9.0 bietet der Dialog **„Neue Version verfügbar“** zusätzlich **„Jetzt aktualisieren“** an. Der Button verwendet denselben bestehenden manuellen Updatepfad wie **Wartung → App aktualisieren…**; ein automatischer oder zweiter Updatekanal wird nicht eingeführt.
+Since v0.5.9.0, the `Neue Version verfügbar` dialog also offers `Jetzt aktualisieren`. The button uses the same existing manual update path as the maintenance action `App aktualisieren…`; no automatic or second update channel is introduced.
 
-Der Updater verändert keine Firmware-, BCD- oder Scheduled-Task-Konfiguration. Änderungen an privilegierten Systemfunktionen bleiben weiterhin ausschließlich dem bestehenden expliziten Setup-/Repair-/Reinitialize-Pfad vorbehalten.
+The updater does not change firmware, BCD, or Scheduled Task configuration. Changes to privileged system functions remain exclusive to the existing explicit setup/repair/reinitialize path.
 
-## Aktuelle Storage-Darstellung
+## Current storage presentation
 
-### Interne NVMe-SSDs
+### Internal NVMe SSDs
 
-Bei genau einer erkannten internen NVMe zeigt die aktuelle Version das physische Modell für den ersten internen Slot an. Auf dem bestätigten Zielsystem ergibt sich beispielsweise:
+When exactly one internal NVMe device is detected, the current version shows its physical model for the first internal slot. On the confirmed target system, for example:
 
 - **NVMe-SSD 1** — `Interne SSD: KXG8AZNV2T04 LA KIOXIA`
 - **NVMe-SSD 2** — `Kein Laufwerk erkannt`
 
-Sind mehrere interne NVMe-Laufwerke vorhanden, rät die Anwendung keine unbelegte Zuordnung zwischen Windows-Disk und Firmware-Slot.
+When multiple internal NVMe devices are present, the application deliberately does not guess an unsupported physical NVMe0/NVMe1 mapping.
 
-### USB-Startmedien
+### USB boot media
 
-Das Firmwareziel bleibt bewusst das generische **USB HDD**. Der physische Datenträger wird nur als read-only Storage-Befund angezeigt. Bei genau einem erkannten USB-Bootkandidaten erscheint beispielsweise `USB-Startmedium: SanDisk Extreme Pro USB4`.
+The firmware target intentionally remains the generic **USB HDD**. The physical drive is shown only as read-only storage context. With exactly one detected USB boot candidate, for example, the current German UI shows `USB-Startmedium: SanDisk Extreme Pro USB4`.
 
-Diese Anzeige behauptet **keine direkte 1:1-Adressierbarkeit** des physischen USB-Geräts durch den generischen Firmwareeintrag `USB HDD`.
+This presentation makes **no claim of direct 1:1 addressability** of the physical USB device through the generic firmware target `USB HDD`.
 
-## Sicherheitsmodell
+## Security model
 
-- Die Tray-App läuft als normaler Benutzer.
-- Privilegierte Änderungen laufen nur über fest eingerichtete SYSTEM-Scheduled-Tasks.
-- Es werden keine freien Commands, Tasknamen, GUIDs, Boot####-Nummern oder Device Paths über die Privilege-Grenze übergeben.
-- Es gibt keine eigene EXE, die als SYSTEM ausgeführt wird.
-- Bootänderungen verwenden ausschließlich einen **one-shot Next-Boot-Pfad**.
-- Die Anwendung ändert weder dauerhaft `{fwbootmgr} displayorder` noch die UEFI-`BootOrder`.
-- Der Self-Updater ist vollständig uneleviert und besitzt keinen separaten privilegierten Updatekanal.
+- The tray application runs as a normal user.
+- Privileged changes run only through fixed SYSTEM Scheduled Tasks.
+- No free command text, task names, GUIDs, Boot#### numbers, or device paths cross the privilege boundary.
+- No custom application EXE runs as SYSTEM.
+- Boot mutations use only a **One-Shot Next Boot** path.
+- The application never permanently changes `{fwbootmgr} displayorder` or UEFI `BootOrder`.
+- The self-updater is fully unelevated and has no separate privileged update channel.
 
-## Voraussetzungen
+## Requirements
 
-- Windows mit **Windows PowerShell 5.1**
+- Windows with **Windows PowerShell 5.1**
 - .NET/WinForms
-- Lenovo-System mit über Windows sichtbaren Firmware-Bootzielen
-- Administratorrechte nur für die einmalige Einrichtung bzw. Wartung der privilegierten Scheduled-Tasks
+- Lenovo system with firmware boot targets visible through Windows
+- administrator rights only for the one-time setup or maintenance of the privileged Scheduled Tasks
 
-## Schnellstart
+## Quick start
 
-1. Release-ZIP aus `downloads/` laden und vollständig in einen **beschreibbaren Benutzerordner** entpacken.
-2. `Start-LenovoBootMenuTray.cmd` starten.
-3. Beim ersten Start die angebotene Einrichtung der Systemfunktionen über **Wartung** ausführen und die UAC-Abfrage bestätigen.
-4. Danach das gewünschte Startziel im Popup auswählen.
-5. Updates bei Bedarf manuell über **Wartung → Auf neue Version prüfen…** prüfen.
+1. Download the release ZIP from `downloads/` and extract it completely into a **writable user directory**.
+2. Start `Start-LenovoBootMenuTray.cmd`.
+3. On first launch, run the offered system-functions setup through the maintenance menu and confirm the UAC prompt.
+4. Select the desired boot target in the popup.
+5. Check for updates manually when needed through the existing maintenance update action.
 
-## Projektstruktur
+## Project structure
 
-| Pfad | Zweck |
+| Path | Purpose |
 | --- | --- |
-| `bin/` | kanonische Runtime-/Release-Quelldateien, inklusive generierter Single-File-Runtime und `version.json` |
-| `src/Core/` | zustandsfreie Fachlogik / Functional Core |
-| `src/Application/` | Anwendungs- und Workflowlogik |
-| `src/Infrastructure/` | Windows-, Storage-, Update-, TaskBroker- und IO-Adapter |
-| `src/UI/` | WinForms-Präsentation |
-| `tests/` | aktive kanonische Python-Gates, native PowerShell-Tests und Baseline-Daten |
-| `tests-history/` | eingefrorene versionsgebundene Validatoren, nach Kategorie + Version benannt |
-| `docs/architecture/` | kanonische und historische Architektur-Baselines |
-| `audits/` | kanonische und historische Catch-Audits |
-| `tools/` | Build-, Packaging-, Audit- und Transition-Skripte |
-| `downloads/` | historische versionierte Release-ZIPs und Update-Manifeste |
+| `bin/` | canonical runtime/release source files, including the generated single-file runtime and `version.json` |
+| `src/Core/` | stateless domain logic / Functional Core |
+| `src/Application/` | application and workflow logic |
+| `src/Infrastructure/` | Windows, storage, update, TaskBroker, and IO adapters |
+| `src/UI/` | WinForms presentation |
+| `tests/` | active canonical Python gates, native PowerShell tests, and baseline data |
+| `tests-history/` | frozen version-specific validators, named by category + version |
+| `docs/architecture/` | canonical and historical architecture baselines |
+| `audits/` | canonical and historical catch audits |
+| `tools/` | build, packaging, audit, and transition scripts |
+| `downloads/` | historical versioned release ZIPs and update manifests |
 
-## Entwicklung und Tests
+## Development and tests
 
-Der zentrale native Windows-PowerShell-5.1-Testwrapper ist:
+The central native Windows PowerShell 5.1 test wrapper is:
 
-```powershell
+~~~powershell
 .\tests\Test-WindowsPowerShell51.ps1
-```
+~~~
 
-Build- und Packaging-Helfer liegen unter `tools/`. Die ausführliche Versionshistorie befindet sich in [CHANGELOG.md](CHANGELOG.md).
+Build and packaging helpers live under `tools/`. Detailed version history is in [CHANGELOG.md](CHANGELOG.md).
 
-Ab v0.6.5.0 wird ein Release zunächst als `candidate/v<version>` geprüft. Nur ein vollständig grüner Candidate darf automatisiert als `release/v<version>` auf exakt demselben Commit weitergeführt werden. Geschützte Runtime-Fragmente verwenden einen versionsgebundenen `protectedFragmentIntent` statt dauerhafter Ausnahme-Listen; Runtime-Module werden ausschließlich über die Include-Marker des Templates registriert.
+Since v0.6.5.0, a release is first validated as `candidate/v<version>`. Only a completely green candidate may be promoted automatically to `release/v<version>` on the exact same commit. Protected runtime fragments use a release-specific `protectedFragmentIntent` instead of permanent exception lists; runtime modules are registered exclusively through template include markers.
 
-Ab v0.6.6.0 gibt es nur noch zwei aktive Releaseprofile: `version-only` für unveränderten Produktcode unter `src/**` und `patch` für fachliche Produktcodeänderungen. Das historische `release-architecture`-Spezialprofil wurde entfernt.
+Since v0.6.6.0, there are only two active release profiles: `version-only` for unchanged product code under `src/**`, and `patch` for functional product-code changes. The historical `release-architecture` special profile has been removed.
 
-Ab v0.6.7.0 bündelt der Release-Orchestrator die vollständige Post-Release-Abnahme in einem maschinenlesbaren `RELEASE_VERIFICATION_SUMMARY`. Dadurch kann die interaktive GitHub-Nachkontrolle mit deutlich weniger Einzelabfragen erfolgen, ohne Candidate Preflight, Reproduzierbarkeit, 8/8 Gates oder Source-/ZIP-Integritätsprüfungen zu reduzieren.
+Since v0.6.7.0, the Release Orchestrator aggregates the complete post-release acceptance into a machine-readable `RELEASE_VERIFICATION_SUMMARY`. This allows interactive GitHub verification with far fewer individual queries without reducing Candidate Preflight, reproducibility, 8/8 gates, or source/ZIP integrity checks.
+
+From v0.6.8.0 onward, **English is the canonical language for repository and GitHub documentation**. All tracked Markdown files are maintained in English. Exact UI strings, identifiers, commands, paths, schemas, event codes, and other technical literals may remain in their original form when intentionally quoted. Interactive communication with the user remains separate from this repository policy.
