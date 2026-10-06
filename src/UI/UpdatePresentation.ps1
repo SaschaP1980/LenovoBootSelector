@@ -14,6 +14,9 @@
         runningVersion = $resolved.RunningVersion
         rollbackAttempted = $resolved.RollbackAttempted
         rollbackSucceeded = $resolved.RollbackSucceeded
+        failureCategory = $resolved.FailureCategory
+        failureStage = $resolved.FailureStage
+        errorClass = $resolved.ErrorClass
         resultMessage = $resolved.StoredMessage
     }) -Level $(if ($resolved.Success) { 'info' } else { 'error' })
 
@@ -46,19 +49,26 @@ function Stop-UpdateCheckUiWorker {
     if ($script:UpdateState.CheckProcess) { try { $script:UpdateState.CheckProcess.Dispose() } catch { }; $script:UpdateState.CheckProcess=$null }
 }
 
+
 function Complete-UpdateCheck {
     param([Parameter(Mandatory=$true)][ValidateSet('Manual','Startup')][string]$Mode)
-
     Stop-UpdateCheckUiWorker
     $path=[string]$script:UpdateState.CheckResultPath
     $isStartup = ($Mode -eq 'Startup')
+    $failureCategory=''; $failureStage=''; $errorClass=''; $networkStatus=''
     try {
-        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Die Update-Prüfung hat kein Ergebnis geliefert.' }
+        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { $failureCategory='runtime'; $failureStage='check-result'; throw 'Die Update-Prüfung hat kein Ergebnis geliefert.' }
         $result=[System.IO.File]::ReadAllText($path,[System.Text.Encoding]::UTF8)|ConvertFrom-Json
-        if (-not $result.Success) { throw ([string]$result.Error) }
+        if (-not $result.Success) {
+            $failureCategory=([string]$result.ErrorCategory).Trim().ToLowerInvariant()
+            $failureStage=([string]$result.FailureStage).Trim()
+            $errorClass=([string]$result.ErrorClass).Trim()
+            $networkStatus=([string]$result.NetworkStatus).Trim()
+            throw ([string]$result.Error)
+        }
         if ($result.UpdateAvailable) {
             $validated=Test-LenovoUpdateManifestCore -Manifest $result.Manifest
-            if (-not $validated.IsValid) { throw $validated.Error }
+            if (-not $validated.IsValid) { $failureCategory='manifest'; $failureStage='result-manifest-validation'; throw $validated.Error }
             [void](Set-UpdateRuntimeAvailable -State $script:UpdateState -Manifest $validated)
             $script:LastStatusText = ('Neue Version verfügbar: v{0}' -f $validated.Version)
             if (-not $isStartup) {
@@ -82,7 +92,7 @@ function Complete-UpdateCheck {
             $script:LastStatusText='Update-Prüfung fehlgeschlagen.'
             Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die Prüfung auf eine neue Version ist fehlgeschlagen.' -Message $_.Exception.Message -Kind Error
         }
-        Write-RuntimeDiagnosticEvent -Event $(if ($isStartup) { 'STARTUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode=$Mode }) -Level warning
+        Write-RuntimeDiagnosticEvent -Event $(if ($isStartup) { 'STARTUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage $(if ($failureStage) { $failureStage } else { 'update-check' }) -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode=$Mode; errorCategory=$failureCategory; failureStage=$failureStage; errorClass=$errorClass; networkStatus=$networkStatus }) -Level warning
     }
     finally {
         try { if ($path -and (Test-Path -LiteralPath $path)) { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue } } catch { }
@@ -95,7 +105,6 @@ function Complete-UpdateCheck {
         if ($script:Popup -and -not $script:Popup.IsDisposed) { Update-PopupRows }
     }
 }
-
 function Complete-ManualUpdateCheck {
     Complete-UpdateCheck -Mode 'Manual'
 }
@@ -192,20 +201,28 @@ function Exit-TrayForPreparedUpdate {
     [System.Windows.Forms.Application]::ExitThread()
 }
 
+
 function Complete-ManualAppUpdatePrepare {
     Stop-UpdatePrepareUiWorker
     $path=[string]$script:UpdateState.PrepareResultPath
+    $failureCategory=''; $failureStage=''; $errorClass=''; $networkStatus=''
     try {
-        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Die Update-Vorbereitung hat kein Ergebnis geliefert.' }
+        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { $failureCategory='runtime'; $failureStage='prepare-result'; throw 'Die Update-Vorbereitung hat kein Ergebnis geliefert.' }
         $result=[System.IO.File]::ReadAllText($path,[System.Text.Encoding]::UTF8)|ConvertFrom-Json
-        if (-not $result.Success) { throw ([string]$result.Error) }
+        if (-not $result.Success) {
+            $failureCategory=([string]$result.ErrorCategory).Trim().ToLowerInvariant()
+            $failureStage=([string]$result.FailureStage).Trim()
+            $errorClass=([string]$result.ErrorClass).Trim()
+            $networkStatus=([string]$result.NetworkStatus).Trim()
+            throw ([string]$result.Error)
+        }
         [void](Set-UpdateRuntimeReadyToInstall -State $script:UpdateState)
         Write-RuntimeDiagnosticEvent -Event 'UPDATE_PACKAGE_PREPARED' -Stage 'update-prepare' -Success $true -Data (New-RuntimeDiagnosticData @{ version=$result.Version })
         Exit-TrayForPreparedUpdate -WorkDir ([string]$result.WorkDir)
     }
     catch {
         [void](Set-UpdateRuntimeFailed -State $script:UpdateState -Message $_.Exception.Message)
-        Write-RuntimeDiagnosticEvent -Event 'UPDATE_PACKAGE_PREPARED' -Stage 'update-prepare' -Success $false -ErrorRecord $_ -Level error
+        Write-RuntimeDiagnosticEvent -Event 'UPDATE_PACKAGE_PREPARED' -Stage $(if ($failureStage) { $failureStage } else { 'update-prepare' }) -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ errorCategory=$failureCategory; failureStage=$failureStage; errorClass=$errorClass; networkStatus=$networkStatus }) -Level error
         Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die App konnte nicht aktualisiert werden.' -Message $_.Exception.Message -Kind Error
         [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
     }
@@ -216,7 +233,6 @@ function Complete-ManualAppUpdatePrepare {
         Update-UpdateMenuState
     }
 }
-
 function Start-ManualAppUpdate {
     if (Test-MaintenanceBusy -or (Test-UpdateRuntimeBusy -State $script:UpdateState)) { return }
     $manifest=$script:UpdateState.AvailableManifest

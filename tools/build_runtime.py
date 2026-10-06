@@ -8,7 +8,7 @@ ROOT_DEFAULT = Path(__file__).resolve().parents[1]
 INCLUDES = [
     'src/UI/StartupRecoveryDialog.ps1','src/Application/MaintenanceRuntime.ps1','src/Application/BootTargetDrift.ps1',
     'src/Core/UpdateModel.ps1','src/Application/UpdateRuntime.ps1','src/UI/MenuAppearance.ps1','src/UI/RefreshPresentation.ps1',
-    'src/Infrastructure/RuntimeDiagnostics.ps1','src/Infrastructure/UpdateClient.ps1','src/UI/DiagnosticsPresentation.ps1',
+    'src/Infrastructure/RuntimeDiagnostics.ps1','src/Infrastructure/UpdateTransport.ps1','src/Infrastructure/UpdateClient.ps1','src/UI/DiagnosticsPresentation.ps1',
     'src/UI/UpdatePresentation.ps1','src/Infrastructure/Autostart.ps1','src/UI/AutostartPresentation.ps1',
     'src/Core/EntryPreferences.ps1','src/UI/ManageEntriesState.ps1','src/Infrastructure/SettingsRepository.ps1',
     'src/Application/SettingsService.ps1','src/UI/ManageEntries.ps1','src/UI/DefaultTargetPresentation.ps1',

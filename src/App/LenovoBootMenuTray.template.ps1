@@ -871,6 +871,7 @@ $script:UpdateState = New-UpdateRuntimeState
 # @include src/UI/RefreshPresentation.ps1
 
 # @include src/Infrastructure/RuntimeDiagnostics.ps1
+# @include src/Infrastructure/UpdateTransport.ps1
 # @include src/Infrastructure/UpdateClient.ps1
 
 # @include src/UI/DiagnosticsPresentation.ps1
