@@ -8,17 +8,27 @@
 
 ## Warum dieses Tool existiert
 
-Wer auf einem Lenovo-System regelmäßig zwischen mehreren vorhandenen Startzielen wechselt – zum Beispiel Windows-Installationen auf unterschiedlichen Laufwerken, einem USB-Startmedium oder einem anderen bereits im UEFI registrierten Bootziel – landet sonst schnell bei demselben umständlichen Ablauf: neu starten, Bootmenü beziehungsweise Firmware-Setup öffnen, den richtigen Eintrag auswählen und anschließend wieder in Windows zurückkehren.
+Das Projekt entstand aus einem sehr konkreten Problem: Auf dem verwendeten Lenovo-Laptop werden **F12** und teilweise auch **Enter** im frühen Startvorgang nicht immer zuverlässig erkannt. Das betrifft sowohl die interne Laptop-Tastatur als auch per USB-Dongle angeschlossene Tastaturen. Wird die Eingabe in diesem kurzen Zeitfenster verpasst, erscheint das gewünschte Boot-Menü nicht – stattdessen startet direkt das erste reguläre Startziel, typischerweise die Windows-Installation auf der ersten NVMe-SSD.
 
-Lenovo Boot Selector soll genau diesen wiederkehrenden Schritt aus Windows heraus vereinfachen. Statt die **dauerhafte UEFI-Bootreihenfolge** umzubauen, wählt die Anwendung nur das Ziel für den **nächsten einzelnen Start** aus. Danach gilt wieder die normale Firmware-Konfiguration.
+Soll eigentlich von einer externen USB-HDD oder einem anderen vorhandenen System gestartet werden, bedeutet das im schlechtesten Fall: das falsche Windows startet, anschließend muss wieder heruntergefahren oder neu gestartet werden, und der Versuch mit F12 oder Enter beginnt von vorn. In der Praxis waren dafür teilweise **bis zu zehn Neustartversuche** nötig, bevor die Tastatur im richtigen Moment erkannt wurde.
 
-Das Tool verfolgt dabei bewusst drei Ziele:
+Lenovo Boot Selector wurde entwickelt, um genau diese Abhängigkeit vom Tastatur-Timing zu beseitigen. Der gewünschte Start kann bereits **innerhalb von Windows** vorbereitet werden:
 
-- **schneller Wechsel:** vorhandene Firmware-Startziele direkt aus dem Tray auswählen;
-- **keine dauerhafte BootOrder-Manipulation:** die normale UEFI-Reihenfolge bleibt unangetastet;
+- Ein vorhandenes Startziel kann als **einmaliges nächstes Bootziel** festgelegt werden.
+- Wenn die beteiligten Systeme entsprechend eingerichtet sind, kann zusätzlich das vorhandene **Boot-Menü als Standard-Startziel** verwendet werden.
+- Der nächste Neustart hängt damit nicht mehr davon ab, ob F12 oder Enter während weniger Sekunden rechtzeitig erkannt wird.
+
+Für den ursprünglichen Anwendungsfall bedeutet das: Soll beispielsweise von der externen USB-HDD gestartet werden, wird das gewünschte Ziel vorher ausgewählt und anschließend neu gestartet. Das versehentliche Starten der falschen NVMe-Windows-Installation und die anschließende Kette aus wiederholtem Herunterfahren und Neustarten entfällt.
+
+Dieses Problem kann auch andere Systeme betreffen, wenn Tastaturen in der frühen Firmwarephase – etwa über USB, Funk-Dongles oder Docks – zu spät oder nicht zuverlässig genug verfügbar sind. Lenovo Boot Selector bietet dafür eine reproduzierbare Alternative zum wiederholten Versuch, den richtigen Tastendruck im richtigen Moment zu treffen.
+
+Das Tool verfolgt dabei bewusst drei technische Ziele:
+
+- **schneller und deterministischer Wechsel:** vorhandene Startziele direkt aus dem Tray auswählen;
+- **keine dauerhafte Änderung der normalen UEFI-Reihenfolge:** die bestehende Firmware-Konfiguration bleibt unangetastet;
 - **möglichst kleine Privilege-Grenze:** die Oberfläche läuft uneleviert, privilegierte Aktionen sind auf fest definierte und validierte Operationen begrenzt.
 
-Damit ist Lenovo Boot Selector kein Ersatz für das BIOS/UEFI-Setup und kein Bootloader. Es ist eine komfortable Windows-Oberfläche für einen häufigen, ansonsten unnötig manuellen **One-Shot-Boot-Wechsel**.
+Damit ist Lenovo Boot Selector kein Ersatz für das BIOS/UEFI-Setup und kein Bootloader. Es ist eine Windows-Oberfläche für einen kontrollierten **One-Shot-Boot-Wechsel** und für Systeme, bei denen die klassische Pre-Boot-Tastaturauswahl nicht zuverlässig genug ist.
 
 Die Anwendung läuft im Normalbetrieb **uneleviert**. Privilegierte Firmwareänderungen werden ausschließlich über fest definierte, allowgelistete Windows-Scheduled-Tasks ausgeführt. Permanente Änderungen an der UEFI-Bootreihenfolge gehören ausdrücklich nicht zum Produktmodell.
 
