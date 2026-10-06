@@ -35,6 +35,9 @@ def main():
     basis_tray=txt(basis_runtime_path(basis,'LenovoBootMenuTray.ps1')); tray=txt(root/'bin/LenovoBootMenuTray.ps1')
     bm=re.search(r"\$script:AppVersion = '([^']+)'",basis_tray); basis_version=bm.group(1) if bm else ''
     s.has('Generated runtime uses canonical version',tray,f"$script:AppVersion = '{version}'")
+    app_template=txt(root/'src/App/LenovoBootMenuTray.template.ps1')
+    s.has('v0.6.8.1 tray tooltip is product name only',app_template,"$script:TrayIcon.Text = 'Lenovo Boot Selector'")
+    s.no('v0.6.8.1 legacy German tray-tooltip suffix removed',app_template,'Startziel wählen')
     s.c('LBS-10 active regression profile is version-only or patch',profile in {'version-only','patch'},profile)
     if profile=='version-only':
         normalized=tray.replace(f"$script:AppVersion = '{version}'",f"$script:AppVersion = '{basis_version}'",1)
