@@ -1,5 +1,16 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.4.1 – Hotfix für LBS-6-Repair-ACL-Prüfung
+
+- Behebt den bestätigten Reparaturabbruch aus v0.6.4.0 im Installer-Schritt `protect-state`.
+- Ursache: `FileSystemRights::Modify` wurde als zusammengesetzte Verbotsmaske verwendet und überlappt mit dem ausdrücklich erlaubten `ReadAndExecute`. Dadurch wurde die gerade gesetzte Users-ReadAndExecute-ACL fälschlich als schreibbar abgelehnt.
+- Die Prüfung verwendet jetzt ausschließlich konkrete Mutationsrechte wie WriteData, AppendData, WriteExtendedAttributes, WriteAttributes, DeleteSubdirectoriesAndFiles, Delete, ChangePermissions und TakeOwnership.
+- `ReadAndExecute` gilt damit korrekt als nicht mutierend; `Modify` und `FullControl` bleiben verboten.
+- Der native TaskBroker-Boundary-Test extrahiert die tatsächlich im Installer enthaltene Rechtefunktion und prüft explizit ReadAndExecute = PASS, Modify = FAIL und FullControl = FAIL.
+- Runtime-Diagnosen trennen künftig `present`, `metadataReadable` und `compatible`. Eine vorhandene, aber inkompatible 0.2.12-Metadatendatei wird nicht mehr fälschlich als „nicht vorhanden“ dargestellt.
+- TaskBroker-Schema 0.2.13, `boundaryContract = fixed-task-v1`, operation-gated Runtime, One-Shot-`bootsequence` und alle übrigen LBS-6-Sicherheitsgrenzen bleiben unverändert.
+- Nach einem in v0.6.4.0 fehlgeschlagenen Repair kann **Wartung → Systemfunktionen reparieren…** mit v0.6.4.1 erneut ausgeführt werden.
+
 ## v0.6.4.0 – LBS-6 Boot-/Privilege-Boundary fail-closed gehärtet
 
 - Der Runtime-TaskBroker akzeptiert keine frei übergebenen Scheduled-Task-Namen mehr. `Invoke-AuthorizedTask` nimmt nur noch die festen Operationsarten `ManagerRefresh`, `FirmwareRefresh`, `BootNext`, `DefaultSet` und `DefaultClear` an.

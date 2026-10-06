@@ -10,9 +10,11 @@ Die Anwendung läuft im Normalbetrieb **uneleviert**. Privilegierte Firmwareänd
 
 Ab v0.6.4.0 ist diese Grenze zusätzlich technisch fail-closed gehärtet: Der Runtime-TaskBroker akzeptiert keine freien Tasknamen mehr, sondern nur feste Operationsarten; zielbezogene Tasknamen werden ausschließlich aus validierten, installierten Firmware-GUIDs abgeleitet. TaskBroker-State und Metadaten sind für normale Benutzer read-only, und die Task-DACL wird auf ausschließlich Read+Execute geprüft bzw. repariert. Der kanonische Vertrag ist in [docs/SECURITY_BOUNDARY.md](docs/SECURITY_BOUNDARY.md) dokumentiert.
 
-**Einmalige Wartung nach dem Update auf v0.6.4.0:** vorhandene TaskBroker-Installationen mit Schema 0.2.12 werden absichtlich nicht weiter vertraut. Unter **Wartung → Systemfunktionen reparieren…** muss einmal der erhöhte Reparaturpfad ausgeführt werden; dadurch werden Schema 0.2.13 und die gehärteten ACLs installiert.
+**Einmalige Wartung nach dem Update auf v0.6.4.1:** vorhandene TaskBroker-Installationen mit Schema 0.2.12 werden absichtlich nicht weiter vertraut. Unter **Wartung → Systemfunktionen reparieren…** muss einmal der erhöhte Reparaturpfad ausgeführt werden; dadurch werden Schema 0.2.13 und die gehärteten ACLs installiert.
 
-**Aktueller Entwicklungsstand:** v0.6.4.0  
+**Hinweis zu v0.6.4.0:** Der dort erstmals ausgelieferte Repair konnte im Schritt `protect-state` fälschlich abbrechen, weil die ACL-Prüfung das erlaubte `ReadAndExecute` über die zusammengesetzte `Modify`-Maske als schreibbar interpretierte. v0.6.4.1 korrigiert ausschließlich diese Prüfung. Ein mit v0.6.4.0 fehlgeschlagener Repair kann mit v0.6.4.1 sicher erneut gestartet werden.
+
+**Aktueller Entwicklungsstand:** v0.6.4.1  
 **Technik:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads und Revisionshistorie
