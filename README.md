@@ -4,7 +4,9 @@
   <img src="bin/icon-preview.png" alt="Lenovo Boot Selector" width="96">
 </p>
 
-**Lenovo Boot Selector** is a Windows tray application for Lenovo systems that lets you conveniently select an existing firmware boot target as the **one-time target for the next boot**.
+**Lenovo Boot Selector** is a Windows tray application for Lenovo systems with two complementary boot-selection modes: choose any existing firmware target as the **one-time target for the next boot**, or configure a **persistent default boot target** that is automatically prepared again for the following boot after every Windows system start.
+
+The persistent default is restored by a fixed SYSTEM Scheduled Task and therefore does **not require a user to log on**. When every participating Windows installation is configured this way, a target such as the Lenovo Boot Menu can effectively become the recurring hand-off point for subsequent boots—without permanently rewriting the UEFI boot order.
 
 ## Why this tool exists
 
@@ -15,7 +17,9 @@ When the intended target is an external USB HDD or another installed system, the
 Lenovo Boot Selector was built to remove that dependency on keyboard timing. The desired boot can be prepared **from within Windows**:
 
 - an existing boot target can be selected as the **one-time target for the next boot**;
-- when the participating systems are configured accordingly, the existing **boot menu can also be used as the default boot target**;
+- a **persistent default boot target** can be configured and is automatically restored after each Windows system start for the following boot;
+- this restore runs as SYSTEM and therefore does **not depend on a user logon**;
+- when all participating Windows installations use the same default, the existing **boot menu can act as the recurring default hand-off point**;
 - the next restart therefore no longer depends on F12 or Enter being detected within a few seconds of pre-boot time.
 
 For the original use case, this means that when the external USB HDD should boot, the desired target is selected in advance and Windows is restarted. Accidentally booting the wrong NVMe Windows installation—and the resulting chain of repeated shutdowns and restarts—is avoided.
@@ -54,7 +58,7 @@ Version format: **MAJOR.MINOR.PATCH.HOTFIX**. Historical three-component version
 - select an existing firmware boot target for the **next boot**
 - clear tray/popup UI in a Lenovo black/red visual style
 - friendly names for known firmware targets
-- persistent default boot target through the hardened TaskBroker
+- persistent default boot target through the hardened TaskBroker, restored at Windows system startup without requiring user logon
 - restart Windows directly from the application
 - autostart without a visible PowerShell/CMD window
 - manage ordering and visibility of displayed boot targets
