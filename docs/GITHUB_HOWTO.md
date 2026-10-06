@@ -440,6 +440,33 @@ After a successful release that completes an Issue, close it as `completed`.
 
 These notes describe the current ChatGPT GitHub connector, not a permanent repository property.
 
+### ChatGPT runtime repository access: connector-first, clone-optional
+
+For ChatGPT-managed repository work, the GitHub connector is the **primary and canonical repository transport**. A direct `git clone` from the execution/container runtime is only an optional convenience and must not be assumed to have outbound GitHub network access.
+
+Use this procedure:
+
+1. Read and pin current `main` SHA/tree through the GitHub connector before any implementation.
+2. Read all required source, test, workflow and documentation files through the connector at that exact SHA.
+3. Do **not** require a local clone in order to implement, validate or publish a change.
+4. If a direct clone is attempted as an optimization and fails because runtime network access is unavailable, treat that as an environment limitation, not a repository failure:
+   - do not repeatedly retry the clone;
+   - do not change the canonical base;
+   - do not fall back to stale local/source-ZIP state;
+   - continue through the GitHub connector.
+5. Prepare repository changes with GitHub Git objects:
+   - create blobs for every intended changed file;
+   - create one tree based on the pinned current `main` tree;
+   - create one commit with the pinned current `main` commit as parent;
+   - inspect the complete commit/diff before creating any visible Candidate ref.
+6. Re-read `main` immediately before exposing the Candidate branch. If `main` advanced, stop and rebuild/reconcile the candidate from the new canonical `main`; never force the stale candidate onto the new base.
+7. Use `candidate/v<version>` only after the exact candidate commit is complete and inspected. Candidate Preflight then performs the authoritative repository-wide Linux validation and GitHub-hosted Windows PowerShell 5.1 validation on that exact SHA.
+8. For documentation-only changes that do not touch product/runtime/release inputs, use the same connector-first reads and lease check, then make one atomic documentation commit directly on current `main` as allowed by the documentation-only policy.
+
+Local/container checks built from connector-fetched files may be used as focused prechecks, but they are **not** a substitute for the repository-wide Candidate/Release gates and must not be reported as such. Conversely, lack of a local clone must not block a valid implementation or release when the connector and GitHub workflows provide the required canonical reads, Git-object writes and authoritative tests.
+
+This is the preferred recovery path for the recurring ChatGPT-runtime condition where direct GitHub cloning is unavailable.
+
 ### Branch deletion limitation
 
 The currently available connector can create/read/move branch refs but does not expose a general delete-branch/delete-ref action.
