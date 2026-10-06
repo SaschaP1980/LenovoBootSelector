@@ -187,9 +187,26 @@ GitHub owns the canonical `publishedUtc`; a local timestamp is never the publica
 
 If Windows/PowerShell tests have not actually been executed on Windows, never report them as passed. Static/source-contract coverage is not a substitute for a Windows pass. A GitHub-hosted Windows PowerShell 5.1 run is a real Windows test run for the contract suite, but it is **not** Lenovo hardware/UEFI E2E and must be reported separately from physical-machine acceptance.
 
+### Test-first bug/regression rule: failing test first, not failing candidate first
+
+For a confirmed bug or regression, establish the regression contract **before changing the product code**:
+
+1. add a focused permanent regression test that expresses the corrected behavior;
+2. execute that test against the current unfixed canonical basis and verify that it fails for the expected bug-specific reason;
+3. record the RED evidence durably when applicable: base SHA, test/validator and relevant failure reason belong in the active Issue for Issue-backed work; an Issue-less Hotfix must retain equivalent evidence in its changelog/PR/release audit trail;
+4. implement the smallest fix;
+5. rerun the same test and require GREEN;
+6. complete the applicable broader prechecks before creating the Candidate.
+
+The RED run should use the narrowest available test or validator harness capable of reproducing the defect against the canonical basis. A materialized canonical basis or focused local/container check is sufficient when it executes the relevant contract. The purpose is to prove that the new regression test detects the old defect, not to make the release pipeline fail.
+
+**Do not intentionally create or push a known-failing `candidate/v<version>` to collect RED evidence.** Candidate branches are release candidates: they are exposed only after implementation, focused RED→GREEN proof, release metadata and applicable prechecks are complete, and all mandatory Candidate gates are expected to pass.
+
+An unexpected Candidate Preflight failure is still handled by the normal same-branch fast-forward correction process; this exception does not convert Candidate Preflight into a test sandbox.
+
 ## Candidate-tree preflight before release branch creation
 
-From v0.6.5.0 onward, a product release enters GitHub through a temporary **`candidate/v<version>`** branch, not directly through `release/v<version>`.
+From v0.6.5.0 onward, a product release enters GitHub through a temporary **`candidate/v<version>`** branch, not directly through `release/v<version>`. The Candidate is a release-ready state whose mandatory gates are expected to pass; it is not used for deliberate RED test runs.
 
 From v0.6.9.0 onward, the exact candidate SHA is validated by two mandatory jobs that run in parallel after the candidate push:
 
@@ -227,7 +244,7 @@ The first production benchmark was v0.6.9.0. Its Windows runner reported Windows
 
 Based on that measured critical-path impact and the additional Windows-specific coverage gained on every release, the gate remains mandatory for all version levels. Future timing data continues to be emitted by `CANDIDATE_TIMING_SUMMARY`; changing this policy requires an explicit, tested, documented release-process change.
 
-If either candidate gate fails, **no release branch exists yet**. Keep the same `candidate/v<version>` branch, apply the minimal fast-forward correction, and let the normal push rerun both mandatory paths. Do not create a parallel candidate or release branch.
+If either candidate gate fails unexpectedly, **no release branch exists yet**. Keep the same `candidate/v<version>` branch, apply the minimal fast-forward correction, and let the normal push rerun both mandatory paths. Do not create a parallel candidate or release branch. Do not manufacture such a failure as part of normal test-first evidence.
 
 ### Protected-fragment intent is release-specific
 
