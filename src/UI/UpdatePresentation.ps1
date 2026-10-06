@@ -1,4 +1,22 @@
-﻿function Show-PendingUpdateResultOnStartup {
+﻿function Get-LocalizedUpdateRestartMessage {
+    param([Parameter(Mandatory=$true)]$Resolved)
+
+    if ([bool]$Resolved.Success) {
+        return (Get-LocalizedString -Key 'Update.RestartSuccessMessage')
+    }
+    if ([bool]$Resolved.RollbackAttempted -and [bool]$Resolved.RollbackSucceeded) {
+        return (Get-LocalizedString -Key 'Update.RestartRollbackMessage')
+    }
+    if ([string]$Resolved.TargetVersion -and [string]$Resolved.RunningVersion -and ([string]$Resolved.TargetVersion -ne [string]$Resolved.RunningVersion)) {
+        return (Get-LocalizedString -Key 'Update.RestartMismatchMessage' -Values @{
+            TargetVersion = [string]$Resolved.TargetVersion
+            RunningVersion = [string]$Resolved.RunningVersion
+        })
+    }
+    return (Get-LocalizedString -Key 'Update.RestartFailureMessage')
+}
+
+function Show-PendingUpdateResultOnStartup {
     $result = Read-LenovoUpdateResult
     if (-not $result) { return $false }
 
@@ -25,10 +43,10 @@
     Remove-LenovoUpdateResult
 
     if ($resolved.Success) {
-        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.SuccessTitle') -Heading (Get-LocalizedString -Key 'Update.SuccessHeading' -Values @{ Version=$resolved.DisplayVersion }) -Message $resolved.Message -Kind Info
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.SuccessTitle') -Heading (Get-LocalizedString -Key 'Update.SuccessHeading' -Values @{ Version=$resolved.DisplayVersion }) -Message (Get-LocalizedUpdateRestartMessage -Resolved $resolved) -Kind Info
     }
     else {
-        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.RestartFailureHeading') -Message $resolved.Message -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.RestartFailureHeading') -Message (Get-LocalizedUpdateRestartMessage -Resolved $resolved) -Kind Error
     }
     return $true
 }
@@ -99,7 +117,7 @@ function Complete-UpdateCheck {
         [void](Set-UpdateRuntimeFailed -State $script:UpdateState -Message $_.Exception.Message)
         if (-not $isPopup) {
             $script:LastStatusText = Get-LocalizedString -Key 'Update.CheckFailedStatus'
-            Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.CheckFailedHeading') -Message $_.Exception.Message -Kind Error
+            Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.CheckFailedHeading') -Message (Get-LocalizedString -Key 'Update.CheckFailureMessage') -Kind Error
         }
         Write-RuntimeDiagnosticEvent -Event $(if ($isPopup) { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage $(if ($failureStage) { $failureStage } else { 'update-check' }) -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode=$Mode; errorCategory=$failureCategory; failureStage=$failureStage; errorClass=$errorClass; networkStatus=$networkStatus }) -Level warning
     }
@@ -169,7 +187,7 @@ function Start-ManualUpdateCheck {
         Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_STARTED' -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ mode='Manual' })
     }
     catch {
-        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.CheckStartFailed') -Message $_.Exception.Message -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.CheckStartFailed') -Message (Get-LocalizedString -Key 'Update.CheckFailureMessage') -Kind Error
         Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_STARTED' -Stage 'update-check' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode='Manual' }) -Level warning
     }
     Update-UpdateMenuState
@@ -197,7 +215,11 @@ function Stop-UpdatePrepareUiWorker {
 
 function Exit-TrayForPreparedUpdate {
     param([Parameter(Mandatory=$true)][string]$WorkDir)
-    $helper=Start-LenovoUpdateInstallerHelper -WorkDir $WorkDir -SourceVersion $script:AppVersion
+    $helper=Start-LenovoUpdateInstallerHelper `
+        -WorkDir $WorkDir `
+        -SourceVersion $script:AppVersion `
+        -FailurePrefix (Get-LocalizedString -Key 'Update.HelperFailurePrefix') `
+        -ManualRestartMessage (Get-LocalizedString -Key 'Update.HelperManualRestart')
     if (-not $helper) { throw (Get-LocalizedString -Key 'Update.InstallerStartFailed') }
     Write-RuntimeDiagnosticEvent -Event 'UPDATE_INSTALL_HELPER_STARTED' -Stage 'update-install' -Success $true -Data (New-RuntimeDiagnosticData @{ processId=$helper.Id; version=$script:UpdateState.AvailableManifest.Version })
     try { $helper.Dispose() } catch { }
@@ -229,7 +251,7 @@ function Complete-ManualAppUpdatePrepare {
     catch {
         [void](Set-UpdateRuntimeFailed -State $script:UpdateState -Message $_.Exception.Message)
         Write-RuntimeDiagnosticEvent -Event 'UPDATE_PACKAGE_PREPARED' -Stage $(if ($failureStage) { $failureStage } else { 'update-prepare' }) -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ errorCategory=$failureCategory; failureStage=$failureStage; errorClass=$errorClass; networkStatus=$networkStatus }) -Level error
-        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.PrepareFailedHeading') -Message $_.Exception.Message -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.PrepareFailedHeading') -Message (Get-LocalizedString -Key 'Update.PrepareFailureMessage') -Kind Error
         [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
     }
     finally {
@@ -271,7 +293,7 @@ function Start-ManualAppUpdate {
     catch {
         Stop-UpdatePrepareUiWorker
         [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
-        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.PrepareFailedHeading') -Message $_.Exception.Message -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.PrepareFailedHeading') -Message (Get-LocalizedString -Key 'Update.PrepareFailureMessage') -Kind Error
     }
     Update-UpdateMenuState
 }

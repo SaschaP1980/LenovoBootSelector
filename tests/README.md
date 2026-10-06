@@ -18,6 +18,7 @@ These four files are the permanent Python gates used by the GitHub Release Orche
 | File | Category | Purpose |
 | --- | --- | --- |
 | `Test-FunctionalCore.ps1` | Core | Parsers, settings, localization resolution/formatting, and functional core behavior |
+| `Test-LocalizationRuntime.ps1` | Runtime | Native PS5.1 language selection, persistence, migration, and central lookup |
 | `Test-UpdateCore.ps1` | Core | Update model, transport failure contract, and update contracts |
 | `Test-RefreshRuntime.ps1` | Runtime | Background refresh state/request lifecycle and child-worker diagnostics-session correlation |
 | `Test-MaintenanceRuntime.ps1` | Runtime | Maintenance state and modes |
@@ -55,6 +56,7 @@ Native PowerShell suites intentionally use different count strategies; one gener
 | `Test-MaintenanceRuntime.ps1` | Loop-derived: 15 runtime checks from static assertions plus assertions repeated per mode. |
 | `Test-ArchitectureSoak.ps1` | Four aggregate soak assertions; each assertion covers many iterations. |
 | `Test-FunctionalCore.ps1` | Dynamic PASS counting; currently no separate coverage target count. |
+| `Test-LocalizationRuntime.ps1` | Straight-line: fixed runtime count of 14 covering native locale selection/persistence/migration/lookup. |
 | `Test-WindowsPowerShell51.ps1` | Aggregate runner/parser gate; file count is dynamic and is not an assertion-coverage count. |
 
 When assertions are added, the corresponding contract must be updated deliberately. In particular, the fixed `62` guard in the update test must not be derived automatically from the source count: it is an additional change-control guard so that a suite extension cannot pass unnoticed.

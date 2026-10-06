@@ -88,6 +88,14 @@ def main():
     s.has('Update native test keeps explicit source coverage guard 62',update_test,'if ($sourceAssertionCount -ne 62) { throw "Unexpected update assertion source count $sourceAssertionCount" }')
     s.has('Update native test keeps explicit runtime coverage output 62',update_test,'Write-Host "UPDATE TOTAL $checks/62"')
     s.has('Update native test keeps explicit runtime coverage guard 62',update_test,'if ($checks -ne 62) { throw "Unexpected update test count $checks" }')
+    localization_native=txt(root/'tests/Test-LocalizationRuntime.ps1') if (root/'tests/Test-LocalizationRuntime.ps1').is_file() else ''
+    windows_wrapper=txt(root/'tests/Test-WindowsPowerShell51.ps1')
+    s.c('LBS-17 native localization test exists',bool(localization_native))
+    s.has('LBS-17 native localization test keeps fixed total 14',localization_native,'Write-Host "LOCALIZATION TOTAL $checks/14"')
+    s.has('LBS-17 native localization test fails closed on count drift',localization_native,'if ($checks -ne 14) { throw "Expected 14 localization checks, got $checks" }')
+    s.has('LBS-17 native localization test covers persisted language selection',localization_native,"Set-ActiveLocale -Locale 'de-DE' -Persist")
+    s.has('LBS-17 native localization test covers legacy migration',localization_native,'Pre-localization schema migrates to de-DE in memory')
+    s.has('LBS-17 native aggregate runner invokes localization suite',windows_wrapper,"Test-LocalizationRuntime.ps1")
     mutex_test=txt(root/'tests/Test-SingleInstanceMutex.ps1')
     s.has('Mutex native test keeps explicit total output',mutex_test,'Write-Host "MUTEX TOTAL $checks/4"')
     s.has('Mutex native test fails closed on count drift',mutex_test,'if ($checks -ne 4) { throw "Unexpected mutex test count $checks" }')
@@ -224,6 +232,9 @@ def main():
         s.has('LBS-20 Windows workflow executes aggregate native wrapper',ww,'Test-WindowsPowerShell51.ps1')
         s.has('LBS-20 Windows workflow publishes dedicated status',ww,'preflight/windows-powershell51')
         s.has('LBS-20 Windows workflow emits machine-readable summary',ww,'WINDOWS_POWERSHELL51_SUMMARY=')
+        s.has('LBS-17 Windows workflow parses localization total',ww,"localizationRuntime = Get-TestTotal $logText '^LOCALIZATION TOTAL")
+        s.has('LBS-17 Windows workflow includes localization in aggregate passed',ww,'$totals.localizationRuntime.passed')
+        s.has('LBS-17 Windows workflow includes localization in aggregate expected',ww,'$totals.localizationRuntime.expected')
         s.has('LBS-20 Windows workflow reports setup timing',ww,'setupMs')
         s.has('LBS-20 Windows workflow reports runtime preparation timing',ww,'runtimePreparationMs')
         s.has('LBS-20 Windows workflow reports test timing',ww,'testMs')
@@ -287,6 +298,45 @@ def main():
     s.has('LBS-17 popup strings consume localization API',popup_ui,"Get-LocalizedString -Key 'Popup.NextBootSection'")
     s.has('LBS-17 English catalog exposes tray maintenance',localization,"'Tray.Maintenance' = 'Maintenance'")
     s.has('LBS-17 German catalog exposes tray maintenance',localization,"'Tray.Maintenance' = 'Wartung'")
+    catalog_match=re.search(r"'en-US'\s*=\s*\[ordered\]@\{([\s\S]*?)\n\s*\}\n\s*'de-DE'\s*=\s*\[ordered\]@\{([\s\S]*?)\n\s*\}\n\s*\}",localization)
+    en_keys=re.findall(r"(?m)^\s*'([^']+)'\s*=",catalog_match.group(1)) if catalog_match else []
+    de_keys=re.findall(r"(?m)^\s*'([^']+)'\s*=",catalog_match.group(2)) if catalog_match else []
+    s.c('LBS-17 localization catalog parses as two locale blocks',catalog_match is not None)
+    s.c('LBS-17 English localization keys are unique',bool(en_keys) and len(en_keys)==len(set(en_keys)))
+    s.c('LBS-17 German localization keys are unique',bool(de_keys) and len(de_keys)==len(set(de_keys)))
+    s.eq('LBS-17 English and German localization key sets match',set(en_keys),set(de_keys))
+
+    visible_literal_paths=[
+        'src/UI/AutostartPresentation.ps1','src/UI/BootEntryList.ps1','src/UI/DefaultTargetMenu.ps1',
+        'src/UI/DefaultTargetPresentation.ps1','src/UI/DiagnosticsPresentation.ps1','src/UI/Dialogs.ps1',
+        'src/UI/LanguagePresentation.ps1','src/UI/MaintenancePresentation.ps1','src/UI/ManageEntries.ps1',
+        'src/UI/ManageEntriesState.ps1','src/UI/MenuAppearance.ps1','src/UI/Popup.ps1',
+        'src/UI/RefreshPresentation.ps1','src/UI/StartupRecoveryDialog.ps1','src/UI/UpdatePresentation.ps1',
+        'src/App/LenovoBootMenuTray.template.ps1'
+    ]
+    visible_patterns=[
+        re.compile(r"\.Text\s*=\s*(['\"])(.*?)\1"),
+        re.compile(r"New-Label\s+-Text\s+(['\"])(.*?)\1"),
+        re.compile(r"\$script:LastStatusText\s*=\s*(['\"])(.*?)\1"),
+        re.compile(r"AccessibleDescription\s*=\s*(['\"])(.*?)\1"),
+        re.compile(r"SetToolTip\([^,]+,\s*(['\"])(.*?)\1"),
+        re.compile(r"ToolStripMenuItem\((['\"])(.*?)\1\)"),
+        re.compile(r"-(?:Title|Heading|Message|SecondaryButtonText)\s+(['\"])(.*?)\1")
+    ]
+    allowed_visible_literals={'Lenovo Boot Selector','v{0}'}
+    visible_literal_violations=[]
+    for rel in visible_literal_paths:
+        source=txt(root/rel)
+        for lineno,line in enumerate(source.splitlines(),1):
+            for pattern in visible_patterns:
+                for match in pattern.finditer(line):
+                    value=match.group(2)
+                    if not value or not re.search(r'[A-Za-z0-9ÄÖÜäöüß]',value):
+                        continue
+                    if value in allowed_visible_literals:
+                        continue
+                    visible_literal_violations.append(f'{rel}:{lineno}:{value}')
+    s.c('LBS-17 affected UI/template surfaces contain no uncontrolled hard-coded visible text',not visible_literal_violations,visible_literal_violations[:20])
     dialogs=txt(root/'src/UI/Dialogs.ps1')
     maintenance_ui=txt(root/'src/UI/MaintenancePresentation.ps1')
     diagnostics_ui=txt(root/'src/UI/DiagnosticsPresentation.ps1')

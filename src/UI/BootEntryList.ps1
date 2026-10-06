@@ -96,7 +96,7 @@ function Update-PopupRows {
             if (([datetime]::UtcNow - $script:ManageLastDragUtc).TotalMilliseconds -lt 350) { return }
             if ($script:ManageAliasEditGuid) { Commit-ActiveManageAliasEditor }
             Toggle-ManageEntryVisibility -Guid $guid
-            $script:LastStatusText = if (Test-ManageEntryHidden -Guid $guid) { 'Eintrag wird ausgeblendet.' } else { 'Eintrag wird angezeigt.' }
+            $script:LastStatusText = if (Test-ManageEntryHidden -Guid $guid) { Get-LocalizedString -Key 'Manage.EntryHiddenStatus' } else { Get-LocalizedString -Key 'Manage.EntryVisibleStatus' }
             Update-PopupRows
             return
         }
@@ -430,7 +430,7 @@ function Update-PopupRows {
                 $state.Name = 'VisibilityGlyph'
                 $state.Tag = $entry.Guid
                 $state.AccessibleName = if ($isHidden) { 'hidden' } else { 'visible' }
-                $state.AccessibleDescription = if ($isHidden) { 'Verborgen – klicken zum Einblenden' } else { 'Sichtbar – klicken zum Ausblenden' }
+                $state.AccessibleDescription = if ($isHidden) { Get-LocalizedString -Key 'Manage.HiddenAccessible' } else { Get-LocalizedString -Key 'Manage.VisibleAccessible' }
                 $state.Location = New-Object Drawing.Point(286, 12)
                 $state.Size = New-Object Drawing.Size(32, 34)
                 $state.BackColor = [Drawing.Color]::Transparent
