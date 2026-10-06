@@ -2,6 +2,8 @@
 
 From v0.5.10.0 onward the canonical release model is **1 build = 1 release branch = 1 pull request = 1 merge**.
 
+Operational companion for ChatGPT/release supervision: [`GITHUB_HOWTO.md`](GITHUB_HOWTO.md).
+
 ## Canonical inputs
 
 - `bin/version.json` is the only authoritative release-version source. Schema v2 intentionally contains no `publishedUtc`.
