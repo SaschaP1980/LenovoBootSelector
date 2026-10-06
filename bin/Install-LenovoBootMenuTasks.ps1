@@ -9,7 +9,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $script:CurrentStep = 'init'
-$version = '0.2.12'
+$version = '0.2.13'
 $taskPrefix = 'LenovoBootMenu-Set-'
 $defaultTaskPrefix = 'LenovoBootMenu-Default-Set-'
 $managerRefreshTask = 'LenovoBootMenu-RefreshManager'
@@ -139,34 +139,154 @@ function Get-FirmwareModel {
     }
 }
 
+
 function Test-SddlReadExecuteAce([string]$Sddl, [string]$Sid) {
     try {
         $raw = New-Object -TypeName 'System.Security.AccessControl.RawSecurityDescriptor' -ArgumentList $Sddl
         if (-not $raw.DiscretionaryAcl) { return $false }
 
         # Task Scheduler maps written generic GR+GX to 0x1200A9 on this system.
+        # LBS-6: GR+GX is a least-privilege contract, not merely a minimum.
         $genericRead = [int]::MinValue
         $genericExecute = 0x20000000
-        $genericAll = 0x10000000
         $mappedReadExecute = 0x001200A9
+        $dangerousMask = 0x10000000 -bor 0x40000000 -bor 0x00010000 -bor 0x00040000 -bor 0x00080000
+        $hasSafeReadExecute = $false
 
         foreach ($ace in $raw.DiscretionaryAcl) {
-            if ($ace -isnot [System.Security.AccessControl.CommonAce]) { continue }
+            if ($ace -isnot [System.Security.AccessControl.QualifiedAce]) { continue }
             if ($ace.AceQualifier -ne [System.Security.AccessControl.AceQualifier]::AccessAllowed) { continue }
             if (-not $ace.SecurityIdentifier -or $ace.SecurityIdentifier.Value -ne $Sid) { continue }
 
             $mask = [int]$ace.AccessMask
-            $hasAll = (($mask -band $genericAll) -ne 0)
-            $hasRead = (($mask -band $genericRead) -ne 0)
-            $hasExecute = (($mask -band $genericExecute) -ne 0)
-            $hasMappedReadExecute = (($mask -band $mappedReadExecute) -eq $mappedReadExecute)
+            if (($mask -band $dangerousMask) -ne 0) { return $false }
 
-            if ($hasAll -or ($hasRead -and $hasExecute) -or $hasMappedReadExecute) { return $true }
+            $hasGenericReadExecute = ((($mask -band $genericRead) -ne 0) -and (($mask -band $genericExecute) -ne 0))
+            $hasMappedReadExecute = ($mask -eq $mappedReadExecute)
+            if ($hasGenericReadExecute -or $hasMappedReadExecute) {
+                $hasSafeReadExecute = $true
+                continue
+            }
+
+            if ($mask -ne 0) { return $false }
         }
+        return $hasSafeReadExecute
     }
     catch { return $false }
-    return $false
 }
+function Get-TaskReadExecuteOnlySddl {
+    param(
+        [Parameter(Mandatory=$true)][string]$Sddl,
+        [Parameter(Mandatory=$true)][string]$Sid
+    )
+    $raw = [System.Security.AccessControl.RawSecurityDescriptor]::new($Sddl)
+    $oldDacl = $raw.DiscretionaryAcl
+    $revision = if ($oldDacl) { $oldDacl.Revision } else { [byte]2 }
+    $capacity = if ($oldDacl) { $oldDacl.Count + 1 } else { 1 }
+    $newDacl = [System.Security.AccessControl.RawAcl]::new($revision,$capacity)
+
+    if ($oldDacl) {
+        foreach ($ace in $oldDacl) {
+            $drop = $false
+            if ($ace -is [System.Security.AccessControl.QualifiedAce] -and
+                $ace.AceQualifier -eq [System.Security.AccessControl.AceQualifier]::AccessAllowed -and
+                $ace.SecurityIdentifier -and $ace.SecurityIdentifier.Value -eq $Sid) {
+                $drop = $true
+            }
+            if (-not $drop) { $newDacl.InsertAce($newDacl.Count,$ace) }
+        }
+    }
+
+    $sidObject = [System.Security.Principal.SecurityIdentifier]::new($Sid)
+    $readExecuteMask = ([int]::MinValue -bor 0x20000000)
+    $readExecuteAce = [System.Security.AccessControl.CommonAce]::new(
+        [System.Security.AccessControl.AceFlags]::None,
+        [System.Security.AccessControl.AceQualifier]::AccessAllowed,
+        $readExecuteMask,
+        $sidObject,
+        $false,
+        $null
+    )
+    $newDacl.InsertAce($newDacl.Count,$readExecuteAce)
+    $raw.DiscretionaryAcl = $newDacl
+    return $raw.GetSddlForm([System.Security.AccessControl.AccessControlSections]::All)
+}
+
+function Test-TaskBrokerStatePathLeastPrivilege {
+    param([Parameter(Mandatory=$true)][string]$Path)
+    try {
+        $acl = Get-Acl -LiteralPath $Path
+        if (-not $acl.AreAccessRulesProtected) { return $false }
+
+        $systemSid = 'S-1-5-18'
+        $adminsSid = 'S-1-5-32-544'
+        $usersSid = 'S-1-5-32-545'
+        $hasSystemFull = $false
+        $hasAdminsFull = $false
+        $hasUsersRead = $false
+        $writeMask = [System.Security.AccessControl.FileSystemRights]::Write -bor
+                     [System.Security.AccessControl.FileSystemRights]::Modify -bor
+                     [System.Security.AccessControl.FileSystemRights]::Delete -bor
+                     [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor
+                     [System.Security.AccessControl.FileSystemRights]::TakeOwnership
+
+        foreach ($rule in @($acl.Access)) {
+            if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) { continue }
+            try { $ruleSid = $rule.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+            catch { return $false }
+            $rights = [System.Security.AccessControl.FileSystemRights]$rule.FileSystemRights
+
+            if ($ruleSid -eq $systemSid) {
+                if (($rights -band [System.Security.AccessControl.FileSystemRights]::FullControl) -eq [System.Security.AccessControl.FileSystemRights]::FullControl) { $hasSystemFull = $true }
+                continue
+            }
+            if ($ruleSid -eq $adminsSid) {
+                if (($rights -band [System.Security.AccessControl.FileSystemRights]::FullControl) -eq [System.Security.AccessControl.FileSystemRights]::FullControl) { $hasAdminsFull = $true }
+                continue
+            }
+
+            if (($rights -band $writeMask) -ne 0) { return $false }
+            if ($ruleSid -eq $usersSid -and
+                (($rights -band [System.Security.AccessControl.FileSystemRights]::ReadAndExecute) -eq [System.Security.AccessControl.FileSystemRights]::ReadAndExecute)) {
+                $hasUsersRead = $true
+            }
+        }
+
+        return ($hasSystemFull -and $hasAdminsFull -and $hasUsersRead)
+    }
+    catch { return $false }
+}
+
+function Protect-TaskBrokerStateDirectory {
+    [void](New-Item -ItemType Directory -Path $StateDir -Force)
+    $acl = New-Object System.Security.AccessControl.DirectorySecurity
+    $acl.SetAccessRuleProtection($true,$false)
+    $inheritance = [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+    $propagation = [System.Security.AccessControl.PropagationFlags]::None
+    $allow = [System.Security.AccessControl.AccessControlType]::Allow
+    $systemSid = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-18')
+    $adminsSid = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
+    $usersSid = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-32-545')
+    $acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($systemSid,[System.Security.AccessControl.FileSystemRights]::FullControl,$inheritance,$propagation,$allow))
+    $acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($adminsSid,[System.Security.AccessControl.FileSystemRights]::FullControl,$inheritance,$propagation,$allow))
+    $acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($usersSid,[System.Security.AccessControl.FileSystemRights]::ReadAndExecute,$inheritance,$propagation,$allow))
+    Set-Acl -LiteralPath $StateDir -AclObject $acl
+}
+
+function Protect-TaskBrokerMetadataFile {
+    if (-not (Test-Path -LiteralPath $metadataFile -PathType Leaf)) { throw 'TaskBroker-Metadatendatei fehlt.' }
+    $acl = New-Object System.Security.AccessControl.FileSecurity
+    $acl.SetAccessRuleProtection($true,$false)
+    $allow = [System.Security.AccessControl.AccessControlType]::Allow
+    $systemSid = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-18')
+    $adminsSid = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
+    $usersSid = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-32-545')
+    $acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($systemSid,[System.Security.AccessControl.FileSystemRights]::FullControl,$allow))
+    $acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($adminsSid,[System.Security.AccessControl.FileSystemRights]::FullControl,$allow))
+    $acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($usersSid,[System.Security.AccessControl.FileSystemRights]::ReadAndExecute,$allow))
+    Set-Acl -LiteralPath $metadataFile -AclObject $acl
+}
+
 
 function Grant-TaskReadExecute([string]$TaskName, [string]$Sid) {
     $service = Get-ScheduleService
@@ -174,19 +294,18 @@ function Grant-TaskReadExecute([string]$TaskName, [string]$Sid) {
     $sddl = $task.GetSecurityDescriptor(0x7)
 
     if (-not (Test-SddlReadExecuteAce -Sddl $sddl -Sid $Sid)) {
-        $newSddl = $sddl + "(A;;GRGX;;;$Sid)"
+        $newSddl = Get-TaskReadExecuteOnlySddl -Sddl $sddl -Sid $Sid
         $task.SetSecurityDescriptor($newSddl, 0)
 
         $task = $service.GetFolder('\').GetTask("\$TaskName")
         $verifySddl = $task.GetSecurityDescriptor(0x7)
         if (-not (Test-SddlReadExecuteAce -Sddl $verifySddl -Sid $Sid)) {
-            Write-InstallLog ("ACL verification failed after SetSecurityDescriptor: {0}; SDDL={1}" -f $TaskName,$verifySddl)
-            throw "Task-ACL konnte nicht mit Read+Execute für $Sid gesetzt werden: $TaskName"
+            Write-InstallLog ("ACL verification failed after least-privilege replacement: {0}; SDDL={1}" -f $TaskName,$verifySddl)
+            throw "Task-ACL konnte nicht auf ausschließlich Read+Execute für $Sid begrenzt werden: $TaskName"
         }
-        Write-InstallLog ("ACL repaired and verified: {0}" -f $TaskName)
+        Write-InstallLog ("ACL replaced and least-privilege verified: {0}" -f $TaskName)
     }
 }
-
 function New-SystemTaskSettings {
     return New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 1)
 }
@@ -234,6 +353,7 @@ function Protect-DefaultStateDirectory {
     [void](New-Item -ItemType Directory -Path $defaultStateDir -Force)
 
     $acl = New-Object System.Security.AccessControl.DirectorySecurity
+    $acl.SetAccessRuleProtection($true,$false)
     $inheritance = [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
     $propagation = [System.Security.AccessControl.PropagationFlags]::None
     $allow = [System.Security.AccessControl.AccessControlType]::Allow
@@ -253,6 +373,7 @@ function Protect-DefaultStateFile {
     if (-not (Test-Path -LiteralPath $defaultFile)) { return }
 
     $acl = New-Object System.Security.AccessControl.FileSecurity
+    $acl.SetAccessRuleProtection($true,$false)
     $allow = [System.Security.AccessControl.AccessControlType]::Allow
     $systemSid = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-18')
     $adminsSid = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
@@ -344,6 +465,13 @@ try {
     [void](New-Item -ItemType Directory -Path $UserStateDir -Force)
     Remove-Item -LiteralPath $installLog -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $diagPointer -Force -ErrorAction SilentlyContinue
+
+    Set-Step 'protect-state'
+    Protect-TaskBrokerStateDirectory
+    if (-not (Test-TaskBrokerStatePathLeastPrivilege -Path $StateDir)) {
+        throw 'TaskBroker-State-Verzeichnis erfüllt den Least-Privilege-ACL-Vertrag nicht.'
+    }
+    Write-InstallLog 'TaskBroker state ACL verified: SYSTEM/Admin write, Users read/execute only.'
 
     Set-Step 'cleanup-old-service'
     Remove-OldServiceBroker
@@ -468,6 +596,7 @@ exit `$LASTEXITCODE
     Set-Step 'write-metadata'
     $metadata = [ordered]@{
         version = $version
+        boundaryContract = 'fixed-task-v1'
         installedUtc = [datetime]::UtcNow.ToString('o')
         userSid = $UserSid
         managerRefreshTask = $managerRefreshTask
@@ -481,6 +610,11 @@ exit `$LASTEXITCODE
         targets = $targets
     }
     $metadata | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $metadataFile -Encoding UTF8
+    Protect-TaskBrokerMetadataFile
+    if (-not (Test-TaskBrokerStatePathLeastPrivilege -Path $metadataFile)) {
+        throw 'TaskBroker-Metadatendatei erfüllt den Least-Privilege-ACL-Vertrag nicht.'
+    }
+    Write-InstallLog 'TaskBroker metadata ACL verified: SYSTEM/Admin write, Users read/execute only.'
 
     Set-Step 'complete'
     Write-InstallLog 'SUCCESS'

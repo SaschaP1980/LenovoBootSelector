@@ -1,5 +1,18 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.4.0 – LBS-6 Boot-/Privilege-Boundary fail-closed gehärtet
+
+- Der Runtime-TaskBroker akzeptiert keine frei übergebenen Scheduled-Task-Namen mehr. `Invoke-AuthorizedTask` nimmt nur noch die festen Operationsarten `ManagerRefresh`, `FirmwareRefresh`, `BootNext`, `DefaultSet` und `DefaultClear` an.
+- Statische Tasknamen sind fest im Runtime-Vertrag verankert; zielbezogene BootNext-/DefaultSet-Tasknamen werden ausschließlich aus streng validierten, bereits installierten Firmware-GUIDs abgeleitet.
+- TaskBroker-Schema **0.2.13** führt `boundaryContract = fixed-task-v1` ein. Metadaten werden fail-closed auf Schema, Benutzer-SID, feste Tasknamen, feste State-Pfade, kanonische GUIDs, abgeleitete Tasknamen und Duplikate geprüft.
+- Das erhöhte Setup schützt das komplette TaskBroker-State-Verzeichnis unter ProgramData sowie `task-broker.json` mit SYSTEM/Admin FullControl und Users ReadAndExecute. Normale Benutzer können vertrauenswürdige TaskBroker-Metadaten damit nicht mehr umschreiben.
+- Die Task-DACL-Verifikation akzeptiert `GENERIC_ALL` nicht mehr als Erfolg. Überbreite Benutzer-Allow-ACEs werden durch genau eine Read+Execute-ACE ersetzt und anschließend per Read-back verifiziert.
+- `LenovoBootMenu-Default-Restore` bleibt ein ausschließlich triggergesteuerter fester SYSTEM-Task und ist nicht als unelevierte Runtime-Operation exponiert.
+- One-Shot-`bootsequence` bleibt unverändert; permanente `BootOrder`-/`{fwbootmgr} displayorder`-Mutation bleibt verboten.
+- Neuer kanonischer Threat-/Boundary-Vertrag: `docs/SECURITY_BOUNDARY.md`.
+- Bestehende Schema-0.2.12-Systemfunktionen werden nach dem App-Update absichtlich als reparaturbedürftig erkannt. Ein einmaliger expliziter UAC-Repair installiert Schema 0.2.13 und die neuen ACL-Grenzen.
+- Updater, Storage und USB-Erkennung erhalten keine neue privilegierte Schnittstelle.
+
 ## v0.6.3.1 – LBS-14 Update-Hinweis interaktiv und Dialogtitel vereinheitlicht
 
 - Der Header-Hinweis lautet jetzt konsistent **„Neue App-Version verfügbar“**.

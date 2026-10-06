@@ -23,6 +23,7 @@ Diese vier Dateien sind die permanenten Python-Gates des GitHub-Release-Orchestr
 | `Test-MaintenanceRuntime.ps1` | Runtime | Maintenance-State und Modi |
 | `Test-SingleInstanceMutex.ps1` | Runtime | Single-Instance-/Mutex-Lifecycle |
 | `Test-BootTargetDrift.ps1` | Safety | Drift-Erkennung und fail-closed Zustände |
+| `Test-TaskBrokerBoundary.ps1` | Safety | LBS-6 Fixed-Task-/Metadata-Boundary ohne privilegierte Ausführung |
 | `Test-ArchitectureSoak.ps1` | Soak | wiederholte Architektur-/State-Stabilität |
 | `Test-WindowsPowerShell51.ps1` | Compatibility | Windows PowerShell 5.1 Parser-/Encoding-Gate und nativer Sammelrunner |
 
