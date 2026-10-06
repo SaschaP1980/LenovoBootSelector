@@ -920,7 +920,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.7.0.1'
+$script:AppVersion = '0.7.0.2'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -936,6 +936,9 @@ $script:ScriptPath = $PSCommandPath
 if (-not $script:ScriptPath) { $script:ScriptPath = $MyInvocation.MyCommand.Path }
 
 $script:RuntimeDiagnosticsRoot = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray\Diagnostics\Runtime'
+# Preserve the command-line parent-session input before active diagnostics state
+# reuses the RuntimeSessionId name in script scope.
+$script:InheritedRuntimeSessionId = [string]$RuntimeSessionId
 $script:RuntimeSessionId = $null
 $script:RuntimeSessionDir = $null
 $script:RuntimeEventsPath = $null
@@ -1656,8 +1659,9 @@ function New-RuntimeDiagnosticData {
 
 function Initialize-RuntimeDiagnostics {
     try {
-        $candidate = ([string]$RuntimeSessionId).Trim()
+        $candidate = ([string]$script:InheritedRuntimeSessionId).Trim()
         if ($candidate) { $candidate = ($candidate -replace '[^A-Za-z0-9-]', '') }
+        $hasParentSession = [bool]$candidate
         if (-not $candidate) { $candidate = [guid]::NewGuid().ToString('D') }
 
         $script:RuntimeSessionId = $candidate
@@ -1683,7 +1687,7 @@ function Initialize-RuntimeDiagnostics {
 
         Write-RuntimeDiagnosticEvent -Event $(if ($BackgroundRefresh) { 'BACKGROUND_WORKER_STARTED' } elseif ($UpdateCheck) { 'UPDATE_CHECK_WORKER_STARTED' } elseif ($UpdatePrepare) { 'UPDATE_PREPARE_WORKER_STARTED' } else { 'SESSION_STARTED' }) -Stage 'startup' -Success $true -Data (New-RuntimeDiagnosticData @{
             role = (Get-RuntimeDiagnosticRole)
-            parentSession = [bool]([string]$RuntimeSessionId)
+            parentSession = $hasParentSession
         })
     }
     catch {
