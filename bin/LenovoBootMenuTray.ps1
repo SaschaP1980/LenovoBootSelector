@@ -2838,6 +2838,57 @@ function Get-LocalizationCatalogCore {
             'Update.Check' = 'Check for new version…'
             'Update.Install' = 'Update app…'
             'Diagnostics.Save' = 'Save diagnostics…'
+            'Boot.OtherTarget' = 'Other boot target'
+            'Boot.OtherTargetTooltip' = 'Gray: other boot target'
+            'Boot.MenuTitle' = 'Lenovo Boot Menu'
+            'Boot.MenuSubtitle' = 'Open the boot menu on the next startup'
+            'Boot.MenuTooltip' = 'Red: Lenovo Boot Menu'
+            'Boot.Nvme1Title' = 'NVMe SSD 1'
+            'Boot.Nvme2Title' = 'NVMe SSD 2'
+            'Boot.NoDrive' = 'No drive detected'
+            'Boot.InternalSsd' = 'Internal SSD'
+            'Boot.SecondInternalSsd' = 'Second internal SSD'
+            'Boot.InternalSsdTooltip' = 'Blue: internal SSD'
+            'Boot.UsbTooltip' = 'Yellow: USB drive'
+            'Boot.UsbChecking' = 'Checking USB drives …'
+            'Boot.UsbCheckFailed' = 'USB drives could not be checked'
+            'Boot.UsbBootMedium' = 'USB boot medium: {Model}'
+            'Boot.UsbMultipleBoot' = 'Multiple possible USB boot media detected'
+            'Boot.UsbNonBoot' = '{Model} detected · not detected as boot medium'
+            'Boot.UsbMultipleNoBoot' = 'USB drives detected · no boot medium found'
+            'Boot.UsbNone' = 'No USB drive connected'
+            'Boot.UsbFddTitle' = 'USB floppy drive'
+            'Boot.UsbFddSubtitle' = 'Boot from a USB floppy drive'
+            'Boot.UsbCdTitle' = 'USB CD/DVD drive'
+            'Boot.UsbCdSubtitle' = 'Boot from an optical USB drive'
+            'Boot.PxeTitle' = 'Network boot'
+            'Boot.PxeSubtitle' = 'Boot over the local network'
+            'Boot.PxeTooltip' = 'Purple: network boot'
+            'Boot.LenovoRecoveryTitle' = 'Lenovo recovery'
+            'Boot.LenovoRecoverySubtitle' = 'Recovery over the network'
+            'Boot.CyanTooltip' = 'Cyan: Lenovo or corporate network'
+            'Boot.CorporateTitle' = 'Corporate network boot'
+            'Boot.CorporateSubtitle' = 'Boot over the corporate network'
+            'Boot.OtherDriveTitle' = 'Other drive'
+            'Boot.OtherDriveSubtitle' = 'Other detected drive'
+            'Boot.OtherDriveTooltip' = 'Gray: other drive'
+            'Boot.OtherCdTitle' = 'Other CD/DVD drive'
+            'Boot.OtherCdSubtitle' = 'Other optical boot drive'
+            'Status.NextBootTarget' = 'Next boot: {Title}'
+            'Status.NextBootSet' = 'Next boot target was set.'
+            'Boot.ChangeErrorTitle' = 'Boot target could not be changed'
+            'Boot.ChangeErrorHeading' = 'The selection was not applied.'
+            'Boot.ChangeErrorMessage' = 'Please try again. If the problem persists, open Maintenance → Repair system functions.'
+            'Manage.OrderChanged' = 'Order changed · Save applies the change.'
+            'Manage.OriginalName' = 'Original name: {Name}'
+            'Boot.MenuManageSubtitle' = 'Selection menu for the next boot target'
+            'Manage.AliasRemoved' = 'Display name removed · Save applies the change.'
+            'Manage.AliasChanged' = 'Display name changed · Save applies the change.'
+            'Manage.AliasDiscarded' = 'Display-name change discarded.'
+            'Common.Apply' = 'Apply'
+            'Manage.OriginalNameHint' = 'Leave empty = original name'
+            'Manage.EditAliasAccessible' = 'Change display name'
+            'Manage.EditAliasStatus' = 'Edit display name · Enter applies · Esc discards · empty = original name'
             'Tray.Exit' = 'Exit'
         }
         'de-DE' = [ordered]@{
@@ -2890,6 +2941,57 @@ function Get-LocalizationCatalogCore {
             'Update.Check' = 'Auf neue Version prüfen…'
             'Update.Install' = 'App aktualisieren…'
             'Diagnostics.Save' = 'Diagnose speichern…'
+            'Boot.OtherTarget' = 'Weiteres Startziel'
+            'Boot.OtherTargetTooltip' = 'Grau: weiteres Startziel'
+            'Boot.MenuTitle' = 'Lenovo Boot-Menü'
+            'Boot.MenuSubtitle' = 'Beim nächsten Start das Boot-Menü öffnen'
+            'Boot.MenuTooltip' = 'Rot: Lenovo Boot-Menü'
+            'Boot.Nvme1Title' = 'NVMe-SSD 1'
+            'Boot.Nvme2Title' = 'NVMe-SSD 2'
+            'Boot.NoDrive' = 'Kein Laufwerk erkannt'
+            'Boot.InternalSsd' = 'Interne SSD'
+            'Boot.SecondInternalSsd' = 'Zweite interne SSD'
+            'Boot.InternalSsdTooltip' = 'Blau: interne SSD'
+            'Boot.UsbTooltip' = 'Gelb: USB-Laufwerk'
+            'Boot.UsbChecking' = 'USB-Laufwerke werden geprüft …'
+            'Boot.UsbCheckFailed' = 'USB-Laufwerke konnten nicht geprüft werden'
+            'Boot.UsbBootMedium' = 'USB-Startmedium: {Model}'
+            'Boot.UsbMultipleBoot' = 'Mehrere mögliche USB-Startmedien erkannt'
+            'Boot.UsbNonBoot' = '{Model} erkannt · nicht als Startmedium erkannt'
+            'Boot.UsbMultipleNoBoot' = 'USB-Laufwerke erkannt · kein Startmedium gefunden'
+            'Boot.UsbNone' = 'Kein USB-Laufwerk angeschlossen'
+            'Boot.UsbFddTitle' = 'USB-Diskettenlaufwerk'
+            'Boot.UsbFddSubtitle' = 'Start von einem USB-Floppy-Laufwerk'
+            'Boot.UsbCdTitle' = 'USB-CD/DVD-Laufwerk'
+            'Boot.UsbCdSubtitle' = 'Start von einem optischen USB-Laufwerk'
+            'Boot.PxeTitle' = 'Netzwerkstart'
+            'Boot.PxeSubtitle' = 'Start über das lokale Netzwerk'
+            'Boot.PxeTooltip' = 'Violett: Netzwerkstart'
+            'Boot.LenovoRecoveryTitle' = 'Lenovo Wiederherstellung'
+            'Boot.LenovoRecoverySubtitle' = 'Wiederherstellung über das Netzwerk'
+            'Boot.CyanTooltip' = 'Cyan: Lenovo- oder Firmen-Netzwerk'
+            'Boot.CorporateTitle' = 'Firmen-Netzwerkstart'
+            'Boot.CorporateSubtitle' = 'Start über das Firmennetzwerk'
+            'Boot.OtherDriveTitle' = 'Weiteres Laufwerk'
+            'Boot.OtherDriveSubtitle' = 'Weiteres erkanntes Laufwerk'
+            'Boot.OtherDriveTooltip' = 'Grau: weiteres Laufwerk'
+            'Boot.OtherCdTitle' = 'Weiteres CD/DVD-Laufwerk'
+            'Boot.OtherCdSubtitle' = 'Anderes optisches Startlaufwerk'
+            'Status.NextBootTarget' = 'Nächster Start: {Title}'
+            'Status.NextBootSet' = 'Nächstes Startziel wurde gesetzt.'
+            'Boot.ChangeErrorTitle' = 'Startziel konnte nicht geändert werden'
+            'Boot.ChangeErrorHeading' = 'Die Auswahl wurde nicht übernommen.'
+            'Boot.ChangeErrorMessage' = 'Bitte versuche es erneut. Falls das Problem bestehen bleibt, öffne Wartung → Systemfunktionen reparieren.'
+            'Manage.OrderChanged' = 'Reihenfolge geändert · Speichern übernimmt die Änderung.'
+            'Manage.OriginalName' = 'Originalname: {Name}'
+            'Boot.MenuManageSubtitle' = 'Auswahlmenü für das nächste Startziel'
+            'Manage.AliasRemoved' = 'Anzeigename entfernt · Speichern übernimmt die Änderung.'
+            'Manage.AliasChanged' = 'Anzeigename geändert · Speichern übernimmt die Änderung.'
+            'Manage.AliasDiscarded' = 'Änderung am Anzeigenamen verworfen.'
+            'Common.Apply' = 'Übernehmen'
+            'Manage.OriginalNameHint' = 'Leer lassen = Originalname'
+            'Manage.EditAliasAccessible' = 'Anzeigename ändern'
+            'Manage.EditAliasStatus' = 'Anzeigename bearbeiten · Enter übernimmt · Esc verwirft · leer = Originalname'
             'Tray.Exit' = 'Beenden'
         }
     }
@@ -5171,15 +5273,17 @@ function Get-FriendlyBootEntryCore {
     param(
         [string]$Guid,
         [string]$RawDescription,
-        $StorageContext
+        $StorageContext,
+        [string]$Locale = 'en-US'
     )
 
-    $description = if ($RawDescription) { $RawDescription.Trim() } else { 'Weiteres Startziel' }
+    $localeId = Resolve-LocaleIdCore -Locale $Locale
+    $description = if ($RawDescription) { $RawDescription.Trim() } else { Get-LocalizedStringCore -Key 'Boot.OtherTarget' -Locale $localeId }
     $title = $description
-    $subtitle = 'Weiteres Startziel'
+    $subtitle = Get-LocalizedStringCore -Key 'Boot.OtherTarget' -Locale $localeId
     $accentRole = 'Secondary'
     $symbol = '●'
-    $typeTooltip = 'Grau: weiteres Startziel'
+    $typeTooltip = Get-LocalizedStringCore -Key 'Boot.OtherTargetTooltip' -Locale $localeId
 
     # The current target ThinkPad has NVMe0 confirmed as the populated internal slot.
     # A single read-only NVMe disk can therefore enrich NVMe0 and implies an empty NVMe1.
@@ -5191,40 +5295,40 @@ function Get-FriendlyBootEntryCore {
 
     switch -Regex ($description) {
         '^Boot Menu$' {
-            $title = 'Lenovo Boot-Menü'
-            $subtitle = 'Beim nächsten Start das Boot-Menü öffnen'
+            $title = Get-LocalizedStringCore -Key 'Boot.MenuTitle' -Locale $localeId
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.MenuSubtitle' -Locale $localeId
             $accentRole = 'Accent'
-            $typeTooltip = 'Rot: Lenovo Boot-Menü'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.MenuTooltip' -Locale $localeId
             break
         }
         '^NVMe0$' {
-            $title = 'NVMe-SSD 1'
+            $title = Get-LocalizedStringCore -Key 'Boot.Nvme1Title' -Locale $localeId
             if ($StorageContext -and $nvmeDisks.Count -eq 1) {
-                $subtitle = 'Interne SSD: ' + [string]$nvmeDisks[0].Model
+                $subtitle = Get-LocalizedStringCore -Key 'Storage.InternalSsdModel' -Locale $localeId -Values @{ Model=[string]$nvmeDisks[0].Model }
             }
             elseif ($StorageContext -and $nvmeDisks.Count -eq 0) {
-                $subtitle = 'Kein Laufwerk erkannt'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.NoDrive' -Locale $localeId
             }
             else {
-                $subtitle = 'Interne SSD'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.InternalSsd' -Locale $localeId
             }
             $accentRole = 'Blue'
-            $typeTooltip = 'Blau: interne SSD'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.InternalSsdTooltip' -Locale $localeId
             break
         }
         '^NVMe1$' {
-            $title = 'NVMe-SSD 2'
+            $title = Get-LocalizedStringCore -Key 'Boot.Nvme2Title' -Locale $localeId
             if ($StorageContext -and $nvmeDisks.Count -eq 1) {
-                $subtitle = 'Kein Laufwerk erkannt'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.NoDrive' -Locale $localeId
             }
             elseif ($StorageContext -and $nvmeDisks.Count -eq 0) {
-                $subtitle = 'Kein Laufwerk erkannt'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.NoDrive' -Locale $localeId
             }
             else {
-                $subtitle = 'Zweite interne SSD'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.SecondInternalSsd' -Locale $localeId
             }
             $accentRole = 'Blue'
-            $typeTooltip = 'Blau: interne SSD'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.InternalSsdTooltip' -Locale $localeId
             break
         }
         '^USB HDD$' {
@@ -5232,89 +5336,89 @@ function Get-FriendlyBootEntryCore {
             # presented only as read-only context and must never replace the target title.
             $title = 'USB HDD'
             $accentRole = 'Warning'
-            $typeTooltip = 'Gelb: USB-Laufwerk'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.UsbTooltip' -Locale $localeId
 
             if (-not $StorageContext) {
-                $subtitle = 'USB-Laufwerke werden geprüft …'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbChecking' -Locale $localeId
             }
             elseif ($StorageContext.UsbResolution -eq 'Unavailable') {
-                $subtitle = 'USB-Laufwerke konnten nicht geprüft werden'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbCheckFailed' -Locale $localeId
             }
             elseif ($StorageContext.UsbBootCandidates.Count -eq 1) {
                 $candidate = $StorageContext.UsbBootCandidates[0]
-                $subtitle = 'USB-Startmedium: ' + [string]$candidate.Model
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbBootMedium' -Locale $localeId -Values @{ Model=[string]$candidate.Model }
             }
             elseif ($StorageContext.UsbBootCandidates.Count -gt 1) {
-                $subtitle = 'Mehrere mögliche USB-Startmedien erkannt'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbMultipleBoot' -Locale $localeId
             }
             elseif ($StorageContext.UsbDisks.Count -eq 1) {
                 $medium = $StorageContext.UsbDisks[0]
-                $subtitle = ([string]$medium.Model) + ' erkannt · nicht als Startmedium erkannt'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbNonBoot' -Locale $localeId -Values @{ Model=[string]$medium.Model }
             }
             elseif ($StorageContext.UsbDisks.Count -gt 1) {
-                $subtitle = 'USB-Laufwerke erkannt · kein Startmedium gefunden'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbMultipleNoBoot' -Locale $localeId
             }
             elseif ($StorageContext.UsbDisks.Count -eq 0) {
-                $subtitle = 'Kein USB-Laufwerk angeschlossen'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbNone' -Locale $localeId
             }
             else {
-                $subtitle = 'USB-Laufwerke konnten nicht geprüft werden'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbCheckFailed' -Locale $localeId
             }
             break
         }
         '^USB FDD$' {
-            $title = 'USB-Diskettenlaufwerk'
-            $subtitle = 'Start von einem USB-Floppy-Laufwerk'
+            $title = Get-LocalizedStringCore -Key 'Boot.UsbFddTitle' -Locale $localeId
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbFddSubtitle' -Locale $localeId
             $accentRole = 'Warning'
-            $typeTooltip = 'Gelb: USB-Laufwerk'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.UsbTooltip' -Locale $localeId
             break
         }
         '^USB CD$' {
-            $title = 'USB-CD/DVD-Laufwerk'
-            $subtitle = 'Start von einem optischen USB-Laufwerk'
+            $title = Get-LocalizedStringCore -Key 'Boot.UsbCdTitle' -Locale $localeId
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbCdSubtitle' -Locale $localeId
             $accentRole = 'Warning'
-            $typeTooltip = 'Gelb: USB-Laufwerk'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.UsbTooltip' -Locale $localeId
             break
         }
         '^PXE BOOT$' {
-            $title = 'Netzwerkstart'
-            $subtitle = 'Start über das lokale Netzwerk'
+            $title = Get-LocalizedStringCore -Key 'Boot.PxeTitle' -Locale $localeId
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.PxeSubtitle' -Locale $localeId
             $accentRole = 'Purple'
-            $typeTooltip = 'Violett: Netzwerkstart'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.PxeTooltip' -Locale $localeId
             break
         }
         '^LENOVO CLOUD$' {
-            $title = 'Lenovo Wiederherstellung'
-            $subtitle = 'Wiederherstellung über das Netzwerk'
+            $title = Get-LocalizedStringCore -Key 'Boot.LenovoRecoveryTitle' -Locale $localeId
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.LenovoRecoverySubtitle' -Locale $localeId
             $accentRole = 'Cyan'
-            $typeTooltip = 'Cyan: Lenovo- oder Firmen-Netzwerk'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.CyanTooltip' -Locale $localeId
             break
         }
         '^ON-PREMISE$' {
-            $title = 'Firmen-Netzwerkstart'
-            $subtitle = 'Start über das Firmennetzwerk'
+            $title = Get-LocalizedStringCore -Key 'Boot.CorporateTitle' -Locale $localeId
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.CorporateSubtitle' -Locale $localeId
             $accentRole = 'Cyan'
-            $typeTooltip = 'Cyan: Lenovo- oder Firmen-Netzwerk'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.CyanTooltip' -Locale $localeId
             break
         }
         '^Other HDD$' {
-            $title = 'Weiteres Laufwerk'
-            $subtitle = 'Weiteres erkanntes Laufwerk'
+            $title = Get-LocalizedStringCore -Key 'Boot.OtherDriveTitle' -Locale $localeId
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.OtherDriveSubtitle' -Locale $localeId
             $accentRole = 'Secondary'
-            $typeTooltip = 'Grau: weiteres Laufwerk'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.OtherDriveTooltip' -Locale $localeId
             break
         }
         '^Other CD$' {
-            $title = 'Weiteres CD/DVD-Laufwerk'
-            $subtitle = 'Anderes optisches Startlaufwerk'
+            $title = Get-LocalizedStringCore -Key 'Boot.OtherCdTitle' -Locale $localeId
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.OtherCdSubtitle' -Locale $localeId
             $accentRole = 'Secondary'
-            $typeTooltip = 'Grau: weiteres Startziel'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.OtherTargetTooltip' -Locale $localeId
             break
         }
         default {
             # Preserve unknown firmware descriptions rather than inventing a meaning.
             $title = $description
-            $subtitle = 'Weiteres Startziel'
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.OtherTarget' -Locale $localeId
             $accentRole = 'Secondary'
         }
     }
@@ -5340,7 +5444,7 @@ function Get-FriendlyBootEntry {
         $StorageContext
     )
 
-    $model = Get-FriendlyBootEntryCore -Guid $Guid -RawDescription $RawDescription -StorageContext $StorageContext
+    $model = Get-FriendlyBootEntryCore -Guid $Guid -RawDescription $RawDescription -StorageContext $StorageContext -Locale (Get-ActiveLocale)
     $accent = switch ([string]$model.AccentRole) {
         'Accent' { $script:ColorAccent; break }
         'Blue' { $script:ColorBlue; break }
@@ -5732,7 +5836,7 @@ function Get-FirmwareBootState {
 
     $entries = @()
     foreach ($guid in $orderedGuids) {
-        $raw = if ($descriptions.ContainsKey($guid)) { [string]$descriptions[$guid] } else { 'Weiteres Startziel' }
+        $raw = if ($descriptions.ContainsKey($guid)) { [string]$descriptions[$guid] } else { '' }
         $entries += Get-FriendlyBootEntry -Guid $guid -RawDescription $raw -StorageContext $storageContext
     }
 
@@ -5872,11 +5976,11 @@ function Update-PopupRows {
             $entry = Get-EntryByGuid $guid
             Set-BootNextTarget -Guid $guid
             $script:SelectedGuid = $guid.ToLowerInvariant()
-            $script:LastStatusText = if ($entry) { "Nächster Start: $(Get-EntryDisplayTitle -Entry $entry)" } else { 'Nächstes Startziel wurde gesetzt.' }
+            $script:LastStatusText = if ($entry) { Get-LocalizedString -Key 'Status.NextBootTarget' -Values @{ Title=(Get-EntryDisplayTitle -Entry $entry) } } else { Get-LocalizedString -Key 'Status.NextBootSet' }
             Update-PopupRows
         }
         catch {
-            Show-LenovoNoticeDialog -Title 'Startziel konnte nicht geändert werden' -Heading 'Die Auswahl wurde nicht übernommen.' -Message 'Bitte versuche es erneut. Falls das Problem bestehen bleibt, öffne Wartung → Systemfunktionen reparieren.' -Kind Error
+            Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Boot.ChangeErrorTitle') -Heading (Get-LocalizedString -Key 'Boot.ChangeErrorHeading') -Message (Get-LocalizedString -Key 'Boot.ChangeErrorMessage') -Kind Error
         }
     }
 
@@ -5938,7 +6042,7 @@ function Update-PopupRows {
         $after = ($point.Y -gt ($targetRow.Height / 2))
         Move-ManageEntry -MovedGuid $movedGuid -TargetGuid ([string]$targetRow.Tag) -After:$after
         $script:ManageLastDragUtc = [datetime]::UtcNow
-        $script:LastStatusText = 'Reihenfolge geändert · Speichern übernimmt die Änderung.'
+        $script:LastStatusText = Get-LocalizedString -Key 'Manage.OrderChanged'
         Update-PopupRows
     }
 
@@ -6025,10 +6129,10 @@ function Update-PopupRows {
         if (-not $aliasEditActive) {
             $subtitleWidth = if ($script:IsManageEntriesMode) { 220 } else { 284 }
             $subtitleText = if ($script:IsManageEntriesMode -and $alias) {
-                "Originalname: $($entry.Title)"
+                Get-LocalizedString -Key 'Manage.OriginalName' -Values @{ Name=[string]$entry.Title }
             }
-            elseif ($script:IsManageEntriesMode -and ([string]$entry.Title -eq 'Lenovo Boot-Menü')) {
-                'Auswahlmenü für das nächste Startziel'
+            elseif ($script:IsManageEntriesMode -and ([string]$entry.RawDescription -eq 'Boot Menu')) {
+                Get-LocalizedString -Key 'Boot.MenuManageSubtitle'
             }
             else {
                 [string]$entry.Subtitle
@@ -6124,13 +6228,13 @@ function Update-PopupRows {
                     if ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
                         Set-ManageEntryAliasDraft -Guid ([string]$sender.Tag) -Alias ([string]$sender.Text)
                         $script:ManageAliasEditGuid = $null
-                        $script:LastStatusText = if ([string]::IsNullOrWhiteSpace([string]$sender.Text)) { 'Anzeigename entfernt · Speichern übernimmt die Änderung.' } else { 'Anzeigename geändert · Speichern übernimmt die Änderung.' }
+                        $script:LastStatusText = if ([string]::IsNullOrWhiteSpace([string]$sender.Text)) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
                         $eventArgs.SuppressKeyPress = $true
                         Update-PopupRows
                     }
                     elseif ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Escape) {
                         $script:ManageAliasEditGuid = $null
-                        $script:LastStatusText = 'Änderung am Anzeigenamen verworfen.'
+                        $script:LastStatusText = Get-LocalizedString -Key 'Manage.AliasDiscarded'
                         $eventArgs.SuppressKeyPress = $true
                         Update-PopupRows
                     }
@@ -6140,7 +6244,7 @@ function Update-PopupRows {
 
                 $applyAlias = New-Object System.Windows.Forms.Button
                 $applyAlias.Name = 'AliasApplyButton'
-                $applyAlias.Text = 'Übernehmen'
+                $applyAlias.Text = Get-LocalizedString -Key 'Common.Apply'
                 $applyAlias.Tag = $entry.Guid
                 $applyAlias.Font = New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Bold)
                 $applyAlias.ForeColor = $script:ColorAccent
@@ -6159,7 +6263,7 @@ function Update-PopupRows {
                         Set-ManageEntryAliasDraft -Guid ([string]$editor.Tag) -Alias ([string]$editor.Text)
                         $empty = [string]::IsNullOrWhiteSpace([string]$editor.Text)
                         $script:ManageAliasEditGuid = $null
-                        $script:LastStatusText = if ($empty) { 'Anzeigename entfernt · Speichern übernimmt die Änderung.' } else { 'Anzeigename geändert · Speichern übernimmt die Änderung.' }
+                        $script:LastStatusText = if ($empty) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
                         Update-PopupRows
                     }
                 })
@@ -6167,7 +6271,7 @@ function Update-PopupRows {
 
                 $cancelAlias = New-Object System.Windows.Forms.Button
                 $cancelAlias.Name = 'AliasCancelButton'
-                $cancelAlias.Text = 'Abbrechen'
+                $cancelAlias.Text = Get-LocalizedString -Key 'Common.Cancel'
                 $cancelAlias.Font = New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Regular)
                 $cancelAlias.ForeColor = $script:ColorSecondary
                 $cancelAlias.BackColor = $script:ColorRow
@@ -6180,12 +6284,12 @@ function Update-PopupRows {
                 $cancelAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
                 $cancelAlias.Add_Click({
                     $script:ManageAliasEditGuid = $null
-                    $script:LastStatusText = 'Änderung am Anzeigenamen verworfen.'
+                    $script:LastStatusText = Get-LocalizedString -Key 'Manage.AliasDiscarded'
                     Update-PopupRows
                 })
                 $row.Controls.Add($cancelAlias)
 
-                $originalHint = New-Label -Text 'Leer lassen = Originalname' -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Regular)) `
+                $originalHint = New-Label -Text (Get-LocalizedString -Key 'Manage.OriginalNameHint') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Regular)) `
                     -ForeColor ([Drawing.Color]::FromArgb(125,125,125)) -X 266 -Y 65 -Width 110 -Height 18
                 $originalHint.TextAlign = [Drawing.ContentAlignment]::MiddleRight
                 $row.Controls.Add($originalHint)
@@ -6238,7 +6342,7 @@ function Update-PopupRows {
                     -ForeColor ([Drawing.Color]::FromArgb(190,190,190)) -X 321 -Y 12 -Width 25 -Height 34
                 $editAlias.Name = 'AliasEditButton'
                 $editAlias.Tag = $entry.Guid
-                $editAlias.AccessibleDescription = 'Anzeigename ändern'
+                $editAlias.AccessibleDescription = Get-LocalizedString -Key 'Manage.EditAliasAccessible'
                 $editAlias.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
                 $editAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
                 $editAlias.Add_MouseEnter({
@@ -6261,7 +6365,7 @@ function Update-PopupRows {
                         Commit-ActiveManageAliasEditor
                     }
                     $script:ManageAliasEditGuid = $guid
-                    $script:LastStatusText = 'Anzeigename bearbeiten · Enter übernimmt · Esc verwirft · leer = Originalname'
+                    $script:LastStatusText = Get-LocalizedString -Key 'Manage.EditAliasStatus'
                     Update-PopupRows
                     $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
                     if ($editor) {

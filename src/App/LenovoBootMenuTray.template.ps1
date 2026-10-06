@@ -1415,7 +1415,7 @@ function Get-FriendlyBootEntry {
         $StorageContext
     )
 
-    $model = Get-FriendlyBootEntryCore -Guid $Guid -RawDescription $RawDescription -StorageContext $StorageContext
+    $model = Get-FriendlyBootEntryCore -Guid $Guid -RawDescription $RawDescription -StorageContext $StorageContext -Locale (Get-ActiveLocale)
     $accent = switch ([string]$model.AccentRole) {
         'Accent' { $script:ColorAccent; break }
         'Blue' { $script:ColorBlue; break }
@@ -1488,7 +1488,7 @@ function Get-FirmwareBootState {
 
     $entries = @()
     foreach ($guid in $orderedGuids) {
-        $raw = if ($descriptions.ContainsKey($guid)) { [string]$descriptions[$guid] } else { 'Weiteres Startziel' }
+        $raw = if ($descriptions.ContainsKey($guid)) { [string]$descriptions[$guid] } else { '' }
         $entries += Get-FriendlyBootEntry -Guid $guid -RawDescription $raw -StorageContext $storageContext
     }
 

@@ -101,57 +101,67 @@ Assert-Equal @($g2.ToLowerInvariant()) @($ordered | ForEach-Object Guid) 'Entry 
 $orderedAll = @(Get-OrderedEntriesCore -Source $entries -Order @($g2,$g1) -Hidden @($g1) -IncludeHidden)
 Assert-Equal @($g2.ToLowerInvariant(),$g1.ToLowerInvariant()) @($orderedAll | ForEach-Object Guid) 'Entry ordering includes hidden when requested'
 
-$bootMenu = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'Boot Menu' -StorageContext $null
+$bootMenu = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'Boot Menu' -StorageContext $null -Locale 'de-DE'
 Assert-Equal 'Lenovo Boot-Menü' $bootMenu.Title 'Friendly model Boot Menu title'
 Assert-Equal 'Accent' $bootMenu.AccentRole 'Friendly model Boot Menu accent role'
-$nvme = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'NVMe0' -StorageContext $null
+$nvme = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'NVMe0' -StorageContext $null -Locale 'de-DE'
 Assert-Equal 'NVMe-SSD 1' $nvme.Title 'Friendly model NVMe title'
 Assert-Equal 'Blue' $nvme.AccentRole 'Friendly model NVMe accent role'
 $singleNvmeDisk = [pscustomobject]@{ Model='KXG8AZNV2T04 LA KIOXIA'; BusType='NVMe' }
 $singleNvmeStorage = [pscustomobject]@{ Disks=@($singleNvmeDisk); UsbResolution='None'; UsbResolutionReason='fixture'; UsbBootCandidates=@(); UsbDisks=@() }
-$nvme0Resolved = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'NVMe0' -StorageContext $singleNvmeStorage
+$nvme0Resolved = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'NVMe0' -StorageContext $singleNvmeStorage -Locale 'de-DE'
 Assert-Equal 'Interne SSD: KXG8AZNV2T04 LA KIOXIA' $nvme0Resolved.Subtitle 'Friendly NVMe0 single internal model'
-$nvme1Empty = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'NVMe1' -StorageContext $singleNvmeStorage
+$nvme1Empty = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'NVMe1' -StorageContext $singleNvmeStorage -Locale 'de-DE'
 Assert-Equal 'Kein Laufwerk erkannt' $nvme1Empty.Subtitle 'Friendly NVMe1 empty slot with one confirmed internal NVMe'
 $twoNvmeStorage = [pscustomobject]@{ Disks=@([pscustomobject]@{Model='A';BusType='NVMe'},[pscustomobject]@{Model='B';BusType='NVMe'}); UsbResolution='None'; UsbResolutionReason='fixture'; UsbBootCandidates=@(); UsbDisks=@() }
-$nvme0Ambiguous = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'NVMe0' -StorageContext $twoNvmeStorage
+$nvme0Ambiguous = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'NVMe0' -StorageContext $twoNvmeStorage -Locale 'de-DE'
 Assert-Equal 'Interne SSD' $nvme0Ambiguous.Subtitle 'Friendly NVMe0 does not guess multi-NVMe mapping'
-$nvme1Ambiguous = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'NVMe1' -StorageContext $twoNvmeStorage
+$nvme1Ambiguous = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'NVMe1' -StorageContext $twoNvmeStorage -Locale 'de-DE'
 Assert-Equal 'Zweite interne SSD' $nvme1Ambiguous.Subtitle 'Friendly NVMe1 does not guess multi-NVMe mapping'
-$unknown = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'Vendor Custom Loader' -StorageContext $null
+$unknown = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'Vendor Custom Loader' -StorageContext $null -Locale 'de-DE'
 Assert-Equal 'Vendor Custom Loader' $unknown.Title 'Friendly model preserves unknown description'
 Assert-Equal 'Secondary' $unknown.AccentRole 'Friendly model unknown accent role'
 $candidateDisk = [pscustomobject]@{Model='USB Test Disk'}
 $storage = [pscustomobject]@{ ResolvedUsbHdd=$candidateDisk; UsbResolution='Candidate'; UsbResolutionReason='fixture'; UsbBootCandidates=@($candidateDisk); UsbDisks=@($candidateDisk) }
-$usb = Get-FriendlyBootEntryCore -Guid $g2 -RawDescription 'USB HDD' -StorageContext $storage
+$usb = Get-FriendlyBootEntryCore -Guid $g2 -RawDescription 'USB HDD' -StorageContext $storage -Locale 'de-DE'
 Assert-Equal 'USB HDD' $usb.Title 'Friendly USB preserves firmware target title'
 Assert-Equal 'USB-Startmedium: USB Test Disk' $usb.Subtitle 'Friendly USB boot medium is contextual subtext'
 Assert-Equal 'Warning' $usb.AccentRole 'Friendly USB accent role'
 
 $nonBootDisk = [pscustomobject]@{Model='USB Data Disk'}
 $storageNonBoot = [pscustomobject]@{ ResolvedUsbHdd=$nonBootDisk; UsbResolution='Medium'; UsbResolutionReason='fixture'; UsbBootCandidates=@(); UsbDisks=@($nonBootDisk) }
-$usbNonBoot = Get-FriendlyBootEntryCore -Guid $g2 -RawDescription 'USB HDD' -StorageContext $storageNonBoot
+$usbNonBoot = Get-FriendlyBootEntryCore -Guid $g2 -RawDescription 'USB HDD' -StorageContext $storageNonBoot -Locale 'de-DE'
 Assert-Equal 'USB HDD' $usbNonBoot.Title 'Friendly USB non-boot media keeps firmware title'
 Assert-Equal 'USB Data Disk erkannt · nicht als Startmedium erkannt' $usbNonBoot.Subtitle 'Friendly USB non-boot medium text'
 
 $storageNone = [pscustomobject]@{ ResolvedUsbHdd=$null; UsbResolution='None'; UsbResolutionReason='fixture'; UsbBootCandidates=@(); UsbDisks=@() }
-$usbNone = Get-FriendlyBootEntryCore -Guid $g2 -RawDescription 'USB HDD' -StorageContext $storageNone
+$usbNone = Get-FriendlyBootEntryCore -Guid $g2 -RawDescription 'USB HDD' -StorageContext $storageNone -Locale 'de-DE'
 Assert-Equal 'Kein USB-Laufwerk angeschlossen' $usbNone.Subtitle 'Friendly USB no media text'
 
 $storageMultiNoBoot = [pscustomobject]@{ ResolvedUsbHdd=$null; UsbResolution='Ambiguous'; UsbResolutionReason='fixture'; UsbBootCandidates=@(); UsbDisks=@([pscustomobject]@{Model='A'},[pscustomobject]@{Model='B'}) }
-$usbMultiNoBoot = Get-FriendlyBootEntryCore -Guid $g2 -RawDescription 'USB HDD' -StorageContext $storageMultiNoBoot
+$usbMultiNoBoot = Get-FriendlyBootEntryCore -Guid $g2 -RawDescription 'USB HDD' -StorageContext $storageMultiNoBoot -Locale 'de-DE'
 Assert-Equal 'USB-Laufwerke erkannt · kein Startmedium gefunden' $usbMultiNoBoot.Subtitle 'Friendly USB multiple non-boot media text'
 
 $storageMultiBoot = [pscustomobject]@{ ResolvedUsbHdd=$null; UsbResolution='Ambiguous'; UsbResolutionReason='fixture'; UsbBootCandidates=@([pscustomobject]@{Model='A'},[pscustomobject]@{Model='B'}); UsbDisks=@([pscustomobject]@{Model='A'},[pscustomobject]@{Model='B'}) }
-$usbMultiBoot = Get-FriendlyBootEntryCore -Guid $g2 -RawDescription 'USB HDD' -StorageContext $storageMultiBoot
+$usbMultiBoot = Get-FriendlyBootEntryCore -Guid $g2 -RawDescription 'USB HDD' -StorageContext $storageMultiBoot -Locale 'de-DE'
 Assert-Equal 'Mehrere mögliche USB-Startmedien erkannt' $usbMultiBoot.Subtitle 'Friendly USB multiple boot candidates text'
 
-$usbPending = Get-FriendlyBootEntryCore -Guid $g2 -RawDescription 'USB HDD' -StorageContext $null
+$usbPending = Get-FriendlyBootEntryCore -Guid $g2 -RawDescription 'USB HDD' -StorageContext $null -Locale 'de-DE'
 Assert-Equal 'USB-Laufwerke werden geprüft …' $usbPending.Subtitle 'Friendly USB pending text'
 
 $storageUnavailable = [pscustomobject]@{ ResolvedUsbHdd=$null; UsbResolution='Unavailable'; UsbResolutionReason='fixture'; UsbBootCandidates=@(); UsbDisks=@() }
-$usbUnavailable = Get-FriendlyBootEntryCore -Guid $g2 -RawDescription 'USB HDD' -StorageContext $storageUnavailable
+$usbUnavailable = Get-FriendlyBootEntryCore -Guid $g2 -RawDescription 'USB HDD' -StorageContext $storageUnavailable -Locale 'de-DE'
 Assert-Equal 'USB-Laufwerke konnten nicht geprüft werden' $usbUnavailable.Subtitle 'Friendly USB unavailable text'
+
+$bootMenuEnglish = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'Boot Menu' -StorageContext $null -Locale 'en-US'
+Assert-Equal 'Lenovo Boot Menu' $bootMenuEnglish.Title 'Friendly model English Boot Menu title'
+Assert-Equal 'Open the boot menu on the next startup' $bootMenuEnglish.Subtitle 'Friendly model English Boot Menu subtitle'
+$nvmeEnglish = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'NVMe0' -StorageContext $singleNvmeStorage -Locale 'en-US'
+Assert-Equal 'Internal SSD: KXG8AZNV2T04 LA KIOXIA' $nvmeEnglish.Subtitle 'Friendly model English NVMe storage text'
+$usbEnglish = Get-FriendlyBootEntryCore -Guid $g2 -RawDescription 'USB HDD' -StorageContext $storage -Locale 'en-US'
+Assert-Equal 'USB boot medium: USB Test Disk' $usbEnglish.Subtitle 'Friendly model English USB boot-medium text'
+$unknownEnglish = Get-FriendlyBootEntryCore -Guid $g1 -RawDescription 'Vendor Custom Loader' -StorageContext $null -Locale 'en-US'
+Assert-Equal 'Vendor Custom Loader' $unknownEnglish.Title 'Friendly model keeps external firmware description untranslated'
 
 Write-Host "TOTAL $script:Pass/$script:Pass"
 exit 0

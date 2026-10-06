@@ -5,15 +5,17 @@ function Get-FriendlyBootEntryCore {
     param(
         [string]$Guid,
         [string]$RawDescription,
-        $StorageContext
+        $StorageContext,
+        [string]$Locale = 'en-US'
     )
 
-    $description = if ($RawDescription) { $RawDescription.Trim() } else { 'Weiteres Startziel' }
+    $localeId = Resolve-LocaleIdCore -Locale $Locale
+    $description = if ($RawDescription) { $RawDescription.Trim() } else { Get-LocalizedStringCore -Key 'Boot.OtherTarget' -Locale $localeId }
     $title = $description
-    $subtitle = 'Weiteres Startziel'
+    $subtitle = Get-LocalizedStringCore -Key 'Boot.OtherTarget' -Locale $localeId
     $accentRole = 'Secondary'
     $symbol = '●'
-    $typeTooltip = 'Grau: weiteres Startziel'
+    $typeTooltip = Get-LocalizedStringCore -Key 'Boot.OtherTargetTooltip' -Locale $localeId
 
     # The current target ThinkPad has NVMe0 confirmed as the populated internal slot.
     # A single read-only NVMe disk can therefore enrich NVMe0 and implies an empty NVMe1.
@@ -25,40 +27,40 @@ function Get-FriendlyBootEntryCore {
 
     switch -Regex ($description) {
         '^Boot Menu$' {
-            $title = 'Lenovo Boot-Menü'
-            $subtitle = 'Beim nächsten Start das Boot-Menü öffnen'
+            $title = Get-LocalizedStringCore -Key 'Boot.MenuTitle' -Locale $localeId
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.MenuSubtitle' -Locale $localeId
             $accentRole = 'Accent'
-            $typeTooltip = 'Rot: Lenovo Boot-Menü'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.MenuTooltip' -Locale $localeId
             break
         }
         '^NVMe0$' {
-            $title = 'NVMe-SSD 1'
+            $title = Get-LocalizedStringCore -Key 'Boot.Nvme1Title' -Locale $localeId
             if ($StorageContext -and $nvmeDisks.Count -eq 1) {
-                $subtitle = 'Interne SSD: ' + [string]$nvmeDisks[0].Model
+                $subtitle = Get-LocalizedStringCore -Key 'Storage.InternalSsdModel' -Locale $localeId -Values @{ Model=[string]$nvmeDisks[0].Model }
             }
             elseif ($StorageContext -and $nvmeDisks.Count -eq 0) {
-                $subtitle = 'Kein Laufwerk erkannt'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.NoDrive' -Locale $localeId
             }
             else {
-                $subtitle = 'Interne SSD'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.InternalSsd' -Locale $localeId
             }
             $accentRole = 'Blue'
-            $typeTooltip = 'Blau: interne SSD'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.InternalSsdTooltip' -Locale $localeId
             break
         }
         '^NVMe1$' {
-            $title = 'NVMe-SSD 2'
+            $title = Get-LocalizedStringCore -Key 'Boot.Nvme2Title' -Locale $localeId
             if ($StorageContext -and $nvmeDisks.Count -eq 1) {
-                $subtitle = 'Kein Laufwerk erkannt'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.NoDrive' -Locale $localeId
             }
             elseif ($StorageContext -and $nvmeDisks.Count -eq 0) {
-                $subtitle = 'Kein Laufwerk erkannt'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.NoDrive' -Locale $localeId
             }
             else {
-                $subtitle = 'Zweite interne SSD'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.SecondInternalSsd' -Locale $localeId
             }
             $accentRole = 'Blue'
-            $typeTooltip = 'Blau: interne SSD'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.InternalSsdTooltip' -Locale $localeId
             break
         }
         '^USB HDD$' {
@@ -66,89 +68,89 @@ function Get-FriendlyBootEntryCore {
             # presented only as read-only context and must never replace the target title.
             $title = 'USB HDD'
             $accentRole = 'Warning'
-            $typeTooltip = 'Gelb: USB-Laufwerk'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.UsbTooltip' -Locale $localeId
 
             if (-not $StorageContext) {
-                $subtitle = 'USB-Laufwerke werden geprüft …'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbChecking' -Locale $localeId
             }
             elseif ($StorageContext.UsbResolution -eq 'Unavailable') {
-                $subtitle = 'USB-Laufwerke konnten nicht geprüft werden'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbCheckFailed' -Locale $localeId
             }
             elseif ($StorageContext.UsbBootCandidates.Count -eq 1) {
                 $candidate = $StorageContext.UsbBootCandidates[0]
-                $subtitle = 'USB-Startmedium: ' + [string]$candidate.Model
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbBootMedium' -Locale $localeId -Values @{ Model=[string]$candidate.Model }
             }
             elseif ($StorageContext.UsbBootCandidates.Count -gt 1) {
-                $subtitle = 'Mehrere mögliche USB-Startmedien erkannt'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbMultipleBoot' -Locale $localeId
             }
             elseif ($StorageContext.UsbDisks.Count -eq 1) {
                 $medium = $StorageContext.UsbDisks[0]
-                $subtitle = ([string]$medium.Model) + ' erkannt · nicht als Startmedium erkannt'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbNonBoot' -Locale $localeId -Values @{ Model=[string]$medium.Model }
             }
             elseif ($StorageContext.UsbDisks.Count -gt 1) {
-                $subtitle = 'USB-Laufwerke erkannt · kein Startmedium gefunden'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbMultipleNoBoot' -Locale $localeId
             }
             elseif ($StorageContext.UsbDisks.Count -eq 0) {
-                $subtitle = 'Kein USB-Laufwerk angeschlossen'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbNone' -Locale $localeId
             }
             else {
-                $subtitle = 'USB-Laufwerke konnten nicht geprüft werden'
+                $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbCheckFailed' -Locale $localeId
             }
             break
         }
         '^USB FDD$' {
-            $title = 'USB-Diskettenlaufwerk'
-            $subtitle = 'Start von einem USB-Floppy-Laufwerk'
+            $title = Get-LocalizedStringCore -Key 'Boot.UsbFddTitle' -Locale $localeId
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbFddSubtitle' -Locale $localeId
             $accentRole = 'Warning'
-            $typeTooltip = 'Gelb: USB-Laufwerk'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.UsbTooltip' -Locale $localeId
             break
         }
         '^USB CD$' {
-            $title = 'USB-CD/DVD-Laufwerk'
-            $subtitle = 'Start von einem optischen USB-Laufwerk'
+            $title = Get-LocalizedStringCore -Key 'Boot.UsbCdTitle' -Locale $localeId
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.UsbCdSubtitle' -Locale $localeId
             $accentRole = 'Warning'
-            $typeTooltip = 'Gelb: USB-Laufwerk'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.UsbTooltip' -Locale $localeId
             break
         }
         '^PXE BOOT$' {
-            $title = 'Netzwerkstart'
-            $subtitle = 'Start über das lokale Netzwerk'
+            $title = Get-LocalizedStringCore -Key 'Boot.PxeTitle' -Locale $localeId
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.PxeSubtitle' -Locale $localeId
             $accentRole = 'Purple'
-            $typeTooltip = 'Violett: Netzwerkstart'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.PxeTooltip' -Locale $localeId
             break
         }
         '^LENOVO CLOUD$' {
-            $title = 'Lenovo Wiederherstellung'
-            $subtitle = 'Wiederherstellung über das Netzwerk'
+            $title = Get-LocalizedStringCore -Key 'Boot.LenovoRecoveryTitle' -Locale $localeId
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.LenovoRecoverySubtitle' -Locale $localeId
             $accentRole = 'Cyan'
-            $typeTooltip = 'Cyan: Lenovo- oder Firmen-Netzwerk'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.CyanTooltip' -Locale $localeId
             break
         }
         '^ON-PREMISE$' {
-            $title = 'Firmen-Netzwerkstart'
-            $subtitle = 'Start über das Firmennetzwerk'
+            $title = Get-LocalizedStringCore -Key 'Boot.CorporateTitle' -Locale $localeId
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.CorporateSubtitle' -Locale $localeId
             $accentRole = 'Cyan'
-            $typeTooltip = 'Cyan: Lenovo- oder Firmen-Netzwerk'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.CyanTooltip' -Locale $localeId
             break
         }
         '^Other HDD$' {
-            $title = 'Weiteres Laufwerk'
-            $subtitle = 'Weiteres erkanntes Laufwerk'
+            $title = Get-LocalizedStringCore -Key 'Boot.OtherDriveTitle' -Locale $localeId
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.OtherDriveSubtitle' -Locale $localeId
             $accentRole = 'Secondary'
-            $typeTooltip = 'Grau: weiteres Laufwerk'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.OtherDriveTooltip' -Locale $localeId
             break
         }
         '^Other CD$' {
-            $title = 'Weiteres CD/DVD-Laufwerk'
-            $subtitle = 'Anderes optisches Startlaufwerk'
+            $title = Get-LocalizedStringCore -Key 'Boot.OtherCdTitle' -Locale $localeId
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.OtherCdSubtitle' -Locale $localeId
             $accentRole = 'Secondary'
-            $typeTooltip = 'Grau: weiteres Startziel'
+            $typeTooltip = Get-LocalizedStringCore -Key 'Boot.OtherTargetTooltip' -Locale $localeId
             break
         }
         default {
             # Preserve unknown firmware descriptions rather than inventing a meaning.
             $title = $description
-            $subtitle = 'Weiteres Startziel'
+            $subtitle = Get-LocalizedStringCore -Key 'Boot.OtherTarget' -Locale $localeId
             $accentRole = 'Secondary'
         }
     }
