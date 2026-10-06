@@ -162,6 +162,7 @@ def main():
     # Security invariants remain in shell/installer, never in core.
     install=txt(root/'bin/Install-LenovoBootMenuTasks.ps1'); uninstall=txt(root/'bin/Uninstall-LenovoBootMenuTasks.ps1')
     taskbroker=txt(root/'src/Infrastructure/TaskBroker.ps1')
+    diagnostics=txt(root/'src/Infrastructure/RuntimeDiagnostics.ps1')
     runner=ps_function(taskbroker,'Invoke-AuthorizedTask') or ''
     s.contains('LBS-6 TaskBroker schema is hardened v0.2.13',tray,"$script:SupportedTaskBrokerVersions = @('0.2.13')")
     s.contains('LBS-6 installer schema is hardened v0.2.13',install,"$version = '0.2.13'")
@@ -176,7 +177,16 @@ def main():
     s.contains('Cleanup exact allowlist retained',uninstall,'$exactTaskNames = @(')
     s.contains('Cleanup owned prefixes retained',uninstall,'$ownedPrefixes = @(')
     s.check('LBS-6 canonical security boundary document exists',(root/'docs/SECURITY_BOUNDARY.md').is_file())
+    s.contains('v0.6.4.1 installer has explicit ACL mutation predicate',install,'function Test-TaskBrokerRightsContainMutation')
+    s.contains('v0.6.4.1 installer tests concrete write data bit',install,'FileSystemRights]::WriteData')
+    s.contains('v0.6.4.1 state validator delegates to ACL mutation predicate',install,'Test-TaskBrokerRightsContainMutation -Rights $rights')
+    s.contains('v0.6.4.1 diagnostics expose physical TaskBroker presence',diagnostics,'$present = [bool](Test-TaskBrokerInstallationPresent)')
+    s.contains('v0.6.4.1 diagnostics expose compatibility separately',diagnostics,'compatible = $compatible')
     s.check('LBS-6 native boundary test exists',(root/'tests/Test-TaskBrokerBoundary.ps1').is_file())
+    native_boundary=txt(root/'tests/Test-TaskBrokerBoundary.ps1')
+    s.contains('v0.6.4.1 native boundary covers ReadAndExecute',native_boundary,'ReadAndExecute is accepted as non-mutating')
+    s.contains('v0.6.4.1 native boundary covers Modify',native_boundary,'Modify is rejected as mutating')
+    s.contains('v0.6.4.1 native boundary covers FullControl',native_boundary,'FullControl is rejected as mutating')
     s.contains('LBS-6 native boundary test is aggregated',txt(root/'tests/Test-WindowsPowerShell51.ps1'),'Test-TaskBrokerBoundary.ps1')
 
     update_test=txt(root/'tests/Test-UpdateCore.ps1')
