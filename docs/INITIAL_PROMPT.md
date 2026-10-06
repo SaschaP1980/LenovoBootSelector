@@ -222,7 +222,7 @@ A separate promotion job depends on both candidate jobs. It revalidates their la
 
 The explicit dispatch is required because a push performed with `GITHUB_TOKEN` does not reliably trigger a recursive follow-up workflow.
 
-The initial LBS-20 policy is **always mandatory** while benchmark data is collected. A later policy change must be explicit, deterministic, tested, and documented.
+The permanent LBS-20 policy is **always mandatory** for Major, Minor, Patch, and Hotfix releases. The v0.6.9.0 production benchmark kept the complete candidate-to-release cycle at about 90 seconds, so the additional Windows coverage was judged worth the measured critical-path cost. Any later policy change must be explicit, deterministic, tested, and documented.
 
 ### Candidate failures
 

@@ -63,7 +63,9 @@ The explicit `workflow_dispatch` is mandatory because a `GITHUB_TOKEN` branch pu
 
 The Windows workflow also supports manual `workflow_dispatch` benchmark/retest runs. Those runs are Windows contract-suite evidence only; they are not physical Lenovo firmware/UEFI E2E.
 
-The initial LBS-20 execution policy is **always mandatory** while release-impact data is collected. The permanent policy is decided from measured critical-path impact and must remain explicit, deterministic, tested, and documented.
+The permanent LBS-20 execution policy is **always mandatory** for Major, Minor, Patch, and Hotfix releases.
+
+The v0.6.9.0 production benchmark measured the Windows job at about 25.0 seconds total (12.7 seconds setup, 1.3 seconds runtime preparation, 10.9 seconds tests), with 46/46 parser and 174/174 functional checks. Linux Candidate Preflight completed in about 4 seconds. The Windows path extended the candidate critical path by about 27.8 seconds, while the complete candidate-to-release cycle finished in about 90 seconds. This remains well within the project's 2–3 minute orchestration target, so the Windows gate is retained for every version level. Timing remains machine-readable through `CANDIDATE_TIMING_SUMMARY` for ongoing observation.
 
 ## GitHub publication
 

@@ -224,7 +224,11 @@ The Release Orchestrator independently requires successful `preflight/candidate`
 
 The Windows workflow also supports manual `workflow_dispatch` runs for benchmark/retest purposes. Manual runs do not count as a candidate gate and must not be reported as firmware/hardware E2E.
 
-The initial LBS-20 policy is **always mandatory** for Major, Minor, Patch, and Hotfix releases while benchmark data is collected. The permanent policy is decided from measured critical-path impact; any later policy change must remain explicit, deterministic, tested, and documented.
+The permanent LBS-20 policy is **always mandatory** for Major, Minor, Patch, and Hotfix releases.
+
+The first production benchmark was v0.6.9.0. Its Windows runner reported Windows PowerShell 5.1.26100.33438 with 46/46 parser checks and 174/174 functional contract checks. The Windows job took about 25.0 seconds total (about 12.7 seconds setup, 1.3 seconds runtime preparation, and 10.9 seconds test execution). Linux Candidate Preflight completed in about 4 seconds. Because both ran in parallel, the Windows gate owned the candidate critical path and added about 27.8 seconds relative to Linux completion. The complete candidate-start-to-release-complete cycle was about 90 seconds, still comfortably inside the project's roughly 2–3 minute orchestration target.
+
+Based on that measured critical-path impact and the additional Windows-specific coverage gained on every release, the gate remains mandatory for all version levels. Future timing data continues to be emitted by `CANDIDATE_TIMING_SUMMARY`; changing this policy requires an explicit, tested, documented release-process change.
 
 If either candidate gate fails, **no release branch exists yet**. Keep the same `candidate/v<version>` branch, apply the minimal fast-forward correction, and let the normal push rerun both mandatory paths. Do not create a parallel candidate or release branch.
 
