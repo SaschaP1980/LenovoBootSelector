@@ -27,6 +27,7 @@ Before planning or implementing a product change:
 3. Read **in full**:
    - `docs/GITHUB_HOWTO.md`
    - `docs/RELEASE_PROCESS.md`
+   - `docs/DEVELOPMENT_GUIDELINES.md`
    - `tests/README.md`
    - `bin/version.json`
 4. Read the executable release contracts:
@@ -56,7 +57,7 @@ Do **not** pick an arbitrary backlog item on your own when the user has not prov
 When information conflicts, use this precedence from strongest to weakest:
 
 1. current GitHub `main`, especially executable workflows, tools, and validators;
-2. current normative documents `docs/GITHUB_HOWTO.md` and `docs/RELEASE_PROCESS.md`;
+2. current normative documents `docs/GITHUB_HOWTO.md`, `docs/RELEASE_PROCESS.md`, and `docs/DEVELOPMENT_GUIDELINES.md`;
 3. current GitHub Issues including comments and acceptance evidence.
 
 No previous chat, model memory, handover artifact, local file, or prior source ZIP participates in the authority order. If durable project knowledge is needed for future work but is not represented in GitHub, treat that as an incomplete project record and capture it in the appropriate repository document, Issue/comment, test, workflow, or source change before relying on it.
@@ -84,6 +85,8 @@ Version format:
 `MAJOR.MINOR.PATCH.HOTFIX`
 
 Before implementation:
+
+For **MAJOR and MINOR** feature work, follow the persistent work-branch/checkpoint model in `docs/DEVELOPMENT_GUIDELINES.md`. Apply that model to PATCH work only when the user explicitly requests it or the Issue declares it.
 
 - **MAJOR:** a relevant GitHub Issue is mandatory.
 - **MINOR:** a relevant GitHub Issue is mandatory.

@@ -11,16 +11,17 @@ Mandatory order:
 1. **Read current `main` and record its SHA/tree.**
 2. **Read this `docs/GITHUB_HOWTO.md` in full from current `main`.**
 3. **Read `docs/RELEASE_PROCESS.md` in full.**
-4. For Issue-backed work, read the **current GitHub Issue** including state, labels, comments, and acceptance criteria.
-5. Read **`bin/version.json`** and verify current version, `releaseProfile`, `protectedFragmentIntent`, and `repositoryDeleteIntent`.
-6. Read the relevant executable contracts:
+4. **Read `docs/DEVELOPMENT_GUIDELINES.md` in full** for Major/Minor work and whenever the user explicitly requests the work-branch/checkpoint model.
+5. For Issue-backed work, read the **current GitHub Issue** including state, labels, comments, and acceptance criteria.
+6. Read **`bin/version.json`** and verify current version, `releaseProfile`, `protectedFragmentIntent`, and `repositoryDeleteIntent`.
+7. Read the relevant executable contracts:
    - `.github/workflows/candidate-preflight.yml`
    - `.github/workflows/windows-powershell51.yml`
    - `.github/workflows/release.yml`
    - `tools/candidate_preflight.py`
    - `tools/release_verification.py`
    - the four permanent validators under `tests/`
-7. Only then determine scope, target version, and implementation/release plan and prepare changes.
+8. Only then determine scope, target version, and implementation/release plan and prepare changes.
 
 ### Authority order
 
@@ -481,6 +482,23 @@ Local/container checks built from connector-fetched files may be used as focused
 
 This is the preferred recovery path for the recurring ChatGPT-runtime condition where direct GitHub cloning is unavailable.
 
+### Repository archive / ZIP materialization limitation
+
+The current connector may provide file/ref/Git-object operations without providing a general repository archive/zipball materialization action. This is an execution-tool limitation, **not a work-branch limitation**.
+
+A `work/**` branch is a normal Git ref and is not inherently less cloneable/downloadable than `main`. The limitation becomes more visible during work-branch development only because the newest intermediate tree exists on GitHub and a local full worktree would be convenient for repository-wide build/validation.
+
+If repository-archive materialization is unavailable and direct container GitHub access also fails:
+
+- do not repeatedly try clone/ZIP/archive variants;
+- do not interpret the failure as a repository or branch defect;
+- do not fall back to a stale Source ZIP;
+- stay connector-first for canonical reads/writes;
+- prefer a GitHub-hosted workflow for operations that genuinely need a full worktree;
+- record any resulting precheck limitation rather than compensating with increasingly elaborate ad-hoc reconstruction.
+
+LBS-17/v0.8.0.0 established this rule: the connector had no general archive action and the container could not resolve `github.com`; neither condition was caused by `work/LBS-17`.
+
 ### Branch deletion limitation
 
 The currently available connector can create/read/move branch refs but does not expose a general delete-branch/delete-ref action.
@@ -492,6 +510,14 @@ Consequences:
 - A branch push made by a GitHub Actions job with `GITHUB_TOKEN` does not normally trigger another workflow. Cross-workflow promotion therefore uses explicit `workflow_dispatch`; do not rely on recursive push triggering.
 - If another stale branch must be deleted and no workflow owns its cleanup, report the connector limitation rather than pretending it was removed.
 - A stale branch must never be reused merely to avoid creating a new branch.
+
+### Bounded connector orchestration
+
+Do not compose dozens of GitHub reads/writes into one connector/code-mode call. Use small bounded batches (typically about 5–8 nested GitHub actions), then persist/verify state before the next batch.
+
+After any orchestration error, re-read the branch ref and `main` before retrying. Partial Git-object side effects may exist even when the visible branch did not move.
+
+For long-running Major/Minor work, the complete checkpoint/session-resilience rules are defined in `docs/DEVELOPMENT_GUIDELINES.md`.
 
 ### Atomic Git-object preparation
 
