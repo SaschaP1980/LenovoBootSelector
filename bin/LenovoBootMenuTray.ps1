@@ -920,7 +920,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.6.2.2'
+$script:AppVersion = '0.6.3.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -1176,6 +1176,9 @@ function Resolve-LenovoUpdateRestartResultCore {
     $resultUtc = ''
     $rollbackAttempted = $false
     $rollbackSucceeded = $false
+    $failureCategory = ''
+    $failureStage = ''
+    $errorClass = ''
     $legacySuccessProperty = $null
     if ($Result) {
         $status = ([string]$Result.status).Trim().ToLowerInvariant()
@@ -1185,6 +1188,9 @@ function Resolve-LenovoUpdateRestartResultCore {
         $resultUtc = [string]$Result.utc
         $rollbackAttempted = [bool]$Result.rollbackAttempted
         $rollbackSucceeded = [bool]$Result.rollbackSucceeded
+        $failureCategory = ([string]$Result.failureCategory).Trim().ToLowerInvariant()
+        $failureStage = ([string]$Result.failureStage).Trim()
+        $errorClass = ([string]$Result.errorClass).Trim()
         $legacySuccessProperty = $Result.PSObject.Properties['success']
     }
 
@@ -1253,6 +1259,9 @@ function Resolve-LenovoUpdateRestartResultCore {
         RunningVersion = $running
         RollbackAttempted = $rollbackAttempted
         RollbackSucceeded = $rollbackSucceeded
+        FailureCategory = $failureCategory
+        FailureStage = $failureStage
+        ErrorClass = $errorClass
         StoredMessage = $storedMessage
     }
 }
@@ -1863,6 +1872,85 @@ function Get-LenovoUpdateDownloadBaseUri {
     return 'https://raw.githubusercontent.com/SaschaP1980/LenovoBootSelector/main/downloads/'
 }
 
+function Enable-LenovoUpdateTls12 {
+    try {
+        $current = [System.Net.ServicePointManager]::SecurityProtocol
+        [System.Net.ServicePointManager]::SecurityProtocol = $current -bor [System.Net.SecurityProtocolType]::Tls12
+    } catch { }
+}
+
+function New-LenovoWebClient {
+    Enable-LenovoUpdateTls12
+    $client = New-Object System.Net.WebClient
+    $client.Headers['User-Agent'] = 'LenovoBootSelector/' + $script:AppVersion
+    $client.Headers['Cache-Control'] = 'no-cache'
+    return $client
+}
+
+function New-LenovoUpdateFailureException {
+    param(
+        [Parameter(Mandatory=$true)][ValidateSet('network','manifest','package','hash','install','restart','runtime')][string]$Category,
+        [Parameter(Mandatory=$true)][string]$Stage,
+        [Parameter(Mandatory=$true)][string]$Message,
+        [AllowNull()][System.Exception]$InnerException = $null
+    )
+    $exception = if ($InnerException) { [System.InvalidOperationException]::new($Message,$InnerException) } else { [System.InvalidOperationException]::new($Message) }
+    $exception.Data['LenovoUpdateCategory'] = $Category
+    $exception.Data['LenovoUpdateStage'] = $Stage
+    return $exception
+}
+
+function Get-LenovoUpdateFailureInfo {
+    param(
+        [AllowNull()]$ErrorRecord,
+        [ValidateSet('network','manifest','package','hash','install','restart','runtime')][string]$DefaultCategory = 'runtime',
+        [string]$DefaultStage = 'update'
+    )
+    $exception = $null
+    if ($ErrorRecord -is [System.Management.Automation.ErrorRecord]) { $exception = $ErrorRecord.Exception }
+    elseif ($ErrorRecord -is [System.Exception]) { $exception = $ErrorRecord }
+    elseif ($ErrorRecord -and $ErrorRecord.Exception) { $exception = $ErrorRecord.Exception }
+    $category = $DefaultCategory
+    $stage = $DefaultStage
+    $errorClass = ''
+    $networkStatus = ''
+    $message = [string]$ErrorRecord
+    if ($exception) {
+        $message = [string]$exception.Message
+        $errorClass = $exception.GetType().FullName
+        $hasStructuredCategory = $exception.Data.Contains('LenovoUpdateCategory')
+        if ($hasStructuredCategory) { $category = [string]$exception.Data['LenovoUpdateCategory'] }
+        if ($exception.Data.Contains('LenovoUpdateStage')) { $stage = [string]$exception.Data['LenovoUpdateStage'] }
+        $probe = $exception
+        while ($probe) {
+            if ($probe -is [System.Net.WebException]) {
+                if (-not $hasStructuredCategory) { $category = 'network' }
+                $networkStatus = [string]$probe.Status
+                $errorClass = $probe.GetType().FullName
+                break
+            }
+            $probe = $probe.InnerException
+        }
+    }
+    return [pscustomobject][ordered]@{ Category=$category; Stage=$stage; ErrorClass=$errorClass; NetworkStatus=$networkStatus; Message=$message }
+}
+
+function Invoke-LenovoUpdateTextDownload {
+    param([Parameter(Mandatory=$true)][uri]$Uri)
+    $client = New-LenovoWebClient
+    try { return $client.DownloadString($Uri) }
+    catch { throw (New-LenovoUpdateFailureException -Category 'network' -Stage 'manifest-download' -Message ('Update-Manifest konnte nicht geladen werden: ' + $_.Exception.Message) -InnerException $_.Exception) }
+    finally { $client.Dispose() }
+}
+
+function Invoke-LenovoUpdateFileDownload {
+    param([Parameter(Mandatory=$true)][uri]$Uri,[Parameter(Mandatory=$true)][string]$DestinationPath)
+    $client = New-LenovoWebClient
+    try { $client.DownloadFile($Uri,$DestinationPath) }
+    catch { throw (New-LenovoUpdateFailureException -Category 'network' -Stage 'package-download' -Message ('Update-Paket konnte nicht geladen werden: ' + $_.Exception.Message) -InnerException $_.Exception) }
+    finally { $client.Dispose() }
+}
+
 function Get-LenovoUpdateResultPath {
     $root = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray\Updates'
     return (Join-Path $root 'last-update-result.json')
@@ -1897,31 +1985,13 @@ function Remove-LenovoUpdateResult {
     } catch { }
 }
 
-function Enable-LenovoUpdateTls12 {
-    try {
-        $current = [System.Net.ServicePointManager]::SecurityProtocol
-        [System.Net.ServicePointManager]::SecurityProtocol = $current -bor [System.Net.SecurityProtocolType]::Tls12
-    } catch { }
-}
-
-function New-LenovoWebClient {
-    Enable-LenovoUpdateTls12
-    $client = New-Object System.Net.WebClient
-    $client.Headers['User-Agent'] = 'LenovoBootSelector/' + $script:AppVersion
-    $client.Headers['Cache-Control'] = 'no-cache'
-    return $client
-}
 
 function Get-LenovoUpdateManifestRemote {
-    $client = New-LenovoWebClient
-    try {
-        $json = $client.DownloadString((Get-LenovoUpdateManifestUri))
-        if ([string]::IsNullOrWhiteSpace($json)) { throw 'Update-Manifest ist leer.' }
-        return ($json | ConvertFrom-Json)
-    }
-    finally { $client.Dispose() }
+    $json = Invoke-LenovoUpdateTextDownload -Uri (Get-LenovoUpdateManifestUri)
+    if ([string]::IsNullOrWhiteSpace($json)) { throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-content' -Message 'Update-Manifest ist leer.') }
+    try { return ($json | ConvertFrom-Json) }
+    catch { throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-parse' -Message ('Update-Manifest ist kein gültiges JSON: ' + $_.Exception.Message) -InnerException $_.Exception) }
 }
-
 function Get-LenovoSha256Hex {
     param([Parameter(Mandatory=$true)][string]$Path)
     $sha = [System.Security.Cryptography.SHA256]::Create()
@@ -1942,22 +2012,24 @@ function Write-LenovoUpdateWorkerResult {
     [System.IO.File]::WriteAllText($Path,$json,(New-Object System.Text.UTF8Encoding($false)))
 }
 
+
 function Invoke-UpdateCheckWorker {
-    $result = [ordered]@{ Success=$false; UpdateAvailable=$false; Manifest=$null; Error='' }
+    $result = [ordered]@{ Success=$false; UpdateAvailable=$false; Manifest=$null; Error=''; ErrorCategory=''; FailureStage=''; ErrorClass=''; NetworkStatus='' }
     try {
         $raw = Get-LenovoUpdateManifestRemote
         $validated = Test-LenovoUpdateManifestCore -Manifest $raw
-        if (-not $validated.IsValid) { throw $validated.Error }
+        if (-not $validated.IsValid) { throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-validation' -Message $validated.Error) }
         $comparison = Compare-LenovoAppVersionCore -Current $script:AppVersion -Candidate $validated.Version
-        $result.Success = $true
-        $result.UpdateAvailable = ($comparison -gt 0)
-        $result.Manifest = $validated
+        $result.Success = $true; $result.UpdateAvailable = ($comparison -gt 0); $result.Manifest = $validated
     }
-    catch { $result.Error = $_.Exception.Message }
+    catch {
+        $failure = Get-LenovoUpdateFailureInfo -ErrorRecord $_ -DefaultCategory 'runtime' -DefaultStage 'update-check'
+        $result.Error=$failure.Message; $result.ErrorCategory=$failure.Category; $result.FailureStage=$failure.Stage; $result.ErrorClass=$failure.ErrorClass; $result.NetworkStatus=$failure.NetworkStatus
+    }
+    Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_WORKER_COMPLETED' -Stage $(if ($result.FailureStage) { [string]$result.FailureStage } else { 'update-check' }) -Success ([bool]$result.Success) -Data (New-RuntimeDiagnosticData @{ updateAvailable=[bool]$result.UpdateAvailable; errorCategory=[string]$result.ErrorCategory; failureStage=[string]$result.FailureStage; errorClass=[string]$result.ErrorClass; networkStatus=[string]$result.NetworkStatus; workerError=[string]$result.Error }) -Level $(if ($result.Success) { 'info' } else { 'warning' })
     if ($UpdateResultPath) { Write-LenovoUpdateWorkerResult -Path $UpdateResultPath -Value ([pscustomobject]$result) }
     return $(if ($result.Success) { 0 } else { 1 })
 }
-
 function Start-UpdateCheckWorkerProcess {
     param([Parameter(Mandatory=$true)][string]$ResultPath,[string]$RuntimeSessionId)
     $powershell = Join-Path $PSHOME 'powershell.exe'
@@ -1973,85 +2045,69 @@ function Start-UpdateCheckWorkerProcess {
     return [System.Diagnostics.Process]::Start($psi)
 }
 
+
 function Test-LenovoUpdatePackageZip {
     param([Parameter(Mandatory=$true)][string]$ZipPath,[Parameter(Mandatory=$true)]$Manifest)
     Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
-    $archive = [System.IO.Compression.ZipFile]::OpenRead($ZipPath)
+    try { $archive = [System.IO.Compression.ZipFile]::OpenRead($ZipPath) }
+    catch { throw (New-LenovoUpdateFailureException -Category 'package' -Stage 'package-structure' -Message ('Update-ZIP konnte nicht geöffnet werden: ' + $_.Exception.Message) -InnerException $_.Exception) }
     try {
-        $names = @()
-        foreach ($entry in @($archive.Entries)) {
-            $name = [string]$entry.FullName
-            if ([string]::IsNullOrWhiteSpace($name)) { throw 'Update-ZIP enthält einen leeren Pfad.' }
-            if ($name.Contains('..') -or $name.Contains('/') -or $name.Contains('\')) { throw 'Update-ZIP enthält einen unzulässigen Pfad.' }
-            if ($entry.Length -lt 0) { throw 'Update-ZIP enthält einen ungültigen Eintrag.' }
-            $names += $name
+        $names=@()
+        foreach($entry in @($archive.Entries)) {
+            $name=[string]$entry.FullName
+            if ([string]::IsNullOrWhiteSpace($name)) { throw (New-LenovoUpdateFailureException -Category 'package' -Stage 'package-structure' -Message 'Update-ZIP enthält einen leeren Pfad.') }
+            if ($name.Contains('..') -or $name.Contains('/') -or $name.Contains('\')) { throw (New-LenovoUpdateFailureException -Category 'package' -Stage 'package-structure' -Message 'Update-ZIP enthält einen unzulässigen Pfad.') }
+            if ($entry.Length -lt 0) { throw (New-LenovoUpdateFailureException -Category 'package' -Stage 'package-structure' -Message 'Update-ZIP enthält einen ungültigen Eintrag.') }
+            $names+=$name
         }
-        $expected = @($Manifest.PackageFiles | Sort-Object)
-        $actual = @($names | Sort-Object)
-        if ($expected.Count -ne $actual.Count) { throw 'Update-ZIP enthält nicht die erwartete Anzahl Dateien.' }
-        for ($i=0;$i -lt $expected.Count;$i++) {
-            if ([string]$expected[$i] -ne [string]$actual[$i]) { throw 'Update-ZIP-Dateiliste stimmt nicht mit dem Manifest überein.' }
-        }
-    }
-    finally { $archive.Dispose() }
+        $expected=@($Manifest.PackageFiles|Sort-Object); $actual=@($names|Sort-Object)
+        if ($expected.Count -ne $actual.Count) { throw (New-LenovoUpdateFailureException -Category 'package' -Stage 'package-structure' -Message 'Update-ZIP enthält nicht die erwartete Anzahl Dateien.') }
+        for($i=0;$i -lt $expected.Count;$i++){ if([string]$expected[$i] -ne [string]$actual[$i]){ throw (New-LenovoUpdateFailureException -Category 'package' -Stage 'package-structure' -Message 'Update-ZIP-Dateiliste stimmt nicht mit dem Manifest überein.') } }
+    } finally { $archive.Dispose() }
 }
 
 function Prepare-LenovoUpdatePackage {
     param([Parameter(Mandatory=$true)]$Manifest)
-    $updateRoot = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray\Updates'
-    if (-not (Test-Path -LiteralPath $updateRoot)) { [void](New-Item -ItemType Directory -Path $updateRoot -Force) }
-    $work = Join-Path $updateRoot (('{0}-{1}' -f $Manifest.Version,([guid]::NewGuid().ToString('N'))))
-    $payload = Join-Path $work 'payload'
-    [void](New-Item -ItemType Directory -Path $payload -Force)
-    $zipPath = Join-Path $work ([string]$Manifest.File)
-    $manifestPath = Join-Path $work 'manifest.json'
-    [System.IO.File]::WriteAllText($manifestPath,($Manifest | ConvertTo-Json -Depth 10),(New-Object System.Text.UTF8Encoding($false)))
-
-    $client = New-LenovoWebClient
+    $updateRoot=Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray\Updates'
     try {
-        $uri = (Get-LenovoUpdateDownloadBaseUri) + [Uri]::EscapeDataString([string]$Manifest.File)
-        $client.DownloadFile($uri,$zipPath)
-    }
-    finally { $client.Dispose() }
-
-    $length = (Get-Item -LiteralPath $zipPath).Length
-    if ([int64]$length -ne [int64]$Manifest.Size) { throw 'Update-Dateigröße stimmt nicht mit dem Manifest überein.' }
-    $actualSha = Get-LenovoSha256Hex -Path $zipPath
-    if ($actualSha -ne ([string]$Manifest.Sha256).ToLowerInvariant()) { throw 'Update-SHA-256 stimmt nicht mit dem Manifest überein.' }
-
+        if(-not(Test-Path -LiteralPath $updateRoot)){[void](New-Item -ItemType Directory -Path $updateRoot -Force)}
+        $work=Join-Path $updateRoot (('{0}-{1}' -f $Manifest.Version,([guid]::NewGuid().ToString('N')))); $payload=Join-Path $work 'payload'
+        [void](New-Item -ItemType Directory -Path $payload -Force); $zipPath=Join-Path $work ([string]$Manifest.File); $manifestPath=Join-Path $work 'manifest.json'
+        [System.IO.File]::WriteAllText($manifestPath,($Manifest|ConvertTo-Json -Depth 10),(New-Object System.Text.UTF8Encoding($false)))
+    } catch { throw (New-LenovoUpdateFailureException -Category 'package' -Stage 'package-workspace' -Message ('Update-Arbeitsverzeichnis konnte nicht vorbereitet werden: '+$_.Exception.Message) -InnerException $_.Exception) }
+    $uri=(Get-LenovoUpdateDownloadBaseUri)+[Uri]::EscapeDataString([string]$Manifest.File); Invoke-LenovoUpdateFileDownload -Uri $uri -DestinationPath $zipPath
+    $length=(Get-Item -LiteralPath $zipPath).Length
+    if([int64]$length -ne [int64]$Manifest.Size){throw (New-LenovoUpdateFailureException -Category 'package' -Stage 'package-size' -Message 'Update-Dateigröße stimmt nicht mit dem Manifest überein.')}
+    try{$actualSha=Get-LenovoSha256Hex -Path $zipPath}catch{throw (New-LenovoUpdateFailureException -Category 'hash' -Stage 'package-hash' -Message ('Update-SHA-256 konnte nicht berechnet werden: '+$_.Exception.Message) -InnerException $_.Exception)}
+    if($actualSha -ne ([string]$Manifest.Sha256).ToLowerInvariant()){throw (New-LenovoUpdateFailureException -Category 'hash' -Stage 'package-hash' -Message 'Update-SHA-256 stimmt nicht mit dem Manifest überein.')}
     Test-LenovoUpdatePackageZip -ZipPath $zipPath -Manifest $Manifest
     Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($zipPath,$payload)
-
-    $runtimePath = Join-Path $payload 'LenovoBootMenuTray.ps1'
-    if (-not (Test-Path -LiteralPath $runtimePath -PathType Leaf)) { throw 'Update-Runtime fehlt im Paket.' }
-    $runtimeText = [System.IO.File]::ReadAllText($runtimePath,[System.Text.Encoding]::UTF8)
-    $versionNeedle = ('$script:AppVersion = ''{0}''' -f [string]$Manifest.Version)
-    if (-not $runtimeText.Contains($versionNeedle)) { throw 'Update-Runtime-Version stimmt nicht mit dem Manifest überein.' }
-
-    return [pscustomobject]@{ WorkDir=$work; PayloadDir=$payload; ManifestPath=$manifestPath; Version=[string]$Manifest.Version }
+    try{[System.IO.Compression.ZipFile]::ExtractToDirectory($zipPath,$payload)}catch{throw (New-LenovoUpdateFailureException -Category 'package' -Stage 'package-extract' -Message ('Update-ZIP konnte nicht entpackt werden: '+$_.Exception.Message) -InnerException $_.Exception)}
+    $runtimePath=Join-Path $payload 'LenovoBootMenuTray.ps1'
+    if(-not(Test-Path -LiteralPath $runtimePath -PathType Leaf)){throw (New-LenovoUpdateFailureException -Category 'package' -Stage 'package-runtime' -Message 'Update-Runtime fehlt im Paket.')}
+    $runtimeText=[System.IO.File]::ReadAllText($runtimePath,[System.Text.Encoding]::UTF8); $versionNeedle=('$script:AppVersion = ''{0}''' -f [string]$Manifest.Version)
+    if(-not $runtimeText.Contains($versionNeedle)){throw (New-LenovoUpdateFailureException -Category 'package' -Stage 'package-runtime' -Message 'Update-Runtime-Version stimmt nicht mit dem Manifest überein.')}
+    return [pscustomobject]@{WorkDir=$work;PayloadDir=$payload;ManifestPath=$manifestPath;Version=[string]$Manifest.Version}
 }
 
 function Invoke-UpdatePrepareWorker {
-    $result = [ordered]@{ Success=$false; WorkDir=''; PayloadDir=''; ManifestPath=''; Version=''; Error='' }
+    $result=[ordered]@{Success=$false;WorkDir='';PayloadDir='';ManifestPath='';Version='';Error='';ErrorCategory='';FailureStage='';ErrorClass='';NetworkStatus=''}
     try {
-        if (-not $UpdateManifestPath -or -not (Test-Path -LiteralPath $UpdateManifestPath -PathType Leaf)) { throw 'Update-Manifestdatei fehlt.' }
-        $raw = [System.IO.File]::ReadAllText($UpdateManifestPath,[System.Text.Encoding]::UTF8) | ConvertFrom-Json
-        $validated = Test-LenovoUpdateManifestCore -Manifest $raw
-        if (-not $validated.IsValid) { throw $validated.Error }
-        if ((Compare-LenovoAppVersionCore -Current $script:AppVersion -Candidate $validated.Version) -le 0) { throw 'Es liegt keine neuere Version vor.' }
-        $prepared = Prepare-LenovoUpdatePackage -Manifest $validated
-        $result.Success = $true
-        $result.WorkDir = $prepared.WorkDir
-        $result.PayloadDir = $prepared.PayloadDir
-        $result.ManifestPath = $prepared.ManifestPath
-        $result.Version = $prepared.Version
+        if(-not $UpdateManifestPath -or -not(Test-Path -LiteralPath $UpdateManifestPath -PathType Leaf)){throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-input' -Message 'Update-Manifestdatei fehlt.')}
+        try{$manifestJson=[System.IO.File]::ReadAllText($UpdateManifestPath,[System.Text.Encoding]::UTF8)}catch{throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-input' -Message ('Update-Manifestdatei konnte nicht gelesen werden: '+$_.Exception.Message) -InnerException $_.Exception)}
+        try{$raw=$manifestJson|ConvertFrom-Json}catch{throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-parse' -Message ('Update-Manifest ist kein gültiges JSON: '+$_.Exception.Message) -InnerException $_.Exception)}
+        $validated=Test-LenovoUpdateManifestCore -Manifest $raw
+        if(-not $validated.IsValid){throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-validation' -Message $validated.Error)}
+        if((Compare-LenovoAppVersionCore -Current $script:AppVersion -Candidate $validated.Version) -le 0){throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'version-eligibility' -Message 'Es liegt keine neuere Version vor.')}
+        $prepared=Prepare-LenovoUpdatePackage -Manifest $validated; $result.Success=$true; $result.WorkDir=$prepared.WorkDir; $result.PayloadDir=$prepared.PayloadDir; $result.ManifestPath=$prepared.ManifestPath; $result.Version=$prepared.Version
+    } catch {
+        $failure=Get-LenovoUpdateFailureInfo -ErrorRecord $_ -DefaultCategory 'runtime' -DefaultStage 'update-prepare'
+        $result.Error=$failure.Message; $result.ErrorCategory=$failure.Category; $result.FailureStage=$failure.Stage; $result.ErrorClass=$failure.ErrorClass; $result.NetworkStatus=$failure.NetworkStatus
     }
-    catch { $result.Error = $_.Exception.Message }
-    if ($UpdateResultPath) { Write-LenovoUpdateWorkerResult -Path $UpdateResultPath -Value ([pscustomobject]$result) }
-    return $(if ($result.Success) { 0 } else { 1 })
+    Write-RuntimeDiagnosticEvent -Event 'UPDATE_PREPARE_WORKER_COMPLETED' -Stage $(if($result.FailureStage){[string]$result.FailureStage}else{'update-prepare'}) -Success ([bool]$result.Success) -Data (New-RuntimeDiagnosticData @{version=[string]$result.Version;errorCategory=[string]$result.ErrorCategory;failureStage=[string]$result.FailureStage;errorClass=[string]$result.ErrorClass;networkStatus=[string]$result.NetworkStatus;workerError=[string]$result.Error}) -Level $(if($result.Success){'info'}else{'error'})
+    if($UpdateResultPath){Write-LenovoUpdateWorkerResult -Path $UpdateResultPath -Value ([pscustomobject]$result)}
+    return $(if($result.Success){0}else{1})
 }
-
 function Start-UpdatePrepareWorkerProcess {
     param(
         [Parameter(Mandatory=$true)][string]$ManifestPath,
@@ -2099,6 +2155,9 @@ $resultPath = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray\Updates\last-up
 $targetVersion = ''
 $rollbackAttempted = $false
 $rollbackSucceeded = $false
+$failureCategory = ''
+$failureStage = ''
+$errorClass = ''
 function Write-Result([string]$Status,[string]$Message) {
     $parent = Split-Path -Parent $resultPath
     if ($parent -and -not (Test-Path -LiteralPath $parent)) { [void](New-Item -ItemType Directory -Path $parent -Force) }
@@ -2111,6 +2170,9 @@ function Write-Result([string]$Status,[string]$Message) {
         message=$Message
         rollbackAttempted=[bool]$rollbackAttempted
         rollbackSucceeded=[bool]$rollbackSucceeded
+        failureCategory=[string]$failureCategory
+        failureStage=[string]$failureStage
+        errorClass=[string]$errorClass
     }
     [System.IO.File]::WriteAllText($resultPath,($obj|ConvertTo-Json -Compress),(New-Object System.Text.UTF8Encoding($false)))
 }
@@ -2129,12 +2191,14 @@ function Show-UpdateError([string]$Message) {
     try { Add-Type -AssemblyName System.Windows.Forms; [void][System.Windows.Forms.MessageBox]::Show($Message,'Lenovo Boot Selector – Update',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) } catch { }
 }
 try {
+    $failureCategory='manifest'; $failureStage='install-manifest'; $errorClass=''
     try { $parent=[System.Diagnostics.Process]::GetProcessById($ParentPid); [void]$parent.WaitForExit(30000) } catch { }
     if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw 'Manifest fehlt.' }
     $manifest=[System.IO.File]::ReadAllText($manifestPath,[System.Text.Encoding]::UTF8)|ConvertFrom-Json
     $targetVersion=[string]$manifest.version
     $files=@($manifest.packageFiles)
     if ($files.Count -lt 1) { throw 'Paketdateien fehlen.' }
+    $failureCategory='install'; $failureStage='backup'; $errorClass=''
     if (Test-Path -LiteralPath $backup) { Remove-Item -LiteralPath $backup -Recurse -Force }
     [void](New-Item -ItemType Directory -Path $backup -Force)
     $existing=@{}
@@ -2149,20 +2213,27 @@ try {
         else { $existing[[string]$name]=$false }
     }
     try {
+        $failureCategory='install'; $failureStage='install-files'; $errorClass=''
         foreach($name in $files) {
             Copy-Item -LiteralPath (Join-Path $payload ([string]$name)) -Destination (Join-Path $InstallDir ([string]$name)) -Force
         }
         # Success is intentionally not declared here. The restarted tray must prove
         # that the expected target version is actually running before showing success.
+        $failureCategory=''; $failureStage=''; $errorClass=''
         Write-Result 'pending-verification' ('Update auf v' + $targetVersion + ' installiert; Neustart-Verifikation ausstehend.')
+        $failureCategory='restart'; $failureStage='restart-after-install'; $errorClass=''
         $started = Restart-InstalledApp
         if (-not $started) { throw 'Lenovo Boot Selector konnte nach dem Update nicht neu gestartet werden.' }
         try { $started.Dispose() } catch { }
     }
     catch {
         $installError=$_.Exception.Message
+        $primaryFailureCategory=$failureCategory
+        $primaryFailureStage=$failureStage
+        $primaryErrorClass=$_.Exception.GetType().FullName
         # ROLLBACK: restore every previous managed file and remove newly introduced files.
         $rollbackAttempted=$true
+        $failureCategory='install'; $failureStage='rollback'; $errorClass=''
         try {
             foreach($name in $files) {
                 $target=Join-Path $InstallDir ([string]$name)
@@ -2180,12 +2251,18 @@ try {
             $rollbackSucceeded=$false
             throw ($installError + ' | Rollback fehlgeschlagen: ' + $_.Exception.Message)
         }
+        $failureCategory=$primaryFailureCategory
+        $failureStage=$primaryFailureStage
+        $errorClass=$primaryErrorClass
         throw $installError
     }
     try { Remove-Item -LiteralPath $WorkDir -Recurse -Force -ErrorAction SilentlyContinue } catch { }
 }
 catch {
     $failureMessage=$_.Exception.Message
+    if (-not $errorClass) { $errorClass=$_.Exception.GetType().FullName }
+    if (-not $failureCategory) { $failureCategory='install' }
+    if (-not $failureStage) { $failureStage='install' }
     Write-Result 'failed' $failureMessage
     try {
         $restart = Restart-InstalledApp
@@ -2251,6 +2328,9 @@ function Show-PendingUpdateResultOnStartup {
         runningVersion = $resolved.RunningVersion
         rollbackAttempted = $resolved.RollbackAttempted
         rollbackSucceeded = $resolved.RollbackSucceeded
+        failureCategory = $resolved.FailureCategory
+        failureStage = $resolved.FailureStage
+        errorClass = $resolved.ErrorClass
         resultMessage = $resolved.StoredMessage
     }) -Level $(if ($resolved.Success) { 'info' } else { 'error' })
 
@@ -2283,19 +2363,26 @@ function Stop-UpdateCheckUiWorker {
     if ($script:UpdateState.CheckProcess) { try { $script:UpdateState.CheckProcess.Dispose() } catch { }; $script:UpdateState.CheckProcess=$null }
 }
 
+
 function Complete-UpdateCheck {
     param([Parameter(Mandatory=$true)][ValidateSet('Manual','Startup')][string]$Mode)
-
     Stop-UpdateCheckUiWorker
     $path=[string]$script:UpdateState.CheckResultPath
     $isStartup = ($Mode -eq 'Startup')
+    $failureCategory=''; $failureStage=''; $errorClass=''; $networkStatus=''
     try {
-        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Die Update-Prüfung hat kein Ergebnis geliefert.' }
+        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { $failureCategory='runtime'; $failureStage='check-result'; throw 'Die Update-Prüfung hat kein Ergebnis geliefert.' }
         $result=[System.IO.File]::ReadAllText($path,[System.Text.Encoding]::UTF8)|ConvertFrom-Json
-        if (-not $result.Success) { throw ([string]$result.Error) }
+        if (-not $result.Success) {
+            $failureCategory=([string]$result.ErrorCategory).Trim().ToLowerInvariant()
+            $failureStage=([string]$result.FailureStage).Trim()
+            $errorClass=([string]$result.ErrorClass).Trim()
+            $networkStatus=([string]$result.NetworkStatus).Trim()
+            throw ([string]$result.Error)
+        }
         if ($result.UpdateAvailable) {
             $validated=Test-LenovoUpdateManifestCore -Manifest $result.Manifest
-            if (-not $validated.IsValid) { throw $validated.Error }
+            if (-not $validated.IsValid) { $failureCategory='manifest'; $failureStage='result-manifest-validation'; throw $validated.Error }
             [void](Set-UpdateRuntimeAvailable -State $script:UpdateState -Manifest $validated)
             $script:LastStatusText = ('Neue Version verfügbar: v{0}' -f $validated.Version)
             if (-not $isStartup) {
@@ -2319,7 +2406,7 @@ function Complete-UpdateCheck {
             $script:LastStatusText='Update-Prüfung fehlgeschlagen.'
             Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die Prüfung auf eine neue Version ist fehlgeschlagen.' -Message $_.Exception.Message -Kind Error
         }
-        Write-RuntimeDiagnosticEvent -Event $(if ($isStartup) { 'STARTUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode=$Mode }) -Level warning
+        Write-RuntimeDiagnosticEvent -Event $(if ($isStartup) { 'STARTUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage $(if ($failureStage) { $failureStage } else { 'update-check' }) -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode=$Mode; errorCategory=$failureCategory; failureStage=$failureStage; errorClass=$errorClass; networkStatus=$networkStatus }) -Level warning
     }
     finally {
         try { if ($path -and (Test-Path -LiteralPath $path)) { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue } } catch { }
@@ -2332,7 +2419,6 @@ function Complete-UpdateCheck {
         if ($script:Popup -and -not $script:Popup.IsDisposed) { Update-PopupRows }
     }
 }
-
 function Complete-ManualUpdateCheck {
     Complete-UpdateCheck -Mode 'Manual'
 }
@@ -2429,20 +2515,28 @@ function Exit-TrayForPreparedUpdate {
     [System.Windows.Forms.Application]::ExitThread()
 }
 
+
 function Complete-ManualAppUpdatePrepare {
     Stop-UpdatePrepareUiWorker
     $path=[string]$script:UpdateState.PrepareResultPath
+    $failureCategory=''; $failureStage=''; $errorClass=''; $networkStatus=''
     try {
-        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Die Update-Vorbereitung hat kein Ergebnis geliefert.' }
+        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { $failureCategory='runtime'; $failureStage='prepare-result'; throw 'Die Update-Vorbereitung hat kein Ergebnis geliefert.' }
         $result=[System.IO.File]::ReadAllText($path,[System.Text.Encoding]::UTF8)|ConvertFrom-Json
-        if (-not $result.Success) { throw ([string]$result.Error) }
+        if (-not $result.Success) {
+            $failureCategory=([string]$result.ErrorCategory).Trim().ToLowerInvariant()
+            $failureStage=([string]$result.FailureStage).Trim()
+            $errorClass=([string]$result.ErrorClass).Trim()
+            $networkStatus=([string]$result.NetworkStatus).Trim()
+            throw ([string]$result.Error)
+        }
         [void](Set-UpdateRuntimeReadyToInstall -State $script:UpdateState)
         Write-RuntimeDiagnosticEvent -Event 'UPDATE_PACKAGE_PREPARED' -Stage 'update-prepare' -Success $true -Data (New-RuntimeDiagnosticData @{ version=$result.Version })
         Exit-TrayForPreparedUpdate -WorkDir ([string]$result.WorkDir)
     }
     catch {
         [void](Set-UpdateRuntimeFailed -State $script:UpdateState -Message $_.Exception.Message)
-        Write-RuntimeDiagnosticEvent -Event 'UPDATE_PACKAGE_PREPARED' -Stage 'update-prepare' -Success $false -ErrorRecord $_ -Level error
+        Write-RuntimeDiagnosticEvent -Event 'UPDATE_PACKAGE_PREPARED' -Stage $(if ($failureStage) { $failureStage } else { 'update-prepare' }) -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ errorCategory=$failureCategory; failureStage=$failureStage; errorClass=$errorClass; networkStatus=$networkStatus }) -Level error
         Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die App konnte nicht aktualisiert werden.' -Message $_.Exception.Message -Kind Error
         [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
     }
@@ -2453,7 +2547,6 @@ function Complete-ManualAppUpdatePrepare {
         Update-UpdateMenuState
     }
 }
-
 function Start-ManualAppUpdate {
     if (Test-MaintenanceBusy -or (Test-UpdateRuntimeBusy -State $script:UpdateState)) { return }
     $manifest=$script:UpdateState.AvailableManifest

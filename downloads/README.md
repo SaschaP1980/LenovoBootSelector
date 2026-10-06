@@ -15,6 +15,7 @@ Dieser Ordner enthält die **historisch erhaltenen gebauten Releases** des Lenov
 
 | Version | Release | Größe | SHA-256 | Git-Tag |
 | --- | --- | ---: | --- | --- |
+| v0.6.3.0 | [LenovoBootMenuTray-v0.6.3.0.zip](LenovoBootMenuTray-v0.6.3.0.zip) | 90.273 Bytes | `4f6b6e99844f133c4f2389ce9c26498285437c7969a7cdbf21766b21aae9b29e` | `v0.6.3.0` |
 | v0.6.2.2 | [LenovoBootMenuTray-v0.6.2.2.zip](LenovoBootMenuTray-v0.6.2.2.zip) | 88.352 Bytes | `3bdb7dff61d0e69b6bed0e10993e104d9111d8f82279542e5f24c74ac151b9fe` | `v0.6.2.2` |
 | v0.6.2.1 | [LenovoBootMenuTray-v0.6.2.1.zip](LenovoBootMenuTray-v0.6.2.1.zip) | 87.631 Bytes | `ee14f85fdfdc4ecbbafdcd9497db780c6816c274e5d46ce8606a5ef2241fb278` | `v0.6.2.1` |
 | v0.6.2.0 | [LenovoBootMenuTray-v0.6.2.0.zip](LenovoBootMenuTray-v0.6.2.0.zip) | 87.481 Bytes | `d6c0199fbca79b9ed677b7df73b6ec3f72b88a98d3e686d5e81f1b53dadea311` | `v0.6.2.0` |
