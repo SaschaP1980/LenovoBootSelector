@@ -8,7 +8,7 @@
 
 Die Anwendung läuft im Normalbetrieb **uneleviert**. Privilegierte Firmwareänderungen werden ausschließlich über fest definierte, allowgelistete Windows-Scheduled-Tasks ausgeführt. Permanente Änderungen an der UEFI-Bootreihenfolge gehören ausdrücklich nicht zum Produktmodell.
 
-**Aktueller Entwicklungsstand:** v0.6.1.0  
+**Aktueller Entwicklungsstand:** v0.6.2.0  
 **Technik:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads und Revisionshistorie
@@ -97,6 +97,8 @@ Diese Anzeige behauptet **keine direkte 1:1-Adressierbarkeit** des physischen US
 | `src/Infrastructure/` | Windows-, Storage-, Update-, TaskBroker- und IO-Adapter |
 | `src/UI/` | WinForms-Präsentation |
 | `tests/` | PowerShell- und Python-Regressions-/Boundary-Tests |
+| `docs/architecture/` | kanonische und historische Architektur-Baselines |
+| `audits/` | kanonische und historische Catch-Audits |
 | `tools/` | Build-, Packaging-, Audit- und Transition-Skripte |
 | `downloads/` | historische versionierte Release-ZIPs und Update-Manifeste |
 

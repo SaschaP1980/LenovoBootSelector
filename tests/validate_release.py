@@ -40,7 +40,12 @@ def main():
     s.c('README remains repository-root file',(root/'README.md').is_file())
     s.c('CHANGELOG remains repository-root file',(root/'CHANGELOG.md').is_file())
     s.c('Git control file remains at repository root',(root/'.gitignore').is_file())
-    s.c('LBS-1 JSON artifacts remain outside LBS-2 scope',(root/'ARCHITECTURE_BASELINE.json').is_file() and (root/'CATCH_AUDIT.json').is_file())
+    s.c('LBS-1 canonical architecture baseline moved to docs/architecture',(root/'docs/architecture/ARCHITECTURE_BASELINE.json').is_file())
+    s.c('LBS-1 canonical catch audit moved to audits',(root/'audits/CATCH_AUDIT.json').is_file())
+    s.c('LBS-1 root has no architecture baseline JSONs',not any(root.glob('ARCHITECTURE_BASELINE*.json')))
+    s.c('LBS-1 root has no catch audit JSONs',not any(root.glob('CATCH_AUDIT*.json')))
+    s.c('LBS-1 historical architecture baselines retained',len(list((root/'docs/architecture').glob('ARCHITECTURE_BASELINE_v*.json'))) >= 1)
+    s.c('LBS-1 historical catch audits retained',len(list((root/'audits').glob('CATCH_AUDIT_v*.json'))) >= 1)
     tray=txt(root/'bin/LenovoBootMenuTray.ps1') if (root/'bin/LenovoBootMenuTray.ps1').is_file() else ''
     template=txt(root/'src/App/LenovoBootMenuTray.template.ps1')
     expected=f"$script:AppVersion = '{version}'"
@@ -59,8 +64,8 @@ def main():
     s.has('Prepare tool rejects missing schema-v2 publication timestamp',prepare,'publishedUtc must be supplied explicitly for schemaVersion 2')
     s.has('Release config keeps legacy schema 1 readable',common,"schema not in {1,2}")
     s.has('Release config forbids publishedUtc in schema 2',common,'schemaVersion 2 must not contain publishedUtc')
-    s.c('Canonical catch audit exists',(root/'CATCH_AUDIT.json').is_file())
-    s.c('Canonical architecture baseline exists',(root/'ARCHITECTURE_BASELINE.json').is_file())
+    s.c('Canonical catch audit exists under audits/',(root/'audits/CATCH_AUDIT.json').is_file())
+    s.c('Canonical architecture baseline exists under docs/architecture/',(root/'docs/architecture/ARCHITECTURE_BASELINE.json').is_file())
     s.c('Persistent release workflow exists',(root/'.github/workflows/release.yml').is_file())
     s.c('No redundant PR verification workflow exists',not (root/'.github/workflows/release-pr.yml').exists())
     if (root/'.github/workflows/release.yml').is_file():
@@ -87,6 +92,11 @@ def main():
         s.has('LBS-2 delete compatibility is gated by legacy root version',w,'origin/main:version.json')
         s.has('LBS-2 delete compatibility requires missing migrated version on main',w,'origin/main:bin/version.json')
         s.has('LBS-2 delete comparison disables rename detection',w,'--diff-filter=D --no-renames origin/main')
+        s.has('Release workflow has one-time LBS-1 migration gate',w,'EXPECTED_LBS1_DELETIONS')
+        s.has('LBS-1 migration requires legacy architecture root file',w,'origin/main:ARCHITECTURE_BASELINE.json')
+        s.has('LBS-1 migration requires legacy catch-audit root file',w,'origin/main:CATCH_AUDIT.json')
+        s.has('LBS-1 migration checks architecture target path',w,'docs/architecture/$path')
+        s.has('LBS-1 migration checks audit target path',w,'audits/$path')
     for rel in ['tests/validate_release.py','tests/validate_core.py','tests/validate_boundary.py','tests/validate_regression.py']:
         s.c(f'Permanent validator exists: {rel}',(root/rel).is_file())
     ui=txt(root/'src/UI/UpdatePresentation.ps1'); infra=txt(root/'src/Infrastructure/UpdateClient.ps1')

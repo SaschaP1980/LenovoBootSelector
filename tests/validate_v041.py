@@ -98,7 +98,7 @@ def main():
     tray_b=(root/'LenovoBootMenuTray.ps1').read_bytes(); tray=text(root/'LenovoBootMenuTray.ps1')
     install=text(root/'Install-LenovoBootMenuTasks.ps1'); uninstall=text(root/'Uninstall-LenovoBootMenuTasks.ps1'); readme=text(root/'README.md')
     baseline=json.loads((root/'tests/characterization-baseline-v0.3.4.json').read_text(encoding='utf-8'))
-    arch=json.loads((root/'ARCHITECTURE_BASELINE_v0.4.1.json').read_text(encoding='utf-8'))
+    arch=json.loads((root/'docs/architecture/ARCHITECTURE_BASELINE_v0.4.1.json').read_text(encoding='utf-8'))
 
     # Version / refactoring baseline
     s.contains('App version is 0.4.1',tray,"$script:AppVersion = '0.4.1'")

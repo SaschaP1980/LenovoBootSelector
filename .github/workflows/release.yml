@@ -126,6 +126,31 @@ jobs:
               for path in BUILD_INTEGRITY.txt icon-preview.png Install-LenovoBootMenuTasks.ps1 LenovoBootMenuTray.ico LenovoBootMenuTray.ps1 Start-LenovoBootMenuTray.cmd Start-LenovoBootMenuTray.vbs Uninstall-LenovoBootMenuTasks.cmd Uninstall-LenovoBootMenuTasks.ps1 version.json; do
                 test -f "bin/$path" || { echo "LBS-2 migration target missing: bin/$path" >&2; exit 1; }
               done
+            elif git cat-file -e origin/main:ARCHITECTURE_BASELINE.json 2>/dev/null && \
+                 git cat-file -e origin/main:CATCH_AUDIT.json 2>/dev/null && \
+                 test -f docs/architecture/ARCHITECTURE_BASELINE.json && \
+                 test -f audits/CATCH_AUDIT.json; then
+              EXPECTED_LBS1_DELETIONS=$(git ls-tree -r --name-only origin/main | \
+                grep -E '^(ARCHITECTURE_BASELINE(_v[^/]+)?|CATCH_AUDIT(_v[^/]+)?)\.json$' | sort)
+              ACTUAL_DELETIONS=$(printf '%s\n' "$DELETED_PATHS" | sort)
+              test "$ACTUAL_DELETIONS" = "$EXPECTED_LBS1_DELETIONS" || {
+                echo "LBS-1 migration delete set is not exact." >&2
+                printf '%s\n' "$DELETED_PATHS" >&2
+                exit 1
+              }
+              while IFS= read -r path; do
+                [ -z "$path" ] && continue
+                case "$path" in
+                  ARCHITECTURE_BASELINE*.json) target="docs/architecture/$path" ;;
+                  CATCH_AUDIT*.json) target="audits/$path" ;;
+                  *) echo "Unexpected LBS-1 migration source: $path" >&2; exit 1 ;;
+                esac
+                test -f "$target" || { echo "LBS-1 migration target missing: $target" >&2; exit 1; }
+              done <<< "$DELETED_PATHS"
+              if find . -maxdepth 1 -type f \( -name 'ARCHITECTURE_BASELINE*.json' -o -name 'CATCH_AUDIT*.json' \) | grep -q .; then
+                echo "LBS-1 migration left architecture/audit JSONs in repository root." >&2
+                exit 1
+              fi
             else
               echo "Release unexpectedly deletes repository files." >&2
               printf '%s\n' "$DELETED_PATHS" >&2

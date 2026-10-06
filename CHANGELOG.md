@@ -1,5 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.2.0 – LBS-1 Architektur-/Audit-Artefakte strukturieren
+
+- Kanonische und historische `ARCHITECTURE_BASELINE*.json` liegen unter `docs/architecture/`.
+- Kanonische und historische `CATCH_AUDIT*.json` liegen unter `audits/`.
+- Generatoren, permanente und historische Regressionstests, Dokumentation und das Release-Migrationsgate verwenden die neuen Pfade.
+- Source-/Transition-Packaging nimmt die neuen Verzeichnisse automatisch auf; die flache Release-ZIP-Struktur bleibt unverändert.
+- Boot-, TaskBroker-, Privilege-, Storage- und UI-Logik bleiben unverändert.
+- LBS-1 ist mit v0.6.2.0 vollständig in den Release-Zyklus übernommen.
+
 ## v0.6.1.0 – LBS-2 Repository-Root-Bereinigung
 
 v0.6.1.0 setzt [LBS-2] um und trennt Repository-Struktur und ausgelieferte Release-Struktur sauber.
