@@ -14,7 +14,7 @@ Ab v0.6.4.0 ist diese Grenze zusätzlich technisch fail-closed gehärtet: Der Ru
 
 **Hinweis zu v0.6.4.0:** Der dort erstmals ausgelieferte Repair konnte im Schritt `protect-state` fälschlich abbrechen, weil die ACL-Prüfung das erlaubte `ReadAndExecute` über die zusammengesetzte `Modify`-Maske als schreibbar interpretierte. v0.6.4.1 korrigiert ausschließlich diese Prüfung. Ein mit v0.6.4.0 fehlgeschlagener Repair kann mit v0.6.4.1 sicher erneut gestartet werden.
 
-**Aktueller Entwicklungsstand:** v0.6.7.0  
+**Aktueller Entwicklungsstand:** v0.6.7.1  
 **Technik:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads und Revisionshistorie
