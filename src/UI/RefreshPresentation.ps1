@@ -1,10 +1,26 @@
-﻿function Update-HeaderRefreshStatus {
+﻿function Update-HeaderStatusInteractionVisual {
+    if (-not $script:HeaderStatusLabel -or $script:HeaderStatusLabel.IsDisposed) { return }
+    $interactive = [bool]$script:HeaderUpdateInteractionEnabled
+    $highlight = ($interactive -and ([bool]$script:HeaderStatusHovered -or $script:HeaderStatusLabel.Focused))
+    $script:HeaderStatusLabel.ForeColor = if ($highlight) { $script:ColorAccent } else { $script:ColorSecondary }
+    $script:HeaderStatusLabel.Cursor = if ($interactive) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
+    $script:HeaderStatusLabel.TabStop = $interactive
+}
+
+function Set-HeaderUpdateInteractionState {
+    param([Parameter(Mandatory=$true)][bool]$Enabled)
+    $script:HeaderUpdateInteractionEnabled = $Enabled
+    Update-HeaderStatusInteractionVisual
+}
+
+function Update-HeaderRefreshStatus {
     if (Test-MaintenanceBusy) {
         if ($script:HeaderTitleLabel -and -not $script:HeaderTitleLabel.IsDisposed) { $script:HeaderTitleLabel.Location = New-Object Drawing.Point(16, 10) }
         if ($script:HeaderStatusLabel -and -not $script:HeaderStatusLabel.IsDisposed) {
             $script:HeaderStatusLabel.Text = Get-MaintenanceBusyStatusText
             $script:HeaderStatusLabel.Visible = $true
         }
+        Set-HeaderUpdateInteractionState -Enabled $false
         return
     }
 
@@ -30,13 +46,14 @@
             'Aktualisiere Bootziele…'
         }
         elseif ($updateAvailable) {
-            'Neue App Version verfügbar'
+            'Neue App-Version verfügbar'
         }
         else {
             ''
         }
         $script:HeaderStatusLabel.Visible = $showStatus
     }
+    Set-HeaderUpdateInteractionState -Enabled (-not $active -and $updateAvailable)
 }
 
 function Update-RefreshButtonVisual {
