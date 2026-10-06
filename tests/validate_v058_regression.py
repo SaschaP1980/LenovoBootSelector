@@ -90,7 +90,7 @@ def main():
 
     # Runtime and catch audit are deterministic.
     cp=subprocess.run([sys.executable,str(root/'tools/build_runtime.py'),'--root',str(root),'--check'],capture_output=True,text=True); s.eq('Runtime deterministic',cp.returncode,0)
-    audit=root/'CATCH_AUDIT_v0.5.8.json'; s.c('v0.5.8 catch audit exists',audit.is_file()); s.c('v0.5.7 catch audit retained',(root/'CATCH_AUDIT_v0.5.7.json').is_file())
+    audit=root/'audits/CATCH_AUDIT_v0.5.8.json'; s.c('v0.5.8 catch audit exists',audit.is_file()); s.c('v0.5.7 catch audit retained',(root/'audits/CATCH_AUDIT_v0.5.7.json').is_file())
     if audit.is_file():
         data=json.loads(audit.read_text(encoding='utf-8')); s.eq('Catch audit version 0.5.8',data.get('version'),'0.5.8'); s.eq('Catch audit count matches entries',data.get('count'),len(data.get('entries',[])))
     cp=subprocess.run([sys.executable,str(root/'tools/build_catch_audit.py'),'--root',str(root),'--check'],capture_output=True,text=True); s.eq('Catch audit deterministic',cp.returncode,0)
