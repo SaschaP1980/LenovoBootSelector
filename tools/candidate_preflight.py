@@ -97,8 +97,9 @@ def main()->int:
                 'sourcePackage':source_name,
                 'result':'PASS',
             }
+            compact=json.dumps(report,ensure_ascii=False,separators=(',',':'),sort_keys=True)
             print('CANDIDATE PREFLIGHT PASS')
-            print(json.dumps(report,ensure_ascii=False,sort_keys=True))
+            print('CANDIDATE_PREFLIGHT_SUMMARY='+compact)
         return 0
     except Exception as e:
         print(f'CANDIDATE PREFLIGHT FAIL: {e}',file=sys.stderr)

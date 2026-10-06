@@ -1,5 +1,16 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.7.0 – LBS-16 Release-Orchestrierung gebündelt
+
+- Neuer integrierter `tools/release_verification.py`-Abschlusscheck bündelt nach dem Merge die bisher interaktiv einzeln kontrollierten GitHub-/Repository-Fakten.
+- Der Verifier prüft: gemergten PR und genau einen Publication-PR, 8/8 Release-Statuskontexte, Candidate-Preflight-Status, Source-Tag/-Commit, ZIP-/cache-freien Source-Tree, `downloads/latest.json`, veröffentlichte Release-ZIP Größe/SHA-256, Candidate-/Release-Branch-Cleanup sowie den zuvor bestandenen Reproduzierbarkeitsvergleich.
+- Erfolgreiche Releases emittieren genau einen maschinenlesbaren `RELEASE_VERIFICATION_SUMMARY=<json>`-Block und zusätzlich eine kompakte GitHub Job Summary.
+- Candidate Preflight emittiert ergänzend `CANDIDATE_PREFLIGHT_SUMMARY=<json>`, behält aber den bestehenden Marker `CANDIDATE PREFLIGHT PASS` für Kompatibilität bei.
+- Die interaktive Orchestrierung verwendet künftig gebündelte Ausgangsreads, einen atomaren Candidate-Commit, zurückhaltendes Workflow-Polling und den verifizierten End-Summary statt redundanter Einzelabfragen.
+- Der neue Verification-Helper besitzt einen permanent ausgeführten Self-Test; Release- und Regression-Gates sichern die Summary-/Workflow-Verträge ab.
+- Candidate Preflight, zwei deterministische Builds, Release/Core/Boundary/Regression, 8/8 Status-Gates, Source-Integrity und historische ZIP-Integrität bleiben vollständig erhalten.
+- v0.6.7.0 verwendet `version-only`; Produktcode unter `src/**`, Installer, Boot-/Firmware-/Storage-/Privilege-Logik bleiben unverändert.
+
 ## v0.6.6.0 – LBS-10 historisches Releaseprofil entfernt
 
 - Das aktive Profil `release-architecture` wurde vollständig entfernt. Seine Sonderlogik bezog sich ausschließlich auf die längst abgeschlossene Migration von einer fest eingebauten AppVersion zum `@APP_VERSION@`-Template-Token.

@@ -31,6 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           VERSION=$(python3 -c "import json; print(json.load(open('bin/version.json',encoding='utf-8'))['version'])")
+          CANDIDATE_SHA="$GITHUB_SHA"
           EXPECTED_BRANCH="release/v$VERSION"
           test "${GITHUB_REF_NAME}" = "$EXPECTED_BRANCH"
 
@@ -78,6 +79,7 @@ jobs:
           python3 -B tools/prepare_release.py --root . --output-dir /tmp/lbs-release-check --published-utc "$PUBLISHED_UTC" --check
           cmp "/tmp/lbs-release/LenovoBootMenuTray-v$VERSION.zip" "/tmp/lbs-release-check/LenovoBootMenuTray-v$VERSION.zip"
           cmp "/tmp/lbs-release/Lenovo-Boot-Selector-Source-v$VERSION.zip" "/tmp/lbs-release-check/Lenovo-Boot-Selector-Source-v$VERSION.zip"
+          printf 'verified\n' > /tmp/lbs-release/reproducible.ok
 
           # Run the permanent gates before any PR or tag exists.
           python3 -B tests/validate_release.py --root .
@@ -229,5 +231,17 @@ jobs:
           status_ok 'release/tag' 'Annotated ZIP-free source tag verified'
 
           gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --merge --delete-branch
-          git fetch origin main --force
-          test "$(git show origin/main:downloads/latest.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")" = "$VERSION"
+
+          # LBS-16: aggregate the complete post-release checklist server-side so interactive
+          # supervision needs one terminal workflow/log read instead of many GitHub roundtrips.
+          python3 -B tools/release_verification.py \
+            --root . \
+            --version "$VERSION" \
+            --candidate-sha "$CANDIDATE_SHA" \
+            --final-sha "$FINAL_SHA" \
+            --source-commit "$SOURCE_COMMIT" \
+            --pr-url "$PR_URL" \
+            --published-utc "$PUBLISHED_UTC" \
+            --release-build-json /tmp/lbs-release/release-build.json \
+            --reproducibility-marker /tmp/lbs-release/reproducible.ok \
+            --output /tmp/lbs-release/release-verification.json

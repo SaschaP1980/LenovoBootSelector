@@ -52,7 +52,9 @@ The explicit `workflow_dispatch` is mandatory because a `GITHUB_TOKEN` branch pu
 
 The single permanent `release.yml` workflow runs the full release/core/boundary/regression gates itself before PR creation, writes the successful gate states directly onto the final PR-head commit, creates the annotated ZIP-free source tag only after successful PR creation, then merges the PR and deletes the release branch. A separate `pull_request` workflow is intentionally not used: pull requests created with the repository `GITHUB_TOKEN` do not recursively start another workflow.
 
-There is no version-specific workflow, separate PR-verification workflow, Base64 patch transport, helper source branch, required post-merge finalizer, or per-version validator copy.
+After the merge, the same workflow runs `tools/release_verification.py`. This integrated verifier checks PR/merge state, exactly one publication PR, 8/8 release statuses, candidate-preflight status, source tag/source tree, `downloads/latest.json`, published release ZIP hash/size, candidate/release branch cleanup and the completed reproducibility marker. It emits one machine-readable `RELEASE_VERIFICATION_SUMMARY=<json>` line and a human-readable GitHub Job Summary.
+
+There is no version-specific workflow, separate PR-verification workflow, Base64 patch transport, helper source branch, separate required post-merge finalizer, or per-version validator copy.
 
 ## Historical ZIP invariant
 
@@ -60,8 +62,12 @@ Existing `downloads/*.zip` files are immutable. A release may add exactly one ne
 
 ## Performance targets
 
-- Version-only hotfix: target <= 5 minutes, limit 10 minutes from start to merged PR, excluding external GitHub incidents.
-- Small patch: target <= 10 minutes, limit 15 minutes when no native Windows acceptance is required.
+GitHub validation depth is not reduced for performance.
+
+- Hosted Candidate Preflight + Release Orchestrator remain governed by their existing safety gates.
+- Once implementation is ready, a small conflict-free connector-supervised patch should target roughly **2–3 minutes interactive orchestration time**, excluding external runner queues/incidents.
+- Achieve this by batched initial reads, one atomic candidate commit, non-aggressive run observation and the aggregated `RELEASE_VERIFICATION_SUMMARY`; never by skipping gates or verification.
+- If the structured summary is unavailable or not `PASS`, fall back to the full direct post-release verification.
 
 ## Runner queue policy
 
