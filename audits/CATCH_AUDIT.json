@@ -1,5 +1,5 @@
 {
-  "version": "0.6.4.0",
+  "version": "0.6.4.1",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
@@ -375,7 +375,7 @@
     },
     {
       "source": "src/Infrastructure/RuntimeDiagnostics.ps1",
-      "line": 238,
+      "line": 262,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue } } catch { }"
