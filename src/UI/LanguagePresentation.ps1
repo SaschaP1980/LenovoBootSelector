@@ -1,4 +1,4 @@
-function Resolve-PendingLocalePreference {
+﻿function Resolve-PendingLocalePreference {
     if (-not $script:LocalePreferenceNeedsConfirmation) { return $false }
 
     $choice = Show-LocaleMigrationDialog
@@ -8,7 +8,7 @@ function Resolve-PendingLocalePreference {
     return $true
 }
 
-﻿function Update-LanguageMenuState {
+function Update-LanguageMenuState {
     $locale = Get-ActiveLocale
     if ($script:LanguageMenuRoot) { $script:LanguageMenuRoot.Text = Get-LocalizedString -Key 'Settings.Language' }
     if ($script:LanguageEnglishMenuItem) {
