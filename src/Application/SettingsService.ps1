@@ -18,9 +18,13 @@ function Save-AppSettings {
         if ($key -and $value) { $aliases[[string]$key] = $value }
     }
 
+    $preferenceSource = ([string]$script:LocalePreferenceSource).Trim().ToLowerInvariant()
+    if ($preferenceSource -notin @('default','user','migration-pending')) { $preferenceSource = 'default' }
+
     $payload = [ordered]@{
-        schemaVersion = 5
+        schemaVersion = 6
         locale = Resolve-LocaleIdCore -Locale $script:UiLocale
+        localePreferenceSource = $preferenceSource
         # Keep an unmigrated legacy default only until the new SYSTEM-backed
         # default architecture has been installed successfully.
         defaultGuid = $script:LegacyDefaultGuid
@@ -36,6 +40,8 @@ function Save-AppSettings {
 function Load-AppSettings {
     $settings = Get-AppSettings
     $script:UiLocale = Resolve-LocaleIdCore -Locale ([string]$settings.locale)
+    $script:LocalePreferenceSource = [string]$settings.localePreferenceSource
+    $script:LocalePreferenceNeedsConfirmation = [bool]$settings.localePreferenceNeedsConfirmation
     $script:LegacyDefaultGuid = if ($settings.defaultGuid) { ([string]$settings.defaultGuid).ToLowerInvariant() } else { $null }
     $script:DefaultGuid = $null
     $script:EntryOrder = @($settings.entryOrder)

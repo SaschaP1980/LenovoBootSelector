@@ -94,6 +94,72 @@
     finally { $form.Dispose() }
 }
 
+function Show-LocaleMigrationDialog {
+    $form = New-Object System.Windows.Forms.Form
+    $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
+    $form.ShowInTaskbar = $false
+    $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
+    $form.TopMost = $true
+    $form.BackColor = [Drawing.Color]::FromArgb(22,22,22)
+    $form.ClientSize = New-Object Drawing.Size(500, 260)
+    $form.KeyPreview = $true
+    $form.Tag = $null
+
+    $root = New-Object System.Windows.Forms.Panel
+    $root.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $root.BackColor = [Drawing.Color]::FromArgb(22,22,22)
+    $form.Controls.Add($root)
+
+    $title = New-Label -Text (Get-LocalizedString -Key 'Language.MigrationTitle') -Font (New-Object Drawing.Font('Segoe UI',10.2,[Drawing.FontStyle]::Bold)) -ForeColor $script:ColorPrimary -X 18 -Y 12 -Width 450 -Height 24
+    $root.Controls.Add($title)
+    $divider = New-Object System.Windows.Forms.Panel
+    $divider.Location = New-Object Drawing.Point(18,43)
+    $divider.Size = New-Object Drawing.Size(464,1)
+    $divider.BackColor = $script:ColorAccent
+    $root.Controls.Add($divider)
+
+    $heading = New-Label -Text (Get-LocalizedString -Key 'Language.MigrationHeading') -Font (New-Object Drawing.Font('Segoe UI',9.6,[Drawing.FontStyle]::Bold)) -ForeColor $script:ColorPrimary -X 28 -Y 62 -Width 440 -Height 24
+    $root.Controls.Add($heading)
+    $message = New-Label -Text (Get-LocalizedString -Key 'Language.MigrationMessage') -Font (New-Object Drawing.Font('Segoe UI',8.5,[Drawing.FontStyle]::Regular)) -ForeColor $script:ColorSecondary -X 28 -Y 92 -Width 440 -Height 92
+    $message.TextAlign = [Drawing.ContentAlignment]::TopLeft
+    $root.Controls.Add($message)
+
+    $german = New-Object System.Windows.Forms.Button
+    $german.Text = Get-LocalizedString -Key 'Language.MigrationKeepGerman'
+    $german.Font = New-Object Drawing.Font('Segoe UI',8.5,[Drawing.FontStyle]::Regular)
+    $german.ForeColor = $script:ColorPrimary
+    $german.BackColor = [Drawing.Color]::FromArgb(34,34,34)
+    $german.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $german.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(70,70,70)
+    $german.FlatAppearance.BorderSize = 1
+    $german.Location = New-Object Drawing.Point(196,204)
+    $german.Size = New-Object Drawing.Size(136,34)
+    $german.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $german.Add_Click({ $form.Tag = 'de-DE'; $form.Close() })
+    $root.Controls.Add($german)
+
+    $english = New-Object System.Windows.Forms.Button
+    $english.Text = Get-LocalizedString -Key 'Language.MigrationUseEnglish'
+    $english.Font = New-Object Drawing.Font('Segoe UI',8.5,[Drawing.FontStyle]::Bold)
+    $english.ForeColor = [Drawing.Color]::White
+    $english.BackColor = $script:ColorAccent
+    $english.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $english.FlatAppearance.BorderSize = 0
+    $english.Location = New-Object Drawing.Point(344,204)
+    $english.Size = New-Object Drawing.Size(136,34)
+    $english.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $english.Add_Click({ $form.Tag = 'en-US'; $form.Close() })
+    $root.Controls.Add($english)
+    $form.AcceptButton = $english
+
+    try {
+        $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
+        if ($owner) { [void]$form.ShowDialog($owner) } else { [void]$form.ShowDialog() }
+        return [string]$form.Tag
+    }
+    finally { $form.Dispose() }
+}
+
 function Show-LenovoSystemFunctionsDialog {
     param([ValidateSet('Setup','Repair','Migrate','Reinitialize','Remove')][string]$Mode)
 

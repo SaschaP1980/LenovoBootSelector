@@ -104,7 +104,7 @@ def main():
     s.has('v0.6.4.1 native regression accepts ReadAndExecute',native_boundary,'ReadAndExecute is accepted as non-mutating')
     s.has('v0.6.4.1 native regression rejects Modify',native_boundary,'Modify is rejected as mutating')
     s.has('v0.6.4.1 native regression rejects FullControl',native_boundary,'FullControl is rejected as mutating')
-    s.has('LBS-17 settings schema is v5',tray,'schemaVersion = 5')
+    s.has('LBS-23 settings schema is v6',tray,'schemaVersion = 6')
     s.has('LBS-17 settings persist locale',tray,'locale = Resolve-LocaleIdCore -Locale $script:UiLocale')
     s.has('LBS-17 localization service is bundled',tray,'function Get-LocalizedString')
     language_ui=txt(root/'src/UI/LanguagePresentation.ps1')

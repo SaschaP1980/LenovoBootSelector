@@ -128,7 +128,7 @@ def main():
     s.contains('Settings shell calls default core',getset,'New-DefaultAppSettingsCore')
     s.contains('Settings shell calls normalization core',getset,'ConvertTo-NormalizedAppSettingsCore')
     s.contains('Settings shell delegates repository read',getset,'Read-AppSettingsRepository')
-    s.contains('LBS-17 settings save current schema',saveset,'schemaVersion = 5')
+    s.contains('LBS-23 settings save current schema',saveset,'schemaVersion = 6')
     s.contains('LBS-17 settings save locale',saveset,'locale = Resolve-LocaleIdCore -Locale $script:UiLocale')
     s.contains('LBS-17 settings load locale',loadset,'$script:UiLocale = Resolve-LocaleIdCore')
     s.check('LBS-17 localization application service exists',bool(localize_service))

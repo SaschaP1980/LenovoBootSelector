@@ -70,6 +70,60 @@ function Test-GuidInList {
     }
     return $false
 }
+function Get-AppSettingsSourcePropertyCore {
+    param(
+        $Source,
+        [Parameter(Mandatory=$true)][string]$Name
+    )
+
+    if (-not $Source) {
+        return [pscustomobject]@{ HasValue = $false; Value = $null }
+    }
+
+    if ($Source -is [System.Collections.IDictionary]) {
+        foreach ($key in @($Source.Keys)) {
+            if ([string]$key -and ([string]$key).Equals($Name, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return [pscustomobject]@{ HasValue = $true; Value = $Source[$key] }
+            }
+        }
+        return [pscustomobject]@{ HasValue = $false; Value = $null }
+    }
+
+    $property = $Source.PSObject.Properties[$Name]
+    if ($null -ne $property) {
+        return [pscustomobject]@{ HasValue = $true; Value = $property.Value }
+    }
+    return [pscustomobject]@{ HasValue = $false; Value = $null }
+}
+
+function Get-AppSettingsLocalePreferenceSourceCore {
+    param(
+        $Source,
+        [int]$SourceSchemaVersion
+    )
+
+    if (-not $Source) { return 'default' }
+
+    $sourceProperty = Get-AppSettingsSourcePropertyCore -Source $Source -Name 'localePreferenceSource'
+    if ($sourceProperty.HasValue) {
+        $value = ([string]$sourceProperty.Value).Trim().ToLowerInvariant()
+        if ($value -in @('default','user','migration-pending')) { return $value }
+    }
+
+    # v0.8.0.0 persisted schema 5 with locale=de-DE both for the incorrect
+    # automatic migration and for a possible explicit user choice. Without
+    # additional metadata those states are indistinguishable, so preserve the
+    # current locale temporarily and require one explicit choice.
+    if ($SourceSchemaVersion -eq 5) {
+        $localeProperty = Get-AppSettingsSourcePropertyCore -Source $Source -Name 'locale'
+        if ($localeProperty.HasValue -and (Resolve-LocaleIdCore -Locale ([string]$localeProperty.Value)) -eq 'de-DE') {
+            return 'migration-pending'
+        }
+    }
+
+    return 'default'
+}
+
 function Get-AppSettingsLocaleCore {
     param(
         $Source,
@@ -78,42 +132,34 @@ function Get-AppSettingsLocaleCore {
 
     if (-not $Source) { return 'en-US' }
 
-    $hasLocale = $false
-    $rawLocale = $null
-
-    if ($Source -is [System.Collections.IDictionary]) {
-        foreach ($key in @($Source.Keys)) {
-            if ([string]$key -and ([string]$key).Equals('locale', [System.StringComparison]::OrdinalIgnoreCase)) {
-                $hasLocale = $true
-                $rawLocale = [string]$Source[$key]
-                break
-            }
-        }
-    }
-    else {
-        $property = $Source.PSObject.Properties['locale']
-        if ($null -ne $property) {
-            $hasLocale = $true
-            $rawLocale = [string]$property.Value
+    $preferenceSource = Get-AppSettingsLocalePreferenceSourceCore -Source $Source -SourceSchemaVersion $SourceSchemaVersion
+    if ($preferenceSource -in @('user','migration-pending')) {
+        $localeProperty = Get-AppSettingsSourcePropertyCore -Source $Source -Name 'locale'
+        if ($localeProperty.HasValue) {
+            return Resolve-LocaleIdCore -Locale ([string]$localeProperty.Value)
         }
     }
 
-    if ($hasLocale) {
-        return Resolve-LocaleIdCore -Locale $rawLocale
-    }
-
-    # Existing settings created before localization represented the historical
-    # German-only UI. Preserve that user experience during migration.
-    if ($SourceSchemaVersion -lt 5) { return 'de-DE' }
-
-    # New/current settings without a valid explicit preference fail safe to English.
+    # English is the canonical default whenever there is no demonstrable
+    # explicit user preference.
     return 'en-US'
+}
+
+function Test-AppSettingsLocaleConfirmationRequiredCore {
+    param(
+        $Source,
+        [int]$SourceSchemaVersion
+    )
+
+    return ((Get-AppSettingsLocalePreferenceSourceCore -Source $Source -SourceSchemaVersion $SourceSchemaVersion) -eq 'migration-pending')
 }
 
 function New-DefaultAppSettingsCore {
     return [pscustomobject]@{
-        schemaVersion = 5
+        schemaVersion = 6
         locale = 'en-US'
+        localePreferenceSource = 'default'
+        localePreferenceNeedsConfirmation = $false
         defaultGuid = $null
         entryOrder = @()
         hiddenEntryGuids = @()
@@ -127,10 +173,13 @@ function ConvertTo-NormalizedAppSettingsCore {
     if (-not $Source) { return New-DefaultAppSettingsCore }
 
     $sourceSchemaVersion = if ($Source.schemaVersion) { [int]$Source.schemaVersion } else { 1 }
+    $preferenceSource = Get-AppSettingsLocalePreferenceSourceCore -Source $Source -SourceSchemaVersion $sourceSchemaVersion
 
     return [pscustomobject]@{
-        schemaVersion = 5
+        schemaVersion = 6
         locale = Get-AppSettingsLocaleCore -Source $Source -SourceSchemaVersion $sourceSchemaVersion
+        localePreferenceSource = $preferenceSource
+        localePreferenceNeedsConfirmation = ($preferenceSource -eq 'migration-pending')
         # defaultGuid is retained only as an upgrade/migration input from
         # v0.2.21 and earlier. v0.2.22 stores the live default system-wide.
         defaultGuid = if ($Source.defaultGuid) { ([string]$Source.defaultGuid).ToLowerInvariant() } else { $null }

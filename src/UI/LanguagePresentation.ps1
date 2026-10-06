@@ -1,4 +1,14 @@
-﻿function Update-LanguageMenuState {
+﻿function Resolve-PendingLocalePreference {
+    if (-not $script:LocalePreferenceNeedsConfirmation) { return $false }
+
+    $choice = Show-LocaleMigrationDialog
+    if ([string]::IsNullOrWhiteSpace([string]$choice)) { return $false }
+
+    [void](Set-ActiveLocale -Locale $choice -Persist)
+    return $true
+}
+
+function Update-LanguageMenuState {
     $locale = Get-ActiveLocale
     if ($script:LanguageMenuRoot) { $script:LanguageMenuRoot.Text = Get-LocalizedString -Key 'Settings.Language' }
     if ($script:LanguageEnglishMenuItem) {
