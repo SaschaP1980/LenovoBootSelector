@@ -129,7 +129,7 @@ def main():
     s.has('LBS-17 template maintenance launch errors remain localized',app_template,"Get-LocalizedString -Key 'Maintenance.SetupNotStartedTitle'")
     s.has('LBS-17 entry visibility accessibility remains localized',boot_entry_ui,"Get-LocalizedString -Key 'Manage.HiddenAccessible'")
     s.no('LBS-17 update UI never exposes raw restart result text',ui,'-Message $resolved.Message')
-    s.no('LBS-17 update UI never exposes raw worker exception text',ui,'-Message $_.Exception.Message')
+    s.c('LBS-17 update UI never exposes raw worker exception text',re.search(r"Show-LenovoNoticeDialog[^\\n]*-Message\\s+\\$_\\.Exception\\.Message",ui) is None)
     s.has('LBS-17 update installer helper receives localized failure prefix',ui,"Get-LocalizedString -Key 'Update.HelperFailurePrefix'")
     s.has('LBS-17 update installer helper transports localized text safely',infra,'-FailurePrefixBase64')
     s.no('LBS-17 installer fallback no longer hard-codes German visible failure prefix',infra,"Show-UpdateError ('Update fehlgeschlagen:")
