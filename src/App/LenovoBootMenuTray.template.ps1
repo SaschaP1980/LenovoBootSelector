@@ -37,6 +37,7 @@ function Start-LenovoBootSelectorHidden {
 # LBS-17: pure localization is loaded before startup recovery so duplicate-instance
 # and fatal-startup UI can honor the persisted locale safely.
 # @include src/Core/Localization.ps1
+# @include src/Core/EntryPreferences.ps1
 # @include src/UI/StartupRecoveryDialog.ps1
 
 # v0.2.18: The tray intentionally runs unelevated. Privileged firmware operations
@@ -824,6 +825,8 @@ $script:AutostartRunValueName = 'Lenovo Boot Menu Tray'
 $script:SettingsDir = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray'
 $script:SettingsPath = Join-Path $script:SettingsDir 'settings.json'
 $script:UiLocale = 'en-US'
+$script:LocalePreferenceSource = 'default'
+$script:LocalePreferenceNeedsConfirmation = $false
 $script:DefaultGuid = $null
 $script:LegacyDefaultGuid = $null
 $script:DefaultButton = $null
@@ -896,7 +899,6 @@ $script:UpdateState = New-UpdateRuntimeState
 # @include src/UI/AutostartPresentation.ps1
 
 # @include src/Application/LocalizationService.ps1
-# @include src/Core/EntryPreferences.ps1
 
 
 
@@ -1857,6 +1859,7 @@ try {
     } catch { }
     Write-RuntimeDiagnosticEvent -Event 'TRAY_STARTUP' -Stage 'startup' -Success $true
     Load-AppSettings
+    [void](Resolve-PendingLocalePreference)
     $script:LastStatusText = Get-LocalizedString -Key 'Status.Ready'
     Repair-AutostartLauncherIfNeeded
 

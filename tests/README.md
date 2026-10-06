@@ -56,7 +56,7 @@ Native PowerShell suites intentionally use different count strategies; one gener
 | `Test-MaintenanceRuntime.ps1` | Loop-derived: 15 runtime checks from static assertions plus assertions repeated per mode. |
 | `Test-ArchitectureSoak.ps1` | Four aggregate soak assertions; each assertion covers many iterations. |
 | `Test-FunctionalCore.ps1` | Dynamic PASS counting; currently no separate coverage target count. |
-| `Test-LocalizationRuntime.ps1` | Straight-line: fixed runtime count of 14 covering native locale selection/persistence/migration/lookup. |
+| `Test-LocalizationRuntime.ps1` | Straight-line: fixed runtime count of 32 covering native locale selection, explicit-preference persistence, v0.8.0.0 ambiguity resolution, startup-recovery migration, reload, parity, and lookup. |
 | `Test-WindowsPowerShell51.ps1` | Aggregate runner/parser gate; file count is dynamic and is not an assertion-coverage count. |
 
 When assertions are added, the corresponding contract must be updated deliberately. In particular, the fixed `62` guard in the update test must not be derived automatically from the source count: it is an additional change-control guard so that a suite extension cannot pass unnoticed.

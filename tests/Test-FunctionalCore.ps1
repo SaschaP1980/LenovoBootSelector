@@ -62,8 +62,10 @@ Assert-Equal @($g1.ToLowerInvariant(),$g2.ToLowerInvariant()) @($mgr.DisplayOrde
 Assert-Equal $g2.ToLowerInvariant() $mgr.SelectedGuid 'Manager parser bootsequence'
 
 $defaults = New-DefaultAppSettingsCore
-Assert-Equal 5 $defaults.schemaVersion 'Default settings schema'
+Assert-Equal 6 $defaults.schemaVersion 'Default settings schema'
 Assert-Equal 'en-US' $defaults.locale 'New settings default to English'
+Assert-Equal 'default' $defaults.localePreferenceSource 'New settings record default locale source'
+Assert-Equal $false $defaults.localePreferenceNeedsConfirmation 'New settings need no locale confirmation'
 Assert-Equal 0 @($defaults.entryOrder).Count 'Default settings empty order'
 Assert-Equal 0 @($defaults.hiddenEntryGuids).Count 'Default settings empty hidden list'
 
@@ -75,22 +77,37 @@ $source = [pscustomobject]@{
     entryAliases = [pscustomobject]@{ ($g1.ToUpperInvariant()) = '  Test Alias  ' }
 }
 $norm = ConvertTo-NormalizedAppSettingsCore $source
-Assert-Equal 5 $norm.schemaVersion 'Legacy settings normalize to current schema'
-Assert-Equal 'de-DE' $norm.locale 'Legacy pre-localization settings migrate to German'
+Assert-Equal 6 $norm.schemaVersion 'Legacy settings normalize to current schema'
+Assert-Equal 'en-US' $norm.locale 'Legacy pre-localization settings migrate to English'
+Assert-Equal 'default' $norm.localePreferenceSource 'Legacy migration records default locale source'
+Assert-Equal $false $norm.localePreferenceNeedsConfirmation 'Legacy pre-localization settings need no confirmation'
 Assert-Equal $g1.ToLowerInvariant() $norm.defaultGuid 'Settings default GUID normalization'
 Assert-Equal @($g2.ToLowerInvariant(),$g1.ToLowerInvariant()) @($norm.entryOrder) 'Settings order lowercase unique'
 Assert-Equal @($g1.ToLowerInvariant()) @($norm.hiddenEntryGuids) 'Settings hidden lowercase unique'
 Assert-Equal 'Test Alias' $norm.entryAliases[$g1.ToLowerInvariant()] 'Alias trim and lowercase key'
 
-
 $currentEnglish = ConvertTo-NormalizedAppSettingsCore ([pscustomobject]@{ schemaVersion=5; locale='en-US' })
-Assert-Equal 'en-US' $currentEnglish.locale 'Explicit English locale persists'
-$currentGerman = ConvertTo-NormalizedAppSettingsCore ([pscustomobject]@{ schemaVersion=5; locale='de-de' })
-Assert-Equal 'de-DE' $currentGerman.locale 'Explicit German locale normalizes'
+Assert-Equal 'en-US' $currentEnglish.locale 'Schema-5 English remains English'
+Assert-Equal 'default' $currentEnglish.localePreferenceSource 'Schema-5 English has default preference source'
+Assert-Equal $false $currentEnglish.localePreferenceNeedsConfirmation 'Schema-5 English needs no confirmation'
+
+$ambiguousGerman = ConvertTo-NormalizedAppSettingsCore ([pscustomobject]@{ schemaVersion=5; locale='de-de' })
+Assert-Equal 'de-DE' $ambiguousGerman.locale 'Schema-5 German remains German until ambiguity is resolved'
+Assert-Equal 'migration-pending' $ambiguousGerman.localePreferenceSource 'Schema-5 German is marked migration-pending'
+Assert-Equal $true $ambiguousGerman.localePreferenceNeedsConfirmation 'Schema-5 German requires one explicit choice'
+
+$explicitGerman = ConvertTo-NormalizedAppSettingsCore ([pscustomobject]@{ schemaVersion=6; locale='de-de'; localePreferenceSource='user' })
+Assert-Equal 'de-DE' $explicitGerman.locale 'Explicit German user preference normalizes and persists'
+Assert-Equal 'user' $explicitGerman.localePreferenceSource 'Explicit German user preference retains user source'
+Assert-Equal $false $explicitGerman.localePreferenceNeedsConfirmation 'Explicit German user preference needs no confirmation'
+
 $currentInvalid = ConvertTo-NormalizedAppSettingsCore ([pscustomobject]@{ schemaVersion=5; locale='fr-FR' })
 Assert-Equal 'en-US' $currentInvalid.locale 'Invalid stored locale falls back to English'
+Assert-Equal 'default' $currentInvalid.localePreferenceSource 'Invalid stored locale has no explicit user evidence'
 $currentMissing = ConvertTo-NormalizedAppSettingsCore ([pscustomobject]@{ schemaVersion=5 })
 Assert-Equal 'en-US' $currentMissing.locale 'Current settings without locale fall back to English'
+$currentDefaultGerman = ConvertTo-NormalizedAppSettingsCore ([pscustomobject]@{ schemaVersion=6; locale='de-DE'; localePreferenceSource='default' })
+Assert-Equal 'en-US' $currentDefaultGerman.locale 'German is not retained without explicit user evidence'
 
 $entries = @(
     [pscustomobject]@{ Guid=$g1.ToLowerInvariant(); Title='One' },

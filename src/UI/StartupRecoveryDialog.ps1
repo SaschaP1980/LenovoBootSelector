@@ -4,9 +4,7 @@
         if (-not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) { return 'en-US' }
         $source = ([System.IO.File]::ReadAllText($settingsPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json)
         $sourceSchema = if ($source.schemaVersion) { [int]$source.schemaVersion } else { 1 }
-        $property = $source.PSObject.Properties['locale']
-        if ($null -ne $property) { return (Resolve-LocaleIdCore -Locale ([string]$property.Value)) }
-        if ($sourceSchema -lt 5) { return 'de-DE' }
+        return (Get-AppSettingsLocaleCore -Source $source -SourceSchemaVersion $sourceSchema)
     }
     catch { }
     return 'en-US'

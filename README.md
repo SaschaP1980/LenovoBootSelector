@@ -69,7 +69,7 @@ The TaskBroker boundary is hardened fail-closed: the runtime accepts only fixed 
 
 Historical migration and repair details for v0.6.4.0/v0.6.4.1 are retained in [CHANGELOG.md](CHANGELOG.md) rather than presented as current maintenance instructions.
 
-**Current development version:** v0.8.0.0  
+**Current development version:** v0.8.0.1  
 **Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads and revision history
@@ -154,6 +154,7 @@ This presentation makes **no claim of direct 1:1 addressability** of the physica
 | `tests-history/` | frozen version-specific validators, named by category + version |
 | `docs/architecture/` | canonical and historical architecture baselines |
 | `docs/LOCALIZATION.md` | localization architecture, migration, contribution rules, and gates |
+| `docs/DEVELOPMENT_GUIDELINES.md` | work-branch/checkpoint, session-resilience, connector, and Major/Minor development rules |
 | `audits/` | canonical and historical catch audits |
 | `tools/` | build, packaging, audit, and transition scripts |
 | `downloads/` | historical versioned release ZIPs and update manifests |
@@ -166,7 +167,7 @@ The central native Windows PowerShell 5.1 test wrapper is:
 .\tests\Test-WindowsPowerShell51.ps1
 ~~~
 
-Build and packaging helpers live under `tools/`. Detailed version history is in [CHANGELOG.md](CHANGELOG.md). Localization development rules are in [docs/LOCALIZATION.md](docs/LOCALIZATION.md).
+Build and packaging helpers live under `tools/`. Detailed version history is in [CHANGELOG.md](CHANGELOG.md). Localization development rules are in [docs/LOCALIZATION.md](docs/LOCALIZATION.md). Long-running Major/Minor feature work follows [docs/DEVELOPMENT_GUIDELINES.md](docs/DEVELOPMENT_GUIDELINES.md).
 
 ### Agentic software engineering
 

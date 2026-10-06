@@ -12,7 +12,11 @@ function Set-ActiveLocale {
     $changed = ([string]$script:UiLocale) -ne $resolved
     $script:UiLocale = $resolved
 
-    if ($Persist -and $changed) {
+    if ($Persist) {
+        # An explicit UI/API language action is evidence of user intent even
+        # when the selected locale already matches the current locale.
+        $script:LocalePreferenceSource = 'user'
+        $script:LocalePreferenceNeedsConfirmation = $false
         Save-AppSettings
     }
     return $resolved
