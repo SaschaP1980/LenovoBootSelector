@@ -109,5 +109,29 @@ $malformed=[pscustomobject]@{success='true';message='not a Boolean'}
 $rr=Resolve-LenovoUpdateRestartResultCore -Result $malformed -RunningVersion '0.5.8.1'
 Assert-Equal 'Non-Boolean legacy success is rejected' 'unknown' $rr.ResultFormat
 Assert-True 'Malformed legacy result fails closed' (-not $rr.Success)
-Write-Host "UPDATE TOTAL $checks/61"
-if ($checks -ne 61) { throw "Unexpected update test count $checks" }
+$tokens = $null
+$parseErrors = $null
+$testAst = [System.Management.Automation.Language.Parser]::ParseFile(
+    $MyInvocation.MyCommand.Path,
+    [ref]$tokens,
+    [ref]$parseErrors
+)
+if (@($parseErrors).Count -ne 0) {
+    throw "Update test self-audit could not parse its own source."
+}
+$sourceAssertionCount = @(
+    $testAst.FindAll({
+        param($node)
+        if ($node -isnot [System.Management.Automation.Language.CommandAst]) { return $false }
+        $commandName = $node.GetCommandName()
+        return $commandName -eq 'Assert-True' -or $commandName -eq 'Assert-Equal'
+    }, $true)
+).Count
+if ($checks -ne $sourceAssertionCount) {
+    throw "Update assertion execution/source mismatch: executed $checks, source $sourceAssertionCount"
+}
+Write-Host "UPDATE ASSERTION SOURCE $sourceAssertionCount/62"
+if ($sourceAssertionCount -ne 62) { throw "Unexpected update assertion source count $sourceAssertionCount" }
+
+Write-Host "UPDATE TOTAL $checks/62"
+if ($checks -ne 62) { throw "Unexpected update test count $checks" }

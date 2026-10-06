@@ -119,3 +119,4 @@ finally {
     try { Remove-Item -LiteralPath $testRoot -Recurse -Force -ErrorAction SilentlyContinue } catch { }
 }
 Write-Host "MUTEX TOTAL $checks/4"
+if ($checks -ne 4) { throw "Unexpected mutex test count $checks" }

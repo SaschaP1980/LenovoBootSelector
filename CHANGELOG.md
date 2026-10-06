@@ -1,5 +1,16 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.7.3 – Native Test-Harness Count-Drift gehärtet
+
+- `Test-UpdateCore.ps1` korrigiert den historisch veralteten Abschlusszähler von 61 auf 62; die 62 vorhandenen fachlichen Assertions waren bereits erfolgreich.
+- Der Update-Test führt zusätzlich einen PowerShell-AST-Self-Audit aus: die im Source definierten `Assert-True`-/`Assert-Equal`-Command-Aufrufe müssen exakt den tatsächlich ausgeführten `$checks` entsprechen.
+- Als bewusster zusätzlicher Change-Control-Guard bleiben `Write-Host "UPDATE TOTAL $checks/62"` und `if ($checks -ne 62) { throw "Unexpected update test count $checks" }` fest erhalten; auch die AST-Source-Anzahl muss explizit 62 sein.
+- Das permanente Release-Gate prüft strukturell 62 Update-Assertion-Call-Sites sowie AST-Self-Audit und beide 62er-Guards, damit Count-Drift bereits im Candidate Preflight auffällt.
+- `Test-SingleInstanceMutex.ps1` erhält zusätzlich zu `MUTEX TOTAL $checks/4` einen echten Fail-Guard auf exakt vier Checks.
+- `tests/README.md` dokumentiert die unterschiedlichen Count-Strategien der nativen Suites; Loop-/Soak-/dynamische Suites werden nicht fälschlich mit einem pauschalen Call-Site-Count behandelt.
+- Produktcode unter `src/**` bleibt unverändert; der Hotfix verwendet deshalb `version-only`.
+- Native Windows-/PowerShell-5.1-Ausführung bleibt nach Veröffentlichung separat zu bestätigen.
+
 ## v0.6.7.2 – Version-only Release-Zyklus-Messung
 
 - Reiner Hotfix-/Releaseprozess-Test ohne fachliche Produktänderung.
