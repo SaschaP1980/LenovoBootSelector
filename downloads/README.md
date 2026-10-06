@@ -15,6 +15,7 @@ This directory contains the **historically retained built releases** of Lenovo B
 
 | Version | Release | Size | SHA-256 | Git tag |
 | --- | --- | ---: | --- | --- |
+| v0.7.0.0 | [LenovoBootMenuTray-v0.7.0.0.zip](LenovoBootMenuTray-v0.7.0.0.zip) | 95.152 Bytes | `6d11d491c17b61cb715b0d60757cd7715c7266e4e102671f48b9884c010b64a4` | `v0.7.0.0` |
 | v0.6.9.1 | [LenovoBootMenuTray-v0.6.9.1.zip](LenovoBootMenuTray-v0.6.9.1.zip) | 94.980 Bytes | `fcda8adf26aa1ee127fbda8c9c0a972bcbf91938f0ea3d2de5e1e196ae04f445` | `v0.6.9.1` |
 | v0.6.9.0 | [LenovoBootMenuTray-v0.6.9.0.zip](LenovoBootMenuTray-v0.6.9.0.zip) | 94.978 Bytes | `2291465dd3299965c14bf8cfb0f5394980a99bc4395cba4b9053450cf048ceba` | `v0.6.9.0` |
 | v0.6.8.1 | [LenovoBootMenuTray-v0.6.8.1.zip](LenovoBootMenuTray-v0.6.8.1.zip) | 94.976 Bytes | `b5cfe6b9f4c52a412ce600a217d83ffc4c321f3166a8c30c3b8e7cea7e273997` | `v0.6.8.1` |

@@ -7,8 +7,6 @@
         CheckTimer = $null
         CheckResultPath = $null
         CheckMode = ''
-        StartupCheckStarted = $false
-        StartupCheckCompleted = $false
         PrepareProcess = $null
         PrepareTimer = $null
         PrepareResultPath = $null

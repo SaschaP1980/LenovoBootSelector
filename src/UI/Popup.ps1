@@ -468,6 +468,10 @@ function Show-OrTogglePopup {
     $script:Popup.Show()
     $script:Popup.Activate()
 
+    # LBS-21: opening the visible UI is the automatic read-only update-check trigger.
+    # The update worker has its own busy gate and can overlap the independent boot-target worker.
+    [void](Start-PopupUpdateCheck)
+
     # Critical latency path: the form is visible before any fresh Scheduled-Task
     # refresh begins. Maintenance/missing-system-function states never launch a
     # competing worker; slow firmware/storage work stays in the hidden child.
