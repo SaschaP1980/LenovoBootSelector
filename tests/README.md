@@ -18,7 +18,7 @@ Diese vier Dateien sind die permanenten Python-Gates des GitHub-Release-Orchestr
 | Datei | Kategorie | Zweck |
 | --- | --- | --- |
 | `Test-FunctionalCore.ps1` | Core | Parser, Settings und fachliche Kernfunktionen |
-| `Test-UpdateCore.ps1` | Core | Update-Modell und Update-Verträge |
+| `Test-UpdateCore.ps1` | Core | Update-Modell, Transport-Fehlervertrag und Update-Verträge |
 | `Test-RefreshRuntime.ps1` | Runtime | Background-Refresh-State und Request-Lifecycle |
 | `Test-MaintenanceRuntime.ps1` | Runtime | Maintenance-State und Modi |
 | `Test-SingleInstanceMutex.ps1` | Runtime | Single-Instance-/Mutex-Lifecycle |

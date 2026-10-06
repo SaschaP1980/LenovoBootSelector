@@ -33,6 +33,9 @@ function Resolve-LenovoUpdateRestartResultCore {
     $resultUtc = ''
     $rollbackAttempted = $false
     $rollbackSucceeded = $false
+    $failureCategory = ''
+    $failureStage = ''
+    $errorClass = ''
     $legacySuccessProperty = $null
     if ($Result) {
         $status = ([string]$Result.status).Trim().ToLowerInvariant()
@@ -42,6 +45,9 @@ function Resolve-LenovoUpdateRestartResultCore {
         $resultUtc = [string]$Result.utc
         $rollbackAttempted = [bool]$Result.rollbackAttempted
         $rollbackSucceeded = [bool]$Result.rollbackSucceeded
+        $failureCategory = ([string]$Result.failureCategory).Trim().ToLowerInvariant()
+        $failureStage = ([string]$Result.failureStage).Trim()
+        $errorClass = ([string]$Result.errorClass).Trim()
         $legacySuccessProperty = $Result.PSObject.Properties['success']
     }
 
@@ -110,6 +116,9 @@ function Resolve-LenovoUpdateRestartResultCore {
         RunningVersion = $running
         RollbackAttempted = $rollbackAttempted
         RollbackSucceeded = $rollbackSucceeded
+        FailureCategory = $failureCategory
+        FailureStage = $failureStage
+        ErrorClass = $errorClass
         StoredMessage = $storedMessage
     }
 }
