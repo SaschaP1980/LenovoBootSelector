@@ -101,7 +101,7 @@ jobs:
           ZIP_DIFF=$(git diff --cached --name-status origin/main -- 'downloads/*.zip')
           EXPECTED_ZIP_DIFF=$(printf 'A\tdownloads/LenovoBootMenuTray-v%s.zip' "$VERSION")
           test "$ZIP_DIFF" = "$EXPECTED_ZIP_DIFF"
-          DELETED_PATHS=$(git diff --cached --name-only --diff-filter=D origin/main || true)
+          DELETED_PATHS=$(git diff --cached --name-only --diff-filter=D --no-renames origin/main || true)
           if [ -n "$DELETED_PATHS" ]; then
             if git cat-file -e origin/main:version.json 2>/dev/null && \
                ! git cat-file -e origin/main:bin/version.json 2>/dev/null && \
