@@ -61,6 +61,10 @@ def main():
     readme=txt(root/'README.md') if (root/'README.md').is_file() else ''
     changelog=txt(root/'CHANGELOG.md') if (root/'CHANGELOG.md').is_file() else ''
     localization_doc=txt(root/'docs/LOCALIZATION.md') if (root/'docs/LOCALIZATION.md').is_file() else ''
+    lbs23_validator=root/'tests/validate_lbs23_localization.py'
+    s.c('LBS-23 focused localization migration validator exists',lbs23_validator.is_file())
+    lbs23_cp=subprocess.run([sys.executable,'-B',str(lbs23_validator),'--root',str(root)],capture_output=True,text=True) if lbs23_validator.is_file() else None
+    s.eq('LBS-23 focused localization migration validator passes',lbs23_cp.returncode if lbs23_cp else 1,0)
     s.has('README current development version matches canonical version',readme,f'**Current development version:** v{version}')
     s.has('CHANGELOG contains canonical version section',changelog,f'## v{version} ')
     s.c('LBS-17 localization architecture document exists',(root/'docs/LOCALIZATION.md').is_file())
@@ -68,7 +72,7 @@ def main():
     s.has('LBS-17 README documents selectable German locale',readme,'German (`de-DE`)')
     s.has('LBS-17 README links localization architecture',readme,'[docs/LOCALIZATION.md](docs/LOCALIZATION.md)')
     s.has('LBS-17 localization docs declare English default and fallback',localization_doc,'`en-US` — canonical default and fallback')
-    s.has('LBS-17 localization docs define legacy German migration',localization_doc,'settings schema below 5 with no locale')
+    s.has('LBS-23 localization docs define English pre-localization migration',localization_doc,'Pre-localization settings without an explicit locale migrate to `en-US`.')
     s.has('LBS-17 localization docs prohibit distributed language branches',localization_doc,'Do not add `if ($Language -eq ...)`')
     s.has('LBS-17 localization docs retain safety boundary',localization_doc,'tray process unelevated')
     s.c('Git control file remains at repository root',(root/'.gitignore').is_file())
@@ -104,10 +108,10 @@ def main():
     localization_native=txt(root/'tests/Test-LocalizationRuntime.ps1') if (root/'tests/Test-LocalizationRuntime.ps1').is_file() else ''
     windows_wrapper=txt(root/'tests/Test-WindowsPowerShell51.ps1')
     s.c('LBS-17 native localization test exists',bool(localization_native))
-    s.has('LBS-17 native localization test keeps fixed total 14',localization_native,'Write-Host "LOCALIZATION TOTAL $checks/14"')
-    s.has('LBS-17 native localization test fails closed on count drift',localization_native,'if ($checks -ne 14) { throw "Expected 14 localization checks, got $checks" }')
+    s.has('LBS-23 native localization test keeps fixed total 32',localization_native,'Write-Host "LOCALIZATION TOTAL $checks/32"')
+    s.has('LBS-23 native localization test fails closed on count drift',localization_native,'if ($checks -ne 32) { throw "Expected 32 localization checks, got $checks" }')
     s.has('LBS-17 native localization test covers persisted language selection',localization_native,"Set-ActiveLocale -Locale 'de-DE' -Persist")
-    s.has('LBS-17 native localization test covers legacy migration',localization_native,'Pre-localization schema migrates to de-DE in memory')
+    s.has('LBS-23 native localization test covers English legacy migration',localization_native,'Pre-localization schema migrates to en-US')
     s.has('LBS-17 native aggregate runner invokes localization suite',windows_wrapper,"Test-LocalizationRuntime.ps1")
     mutex_test=txt(root/'tests/Test-SingleInstanceMutex.ps1')
     s.has('Mutex native test keeps explicit total output',mutex_test,'Write-Host "MUTEX TOTAL $checks/4"')

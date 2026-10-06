@@ -1,19 +1,10 @@
 {
   "schemaVersion": 2,
-  "version": "0.8.0.0",
+  "version": "0.8.0.1",
   "releaseProfile": "patch",
   "protectedFragmentIntent": [
-    "ps:Complete-BackgroundBootRefresh",
-    "ps:Get-FirmwareBootState",
-    "ps:Get-FriendlyBootEntry",
     "ps:Load-AppSettings",
-    "ps:New-PopupForm",
-    "ps:Save-AppSettings",
-    "ps:Save-RuntimeDiagnosticsFromUi",
-    "ps:Show-LenovoNoticeDialog",
-    "ps:Show-OrTogglePopup",
-    "ps:Start-BackgroundBootRefresh",
-    "ps:Update-PopupRows"
+    "ps:Save-AppSettings"
   ],
   "repositoryDeleteIntent": []
 }

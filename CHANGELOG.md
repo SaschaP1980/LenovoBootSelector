@@ -1,5 +1,17 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.8.0.1 – LBS-23 English-default localization migration hotfix
+
+- Fix the v0.8.0.0 localization migration so pre-localization settings without an explicit locale resolve to English (`en-US`) instead of German.
+- Advance user settings to schema 6 and persist `localePreferenceSource` as explicit evidence of whether the active language is the default, a user choice, or the one-time ambiguous v0.8.0.0 migration state.
+- Treat schema-5 `locale: "de-DE"` without preference metadata as `migration-pending` because v0.8.0.0 serialized both automatic migration and a possible explicit German selection identically; do not guess or silently overwrite it.
+- Ask once on normal startup whether that ambiguous state should use English or keep German, then persist the result as an explicit user choice. Selecting German explicitly is recorded even when German is already active.
+- Reuse the canonical locale-resolution rule for startup-recovery: pre-localization settings without a locale use English, while unresolved v0.8.0.0 German remains German only until the normal UI can obtain the explicit choice.
+- Expand the native Windows PowerShell 5.1 localization suite from 14 to 32 checks, covering schema-6 persistence, the ambiguous migration state, same-locale German confirmation, one-time English correction, later explicit German selection, reload behavior, startup recovery, parity, and lookup.
+- Add permanent focused LBS-23 release validation and update localization architecture documentation.
+- BootService, TaskBroker, Storage mutation, firmware/BCD, BootNext, SYSTEM task allowlist, updater installation safety, and USB detection architecture are unchanged.
+- Release profile: `patch`. Intentional characterized protected-fragment delta: `ps:Load-AppSettings`, `ps:Save-AppSettings`.
+
 ## v0.8.0.0 – LBS-17 English/German localization
 
 - Introduce a central deterministic localization layer with matching `en-US` and `de-DE` catalogs; English is the canonical default and fallback language.

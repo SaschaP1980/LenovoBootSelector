@@ -51,35 +51,45 @@ Both positional and named formatting are supported. Named placeholders use value
 
 ## Settings and migration
 
-Localization uses settings schema **5**.
+Localization uses settings schema **6**.
 
-The persisted property is:
+The persisted localization properties are:
 
-`locale`
+- `locale`;
+- `localePreferenceSource`.
+
+`localePreferenceSource` is the evidence for how the current language was chosen:
+
+- `default` — no explicit user language choice has been established;
+- `user` — the user explicitly selected a supported language;
+- `migration-pending` — a one-time compatibility state for an ambiguous v0.8.0.0 German setting.
 
 Migration is deliberate:
 
-- no settings file → new installation → `en-US`;
-- settings schema below 5 with no locale → existing pre-localization installation → `de-DE`;
-- valid explicit `en-US` or `de-DE` → normalize and preserve;
-- invalid explicit locale → `en-US`;
-- current schema without a locale → `en-US`.
+- no settings file → new installation → `en-US` with `default`;
+- Pre-localization settings without an explicit locale migrate to `en-US`.
+- schema 5 with `locale: "de-DE"` and no preference metadata is ambiguous because v0.8.0.0 used the same serialized state for both the incorrect automatic migration and a possible explicit user choice;
+- that ambiguous state is preserved temporarily as `de-DE` with `migration-pending` and requires one explicit English/German choice;
+- an explicit supported choice is persisted with `localePreferenceSource: "user"` and is never changed automatically afterward;
+- invalid/unknown locale data falls back to `en-US`;
+- current/default settings without demonstrable user preference remain `en-US`.
 
-This preserves the historical German experience for an existing installation while making English the product default for new installations.
+The v0.8.0.0 ambiguity is intentionally **not** resolved by guessing. On the next normal UI startup, Lenovo Boot Selector asks once which language to keep. Choosing English corrects the unintended migration; choosing German preserves German as an explicit user choice. The resulting `user` marker prevents future automatic migration from changing that choice.
 
-`Set-ActiveLocale -Persist` writes the selection through the existing settings service. A visible popup is rebuilt when the language changes so all product-controlled text immediately reflects the new locale.
+`Set-ActiveLocale -Persist` records explicit user intent even when the selected locale already equals the active locale. This is required so choosing German in the one-time migration prompt can distinguish a genuine German preference from the historical ambiguous state.
 
 ## Startup recovery
 
-The localization core is included before `src/UI/StartupRecoveryDialog.ps1` in the runtime template.
+The localization core and settings-preference core are included before `src/UI/StartupRecoveryDialog.ps1` in the runtime template.
 
-Startup recovery cannot rely on the normal application settings lifecycle because it also handles failures that occur before full startup. `Get-StartupRecoveryLocale` therefore performs a narrow read-only settings lookup and applies the same migration/default rules:
+Startup recovery cannot display the normal migration-choice dialog because it also handles failures that occur before full UI startup. `Get-StartupRecoveryLocale` therefore performs a narrow read-only settings lookup and reuses the canonical locale-resolution rule:
 
-- explicit valid locale → selected locale;
-- legacy schema without locale → German;
-- missing/invalid/current-without-locale → English.
+- pre-localization settings without an explicit locale → English;
+- explicit `user` preference → selected supported locale;
+- `migration-pending` schema-5 German → German temporarily, until normal startup can ask for the explicit choice;
+- missing/invalid/default-without-user-evidence → English.
 
-It does not change settings.
+Startup recovery never changes settings.
 
 ## What is localized
 
@@ -159,7 +169,7 @@ The dedicated native suite is:
 
 It emits:
 
-`LOCALIZATION TOTAL <passed>/14`
+`LOCALIZATION TOTAL <passed>/32`
 
 and is part of the mandatory GitHub-hosted Windows PowerShell 5.1 Candidate gate.
 
