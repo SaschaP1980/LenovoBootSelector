@@ -1,5 +1,16 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.3.1 – LBS-14 Update-Hinweis interaktiv und Dialogtitel vereinheitlicht
+
+- Der Header-Hinweis lautet jetzt konsistent **„Neue App-Version verfügbar“**.
+- Der Hinweis ist bei verfügbarem Update interaktiv: Hover und Tastaturfokus färben die Schrift Lenovo-rot, der Mauszeiger signalisiert Klickbarkeit.
+- Der Status verwendet einen flach gestalteten WinForms-Button und unterstützt dadurch die native Aktivierung per Enter und Leertaste.
+- Erst ein Klick bzw. eine Tastaturaktivierung öffnet den vorhandenen Update-Dialog; Hover allein öffnet nichts.
+- Der Dialogtitel lautet ebenfalls **„Neue App-Version verfügbar“** und verwendet weiterhin das bereits validierte, im Prozesszustand gespeicherte Manifest.
+- Der Header-Klick startet keinen zusätzlichen Netzwerk-/Versionscheck und führt keinen Download oder keine Installation automatisch aus.
+- Die bestehende Priorität bleibt unverändert: aktiver Bootziel-Refresh vor Update-Hinweis vor normaler Headeranzeige; während Refresh oder Maintenance ist der Update-Hinweis nicht interaktiv.
+- LBS-11-Startup-Check, LBS-5-Updatergrenzen sowie BootService, TaskBroker, Storage und Firmware-/BCD-Pfade bleiben unverändert.
+
 ## v0.6.3.0 – LBS-5 Updater-Netzwerklogik gekapselt und diagnostisch gehärtet
 
 - Neue Infrastrukturgrenze `src/Infrastructure/UpdateTransport.ps1`: feste GitHub-Quelle, TLS-1.2-Aktivierung, WebClient-Erzeugung sowie Manifest-/Pakettransport liegen nicht mehr im UpdateClient.

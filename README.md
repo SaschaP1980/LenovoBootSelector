@@ -8,7 +8,7 @@
 
 Die Anwendung läuft im Normalbetrieb **uneleviert**. Privilegierte Firmwareänderungen werden ausschließlich über fest definierte, allowgelistete Windows-Scheduled-Tasks ausgeführt. Permanente Änderungen an der UEFI-Bootreihenfolge gehören ausdrücklich nicht zum Produktmodell.
 
-**Aktueller Entwicklungsstand:** v0.6.3.0  
+**Aktueller Entwicklungsstand:** v0.6.3.1  
 **Technik:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads und Revisionshistorie
@@ -35,9 +35,11 @@ Versionsschema: **MAJOR.MINOR.PATCH.HOTFIX**. Historische dreiteilige Versionen 
 
 ## Update-Funktion
 
-Beim Start jedes neuen Tray-Prozesses wird **genau einmal** automatisch read-only geprüft, ob eine neuere App-Version verfügbar ist. Das erneute Öffnen des Popups löst keinen weiteren Check aus; es gibt weiterhin **kein periodisches Polling**. Wird eine neue Version gefunden, zeigt der Popup-Header – solange kein Bootziel-Refresh läuft – **„Neue App Version verfügbar“**. Während eines Bootziel-Refreshs hat **„Aktualisiere Bootziele…“** Vorrang und danach erscheint die Update-Meldung wieder.
+Beim Start jedes neuen Tray-Prozesses wird **genau einmal** automatisch read-only geprüft, ob eine neuere App-Version verfügbar ist. Das erneute Öffnen des Popups löst keinen weiteren Check aus; es gibt weiterhin **kein periodisches Polling**. Wird eine neue Version gefunden, zeigt der Popup-Header – solange kein Bootziel-Refresh läuft – **„Neue App-Version verfügbar“**. Während eines Bootziel-Refreshs hat **„Aktualisiere Bootziele…“** Vorrang und danach erscheint die Update-Meldung wieder.
 
 Die Prüfung liest `downloads/latest.json` aus dem fest eingebauten GitHub-Repository. Eine neue Version wird nur akzeptiert, wenn Manifest, semantische Version, Dateiname, Tag, Größe, SHA-256 und Paketdateiliste valide sind. Der automatische Startcheck lädt oder installiert nichts. Download und Installation bleiben ausschließlich explizite Nutzeraktionen über den bestehenden manuellen Updatepfad. Das heruntergeladene ZIP wird vor dem Entpacken nochmals gegen Größe und SHA-256 geprüft. Die Installation läuft uneleviert mit lokalem Backup und Rollback; anschließend startet die App über den vorhandenen VBS-Launcher neu.
+
+Ab v0.6.3.1 ist **„Neue App-Version verfügbar“** im Popup-Header direkt bedienbar. Hover und Tastaturfokus heben den Hinweis Lenovo-rot hervor; Klick, Enter oder Leertaste öffnen den vorhandenen Dialog **„Neue App-Version verfügbar“**. Der Header verwendet dabei ausschließlich das bereits validierte Update-Manifest und startet keinen weiteren Versionscheck. Während eines Bootziel-Refreshs oder einer Wartungsaktion bleibt der Hinweis nicht interaktiv.
 
 Ab v0.6.3.0 ist die Netzwerkseite des Updaters in `src/Infrastructure/UpdateTransport.ps1` gekapselt. Runtime-Diagnosen unterscheiden Transportfehler strukturiert von Manifest-, Paket-, Hash-, Installations- und Restartfehlern. Bei Netzwerkfehlern werden zusätzlich Fehlerklasse und `WebExceptionStatus` erfasst. Der Sicherheitsvertrag bleibt unverändert: feste HTTPS-Quelle, fail-closed Manifest-/Paketprüfung, unelevierte Ausführung und kein periodisches Polling.
 

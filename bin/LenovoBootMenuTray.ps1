@@ -920,7 +920,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.6.3.0'
+$script:AppVersion = '0.6.3.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -1547,6 +1547,21 @@ function Hide-DarkActionTooltip {
 }
 
 
+function Update-HeaderStatusInteractionVisual {
+    if (-not $script:HeaderStatusLabel -or $script:HeaderStatusLabel.IsDisposed) { return }
+    $interactive = [bool]$script:HeaderUpdateInteractionEnabled
+    $highlight = ($interactive -and ([bool]$script:HeaderStatusHovered -or $script:HeaderStatusLabel.Focused))
+    $script:HeaderStatusLabel.ForeColor = if ($highlight) { $script:ColorAccent } else { $script:ColorSecondary }
+    $script:HeaderStatusLabel.Cursor = if ($interactive) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
+    $script:HeaderStatusLabel.TabStop = $interactive
+}
+
+function Set-HeaderUpdateInteractionState {
+    param([Parameter(Mandatory=$true)][bool]$Enabled)
+    $script:HeaderUpdateInteractionEnabled = $Enabled
+    Update-HeaderStatusInteractionVisual
+}
+
 function Update-HeaderRefreshStatus {
     if (Test-MaintenanceBusy) {
         if ($script:HeaderTitleLabel -and -not $script:HeaderTitleLabel.IsDisposed) { $script:HeaderTitleLabel.Location = New-Object Drawing.Point(16, 10) }
@@ -1554,6 +1569,7 @@ function Update-HeaderRefreshStatus {
             $script:HeaderStatusLabel.Text = Get-MaintenanceBusyStatusText
             $script:HeaderStatusLabel.Visible = $true
         }
+        Set-HeaderUpdateInteractionState -Enabled $false
         return
     }
 
@@ -1579,13 +1595,14 @@ function Update-HeaderRefreshStatus {
             'Aktualisiere Bootziele…'
         }
         elseif ($updateAvailable) {
-            'Neue App Version verfügbar'
+            'Neue App-Version verfügbar'
         }
         else {
             ''
         }
         $script:HeaderStatusLabel.Visible = $showStatus
     }
+    Set-HeaderUpdateInteractionState -Enabled (-not $active -and $updateAvailable)
 }
 
 function Update-RefreshButtonVisual {
@@ -2358,6 +2375,15 @@ function Update-UpdateMenuState {
     }
 }
 
+function Show-AvailableUpdateDialog {
+    if (-not $script:UpdateState -or [string]$script:UpdateState.Status -ne 'UpdateAvailable' -or $null -eq $script:UpdateState.AvailableManifest) {
+        return $false
+    }
+    $manifest = $script:UpdateState.AvailableManifest
+    Show-LenovoNoticeDialog -Title 'Neue App-Version verfügbar' -Heading ('Lenovo Boot Selector v{0} ist verfügbar.' -f $manifest.Version) -Message 'Du kannst die neue Version jetzt direkt installieren. Später findest du die Aktualisierung im Tray-Menü unter „Wartung“ → „App aktualisieren…“.' -Kind Info -SecondaryButtonText 'Jetzt aktualisieren' -SecondaryAction { Start-ManualAppUpdate }
+    return $true
+}
+
 function Stop-UpdateCheckUiWorker {
     if ($script:UpdateState.CheckTimer) { try { $script:UpdateState.CheckTimer.Stop() } catch { }; try { $script:UpdateState.CheckTimer.Dispose() } catch { }; $script:UpdateState.CheckTimer=$null }
     if ($script:UpdateState.CheckProcess) { try { $script:UpdateState.CheckProcess.Dispose() } catch { }; $script:UpdateState.CheckProcess=$null }
@@ -2384,9 +2410,9 @@ function Complete-UpdateCheck {
             $validated=Test-LenovoUpdateManifestCore -Manifest $result.Manifest
             if (-not $validated.IsValid) { $failureCategory='manifest'; $failureStage='result-manifest-validation'; throw $validated.Error }
             [void](Set-UpdateRuntimeAvailable -State $script:UpdateState -Manifest $validated)
-            $script:LastStatusText = ('Neue Version verfügbar: v{0}' -f $validated.Version)
+            $script:LastStatusText = ('Neue App-Version verfügbar: v{0}' -f $validated.Version)
             if (-not $isStartup) {
-                Show-LenovoNoticeDialog -Title 'Neue Version verfügbar' -Heading ('Lenovo Boot Selector v{0} ist verfügbar.' -f $validated.Version) -Message 'Du kannst die neue Version jetzt direkt installieren. Später findest du die Aktualisierung im Tray-Menü unter „Wartung“ → „App aktualisieren…“.' -Kind Info -SecondaryButtonText 'Jetzt aktualisieren' -SecondaryAction { Start-ManualAppUpdate }
+                [void](Show-AvailableUpdateDialog)
             }
             Write-RuntimeDiagnosticEvent -Event $(if ($isStartup) { 'STARTUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$true; availableVersion=$validated.Version; mode=$Mode })
         }
@@ -6189,10 +6215,41 @@ function New-PopupForm {
     $script:HeaderTitleLabel = $headerTitle
     $header.Controls.Add($headerTitle)
 
-    $headerSub = New-Label -Text '' -Font (New-Object Drawing.Font('Segoe UI', 7.8, [Drawing.FontStyle]::Regular)) `
-        -ForeColor $script:ColorSecondary -X 16 -Y 31 -Width 290 -Height 16
+    # LBS-14: a real flat Button keeps the status visually label-like while
+    # providing native Enter/Space activation and keyboard focus semantics.
+    $headerSub = New-Object System.Windows.Forms.Button
+    $headerSub.Text = ''
+    $headerSub.Font = New-Object Drawing.Font('Segoe UI', 7.8, [Drawing.FontStyle]::Regular)
+    $headerSub.ForeColor = $script:ColorSecondary
+    $headerSub.BackColor = $script:ColorHeader
+    $headerSub.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $headerSub.FlatAppearance.BorderSize = 0
+    $headerSub.FlatAppearance.MouseOverBackColor = $script:ColorHeader
+    $headerSub.FlatAppearance.MouseDownBackColor = $script:ColorHeader
+    $headerSub.UseVisualStyleBackColor = $false
+    $headerSub.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
+    $headerSub.Padding = New-Object System.Windows.Forms.Padding(0)
+    $headerSub.Location = New-Object Drawing.Point(13, 28)
+    $headerSub.Size = New-Object Drawing.Size(300, 21)
+    $headerSub.TabStop = $false
+    $headerSub.Cursor = [System.Windows.Forms.Cursors]::Default
     $headerSub.Name = 'HeaderStatusLabel'
     $headerSub.Visible = $false
+    $headerSub.AccessibleDescription = 'Öffnet den Dialog zur verfügbaren App-Version.'
+    $headerSub.Add_MouseEnter({
+        $script:HeaderStatusHovered = $true
+        Update-HeaderStatusInteractionVisual
+    })
+    $headerSub.Add_MouseLeave({
+        $script:HeaderStatusHovered = $false
+        Update-HeaderStatusInteractionVisual
+    })
+    $headerSub.Add_Enter({ Update-HeaderStatusInteractionVisual })
+    $headerSub.Add_Leave({ Update-HeaderStatusInteractionVisual })
+    $headerSub.Add_Click({
+        if (-not $script:HeaderUpdateInteractionEnabled) { return }
+        [void](Show-AvailableUpdateDialog)
+    })
     $script:HeaderStatusLabel = $headerSub
     $header.Controls.Add($headerSub)
 

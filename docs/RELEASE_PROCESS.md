@@ -2,6 +2,8 @@
 
 From v0.5.10.0 onward the canonical release model is **1 build = 1 release branch = 1 pull request = 1 merge**.
 
+Operational companion for ChatGPT/release supervision: [`GITHUB_HOWTO.md`](GITHUB_HOWTO.md).
+
 ## Canonical inputs
 
 - `bin/version.json` is the only authoritative release-version source. Schema v2 intentionally contains no `publishedUtc`.
@@ -42,3 +44,10 @@ Interactive release supervision waits at most 60 seconds for a GitHub-hosted run
 ## Repository/runtime layout
 
 Repository runtime/release source files live under `bin/`. The downloadable Release ZIP intentionally remains a flat 10-file package: packaging maps the `bin/` source files back to their established top-level archive names. Architecture baselines live under `docs/architecture/`; catch audits live under `audits/`. The canonical generated files are `docs/architecture/ARCHITECTURE_BASELINE.json` and `audits/CATCH_AUDIT.json`; historical versioned snapshots remain alongside them.
+
+## Operational guide maintenance and handovers
+
+`docs/GITHUB_HOWTO.md` is a mandatory living operational artifact. New durable findings about GitHub integration/release behavior and intentional changes to that integration must be documented there when established.
+
+Every project handover must include the **complete latest version** of `docs/GITHUB_HOWTO.md` from canonical `main`. A summary, excerpt or stale embedded copy is not sufficient. If the guide changes during handover preparation, update/regenerate the handover before delivery.
+
