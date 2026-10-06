@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "0.6.5.0",
-  "releaseProfile": "patch",
+  "version": "0.6.6.0",
+  "releaseProfile": "version-only",
   "protectedFragmentIntent": [],
   "repositoryDeleteIntent": []
 }
