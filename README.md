@@ -48,7 +48,7 @@ Lenovo Boot Selector is therefore not a BIOS/UEFI replacement and not a bootload
 - read-only firmware-target drift detection
 - read-only storage context for internal NVMe and USB media
 - diagnostic export and maintenance functions
-- manual self-updater with the current German UI actions `Auf neue Version prüfen…` and `App aktualisieren…`
+- self-updater with an automatic read-only version check whenever the popup opens, plus the current German manual UI actions `Auf neue Version prüfen…` and `App aktualisieren…`
 
 ## Security and maintenance notes
 
@@ -60,7 +60,7 @@ Since v0.6.4.0 this boundary is additionally hardened fail-closed: the runtime T
 
 **Note about v0.6.4.0:** the repair path first shipped in that version could falsely fail at the `protect-state` step because the ACL check interpreted the allowed `ReadAndExecute` rights as writable through the composite `Modify` mask. v0.6.4.1 fixes only that check. A repair that failed under v0.6.4.0 can safely be run again with v0.6.4.1.
 
-**Current development version:** v0.6.9.1  
+**Current development version:** v0.7.0.0  
 **Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads and revision history
@@ -73,9 +73,9 @@ Version format: **MAJOR.MINOR.PATCH.HOTFIX**. Historical three-component version
 
 ## Update function
 
-At the start of every new tray process, the application performs **exactly one** automatic read-only check for a newer app version. Reopening the popup does not trigger another check, and there is still **no periodic polling**. When a newer version is available, the popup header shows the current German UI text `Neue App-Version verfügbar` as long as no boot-target refresh is active. During a boot-target refresh, `Aktualisiere Bootziele…` takes precedence; the update indication returns afterward.
+Each transition from a hidden popup to the visible Lenovo Boot Selector UI starts one automatic read-only check for a newer app version, at the same lifecycle point as the existing fresh boot-target refresh. Starting the tray process alone does not perform that check; closing and later reopening the popup starts another one. If an update operation is already busy, the popup-open trigger does not start a competing second update worker. There is still **no periodic polling**. When a newer version is available, the popup header shows the current German UI text `Neue App-Version verfügbar` as long as no boot-target refresh is active. During a boot-target refresh, `Aktualisiere Bootziele…` takes precedence; the update indication returns afterward.
 
-The check reads `downloads/latest.json` from the fixed GitHub repository. A newer version is accepted only when manifest, semantic version, filename, tag, size, SHA-256, and package file list are valid. The automatic startup check does not download or install anything. Download and installation remain explicit user actions through the existing manual update path. The downloaded ZIP is checked again for size and SHA-256 before extraction. Installation runs unelevated with a local backup and rollback; the app then restarts through the existing VBS launcher.
+The check reads `downloads/latest.json` from the fixed GitHub repository. A newer version is accepted only when manifest, semantic version, filename, tag, size, SHA-256, and package file list are valid. The automatic popup-open check does not download or install anything. Download and installation remain explicit user actions through the existing manual update path. The downloaded ZIP is checked again for size and SHA-256 before extraction. Installation runs unelevated with a local backup and rollback; the app then restarts through the existing VBS launcher.
 
 Since v0.6.3.1, `Neue App-Version verfügbar` in the popup header is directly interactive. Hover and keyboard focus highlight the indicator in Lenovo red; click, Enter, or Space opens the existing update dialog. The header uses only the already validated update manifest and does not start another version check. The indicator is not interactive while a boot-target refresh or maintenance operation is active.
 
