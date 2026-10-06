@@ -2,6 +2,8 @@
 
 ## Bootstrap für einen neuen Chat
 
+Der kanonische Ein-Zeilen-Einstieg für einen komplett neuen Chat ist `docs/INITIAL_PROMPT.md`. Wenn der Nutzer lediglich auf diese Datei verweist, führt der neue Chat den dort beschriebenen vollständigen Bootstrap aus und liest anschließend diese How-To-Datei sowie die übrigen aktuellen Verträge.
+
 Wenn ein neuer Chat die Entwicklung, einen Build, einen Hotfix oder ein GitHub-Release für Lenovo Boot Selector übernimmt, darf er **nicht** aus Gesprächserinnerung oder einem alten Handover heraus direkt handeln. Zuerst muss der aktuelle kanonische Repository-Zustand rekonstruiert werden.
 
 Verbindliche Reihenfolge:
