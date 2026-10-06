@@ -34,6 +34,8 @@ function Start-LenovoBootSelectorHidden {
     }
 }
 
+# LBS-17: pure localization is loaded before startup recovery so duplicate-instance
+# and fatal-startup UI can honor the persisted locale safely.
 # Lenovo Boot Selector - Functional Core: localization
 # Pure/deterministic functions only. No script state, WinForms, filesystem, registry,
 # network, process starts, Scheduled Tasks, or privileged broker access.
@@ -609,6 +611,7 @@ function Get-LocalizedStringCore {
     }
     return $text
 }
+
 function Get-StartupRecoveryLocale {
     try {
         $settingsPath = Join-Path (Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray') 'settings.json'
@@ -3387,7 +3390,6 @@ function Set-AutostartFromUi([bool]$Enabled) {
 }
 
 
-
 function Get-ActiveLocale {
     return (Resolve-LocaleIdCore -Locale $script:UiLocale)
 }
@@ -3732,6 +3734,7 @@ function Load-AppSettings {
     # login-time restore. v0.2.22 no longer uses that mechanism.
     Remove-LegacySessionRestoreMarker -RegistryPath $script:LegacySessionRestoreRegistryPath -ValueName $script:LegacySessionRestoreValueName
 }
+
 function Update-LanguageMenuState {
     $locale = Get-ActiveLocale
     if ($script:LanguageMenuRoot) { $script:LanguageMenuRoot.Text = Get-LocalizedString -Key 'Settings.Language' }
