@@ -12,12 +12,23 @@ Operational companion for ChatGPT/release supervision: [`GITHUB_HOWTO.md`](GITHU
 - `tools/prepare_release.py` owns generated release metadata and packages. For schema v2, publication time must be supplied explicitly with `--published-utc`.
 - Canonical `publishedUtc` is owned by GitHub: the Release Orchestrator captures one UTC timestamp only after the hosted runner is executing the publication job and reuses that exact value for both deterministic rebuilds. Local preparation timestamps are provisional and are never committed as canonical publication metadata.
 
+## Issue prerequisite by version level
+
+Before implementation/release preparation:
+
+- **MAJOR / MINOR / PATCH:** relevant GitHub Issue(s) are mandatory before implementation starts. Do not create the release candidate or release branch for issue-less Major/Minor/Patch product work.
+- **HOTFIX:** an Issue is optional for a narrow defect correction. A direct Hotfix may be implemented and released without first creating an Issue when no existing Issue covers it.
+- If a Hotfix corrects a direct regression/incomplete implementation of an already completed Issue, reopen that original Issue, document the confirmed failure/root cause and Hotfix plan, reassess priority, and keep it open through successful Hotfix publication. Add the final Hotfix version/PR result, then close it again as `completed`.
+
+For Issue-backed releases, the Issue is part of the audit trail: important implementation findings belong in comments, and closure occurs only after successful publication/post-release verification.
+
 ## Local release preparation
 
-1. Change `bin/version.json` and add the corresponding `CHANGELOG.md` section.
-2. Run `python -B tools/prepare_release.py --root . --output-dir <dir> --published-utc <provisional-UTC>` for local validation only.
-3. Run the four permanent validators: `validate_release.py`, `validate_core.py`, `validate_boundary.py`, `validate_regression.py`.
-4. Push the canonical input changes to `release/v<version>`; do not add the new release ZIP manually. Generated runtime/audit/metadata files may already be present from the local build, but GitHub recreates them deterministically before the PR commit.
+1. Verify the version-level Issue prerequisite above.
+2. Change `bin/version.json` and add the corresponding `CHANGELOG.md` section.
+3. Run `python -B tools/prepare_release.py --root . --output-dir <dir> --published-utc <provisional-UTC>` for local validation only.
+4. Run the four permanent validators: `validate_release.py`, `validate_core.py`, `validate_boundary.py`, `validate_regression.py`.
+5. Push the canonical input changes to `release/v<version>`; do not add the new release ZIP manually. Generated runtime/audit/metadata files may already be present from the local build, but GitHub recreates them deterministically before the PR commit.
 
 ## Mandatory candidate preflight
 

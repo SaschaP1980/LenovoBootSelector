@@ -271,10 +271,40 @@ Do not declare a release complete until all relevant items are verified:
 10. Previously published ZIPs are unchanged.
 11. The release branch has been deleted.
 12. Only after this should the corresponding implementation Issue be closed as `completed`.
+13. For Issue-backed work, add the final release/version/PR result to the Issue before closing it.
+14. If the release is a corrective Hotfix for a reopened Issue, close it only after the Hotfix itself is published and verified.
 
 ## GitHub Issues / backlog discipline
 
-GitHub Issues are the backlog.
+GitHub Issues are the backlog and the canonical implementation/audit trail for planned product work.
+
+### Issue requirement by version level
+
+The version level determines whether an Issue is mandatory **before implementation starts**:
+
+- **MAJOR:** at least one relevant GitHub Issue is mandatory before implementation.
+- **MINOR:** at least one relevant GitHub Issue is mandatory before implementation.
+- **PATCH:** at least one relevant GitHub Issue is mandatory before implementation.
+- **HOTFIX:** a pre-existing/new Issue is optional. A narrowly scoped defect may be fixed, built, tested and released directly when no Issue already covers it.
+
+A Major/Minor/Patch release must not be started as issue-less work and must not reach `release/v<version>` without a relevant Issue that existed before implementation. If several independent product changes are bundled, each substantive work item should be represented by an Issue rather than hidden only in a changelog/PR.
+
+The Hotfix exception exists to keep urgent, narrow corrections fast. Even when a Hotfix has no Issue, the root cause, scope, tests and release result must still be documented in the changelog/PR/release history.
+
+### Issue-backed implementation lifecycle — best practice
+
+When work is backed by an Issue, keep that Issue as the durable lifecycle record:
+
+1. Read/reconcile the Issue against current `main` before changing code.
+2. Keep/reopen the Issue while its implementation or a directly related corrective Hotfix is actively unresolved.
+3. Preserve the Issue's type/status labels and maintain exactly one current `priority:*` label.
+4. During implementation or corrective work, add concise comments for materially important findings such as confirmed root cause, changed scope, migration impact or the planned Hotfix version.
+5. Close the Issue as `completed` **only after** the implementing release is successfully published and post-release verification is complete.
+6. Before closing, add a final implementation/release comment that records at least the released version and relevant release PR; include important migration/testing notes when applicable.
+
+If a released implementation later proves defective and the defect is a **direct regression or incomplete fulfillment of that same Issue**, reopen the original Issue instead of silently fixing around it. Add a comment with the confirmed failure/root cause and Hotfix plan, reassess its priority for the active incident, and keep it open until the corrective release is published and verified. Then add the Hotfix release result and close it again as `completed`.
+
+Create a new Issue instead when the newly found problem is materially different in scope from the original Issue rather than a regression/incomplete implementation of it.
 
 Before implementing an Issue:
 
