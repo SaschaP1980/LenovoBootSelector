@@ -151,6 +151,34 @@ jobs:
                 echo "LBS-1 migration left architecture/audit JSONs in repository root." >&2
                 exit 1
               fi
+            elif git cat-file -e origin/main:tests/validate_v040.py 2>/dev/null && \
+                 test -f tests-history/release-v0.4.0.py; then
+              EXPECTED_LBS13_DELETIONS=$(git ls-tree -r --name-only origin/main | \
+                grep -E '^tests/validate_v[0-9]+(_(core|boundary|regression))?\.py$' | sort)
+              ACTUAL_DELETIONS=$(printf '%s\n' "$DELETED_PATHS" | sort)
+              test "$ACTUAL_DELETIONS" = "$EXPECTED_LBS13_DELETIONS" || {
+                echo "LBS-13 migration delete set is not exact." >&2
+                printf '%s\n' "$DELETED_PATHS" >&2
+                exit 1
+              }
+              EXPECTED_LBS13_COUNT=$(printf '%s\n' "$EXPECTED_LBS13_DELETIONS" | grep -c .)
+              ACTUAL_LBS13_COUNT=$(find tests-history -maxdepth 1 -type f -name '*.py' | wc -l | tr -d ' ')
+              test "$ACTUAL_LBS13_COUNT" = "$EXPECTED_LBS13_COUNT" || {
+                echo "LBS-13 historical validator count differs from migrated source count." >&2
+                exit 1
+              }
+              while IFS= read -r path; do
+                [ -z "$path" ] && continue
+                source_blob=$(git rev-parse "origin/main:$path")
+                if ! git ls-tree -r HEAD tests-history | awk -v sha="$source_blob" '$3 == sha { found=1 } END { exit(found ? 0 : 1) }'; then
+                  echo "LBS-13 historical validator blob missing for $path" >&2
+                  exit 1
+                fi
+              done <<< "$DELETED_PATHS"
+              if find tests -maxdepth 1 -type f -name 'validate_v*.py' | grep -q .; then
+                echo "LBS-13 migration left versioned validators in active tests/." >&2
+                exit 1
+              fi
             else
               echo "Release unexpectedly deletes repository files." >&2
               printf '%s\n' "$DELETED_PATHS" >&2
