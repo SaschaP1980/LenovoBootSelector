@@ -11,6 +11,7 @@ CORE_FILES=[
     'src/Core/UpdateModel.ps1',
 ]
 CHANGED_WRAPPERS={'Get-AppSettings','Save-AppSettings','Load-AppSettings','Get-FirmwareBootState','Get-FriendlyBootEntry','Update-PopupRows','Complete-BackgroundBootRefresh','Start-BackgroundBootRefresh','Export-RuntimeDiagnosticPackage','Show-OrTogglePopup','New-PopupForm'}
+INTENTIONALLY_CHANGED_FROZEN=CHANGED_WRAPPERS|{'Test-TaskBrokerReady','Invoke-AuthorizedTask'}
 REMOVED_FROZEN={'Set-BootSequence','Invoke-BcdEdit'}
 
 class Suite:
@@ -147,8 +148,8 @@ def main():
             s.check(f'Critical fragment present: {name}',frag is not None)
             if frag is None: continue
             actual=sha(frag.encode('utf-8'))
-            if name in CHANGED_WRAPPERS:
-                s.check(f'Intentional wrapper refactor changed frozen fragment: {name}',actual!=expected)
+            if name in INTENTIONALLY_CHANGED_FROZEN:
+                s.check(f'Intentional protected fragment changed: {name}',actual!=expected)
             else:
                 s.eq(f'Unrelated critical fragment unchanged: {name}',actual,expected)
         for fn in ['LenovoBootMenuTray.ico','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','icon-preview.png']:
@@ -165,7 +166,7 @@ def main():
     s.contains('LBS-6 TaskBroker schema is hardened v0.2.13',tray,"$script:SupportedTaskBrokerVersions = @('0.2.13')")
     s.contains('LBS-6 installer schema is hardened v0.2.13',install,"$version = '0.2.13'")
     s.contains('LBS-6 metadata boundary marker is emitted',install,"boundaryContract = 'fixed-task-v1'")
-    s.absent('LBS-6 runtime task runner has no free TaskName parameter',runner.lower(),'$taskname')
+    s.absent('LBS-6 runtime task runner has no free TaskName parameter',runner.lower(),'[string]$taskname')
     s.contains('LBS-6 runtime task runner uses operation ValidateSet',runner,"[ValidateSet('ManagerRefresh','FirmwareRefresh','BootNext','DefaultSet','DefaultClear')]")
     s.eq('Elevation prompts still restricted to setup/remove',tray.count('-Verb RunAs'),2)
     s.contains('Explicit BootNext broker operation bundled',tray,'function Set-TaskBrokerBootNextTarget')

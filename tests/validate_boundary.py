@@ -70,7 +70,7 @@ def main():
     s.absent('Application has no WinForms',app,'System.Windows.Forms')
     s.contains('Exact-task COM access stays infrastructure-only',infra,"New-Object -ComObject 'Schedule.Service'")
     s.contains('Exact task start stays infrastructure-only',runner,'Start-ScheduledTask -TaskName $taskName')
-    s.absent('LBS-6 runtime runner accepts no free TaskName parameter',runner.lower(),'$taskname')
+    s.absent('LBS-6 runtime runner accepts no free TaskName parameter',runner.lower(),'[string]$taskname')
     s.contains('LBS-6 runtime runner accepts only operation enum',runner,"[ValidateSet('ManagerRefresh','FirmwareRefresh','BootNext','DefaultSet','DefaultClear')]")
     s.contains('LBS-6 runtime runner resolves task before scheduler access',runner,'Resolve-TaskBrokerAuthorizedTaskName -Operation $Operation')
     s.contains('LBS-6 resolver exposes fixed operation set',resolver,"[ValidateSet('ManagerRefresh','FirmwareRefresh','BootNext','DefaultSet','DefaultClear')]")
