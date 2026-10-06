@@ -10,9 +10,14 @@
 
     $active = $false
     try { $active = (Test-BackgroundRefreshActive -State $script:BackgroundRefreshState) } catch { }
+    $updateAvailable = $false
+    try {
+        $updateAvailable = ($script:UpdateState -and [string]$script:UpdateState.Status -eq 'UpdateAvailable' -and $null -ne $script:UpdateState.AvailableManifest)
+    } catch { }
+    $showStatus = ($active -or $updateAvailable)
 
     if ($script:HeaderTitleLabel -and -not $script:HeaderTitleLabel.IsDisposed) {
-        $script:HeaderTitleLabel.Location = if ($active) {
+        $script:HeaderTitleLabel.Location = if ($showStatus) {
             New-Object Drawing.Point(16, 10)
         }
         else {
@@ -21,8 +26,16 @@
     }
 
     if ($script:HeaderStatusLabel -and -not $script:HeaderStatusLabel.IsDisposed) {
-        $script:HeaderStatusLabel.Text = if ($active) { 'Aktualisiere Bootziele…' } else { '' }
-        $script:HeaderStatusLabel.Visible = $active
+        $script:HeaderStatusLabel.Text = if ($active) {
+            'Aktualisiere Bootziele…'
+        }
+        elseif ($updateAvailable) {
+            'Neue App Version verfügbar'
+        }
+        else {
+            ''
+        }
+        $script:HeaderStatusLabel.Visible = $showStatus
     }
 }
 

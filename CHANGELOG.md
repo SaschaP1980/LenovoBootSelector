@@ -1,5 +1,25 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.2.2 – Teststruktur aufgeräumt und einmaliger Start-Versionscheck
+
+### LBS-13 – Teststruktur
+
+- `tests/` enthält nur noch die aktiven kanonischen Validatoren, nativen PowerShell-Tests und benötigten Baseline-Daten.
+- 74 historische `validate_v*.py`-Dateien wurden byteidentisch nach `tests-history/` verschoben.
+- Historische Dateinamen enthalten jetzt explizit die Testkategorie `release`, `core`, `boundary` oder `regression` sowie eine lesbare Versionsnummer.
+- `tests/README.md` dokumentiert die aktive Testmatrix; `tests-history/README.md` dokumentiert die historischen Snapshots und das Namensschema.
+- Die vier permanenten GitHub-Gates bleiben `validate_release.py`, `validate_core.py`, `validate_boundary.py` und `validate_regression.py`.
+
+### LBS-11 – Versionscheck pro Tray-Prozess
+
+- Beim Start eines neuen Tray-Prozesses wird genau einmal automatisch und read-only auf eine neuere App-Version geprüft.
+- Popup-Öffnen oder erneutes Popup-Öffnen startet keinen weiteren automatischen Check; periodisches Polling bleibt ausgeschlossen.
+- Der automatische Check zeigt keine Update-Dialoge, lädt nichts herunter und installiert nichts.
+- Bei verfügbarem Update bleibt das validierte Manifest im Prozesszustand erhalten und der Header zeigt `Neue App Version verfügbar`.
+- Ein aktiver Bootziel-Refresh hat im Header Vorrang mit `Aktualisiere Bootziele…`; nach Abschluss erscheint die Update-Meldung wieder.
+- Der bestehende manuelle Updatepfad mit Dialog und expliziter Installation bleibt unverändert.
+- Keine Änderung an BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
+
 ## v0.6.2.1 – Standard-Startziel während Erstprüfung klar darstellen
 
 - Während der initialen asynchronen Systemfunktionsprüfung bleibt die Zeile „Standard-Startziel“ vollständig lesbar.

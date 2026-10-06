@@ -1950,6 +1950,7 @@ try {
 
     $script:TrayIcon.ContextMenuStrip = $context
     [void](Show-PendingUpdateResultOnStartup)
+    Start-StartupUpdateCheck
     $script:TrayIcon.Add_MouseClick({
         param($sender, $eventArgs)
         if ($eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
