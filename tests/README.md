@@ -31,7 +31,7 @@ From v0.6.9.0 onward, the aggregate wrapper is also executed automatically by `.
 
 That GitHub-hosted execution is valid Windows contract-suite evidence. It is **not** physical Lenovo hardware/UEFI E2E and must be reported separately from tests performed on the target ThinkPad.
 
-The Candidate workflow initially treats this Windows gate as mandatory for every version while LBS-20 benchmark data is collected. Linux Candidate Preflight and the Windows gate run in parallel; promotion waits for both and emits `CANDIDATE_TIMING_SUMMARY=<json>` with critical-path data.
+The Candidate workflow treats this Windows gate as mandatory for every Major, Minor, Patch, and Hotfix release. Linux Candidate Preflight and the Windows gate run in parallel; promotion waits for both and emits `CANDIDATE_TIMING_SUMMARY=<json>` with critical-path data. The permanent always-on policy was selected after the v0.6.9.0 production benchmark kept the complete candidate-to-release cycle at about 90 seconds.
 
 ## Baseline data
 
