@@ -43,6 +43,7 @@ def main():
     s.check('Application BootService module exists',(root/APP).is_file())
     infra=txt(root/INFRA) if (root/INFRA).is_file() else ''; app=txt(root/APP) if (root/APP).is_file() else ''
     install=txt(root/'bin/Install-LenovoBootMenuTasks.ps1'); security_doc=txt(root/'docs/SECURITY_BOUNDARY.md') if (root/'docs/SECURITY_BOUNDARY.md').is_file() else ''
+    diagnostics=txt(root/'src/Infrastructure/RuntimeDiagnostics.ps1')
     for rel in [INFRA,APP,*CORE]:
         marker=f'# @include {rel}'
         s.eq(f'Include marker once: {rel}',template.count(marker),1)
@@ -116,7 +117,16 @@ def main():
     s.absent('LBS-6 task ACL no longer treats GenericAll as sufficient',install,'$hasAll =')
     s.contains('LBS-6 task ACL replaces user allow ACEs',install,'function Get-TaskReadExecuteOnlySddl')
     s.contains('LBS-6 state directory disables inherited ACLs',install,'$acl.SetAccessRuleProtection($true,$false)')
+    state_acl=psfn(install,'Test-TaskBrokerStatePathLeastPrivilege'); rights_predicate=psfn(install,'Test-TaskBrokerRightsContainMutation'); broker_summary=psfn(diagnostics,'Get-RuntimeDiagnosticBrokerSummary')
     s.contains('LBS-6 state directory least-privilege validator exists',install,'function Test-TaskBrokerStatePathLeastPrivilege')
+    s.contains('v0.6.4.1 ACL mutation predicate exists',install,'function Test-TaskBrokerRightsContainMutation')
+    s.contains('v0.6.4.1 ACL mutation predicate checks concrete write rights',rights_predicate,'FileSystemRights]::WriteData')
+    s.absent('v0.6.4.1 state ACL validator excludes composite Modify mask',state_acl,'FileSystemRights]::Modify')
+    s.contains('v0.6.4.1 state ACL validator delegates mutation decision',state_acl,'Test-TaskBrokerRightsContainMutation -Rights $rights')
+    s.contains('v0.6.4.1 broker diagnostics use physical presence probe',broker_summary,'Test-TaskBrokerInstallationPresent')
+    s.contains('v0.6.4.1 broker diagnostics expose metadataReadable',broker_summary,'metadataReadable = $true')
+    s.contains('v0.6.4.1 broker diagnostics expose compatibility',broker_summary,'compatible = $compatible')
+    s.absent('v0.6.4.1 broker diagnostics do not conflate trust and presence',broker_summary,'$meta = Get-TaskBrokerMetadata')
     s.contains('LBS-6 ProgramData state is explicitly protected',install,'function Protect-TaskBrokerStateDirectory')
     s.contains('LBS-6 metadata file is explicitly protected',install,'function Protect-TaskBrokerMetadataFile')
     s.contains('LBS-6 security boundary document exists',security_doc,'No runtime API accepts a free Scheduled Task name.')
@@ -124,6 +134,10 @@ def main():
     s.check('LBS-6 native TaskBroker boundary test exists',(root/'tests/Test-TaskBrokerBoundary.ps1').is_file())
     aggregate=txt(root/'tests/Test-WindowsPowerShell51.ps1')
     s.contains('LBS-6 native boundary test is in PS5.1 aggregate',aggregate,'Test-TaskBrokerBoundary.ps1')
+    native_boundary=txt(root/'tests/Test-TaskBrokerBoundary.ps1')
+    s.contains('v0.6.4.1 native ACL regression accepts ReadAndExecute',native_boundary,'ReadAndExecute is accepted as non-mutating')
+    s.contains('v0.6.4.1 native ACL regression rejects Modify',native_boundary,'Modify is rejected as mutating')
+    s.contains('v0.6.4.1 native ACL regression rejects FullControl',native_boundary,'FullControl is rejected as mutating')
     uninstall_bytes=(root/'bin/Uninstall-LenovoBootMenuTasks.ps1').read_bytes()
     s.check('Uninstaller now carries UTF-8 BOM for PS5.1',uninstall_bytes.startswith(b'\xef\xbb\xbf'))
     # v0.4.1 native test-harness parser finding is fixed in source.

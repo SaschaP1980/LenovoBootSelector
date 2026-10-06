@@ -212,6 +212,23 @@ function Get-TaskReadExecuteOnlySddl {
     return $raw.GetSddlForm([System.Security.AccessControl.AccessControlSections]::All)
 }
 
+function Test-TaskBrokerRightsContainMutation {
+    param([Parameter(Mandatory=$true)][System.Security.AccessControl.FileSystemRights]$Rights)
+
+    # FileSystemRights::Modify is composite and overlaps ReadAndExecute. Do not use
+    # it as a forbidden bit mask. Check only concrete mutation-capable rights.
+    $mutationMask = [System.Security.AccessControl.FileSystemRights]::WriteData -bor
+                    [System.Security.AccessControl.FileSystemRights]::AppendData -bor
+                    [System.Security.AccessControl.FileSystemRights]::WriteExtendedAttributes -bor
+                    [System.Security.AccessControl.FileSystemRights]::WriteAttributes -bor
+                    [System.Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor
+                    [System.Security.AccessControl.FileSystemRights]::Delete -bor
+                    [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor
+                    [System.Security.AccessControl.FileSystemRights]::TakeOwnership
+    return (($Rights -band $mutationMask) -ne 0)
+}
+
+
 function Test-TaskBrokerStatePathLeastPrivilege {
     param([Parameter(Mandatory=$true)][string]$Path)
     try {
@@ -224,11 +241,6 @@ function Test-TaskBrokerStatePathLeastPrivilege {
         $hasSystemFull = $false
         $hasAdminsFull = $false
         $hasUsersRead = $false
-        $writeMask = [System.Security.AccessControl.FileSystemRights]::Write -bor
-                     [System.Security.AccessControl.FileSystemRights]::Modify -bor
-                     [System.Security.AccessControl.FileSystemRights]::Delete -bor
-                     [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor
-                     [System.Security.AccessControl.FileSystemRights]::TakeOwnership
 
         foreach ($rule in @($acl.Access)) {
             if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) { continue }
@@ -245,7 +257,7 @@ function Test-TaskBrokerStatePathLeastPrivilege {
                 continue
             }
 
-            if (($rights -band $writeMask) -ne 0) { return $false }
+            if (Test-TaskBrokerRightsContainMutation -Rights $rights) { return $false }
             if ($ruleSid -eq $usersSid -and
                 (($rights -band [System.Security.AccessControl.FileSystemRights]::ReadAndExecute) -eq [System.Security.AccessControl.FileSystemRights]::ReadAndExecute)) {
                 $hasUsersRead = $true
@@ -256,7 +268,6 @@ function Test-TaskBrokerStatePathLeastPrivilege {
     }
     catch { return $false }
 }
-
 function Protect-TaskBrokerStateDirectory {
     [void](New-Item -ItemType Directory -Path $StateDir -Force)
     $acl = New-Object System.Security.AccessControl.DirectorySecurity

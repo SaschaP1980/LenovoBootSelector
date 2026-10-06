@@ -88,5 +88,22 @@ $defaultRestoreExposed = $false
 try { [void](Resolve-TaskBrokerAuthorizedTaskName -Operation DefaultRestore) ; $defaultRestoreExposed = $true } catch { }
 Assert-False 'DefaultRestore is not an unelevated runtime operation' $defaultRestoreExposed
 
-Write-Host "TASKBROKER BOUNDARY TOTAL $checks/18"
-if ($checks -ne 18) { throw "Unexpected TaskBroker boundary test count $checks" }
+$installerPath = Join-Path $root 'bin\Install-LenovoBootMenuTasks.ps1'
+$tokens = $null
+$parseErrors = $null
+$installerAst = [System.Management.Automation.Language.Parser]::ParseFile($installerPath,[ref]$tokens,[ref]$parseErrors)
+Assert-Equal 'Installer source parses for ACL predicate extraction' 0 @($parseErrors).Count
+$rightsFunctionAst = $installerAst.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -eq 'Test-TaskBrokerRightsContainMutation'
+},$true)
+Assert-True 'ACL mutation predicate exists in installer' ($null -ne $rightsFunctionAst)
+Invoke-Expression $rightsFunctionAst.Extent.Text
+
+Assert-False 'ReadAndExecute is accepted as non-mutating' (Test-TaskBrokerRightsContainMutation -Rights ([System.Security.AccessControl.FileSystemRights]::ReadAndExecute))
+Assert-True 'Modify is rejected as mutating' (Test-TaskBrokerRightsContainMutation -Rights ([System.Security.AccessControl.FileSystemRights]::Modify))
+Assert-True 'FullControl is rejected as mutating' (Test-TaskBrokerRightsContainMutation -Rights ([System.Security.AccessControl.FileSystemRights]::FullControl))
+
+Write-Host "TASKBROKER BOUNDARY TOTAL $checks/23"
+if ($checks -ne 23) { throw "Unexpected TaskBroker boundary test count $checks" }

@@ -920,7 +920,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.6.4.0'
+$script:AppVersion = '0.6.4.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -1755,9 +1755,31 @@ function Write-RuntimeDiagnosticEvent {
     catch { }
 }
 
+
 function Get-RuntimeDiagnosticBrokerSummary {
-    $meta = Get-TaskBrokerMetadata
-    if (-not $meta) { return [ordered]@{ present = $false } }
+    $present = [bool](Test-TaskBrokerInstallationPresent)
+    if (-not $present) {
+        return [ordered]@{
+            present = $false
+            metadataReadable = $false
+            compatible = $false
+        }
+    }
+
+    $meta = $null
+    try {
+        $text = [System.IO.File]::ReadAllText($script:TaskBrokerMetadataPath,[System.Text.Encoding]::UTF8)
+        $meta = $text | ConvertFrom-Json
+    }
+    catch {
+        return [ordered]@{
+            present = $true
+            metadataReadable = $false
+            compatible = $false
+        }
+    }
+
+    $compatible = [bool](Test-TaskBrokerMetadataCompatible)
     $targets = @()
     foreach ($target in @($meta.targets)) {
         $targets += [ordered]@{
@@ -1768,7 +1790,10 @@ function Get-RuntimeDiagnosticBrokerSummary {
     }
     return [ordered]@{
         present = $true
+        metadataReadable = $true
+        compatible = $compatible
         version = [string]$meta.version
+        boundaryContract = [string]$meta.boundaryContract
         installedUtc = [string]$meta.installedUtc
         managerRefreshTask = [string]$meta.managerRefreshTask
         firmwareRefreshTask = [string]$meta.firmwareRefreshTask
@@ -1779,7 +1804,6 @@ function Get-RuntimeDiagnosticBrokerSummary {
         targets = @($targets)
     }
 }
-
 function Export-RuntimeDiagnosticPackage {
     param([string]$Reason = 'manual')
 

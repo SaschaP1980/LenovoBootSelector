@@ -69,7 +69,9 @@ The elevated installer protects `%ProgramData%\Lenovo Boot Menu\TaskBroker` with
 
 The metadata file is explicitly protected with the same write boundary.
 
-This prevents the normal unelevated user from rewriting task names, target GUIDs or trusted state paths after setup.
+ACL verification must distinguish concrete mutation rights from composite convenience rights. In particular, `FileSystemRights::Modify` must **not** be used as a forbidden bit mask because it includes read/execute components and therefore overlaps the allowed `ReadAndExecute` set. The verifier checks concrete mutation-capable bits (write/create/append/delete/ACL/ownership changes) instead.
+
+This prevents the normal unelevated user from rewriting task names, target GUIDs or trusted state paths after setup while still accepting the intended Users=ReadAndExecute ACL.
 
 ## Scheduled Task DACL contract
 
