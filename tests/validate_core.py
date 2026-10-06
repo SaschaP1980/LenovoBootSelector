@@ -5,6 +5,7 @@ import argparse, hashlib, json, re, subprocess, sys
 
 ROOT_DEFAULT=Path(__file__).resolve().parents[1]
 CORE_FILES=[
+    'src/Core/Localization.ps1',
     'src/Core/EntryPreferences.ps1',
     'src/Core/FirmwareParsing.ps1',
     'src/Core/BootTargetModel.ps1',
@@ -94,10 +95,19 @@ def main():
         s.eq(f'Template include marker exactly once: {rel}',template.count(marker),1)
         s.absent(f'Generated runtime contains no include marker: {rel}',tray,marker)
 
+    localization=core_text.get('src/Core/Localization.ps1','')
     entry=core_text.get('src/Core/EntryPreferences.ps1','')
     firmware=core_text.get('src/Core/FirmwareParsing.ps1','')
+    for fn in ['Get-SupportedLocaleIdsCore','Resolve-LocaleIdCore','Get-LocalizationCatalogCore','Get-LocalizationKeySetCore','Test-LocalizationCatalogParityCore','Get-LocalizedStringCore']:
+        s.eq(f'Localization core function once in module: {fn}',len(re.findall(rf'(?m)^function\s+{re.escape(fn)}\b',localization)),1)
+        s.eq(f'Localization core function once in bundle: {fn}',len(re.findall(rf'(?m)^function\s+{re.escape(fn)}\b',tray)),1)
+    s.contains('Localization catalog contains English',localization,"'en-US' = [ordered]@{")
+    s.contains('Localization catalog contains German',localization,"'de-DE' = [ordered]@{")
+    s.contains('Localization invalid locale fallback is English',localization,"return 'en-US'")
+    s.contains('Localization missing active key falls back to English',localization,"$english = $catalogs['en-US']")
+    s.absent('Localization core excludes dynamic execution',localization,'Invoke-Expression')
     boot=core_text.get('src/Core/BootTargetModel.ps1','')
-    for fn in ['Convert-EntryAliasesToHashtable','Copy-EntryAliasMap','Test-StringSequenceEqual','Test-EntryAliasMapsEqual','Test-GuidInList','New-DefaultAppSettingsCore','ConvertTo-NormalizedAppSettingsCore','Get-OrderedEntriesCore']:
+    for fn in ['Convert-EntryAliasesToHashtable','Copy-EntryAliasMap','Test-StringSequenceEqual','Test-EntryAliasMapsEqual','Test-GuidInList','Get-AppSettingsLocaleCore','New-DefaultAppSettingsCore','ConvertTo-NormalizedAppSettingsCore','Get-OrderedEntriesCore']:
         s.eq(f'Entry core function once in module: {fn}',len(re.findall(rf'(?m)^function\s+{re.escape(fn)}\b',entry)),1)
         s.eq(f'Entry core function once in bundle: {fn}',len(re.findall(rf'(?m)^function\s+{re.escape(fn)}\b',tray)),1)
     for fn in ['Parse-GuidFromLine','ConvertFrom-FirmwareEntriesText','ConvertFrom-FirmwareManagerText']:
@@ -108,15 +118,29 @@ def main():
 
     # Thin shell adapters actually consume the core; no dead extraction.
     getset=ps_function(tray,'Get-AppSettings') or ''
+    saveset=ps_function(tray,'Save-AppSettings') or ''
+    loadset=ps_function(tray,'Load-AppSettings') or ''
+    localize_service=txt(root/'src/Application/LocalizationService.ps1') if (root/'src/Application/LocalizationService.ps1').is_file() else ''
+    getlocalized=ps_function(tray,'Get-LocalizedString') or ''
     order=ps_function(tray,'Get-OrderedEntriesForUi') or ''
     friendly=ps_function(tray,'Get-FriendlyBootEntry') or ''
     fwstate=ps_function(tray,'Get-FirmwareBootState') or ''
     s.contains('Settings shell calls default core',getset,'New-DefaultAppSettingsCore')
     s.contains('Settings shell calls normalization core',getset,'ConvertTo-NormalizedAppSettingsCore')
     s.contains('Settings shell delegates repository read',getset,'Read-AppSettingsRepository')
+    s.contains('LBS-17 settings save current schema',saveset,'schemaVersion = 5')
+    s.contains('LBS-17 settings save locale',saveset,'locale = Resolve-LocaleIdCore -Locale $script:UiLocale')
+    s.contains('LBS-17 settings load locale',loadset,'$script:UiLocale = Resolve-LocaleIdCore')
+    s.check('LBS-17 localization application service exists',bool(localize_service))
+    s.contains('LBS-17 localized-string service delegates to core',getlocalized,'Get-LocalizedStringCore')
+    s.contains('LBS-17 localized-string service uses active locale',getlocalized,'Get-ActiveLocale')
     s.contains('Entry-order shell calls pure core',order,'Get-OrderedEntriesCore')
     s.contains('Entry-order shell passes CurrentEntries explicitly',order,'-Source @($script:CurrentEntries)')
     s.contains('Friendly shell calls presentation-neutral core',friendly,'Get-FriendlyBootEntryCore')
+    s.contains('LBS-17 Friendly shell passes active locale',friendly,'-Locale (Get-ActiveLocale)')
+    s.contains('LBS-17 Friendly core normalizes requested locale',boot,'Resolve-LocaleIdCore -Locale $Locale')
+    s.contains('LBS-17 Friendly core localizes product text centrally',boot,"Get-LocalizedStringCore -Key 'Boot.MenuTitle'")
+    s.contains('LBS-17 Friendly core preserves raw firmware description',boot,'$title = $description')
     s.contains('Friendly shell maps AccentRole',friendly,'switch ([string]$model.AccentRole)')
     s.absent('Friendly core has no Drawing.Color',boot,'Drawing.Color')
     s.absent('Friendly core has no script palette',boot,'$script:Color')

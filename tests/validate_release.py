@@ -58,6 +58,19 @@ def main():
         s.c(f'LBS-2 obsolete root path removed: {name}',not (root/name).exists())
     s.c('README remains repository-root file',(root/'README.md').is_file())
     s.c('CHANGELOG remains repository-root file',(root/'CHANGELOG.md').is_file())
+    readme=txt(root/'README.md') if (root/'README.md').is_file() else ''
+    changelog=txt(root/'CHANGELOG.md') if (root/'CHANGELOG.md').is_file() else ''
+    localization_doc=txt(root/'docs/LOCALIZATION.md') if (root/'docs/LOCALIZATION.md').is_file() else ''
+    s.has('README current development version matches canonical version',readme,f'**Current development version:** v{version}')
+    s.has('CHANGELOG contains canonical version section',changelog,f'## v{version} ')
+    s.c('LBS-17 localization architecture document exists',(root/'docs/LOCALIZATION.md').is_file())
+    s.has('LBS-17 README documents English default locale',readme,'English (`en-US`) UI by default')
+    s.has('LBS-17 README documents selectable German locale',readme,'German (`de-DE`)')
+    s.has('LBS-17 README links localization architecture',readme,'[docs/LOCALIZATION.md](docs/LOCALIZATION.md)')
+    s.has('LBS-17 localization docs declare English default and fallback',localization_doc,'`en-US` — canonical default and fallback')
+    s.has('LBS-17 localization docs define legacy German migration',localization_doc,'settings schema below 5 with no locale')
+    s.has('LBS-17 localization docs prohibit distributed language branches',localization_doc,'Do not add `if ($Language -eq ...)`')
+    s.has('LBS-17 localization docs retain safety boundary',localization_doc,'tray process unelevated')
     s.c('Git control file remains at repository root',(root/'.gitignore').is_file())
     s.c('LBS-1 canonical architecture baseline moved to docs/architecture',(root/'docs/architecture/ARCHITECTURE_BASELINE.json').is_file())
     s.c('LBS-1 canonical catch audit moved to audits',(root/'audits/CATCH_AUDIT.json').is_file())
@@ -88,6 +101,14 @@ def main():
     s.has('Update native test keeps explicit source coverage guard 62',update_test,'if ($sourceAssertionCount -ne 62) { throw "Unexpected update assertion source count $sourceAssertionCount" }')
     s.has('Update native test keeps explicit runtime coverage output 62',update_test,'Write-Host "UPDATE TOTAL $checks/62"')
     s.has('Update native test keeps explicit runtime coverage guard 62',update_test,'if ($checks -ne 62) { throw "Unexpected update test count $checks" }')
+    localization_native=txt(root/'tests/Test-LocalizationRuntime.ps1') if (root/'tests/Test-LocalizationRuntime.ps1').is_file() else ''
+    windows_wrapper=txt(root/'tests/Test-WindowsPowerShell51.ps1')
+    s.c('LBS-17 native localization test exists',bool(localization_native))
+    s.has('LBS-17 native localization test keeps fixed total 14',localization_native,'Write-Host "LOCALIZATION TOTAL $checks/14"')
+    s.has('LBS-17 native localization test fails closed on count drift',localization_native,'if ($checks -ne 14) { throw "Expected 14 localization checks, got $checks" }')
+    s.has('LBS-17 native localization test covers persisted language selection',localization_native,"Set-ActiveLocale -Locale 'de-DE' -Persist")
+    s.has('LBS-17 native localization test covers legacy migration',localization_native,'Pre-localization schema migrates to de-DE in memory')
+    s.has('LBS-17 native aggregate runner invokes localization suite',windows_wrapper,"Test-LocalizationRuntime.ps1")
     mutex_test=txt(root/'tests/Test-SingleInstanceMutex.ps1')
     s.has('Mutex native test keeps explicit total output',mutex_test,'Write-Host "MUTEX TOTAL $checks/4"')
     s.has('Mutex native test fails closed on count drift',mutex_test,'if ($checks -ne 4) { throw "Unexpected mutex test count $checks" }')
@@ -224,6 +245,9 @@ def main():
         s.has('LBS-20 Windows workflow executes aggregate native wrapper',ww,'Test-WindowsPowerShell51.ps1')
         s.has('LBS-20 Windows workflow publishes dedicated status',ww,'preflight/windows-powershell51')
         s.has('LBS-20 Windows workflow emits machine-readable summary',ww,'WINDOWS_POWERSHELL51_SUMMARY=')
+        s.has('LBS-17 Windows workflow parses localization total',ww,"localizationRuntime = Get-TestTotal $logText '^LOCALIZATION TOTAL")
+        s.has('LBS-17 Windows workflow includes localization in aggregate passed',ww,'$totals.localizationRuntime.passed')
+        s.has('LBS-17 Windows workflow includes localization in aggregate expected',ww,'$totals.localizationRuntime.expected')
         s.has('LBS-20 Windows workflow reports setup timing',ww,'setupMs')
         s.has('LBS-20 Windows workflow reports runtime preparation timing',ww,'runtimePreparationMs')
         s.has('LBS-20 Windows workflow reports test timing',ww,'testMs')
@@ -232,7 +256,7 @@ def main():
     for rel in ['tests/validate_release.py','tests/validate_core.py','tests/validate_boundary.py','tests/validate_regression.py']:
         s.c(f'Permanent validator exists: {rel}',(root/rel).is_file())
     default_ui=txt(root/'src/UI/DefaultTargetPresentation.ps1'); popup_ui=txt(root/'src/UI/Popup.ps1')
-    s.has('Default target startup check shows explicit pending text',default_ui,"'Wird geprüft …'")
+    s.has('LBS-17 default target startup check is localized',default_ui,"Get-LocalizedString -Key 'Status.Checking'")
     s.has('Default target pending state is limited to compatible metadata plus unknown readiness',default_ui,'$checking = ($schemaReady -and $null -eq $script:TaskBrokerReadyCached)')
     s.has('Default target pending state stays visually readable',default_ui,'$visualEnabled = ($enabled -or $checking)')
     s.has('Default target interaction remains separately gated',default_ui,'$script:DefaultInteractionEnabled = $enabled')
@@ -252,7 +276,7 @@ def main():
     header_interaction=fn(refresh_ui,'Set-HeaderUpdateInteractionState')
     popup_form=fn(popup_ui,'New-PopupForm')
     update_runtime=txt(root/'src/Application/UpdateRuntime.ps1')
-    s.has('Manual update button retained',available_dialog,"-SecondaryButtonText 'Jetzt aktualisieren'")
+    s.has('LBS-17 manual update button is localized',available_dialog,"-SecondaryButtonText (Get-LocalizedString -Key 'Update.InstallNow')")
     s.has('Manual update button still reuses manual update path',available_dialog,'Start-ManualAppUpdate')
     s.has('Manual update check reuses shared available dialog',complete,'Show-AvailableUpdateDialog')
     s.has('LBS-21 popup check reuses read-only hidden worker',popup_check,"Start-UpdateCheckUiWorker -Mode 'Popup'")
@@ -267,9 +291,9 @@ def main():
     s.no('LBS-21 update runtime has no startup completion flag',update_runtime,'StartupCheckCompleted')
     s.has('LBS-21 automatic popup check suppresses update dialogs',complete,'if (-not $isPopup)')
     s.has('LBS-21 popup completion has dedicated diagnostics',complete,'POPUP_UPDATE_CHECK_COMPLETED')
-    s.has('Header exposes hyphenated update-available message',refresh_ui,"'Neue App-Version verfügbar'")
+    s.has('LBS-17 header update-available message is localized',refresh_ui,"Get-LocalizedString -Key 'Update.Available'")
     s.has('Header keeps boot refresh as first update-status branch',refresh_ui,"if ($active) {")
-    s.has('Header boot refresh text retained',refresh_ui,"'Aktualisiere Bootziele…'")
+    s.has('LBS-17 header boot refresh text is localized',refresh_ui,"Get-LocalizedString -Key 'Header.Refreshing'")
     s.has('Header restores update state after refresh',refresh_ui,"elseif ($updateAvailable)")
     s.has('LBS-14 header status uses focusable button control',popup_form,'$headerSub = New-Object System.Windows.Forms.Button')
     s.has('LBS-14 header button documents native Enter/Space activation',popup_form,'native Enter/Space activation')
@@ -278,12 +302,72 @@ def main():
     s.has('LBS-14 click is gated by update interaction state',popup_form,'if (-not $script:HeaderUpdateInteractionEnabled) { return }')
     s.has('LBS-14 click opens shared available-update dialog',popup_form,'[void](Show-AvailableUpdateDialog)')
     s.eq('LBS-14 shared dialog is invoked only from header click in popup form',popup_form.count('Show-AvailableUpdateDialog'),1)
+    language_ui=txt(root/'src/UI/LanguagePresentation.ps1')
+    localization=txt(root/'src/Core/Localization.ps1')
+    s.has('LBS-17 tray exposes English selector',template,"Set-LanguageFromUi -Locale 'en-US'")
+    s.has('LBS-17 tray exposes German selector',template,"Set-LanguageFromUi -Locale 'de-DE'")
+    s.has('LBS-17 language selector persists through active locale service',language_ui,'Set-ActiveLocale -Locale $Locale -Persist')
+    s.has('LBS-17 language change rebuilds visible popup',language_ui,'Rebuild-PopupForLocale')
+    s.has('LBS-17 popup strings consume localization API',popup_ui,"Get-LocalizedString -Key 'Popup.NextBootSection'")
+    s.has('LBS-17 English catalog exposes tray maintenance',localization,"'Tray.Maintenance' = 'Maintenance'")
+    s.has('LBS-17 German catalog exposes tray maintenance',localization,"'Tray.Maintenance' = 'Wartung'")
+    catalog_match=re.search(r"'en-US'\s*=\s*\[ordered\]@\{([\s\S]*?)\n\s*\}\n\s*'de-DE'\s*=\s*\[ordered\]@\{([\s\S]*?)\n\s*\}\n\s*\}",localization)
+    en_keys=re.findall(r"(?m)^\s*'([^']+)'\s*=",catalog_match.group(1)) if catalog_match else []
+    de_keys=re.findall(r"(?m)^\s*'([^']+)'\s*=",catalog_match.group(2)) if catalog_match else []
+    s.c('LBS-17 localization catalog parses as two locale blocks',catalog_match is not None)
+    s.c('LBS-17 English localization keys are unique',bool(en_keys) and len(en_keys)==len(set(en_keys)))
+    s.c('LBS-17 German localization keys are unique',bool(de_keys) and len(de_keys)==len(set(de_keys)))
+    s.eq('LBS-17 English and German localization key sets match',set(en_keys),set(de_keys))
+
+    visible_literal_paths=[
+        'src/UI/AutostartPresentation.ps1','src/UI/BootEntryList.ps1','src/UI/DefaultTargetMenu.ps1',
+        'src/UI/DefaultTargetPresentation.ps1','src/UI/DiagnosticsPresentation.ps1','src/UI/Dialogs.ps1',
+        'src/UI/LanguagePresentation.ps1','src/UI/MaintenancePresentation.ps1','src/UI/ManageEntries.ps1',
+        'src/UI/ManageEntriesState.ps1','src/UI/MenuAppearance.ps1','src/UI/Popup.ps1',
+        'src/UI/RefreshPresentation.ps1','src/UI/StartupRecoveryDialog.ps1','src/UI/UpdatePresentation.ps1',
+        'src/App/LenovoBootMenuTray.template.ps1'
+    ]
+    visible_patterns=[
+        re.compile(r"\.Text\s*=\s*(['\"])(.*?)\1"),
+        re.compile(r"New-Label\s+-Text\s+(['\"])(.*?)\1"),
+        re.compile(r"\$script:LastStatusText\s*=\s*(['\"])(.*?)\1"),
+        re.compile(r"AccessibleDescription\s*=\s*(['\"])(.*?)\1"),
+        re.compile(r"SetToolTip\([^,]+,\s*(['\"])(.*?)\1"),
+        re.compile(r"ToolStripMenuItem\((['\"])(.*?)\1\)"),
+        re.compile(r"-(?:Title|Heading|Message|SecondaryButtonText)\s+(['\"])(.*?)\1")
+    ]
+    allowed_visible_literals={'Lenovo Boot Selector','v{0}'}
+    visible_literal_violations=[]
+    for rel in visible_literal_paths:
+        source=txt(root/rel)
+        for lineno,line in enumerate(source.splitlines(),1):
+            for pattern in visible_patterns:
+                for match in pattern.finditer(line):
+                    value=match.group(2)
+                    if not value or not re.search(r'[A-Za-z0-9ÄÖÜäöüß]',value):
+                        continue
+                    if value in allowed_visible_literals:
+                        continue
+                    visible_literal_violations.append(f'{rel}:{lineno}:{value}')
+    s.c('LBS-17 affected UI/template surfaces contain no uncontrolled hard-coded visible text',not visible_literal_violations,visible_literal_violations[:20])
+    dialogs=txt(root/'src/UI/Dialogs.ps1')
+    maintenance_ui=txt(root/'src/UI/MaintenancePresentation.ps1')
+    diagnostics_ui=txt(root/'src/UI/DiagnosticsPresentation.ps1')
+    startup_recovery=txt(root/'src/UI/StartupRecoveryDialog.ps1')
+    s.has('LBS-17 maintenance dialog is localized',dialogs,"Get-LocalizedString -Key 'Maintenance.Dialog.RemoveTitle'")
+    s.has('LBS-17 restart dialog is localized',dialogs,"Get-LocalizedString -Key 'Restart.Question'")
+    s.has('LBS-17 maintenance panel is localized',maintenance_ui,"Get-LocalizedString -Key 'Maintenance.Panel.SetupHeading'")
+    s.has('LBS-17 update dialog is localized',ui,"Get-LocalizedString -Key 'Update.AvailableMessage'")
+    s.has('LBS-17 diagnostics dialog is localized',diagnostics_ui,"Get-LocalizedString -Key 'Diagnostics.SavedTitle'")
+    s.has('LBS-17 startup recovery resolves persisted locale',startup_recovery,'Get-StartupRecoveryLocale')
+    s.has('LBS-17 startup recovery uses pure localization core',startup_recovery,"Get-LocalizedStringCore -Key 'Startup.FailedTitle'")
+    s.c('LBS-17 localization is included before startup recovery',template.find('# @include src/Core/Localization.ps1') < template.find('# @include src/UI/StartupRecoveryDialog.ps1'))
     s.has('LBS-14 interactive header uses hand cursor',header_visual,'[System.Windows.Forms.Cursors]::Hand')
     s.has('LBS-14 interactive header participates in tab navigation',header_visual,'$script:HeaderStatusLabel.TabStop = $interactive')
     s.has('LBS-14 keyboard focus uses Lenovo accent',header_visual,'$script:HeaderStatusLabel.Focused')
     s.has('LBS-14 refresh disables header update interaction',refresh_ui,'Set-HeaderUpdateInteractionState -Enabled (-not $active -and $updateAvailable)')
     s.has('LBS-14 maintenance disables header update interaction',refresh_ui,'Set-HeaderUpdateInteractionState -Enabled $false')
-    s.has('LBS-14 shared dialog title is canonical',available_dialog,"-Title 'Neue App-Version verfügbar'")
+    s.has('LBS-17 LBS-14 shared dialog title uses canonical localization key',available_dialog,"-Title (Get-LocalizedString -Key 'Update.Available')")
     s.has('LBS-14 shared dialog uses already validated manifest',available_dialog,'$script:UpdateState.AvailableManifest')
     s.no('LBS-14 shared dialog starts no new update worker',available_dialog,'Start-UpdateCheckUiWorker')
     s.has('No periodic update polling policy retained',ui,'There is no periodic polling')

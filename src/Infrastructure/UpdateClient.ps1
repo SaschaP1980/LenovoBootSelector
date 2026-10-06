@@ -192,7 +192,9 @@ param(
     [Parameter(Mandatory=$true)][int]$ParentPid,
     [Parameter(Mandatory=$true)][string]$InstallDir,
     [Parameter(Mandatory=$true)][string]$WorkDir,
-    [Parameter(Mandatory=$true)][string]$SourceVersion
+    [Parameter(Mandatory=$true)][string]$SourceVersion,
+    [Parameter(Mandatory=$true)][string]$FailurePrefixBase64,
+    [Parameter(Mandatory=$true)][string]$ManualRestartBase64
 )
 $ErrorActionPreference = 'Stop'
 $backup = Join-Path $WorkDir 'backup'
@@ -205,6 +207,8 @@ $rollbackSucceeded = $false
 $failureCategory = ''
 $failureStage = ''
 $errorClass = ''
+$failurePrefix = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($FailurePrefixBase64))
+$manualRestartMessage = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($ManualRestartBase64))
 function Write-Result([string]$Status,[string]$Message) {
     $parent = Split-Path -Parent $resultPath
     if ($parent -and -not (Test-Path -LiteralPath $parent)) { [void](New-Item -ItemType Directory -Path $parent -Force) }
@@ -317,7 +321,7 @@ catch {
         else { throw 'Lenovo Boot Selector konnte nach dem fehlgeschlagenen Update nicht neu gestartet werden.' }
     }
     catch {
-        Show-UpdateError ('Update fehlgeschlagen: ' + $failureMessage + "`r`n`r`nDie App konnte nicht automatisch neu gestartet werden. Bitte starte Lenovo Boot Selector manuell.")
+        Show-UpdateError ($failurePrefix + "`r`n`r`n" + $manualRestartMessage)
     }
 }
 finally {
@@ -331,14 +335,18 @@ finally {
 function Start-LenovoUpdateInstallerHelper {
     param(
         [Parameter(Mandatory=$true)][string]$WorkDir,
-        [Parameter(Mandatory=$true)][string]$SourceVersion
+        [Parameter(Mandatory=$true)][string]$SourceVersion,
+        [Parameter(Mandatory=$true)][string]$FailurePrefix,
+        [Parameter(Mandatory=$true)][string]$ManualRestartMessage
     )
     $helper = New-LenovoUpdateInstallerHelper -WorkDir $WorkDir
     $powershell = Join-Path $PSHOME 'powershell.exe'
     if (-not (Test-Path -LiteralPath $powershell)) { $powershell = 'powershell.exe' }
+    $failurePrefixBase64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($FailurePrefix))
+    $manualRestartBase64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($ManualRestartMessage))
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $powershell
-    $psi.Arguments = ('-NoProfile -ExecutionPolicy Bypass -File "{0}" -ParentPid {1} -InstallDir "{2}" -WorkDir "{3}" -SourceVersion "{4}"' -f $helper,$PID,$PSScriptRoot,$WorkDir,$SourceVersion)
+    $psi.Arguments = ('-NoProfile -ExecutionPolicy Bypass -File "{0}" -ParentPid {1} -InstallDir "{2}" -WorkDir "{3}" -SourceVersion "{4}" -FailurePrefixBase64 "{5}" -ManualRestartBase64 "{6}"' -f $helper,$PID,$PSScriptRoot,$WorkDir,$SourceVersion,$failurePrefixBase64,$manualRestartBase64)
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
     $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden

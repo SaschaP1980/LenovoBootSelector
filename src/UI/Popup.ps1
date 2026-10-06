@@ -61,7 +61,7 @@
     $headerSub.Cursor = [System.Windows.Forms.Cursors]::Default
     $headerSub.Name = 'HeaderStatusLabel'
     $headerSub.Visible = $false
-    $headerSub.AccessibleDescription = 'Öffnet den Dialog zur verfügbaren App-Version.'
+    $headerSub.AccessibleDescription = Get-LocalizedString -Key 'Popup.HeaderUpdateAccessible'
     $headerSub.Add_MouseEnter({
         $script:HeaderStatusHovered = $true
         Update-HeaderStatusInteractionVisual
@@ -102,13 +102,13 @@
     })
     $refresh.Add_Click({
         if (Test-MaintenanceBusy) { return }
-        $script:LastStatusText = 'Startziele werden im Hintergrund aktualisiert…'
+        $script:LastStatusText = Get-LocalizedString -Key 'Status.BootTargetsRefreshing'
         Update-PopupRows
         Start-BackgroundBootRefresh -RefreshStorage
         Update-RefreshButtonVisual
     })
     $header.Controls.Add($refresh)
-    if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($refresh, 'Startziele aktualisieren') }
+    if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($refresh, (Get-LocalizedString -Key 'Action.RefreshBootTargets')) }
     Update-RefreshButtonVisual
     $root.Controls.Add($header)
 
@@ -123,14 +123,14 @@
     $section.Size = New-Object Drawing.Size(390, 28)
     $section.BackColor = $script:ColorBackground
 
-    $sectionLabel = New-Label -Text 'NÄCHSTER START' -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
+    $sectionLabel = New-Label -Text (Get-LocalizedString -Key 'Popup.NextBootSection') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 4 -Width 200 -Height 20
     $sectionLabel.Name = 'SectionLabel'
     $section.Controls.Add($sectionLabel)
 
     $manageButton = New-Object System.Windows.Forms.Button
     $manageButton.Name = 'ManageEntriesButton'
-    $manageButton.Text = 'ANPASSEN'
+    $manageButton.Text = Get-LocalizedString -Key 'Popup.Customize'
     $manageButton.Font = New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)
     $manageButton.ForeColor = $script:ColorSecondary
     $manageButton.BackColor = $script:ColorBackground
@@ -178,7 +178,7 @@
             }
         }
         catch {
-            $script:LastStatusText = 'Scrollposition konnte nicht aktualisiert werden.'
+            $script:LastStatusText = Get-LocalizedString -Key 'Status.ScrollPositionFailed'
         }
     })
     $listPanel.Controls.Add($entryScroll)
@@ -204,7 +204,7 @@
     $configSection.Size = New-Object Drawing.Size(390, 20)
     $configSection.BackColor = $script:ColorSurface
 
-    $configLabel = New-Label -Text 'EINSTELLUNGEN' -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
+    $configLabel = New-Label -Text (Get-LocalizedString -Key 'Settings.Title') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 2 -Width 220 -Height 17
     $configSection.Controls.Add($configLabel)
     $root.Controls.Add($configSection)
@@ -215,7 +215,7 @@
     $settings.Size = New-Object Drawing.Size(390, 38)
     $settings.BackColor = $script:ColorSurface
 
-    $autostartText = New-Label -Text 'Mit Windows starten' -Font (New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)) `
+    $autostartText = New-Label -Text (Get-LocalizedString -Key 'Settings.Autostart') -Font (New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)) `
         -ForeColor $script:ColorPrimary -X 16 -Y 8 -Width 280 -Height 22
     $autostartText.Cursor = [System.Windows.Forms.Cursors]::Hand
     $settings.Controls.Add($autostartText)
@@ -247,12 +247,12 @@
     $defaultPanel.BackColor = $script:ColorSurface
     $defaultPanel.Cursor = [System.Windows.Forms.Cursors]::Hand
 
-    $defaultName = New-Label -Text 'Standard-Startziel' -Font (New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)) `
+    $defaultName = New-Label -Text (Get-LocalizedString -Key 'Settings.DefaultTarget') -Font (New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)) `
         -ForeColor $script:ColorPrimary -X 16 -Y 8 -Width 150 -Height 22
     $defaultName.Cursor = [System.Windows.Forms.Cursors]::Hand
     $defaultPanel.Controls.Add($defaultName)
 
-    $defaultValue = New-Label -Text 'Kein Standardziel' -Font (New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)) `
+    $defaultValue = New-Label -Text (Get-LocalizedString -Key 'Settings.NoDefaultTarget') -Font (New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)) `
         -ForeColor $script:ColorPrimary -X 164 -Y 8 -Width 184 -Height 22
     $defaultValue.TextAlign = [Drawing.ContentAlignment]::MiddleRight
     $defaultValue.Cursor = [System.Windows.Forms.Cursors]::Hand
@@ -299,7 +299,7 @@
     $restartPanel.BackColor = $script:ColorSurface
 
     $restartButton = New-Object System.Windows.Forms.Button
-    $restartButton.Text = 'Windows neu starten'
+    $restartButton.Text = Get-LocalizedString -Key 'Action.RestartWindows'
     $restartButton.Font = New-Object Drawing.Font('Segoe UI', 8.6, [Drawing.FontStyle]::Bold)
     $restartButton.ForeColor = $script:ColorPrimary
     $restartButton.BackColor = [Drawing.Color]::FromArgb(34, 34, 34)
@@ -314,7 +314,7 @@
     $restartButton.Add_Click({ Restart-Windows })
     $restartPanel.Controls.Add($restartButton)
 
-    $restartTarget = New-Label -Text 'Nächstes Ziel: Standardreihenfolge' -Font (New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Regular)) `
+    $restartTarget = New-Label -Text (Get-LocalizedString -Key 'Status.NextTargetDefaultOrder') -Font (New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Regular)) `
         -ForeColor ([Drawing.Color]::FromArgb(155,155,155)) -X 16 -Y 39 -Width 358 -Height 18
     $restartTarget.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $restartTarget.Name = 'RestartTargetLabel'
@@ -349,20 +349,20 @@
     $manageDivider.BackColor = [Drawing.Color]::FromArgb(54,54,54)
     $managePanel.Controls.Add($manageDivider)
 
-    $manageTitle = New-Label -Text 'ÄNDERUNGEN' -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
+    $manageTitle = New-Label -Text (Get-LocalizedString -Key 'Manage.Title') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 8 -Width 350 -Height 18
     $managePanel.Controls.Add($manageTitle)
 
-    $manageHint = New-Label -Text 'Ziehen zum Sortieren · Klicken zum Ein-/Ausblenden' -Font (New-Object Drawing.Font('Segoe UI', 7.5, [Drawing.FontStyle]::Regular)) `
+    $manageHint = New-Label -Text (Get-LocalizedString -Key 'Manage.Hint') -Font (New-Object Drawing.Font('Segoe UI', 7.5, [Drawing.FontStyle]::Regular)) `
         -ForeColor $script:ColorSecondary -X 16 -Y 29 -Width 358 -Height 17
     $managePanel.Controls.Add($manageHint)
 
-    $manageSubHint = New-Label -Text 'Stift zum Umbenennen · Leer lassen = Originalname' -Font (New-Object Drawing.Font('Segoe UI', 7.2, [Drawing.FontStyle]::Regular)) `
+    $manageSubHint = New-Label -Text (Get-LocalizedString -Key 'Manage.SubHint') -Font (New-Object Drawing.Font('Segoe UI', 7.2, [Drawing.FontStyle]::Regular)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 46 -Width 358 -Height 17
     $managePanel.Controls.Add($manageSubHint)
 
     $cancelManage = New-Object System.Windows.Forms.Button
-    $cancelManage.Text = 'Abbrechen'
+    $cancelManage.Text = Get-LocalizedString -Key 'Common.Cancel'
     $cancelManage.Font = New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)
     $cancelManage.ForeColor = $script:ColorPrimary
     $cancelManage.BackColor = [Drawing.Color]::FromArgb(34,34,34)
@@ -378,7 +378,7 @@
     $managePanel.Controls.Add($cancelManage)
 
     $saveManage = New-Object System.Windows.Forms.Button
-    $saveManage.Text = 'Änderungen speichern'
+    $saveManage.Text = Get-LocalizedString -Key 'Manage.Save'
     $saveManage.Font = New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Bold)
     $saveManage.ForeColor = [Drawing.Color]::FromArgb(135,135,135)
     $saveManage.BackColor = [Drawing.Color]::FromArgb(35,35,35)
@@ -450,13 +450,13 @@ function Show-OrTogglePopup {
             $script:CurrentEntries = @()
             $script:SelectedGuid = $null
             if (Test-BootTargetDriftDetected) {
-                $script:LastStatusText = if (Test-BootTargetDriftHasNewTargets) { 'Neues Startziel erkannt · Systemfunktionen neu initialisieren.' } else { 'Startziele geändert · Systemfunktionen neu initialisieren.' }
+                $script:LastStatusText = if (Test-BootTargetDriftHasNewTargets) { Get-LocalizedString -Key 'Status.NewBootTargetDetected' } else { Get-LocalizedString -Key 'Status.BootTargetsChanged' }
             }
             elseif (Test-TaskBrokerInstallationPresent) {
-                $script:LastStatusText = 'Systemfunktionen müssen repariert werden.'
+                $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsRepairRequired'
             }
             else {
-                $script:LastStatusText = 'Systemfunktionen müssen eingerichtet werden.'
+                $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsSetupRequired'
             }
         }
         Update-PopupRows

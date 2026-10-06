@@ -1,8 +1,8 @@
 ﻿function Get-DefaultEntryTitle {
-    if (-not $script:DefaultGuid) { return 'Kein Standardziel' }
+    if (-not $script:DefaultGuid) { return (Get-LocalizedString -Key 'Settings.NoDefaultTarget') }
     $entry = Get-EntryByGuid $script:DefaultGuid
     if ($entry) { return (Get-EntryDisplayTitle -Entry $entry) }
-    return 'Nicht verfügbares Startziel'
+    return (Get-LocalizedString -Key 'Settings.DefaultTargetUnavailable')
 }
 
 function Update-DefaultUi {
@@ -18,7 +18,7 @@ function Update-DefaultUi {
         $script:DefaultButton.Cursor = if ($enabled) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
 
         if ($script:DefaultValueLabel -and -not $script:DefaultValueLabel.IsDisposed) {
-            $script:DefaultValueLabel.Text = if ($checking) { 'Wird geprüft …' } else { Get-DefaultEntryTitle }
+            $script:DefaultValueLabel.Text = if ($checking) { Get-LocalizedString -Key 'Status.Checking' } else { Get-DefaultEntryTitle }
             $script:DefaultValueLabel.ForeColor = if ($visualEnabled) { $script:ColorPrimary } else { [Drawing.Color]::FromArgb(110,110,110) }
         }
         if ($script:DefaultArrowLabel -and -not $script:DefaultArrowLabel.IsDisposed) {

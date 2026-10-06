@@ -19,7 +19,8 @@ function Save-AppSettings {
     }
 
     $payload = [ordered]@{
-        schemaVersion = 4
+        schemaVersion = 5
+        locale = Resolve-LocaleIdCore -Locale $script:UiLocale
         # Keep an unmigrated legacy default only until the new SYSTEM-backed
         # default architecture has been installed successfully.
         defaultGuid = $script:LegacyDefaultGuid
@@ -34,6 +35,7 @@ function Save-AppSettings {
 
 function Load-AppSettings {
     $settings = Get-AppSettings
+    $script:UiLocale = Resolve-LocaleIdCore -Locale ([string]$settings.locale)
     $script:LegacyDefaultGuid = if ($settings.defaultGuid) { ([string]$settings.defaultGuid).ToLowerInvariant() } else { $null }
     $script:DefaultGuid = $null
     $script:EntryOrder = @($settings.entryOrder)

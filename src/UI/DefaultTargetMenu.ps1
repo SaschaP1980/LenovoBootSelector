@@ -8,12 +8,12 @@
     $menu.TargetWidth = 260
     Initialize-LenovoMenuAppearance -Menu $menu
 
-    $none = New-Object System.Windows.Forms.ToolStripMenuItem('Kein Standardziel')
+    $none = New-Object System.Windows.Forms.ToolStripMenuItem((Get-LocalizedString -Key 'Settings.NoDefaultTarget'))
     $none.Checked = -not [bool]$script:DefaultGuid
     $none.Padding = New-Object System.Windows.Forms.Padding(18, 3, 32, 3)
     $none.Add_Click({
         try { Set-DefaultGuid -Guid $null }
-        catch { Show-LenovoNoticeDialog -Title 'Standard-Startziel' -Heading 'Das Standard-Startziel konnte nicht gespeichert werden.' -Message 'Bitte versuche es erneut. Falls das Problem bestehen bleibt, öffne Wartung → Systemfunktionen reparieren.' -Kind Error }
+        catch { Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Settings.DefaultTarget') -Heading (Get-LocalizedString -Key 'Default.SaveErrorHeading') -Message (Get-LocalizedString -Key 'Default.SaveErrorMessage') -Kind Error }
     })
     [void]$menu.Items.Add($none)
     [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
@@ -25,7 +25,7 @@
         $item.Padding = New-Object System.Windows.Forms.Padding(18, 3, 32, 3)
         $item.Add_Click({
             try { Set-DefaultGuid -Guid ([string]$this.Tag) }
-            catch { Show-LenovoNoticeDialog -Title 'Standard-Startziel' -Heading 'Das Standard-Startziel konnte nicht gespeichert werden.' -Message 'Bitte versuche es erneut. Falls das Problem bestehen bleibt, öffne Wartung → Systemfunktionen reparieren.' -Kind Error }
+            catch { Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Settings.DefaultTarget') -Heading (Get-LocalizedString -Key 'Default.SaveErrorHeading') -Message (Get-LocalizedString -Key 'Default.SaveErrorMessage') -Kind Error }
         })
         [void]$menu.Items.Add($item)
     }

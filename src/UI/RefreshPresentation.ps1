@@ -43,10 +43,10 @@ function Update-HeaderRefreshStatus {
 
     if ($script:HeaderStatusLabel -and -not $script:HeaderStatusLabel.IsDisposed) {
         $script:HeaderStatusLabel.Text = if ($active) {
-            'Aktualisiere Bootziele…'
+            Get-LocalizedString -Key 'Header.Refreshing'
         }
         elseif ($updateAvailable) {
-            'Neue App-Version verfügbar'
+            Get-LocalizedString -Key 'Update.Available'
         }
         else {
             ''
