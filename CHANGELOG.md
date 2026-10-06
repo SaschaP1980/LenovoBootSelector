@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.7.2 – Version-only Release-Zyklus-Messung
+
+- Reiner Hotfix-/Releaseprozess-Test ohne fachliche Produktänderung.
+- Kanonische Version von `0.6.7.1` auf `0.6.7.2` erhöht.
+- `releaseProfile` bleibt `version-only`; Produktcode unter `src/**` bleibt unverändert.
+- Dieser Build dient ausschließlich der erneuten Messung des optimierten Candidate-/Release-Ablaufs.
+
 ## v0.6.7.1 – Version-only Release-Zyklus-Messung
 
 - Reiner Hotfix-/Releaseprozess-Test ohne fachliche Produktänderung.
