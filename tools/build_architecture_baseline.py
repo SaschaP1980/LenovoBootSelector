@@ -13,7 +13,7 @@ def section(root:Path,name:str)->dict:
     files=sorted((root/'src'/name).glob('*.ps1')); texts=[p.read_text(encoding='utf-8-sig') for p in files]
     return {'files':len(files),'lines':sum(len(t.splitlines()) for t in texts),'functions':sum(len(re.findall(r'(?m)^\s*function\s+[A-Za-z0-9_-]+\b',t,re.I)) for t in texts),'scriptReferences':sum(len(re.findall(r'\$script:([A-Za-z0-9_]+)',t,re.I)) for t in texts)}
 def collect(root:Path)->dict:
-    tray=(root/'LenovoBootMenuTray.ps1').read_text(encoding='utf-8-sig'); tm=metrics(tray); refs=re.findall(r'\$script:([A-Za-z0-9_]+)',tray,re.I)
+    tray=(root/'bin/LenovoBootMenuTray.ps1').read_text(encoding='utf-8-sig'); tm=metrics(tray); refs=re.findall(r'\$script:([A-Za-z0-9_]+)',tray,re.I)
     runtime={**tm,'scriptVariables':len({x.lower() for x in refs}),'catchBlocks':len(re.findall(r'\bcatch\s*\{',tray,re.I)),'inlineSilentCatches':len(re.findall(r'catch\s*\{\s*\}',tray,re.I))}
     return {'version':load_version(root),'runtime':runtime,'core':section(root,'Core'),'application':section(root,'Application'),'infrastructure':section(root,'Infrastructure'),'ui':section(root,'UI'),'appTemplate':metrics((root/'src/App/LenovoBootMenuTray.template.ps1').read_text(encoding='utf-8-sig'))}
 def main()->int:

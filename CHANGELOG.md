@@ -1,5 +1,17 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.1.0 – LBS-2 Repository-Root-Bereinigung
+
+v0.6.1.0 setzt [LBS-2] um und trennt Repository-Struktur und ausgelieferte Release-Struktur sauber.
+
+- Die lose im Repository-Root liegenden Runtime-/Projektdateien liegen nun unter `bin/`.
+- Dazu gehören die generierte Runtime, Installer/Uninstaller, Launcher, Icon/Preview, `BUILD_INTEGRITY.txt` und die kanonische `version.json`.
+- `README.md` und `CHANGELOG.md` bleiben im Root; `.gitignore` bleibt als Git-Steuerdatei im Root.
+- Die JSON-Architektur-/Audit-Artefakte bleiben ausdrücklich unverändert im Scope von LBS-1 und werden durch LBS-2 nicht verschoben.
+- Build-, Test-, Packaging-, Release-Workflow- und Dokumentationspfade wurden auf die neue `bin/`-Quelle umgestellt.
+- Die ausgelieferte Release-ZIP bleibt bewusst unverändert flach mit denselben 10 Dateien; `bin/` ist ausschließlich Repository-/Source-Struktur.
+- Updater-, Boot-, Storage-, TaskBroker- und Privilege-Boundary-Semantik bleiben unverändert.
+
 ## v0.6.0.0 – GitHub-eigener Veröffentlichungszeitpunkt und Release-Zyklus-Härtung
 
 v0.6.0.0 ist eine Minor-Version des Release-Systems. Die Produkt-Runtime bleibt bis auf die Versionsnummer unverändert.

@@ -4,7 +4,7 @@ From v0.5.10.0 onward the canonical release model is **1 build = 1 release branc
 
 ## Canonical inputs
 
-- `version.json` is the only authoritative release-version source. Schema v2 intentionally contains no `publishedUtc`.
+- `bin/version.json` is the only authoritative release-version source. Schema v2 intentionally contains no `publishedUtc`.
 - `releaseProfile` selects regression strictness (`version-only`, `release-architecture`, `patch`).
 - Product runtime receives the version only through the `@APP_VERSION@` token during deterministic runtime generation.
 - `tools/prepare_release.py` owns generated release metadata and packages. For schema v2, publication time must be supplied explicitly with `--published-utc`.
@@ -12,7 +12,7 @@ From v0.5.10.0 onward the canonical release model is **1 build = 1 release branc
 
 ## Local release preparation
 
-1. Change `version.json` and add the corresponding `CHANGELOG.md` section.
+1. Change `bin/version.json` and add the corresponding `CHANGELOG.md` section.
 2. Run `python -B tools/prepare_release.py --root . --output-dir <dir> --published-utc <provisional-UTC>` for local validation only.
 3. Run the four permanent validators: `validate_release.py`, `validate_core.py`, `validate_boundary.py`, `validate_regression.py`.
 4. Push the canonical input changes to `release/v<version>`; do not add the new release ZIP manually. Generated runtime/audit/metadata files may already be present from the local build, but GitHub recreates them deterministically before the PR commit.
@@ -37,3 +37,8 @@ Existing `downloads/*.zip` files are immutable. A release may add exactly one ne
 ## Runner queue policy
 
 Interactive release supervision waits at most 60 seconds for a GitHub-hosted runner assignment. If the job is still `queued` with no runner after that window, the condition is reported as external GitHub queue delay. The workflow is not cancelled, retried or duplicated; GitHub continues autonomously. A later `Github Status` check verifies the terminal state.
+
+
+## Repository/runtime layout
+
+Repository runtime/release source files live under `bin/`. The downloadable Release ZIP intentionally remains a flat 10-file package: packaging maps the `bin/` source files back to their established top-level archive names. Historical architecture/catch JSON organization remains owned by LBS-1.

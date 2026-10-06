@@ -7,6 +7,9 @@ from release_common import STAMP, load_version, release_zip_name, source_zip_nam
 ROOT_DEFAULT=Path(__file__).resolve().parents[1]
 RELEASE_NAMES=['BUILD_INTEGRITY.txt','icon-preview.png','Install-LenovoBootMenuTasks.ps1','LenovoBootMenuTray.ico','LenovoBootMenuTray.ps1','README.md','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','Uninstall-LenovoBootMenuTasks.ps1']
 
+def release_source(root:Path,name:str)->Path:
+    return root/name if name=='README.md' else root/'bin'/name
+
 def write_zip(path:Path,entries:list[tuple[str,bytes]]):
     path.parent.mkdir(parents=True,exist_ok=True)
     with zipfile.ZipFile(path,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as z:
@@ -25,7 +28,7 @@ def source_entries(root:Path):
     return sorted(out,key=lambda x:x[0])
 
 def build_release(root:Path,out:Path,version:str)->Path:
-    path=out/release_zip_name(version); write_zip(path,[(n,(root/n).read_bytes()) for n in RELEASE_NAMES]); return path
+    path=out/release_zip_name(version); write_zip(path,[(n,release_source(root,n).read_bytes()) for n in RELEASE_NAMES]); return path
 
 def build_source(root:Path,out:Path,version:str)->Path:
     path=out/source_zip_name(version); write_zip(path,source_entries(root)); return path

@@ -28,7 +28,7 @@ class Suite:
 
 def txt(p): return Path(p).read_text(encoding='utf-8-sig')
 def load_version(root):
-    p=root/'version.json'
+    p=root/'bin/version.json'
     if not p.is_file(): return None
     import json
     return str(json.loads(p.read_text(encoding='utf-8'))['version'])
@@ -66,7 +66,7 @@ def balanced_fragment(source,marker):
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); args=ap.parse_args(); root=args.root
     s=Suite()
-    tray_path=root/'LenovoBootMenuTray.ps1'; template_path=root/'src/App/LenovoBootMenuTray.template.ps1'; builder=root/'tools/build_runtime.py'
+    tray_path=root/'bin/LenovoBootMenuTray.ps1'; template_path=root/'src/App/LenovoBootMenuTray.template.ps1'; builder=root/'tools/build_runtime.py'
     s.check('Generated runtime exists',tray_path.is_file())
     s.check('Runtime template exists',template_path.is_file())
     s.check('Deterministic runtime builder exists',builder.is_file())
@@ -74,7 +74,7 @@ def main():
     tray=txt(tray_path)
     template=txt(template_path) if template_path.is_file() else ''
     version=load_version(root)
-    s.check('version.json provides version',bool(version))
+    s.check('bin/version.json provides version',bool(version))
     expected=f"$script:AppVersion = '{version}'" if version else ''
     s.contains(f'App version is {version}',tray,expected)
     s.eq('App version declaration exactly once',tray.count(expected),1)
@@ -152,14 +152,14 @@ def main():
             else:
                 s.eq(f'Unrelated critical fragment unchanged: {name}',actual,expected)
         for fn in ['Install-LenovoBootMenuTasks.ps1','LenovoBootMenuTray.ico','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','icon-preview.png']:
-            s.eq(f'Unrelated runtime asset byte-identical to v0.3.4: {fn}',sha_file(root/fn),baseline['source_sha256'][fn])
-        uninstall_bytes=(root/'Uninstall-LenovoBootMenuTasks.ps1').read_bytes()
+            s.eq(f'Unrelated runtime asset byte-identical to v0.3.4: {fn}',sha_file(root/'bin'/fn),baseline['source_sha256'][fn])
+        uninstall_bytes=(root/'bin/Uninstall-LenovoBootMenuTasks.ps1').read_bytes()
         normalized_uninstall=uninstall_bytes[3:] if uninstall_bytes.startswith(b'\xef\xbb\xbf') else uninstall_bytes
-        baseline_uninstall=(root/'Uninstall-LenovoBootMenuTasks.ps1').read_text(encoding='utf-8-sig').encode('utf-8')
+        baseline_uninstall=(root/'bin/Uninstall-LenovoBootMenuTasks.ps1').read_text(encoding='utf-8-sig').encode('utf-8')
         s.eq('Uninstaller differs only by UTF-8 BOM normalization',normalized_uninstall,baseline_uninstall)
 
     # Security invariants remain in shell/installer, never in core.
-    install=txt(root/'Install-LenovoBootMenuTasks.ps1'); uninstall=txt(root/'Uninstall-LenovoBootMenuTasks.ps1')
+    install=txt(root/'bin/Install-LenovoBootMenuTasks.ps1'); uninstall=txt(root/'bin/Uninstall-LenovoBootMenuTasks.ps1')
     s.contains('TaskBroker schema unchanged',tray,"$script:SupportedTaskBrokerVersions = @('0.2.12')")
     s.contains('Installer schema unchanged',install,"$version = '0.2.12'")
     s.eq('Elevation prompts still restricted to setup/remove',tray.count('-Verb RunAs'),2)
