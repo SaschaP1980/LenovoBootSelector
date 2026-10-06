@@ -52,6 +52,10 @@ def main():
     ui=txt(root/'src/UI/UpdatePresentation.ps1'); infra=txt(root/'src/Infrastructure/UpdateClient.ps1'); transport=txt(root/'src/Infrastructure/UpdateTransport.ps1')
     refresh_ui=txt(root/'src/UI/RefreshPresentation.ps1'); popup_ui=txt(root/'src/UI/Popup.ps1')
     taskbroker=txt(root/'src/Infrastructure/TaskBroker.ps1'); install=txt(root/'bin/Install-LenovoBootMenuTasks.ps1'); diagnostics=txt(root/'src/Infrastructure/RuntimeDiagnostics.ps1'); update_runtime=txt(root/'src/Application/UpdateRuntime.ps1')
+    diagnostics_init=diagnostics[diagnostics.find('function Initialize-RuntimeDiagnostics'):diagnostics.find('function Write-RuntimeDiagnosticEvent')]
+    s.has('LBS-22 template preserves inherited diagnostics session input',app_template,'$script:InheritedRuntimeSessionId = [string]$RuntimeSessionId')
+    s.has('LBS-22 diagnostics initialization uses captured inherited ID',diagnostics_init,'$candidate = ([string]$script:InheritedRuntimeSessionId).Trim()')
+    s.has('LBS-22 parentSession reports inherited state only',diagnostics_init,'parentSession = $hasParentSession')
     s.has('Update button unchanged',ui,"-SecondaryButtonText 'Jetzt aktualisieren' -SecondaryAction { Start-ManualAppUpdate }")
     s.has('LBS-14 shared update dialog title is canonical',ui,"-Title 'Neue App-Version verfügbar'")
     s.has('LBS-14 header message is canonical',refresh_ui,"'Neue App-Version verfügbar'")

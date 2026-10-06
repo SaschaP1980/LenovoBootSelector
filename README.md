@@ -54,13 +54,11 @@ Lenovo Boot Selector is therefore not a BIOS/UEFI replacement and not a bootload
 
 The application runs **unelevated** during normal operation. Privileged firmware mutations are executed only through fixed, allowlisted Windows Scheduled Tasks. Permanent changes to the UEFI boot order are explicitly outside the product model.
 
-Since v0.6.4.0 this boundary is additionally hardened fail-closed: the runtime TaskBroker no longer accepts arbitrary task names and instead accepts only fixed operation types; target-specific task names are derived only from validated, installed firmware GUIDs. TaskBroker state and metadata are read-only for normal users, and the task DACL is validated/repaired to Read+Execute only. The canonical contract is documented in [docs/SECURITY_BOUNDARY.md](docs/SECURITY_BOUNDARY.md).
+The TaskBroker boundary is hardened fail-closed: the runtime accepts only fixed operation types, target-specific task names are derived only from validated installed firmware GUIDs, TaskBroker state/metadata are read-only for normal users, and task DACLs are validated for Read+Execute only. If the installed privileged-task metadata is missing or incompatible, the application reports that setup or repair is required and keeps privileged actions closed until explicit maintenance succeeds. The canonical contract is documented in [docs/SECURITY_BOUNDARY.md](docs/SECURITY_BOUNDARY.md).
 
-**One-time maintenance after updating to v0.6.4.1:** existing TaskBroker installations with schema 0.2.12 are intentionally no longer trusted. Run the existing system-functions repair action once and confirm the UAC prompt; this installs schema 0.2.13 and the hardened ACLs.
+Historical migration and repair details for v0.6.4.0/v0.6.4.1 are retained in [CHANGELOG.md](CHANGELOG.md) rather than presented as current maintenance instructions.
 
-**Note about v0.6.4.0:** the repair path first shipped in that version could falsely fail at the `protect-state` step because the ACL check interpreted the allowed `ReadAndExecute` rights as writable through the composite `Modify` mask. v0.6.4.1 fixes only that check. A repair that failed under v0.6.4.0 can safely be run again with v0.6.4.1.
-
-**Current development version:** v0.7.0.1  
+**Current development version:** v0.7.0.2  
 **Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads and revision history
@@ -127,13 +125,13 @@ This presentation makes **no claim of direct 1:1 addressability** of the physica
 2. Start `Start-LenovoBootMenuTray.cmd`.
 3. On first launch, run the offered system-functions setup through the maintenance menu and confirm the UAC prompt.
 4. Select the desired boot target in the popup.
-5. Check for updates manually when needed through the existing maintenance update action.
+5. Opening the popup automatically performs a read-only version check. The existing maintenance action remains available for an explicit manual re-check or user-controlled update installation.
 
 ## Project structure
 
 | Path | Purpose |
 | --- | --- |
-| `bin/` | canonical runtime/release source files, including the generated single-file runtime and `version.json` |
+| `bin/` | release/package inputs and generated runtime artifacts; `version.json` is the authoritative release-version source |
 | `src/Core/` | stateless domain logic / Functional Core |
 | `src/Application/` | application and workflow logic |
 | `src/Infrastructure/` | Windows, storage, update, TaskBroker, and IO adapters |
@@ -154,6 +152,14 @@ The central native Windows PowerShell 5.1 test wrapper is:
 ~~~
 
 Build and packaging helpers live under `tools/`. Detailed version history is in [CHANGELOG.md](CHANGELOG.md).
+
+### Agentic software engineering
+
+Lenovo Boot Selector is developed as an **agentic software engineering** project. GitHub is the project's **single durable point of truth and continuity**: a fresh engineering agent must be able to reconstruct the complete current project state from the current repository, GitHub Issues/comments, workflows, tests, release metadata, and other tracked GitHub evidence alone.
+
+No previous chat, chat summary, handover document or ZIP, model memory, stale local checkout, previous source ZIP, or other unpublished context is required or authoritative for continuing the project. Interactive chats are transient working sessions only. When a durable finding, decision, constraint, acceptance result, or operating rule emerges during a session, it must be captured in the appropriate GitHub artifact before future work depends on it.
+
+Agentic work is constrained by the same engineering controls as any other contribution: Issue-backed scope where required, test-first regression handling, explicit safety boundaries, atomic candidate commits, deterministic builds, Linux and Windows PowerShell 5.1 gates, reproducibility checks, post-release verification, and native acceptance where hardware-specific behavior must be proven. Human direction remains authoritative for product intent, safety-sensitive decisions, and final acceptance.
 
 Since v0.6.5.0, a release is first validated as `candidate/v<version>`. Only a completely green candidate may be promoted automatically to `release/v<version>` on the exact same commit. Protected runtime fragments use a release-specific `protectedFragmentIntent` instead of permanent exception lists; runtime modules are registered exclusively through template include markers.
 

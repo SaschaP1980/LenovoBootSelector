@@ -19,7 +19,7 @@ These four files are the permanent Python gates used by the GitHub Release Orche
 | --- | --- | --- |
 | `Test-FunctionalCore.ps1` | Core | Parsers, settings, and functional core behavior |
 | `Test-UpdateCore.ps1` | Core | Update model, transport failure contract, and update contracts |
-| `Test-RefreshRuntime.ps1` | Runtime | Background refresh state and request lifecycle |
+| `Test-RefreshRuntime.ps1` | Runtime | Background refresh state/request lifecycle and child-worker diagnostics-session correlation |
 | `Test-MaintenanceRuntime.ps1` | Runtime | Maintenance state and modes |
 | `Test-SingleInstanceMutex.ps1` | Runtime | Single-instance / mutex lifecycle |
 | `Test-BootTargetDrift.ps1` | Safety | Drift detection and fail-closed states |
@@ -48,7 +48,7 @@ Native PowerShell suites intentionally use different count strategies; one gener
 | Suite | Strategy |
 | --- | --- |
 | `Test-UpdateCore.ps1` | **AST self-audit + fixed coverage guard.** PowerShell counts the `Assert-True` / `Assert-Equal` command ASTs, compares them with the actually executed `$checks`, and additionally requires exactly 62. The permanent release gate validates the same contract statically. |
-| `Test-RefreshRuntime.ps1` | Straight-line: fixed runtime count of 18. |
+| `Test-RefreshRuntime.ps1` | Straight-line: fixed runtime count of 28, including LBS-22 inherited/fresh diagnostics-session coverage for background-refresh, update-check, and update-prepare roles. |
 | `Test-TaskBrokerBoundary.ps1` | Straight-line: fixed runtime count of 23. |
 | `Test-BootTargetDrift.ps1` | Straight-line: fixed runtime count of 13. |
 | `Test-SingleInstanceMutex.ps1` | Explicit manual increments; fixed fail guard of 4. |
