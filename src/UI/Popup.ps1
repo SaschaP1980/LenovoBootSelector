@@ -41,10 +41,41 @@
     $script:HeaderTitleLabel = $headerTitle
     $header.Controls.Add($headerTitle)
 
-    $headerSub = New-Label -Text '' -Font (New-Object Drawing.Font('Segoe UI', 7.8, [Drawing.FontStyle]::Regular)) `
-        -ForeColor $script:ColorSecondary -X 16 -Y 31 -Width 290 -Height 16
+    # LBS-14: a real flat Button keeps the status visually label-like while
+    # providing native Enter/Space activation and keyboard focus semantics.
+    $headerSub = New-Object System.Windows.Forms.Button
+    $headerSub.Text = ''
+    $headerSub.Font = New-Object Drawing.Font('Segoe UI', 7.8, [Drawing.FontStyle]::Regular)
+    $headerSub.ForeColor = $script:ColorSecondary
+    $headerSub.BackColor = $script:ColorHeader
+    $headerSub.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $headerSub.FlatAppearance.BorderSize = 0
+    $headerSub.FlatAppearance.MouseOverBackColor = $script:ColorHeader
+    $headerSub.FlatAppearance.MouseDownBackColor = $script:ColorHeader
+    $headerSub.UseVisualStyleBackColor = $false
+    $headerSub.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
+    $headerSub.Padding = New-Object System.Windows.Forms.Padding(0)
+    $headerSub.Location = New-Object Drawing.Point(13, 28)
+    $headerSub.Size = New-Object Drawing.Size(300, 21)
+    $headerSub.TabStop = $false
+    $headerSub.Cursor = [System.Windows.Forms.Cursors]::Default
     $headerSub.Name = 'HeaderStatusLabel'
     $headerSub.Visible = $false
+    $headerSub.AccessibleDescription = 'Öffnet den Dialog zur verfügbaren App-Version.'
+    $headerSub.Add_MouseEnter({
+        $script:HeaderStatusHovered = $true
+        Update-HeaderStatusInteractionVisual
+    })
+    $headerSub.Add_MouseLeave({
+        $script:HeaderStatusHovered = $false
+        Update-HeaderStatusInteractionVisual
+    })
+    $headerSub.Add_Enter({ Update-HeaderStatusInteractionVisual })
+    $headerSub.Add_Leave({ Update-HeaderStatusInteractionVisual })
+    $headerSub.Add_Click({
+        if (-not $script:HeaderUpdateInteractionEnabled) { return }
+        [void](Show-AvailableUpdateDialog)
+    })
     $script:HeaderStatusLabel = $headerSub
     $header.Controls.Add($headerSub)
 

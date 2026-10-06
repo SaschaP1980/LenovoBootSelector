@@ -44,6 +44,15 @@ function Update-UpdateMenuState {
     }
 }
 
+function Show-AvailableUpdateDialog {
+    if (-not $script:UpdateState -or [string]$script:UpdateState.Status -ne 'UpdateAvailable' -or $null -eq $script:UpdateState.AvailableManifest) {
+        return $false
+    }
+    $manifest = $script:UpdateState.AvailableManifest
+    Show-LenovoNoticeDialog -Title 'Neue App-Version verfügbar' -Heading ('Lenovo Boot Selector v{0} ist verfügbar.' -f $manifest.Version) -Message 'Du kannst die neue Version jetzt direkt installieren. Später findest du die Aktualisierung im Tray-Menü unter „Wartung“ → „App aktualisieren…“.' -Kind Info -SecondaryButtonText 'Jetzt aktualisieren' -SecondaryAction { Start-ManualAppUpdate }
+    return $true
+}
+
 function Stop-UpdateCheckUiWorker {
     if ($script:UpdateState.CheckTimer) { try { $script:UpdateState.CheckTimer.Stop() } catch { }; try { $script:UpdateState.CheckTimer.Dispose() } catch { }; $script:UpdateState.CheckTimer=$null }
     if ($script:UpdateState.CheckProcess) { try { $script:UpdateState.CheckProcess.Dispose() } catch { }; $script:UpdateState.CheckProcess=$null }
@@ -70,9 +79,9 @@ function Complete-UpdateCheck {
             $validated=Test-LenovoUpdateManifestCore -Manifest $result.Manifest
             if (-not $validated.IsValid) { $failureCategory='manifest'; $failureStage='result-manifest-validation'; throw $validated.Error }
             [void](Set-UpdateRuntimeAvailable -State $script:UpdateState -Manifest $validated)
-            $script:LastStatusText = ('Neue Version verfügbar: v{0}' -f $validated.Version)
+            $script:LastStatusText = ('Neue App-Version verfügbar: v{0}' -f $validated.Version)
             if (-not $isStartup) {
-                Show-LenovoNoticeDialog -Title 'Neue Version verfügbar' -Heading ('Lenovo Boot Selector v{0} ist verfügbar.' -f $validated.Version) -Message 'Du kannst die neue Version jetzt direkt installieren. Später findest du die Aktualisierung im Tray-Menü unter „Wartung“ → „App aktualisieren…“.' -Kind Info -SecondaryButtonText 'Jetzt aktualisieren' -SecondaryAction { Start-ManualAppUpdate }
+                [void](Show-AvailableUpdateDialog)
             }
             Write-RuntimeDiagnosticEvent -Event $(if ($isStartup) { 'STARTUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$true; availableVersion=$validated.Version; mode=$Mode })
         }
