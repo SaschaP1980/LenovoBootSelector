@@ -48,7 +48,18 @@ Lenovo Boot Selector is therefore not a BIOS/UEFI replacement and not a bootload
 - read-only firmware-target drift detection
 - read-only storage context for internal NVMe and USB media
 - diagnostic export and maintenance functions
-- self-updater with an automatic read-only version check whenever the popup opens, plus the current German manual UI actions `Auf neue Version prüfen…` and `App aktualisieren…`
+- English (`en-US`) UI by default, with fully selectable and persisted German (`de-DE`)
+- self-updater with an automatic read-only version check whenever the popup opens, plus localized manual check/install actions
+
+## Language support
+
+Starting with v0.8.0.0, all product-controlled user-facing UI text is supplied through a central PowerShell-5.1-compatible localization layer. **English (`en-US`) is the default and fallback language**; **German (`de-DE`)** is available from the tray menu under **Language / Sprache** and the selection is persisted in the existing user settings.
+
+A new installation with no settings file starts in English. Existing pre-localization settings (schema versions below 5) migrate to German so an established German installation does not unexpectedly switch language during upgrade. Invalid or unknown stored locale values fail safely to English.
+
+Changing the language updates the tray UI immediately and rebuilds a visible popup in the selected language. Firmware descriptions, drive model names, GUIDs, paths, diagnostic event codes, TaskBroker operations, and other externally supplied or technical identifiers are not translated.
+
+The localization architecture, contribution rules, migration contract, and permanent gates are documented in [docs/LOCALIZATION.md](docs/LOCALIZATION.md).
 
 ## Security and maintenance notes
 
@@ -58,7 +69,7 @@ The TaskBroker boundary is hardened fail-closed: the runtime accepts only fixed 
 
 Historical migration and repair details for v0.6.4.0/v0.6.4.1 are retained in [CHANGELOG.md](CHANGELOG.md) rather than presented as current maintenance instructions.
 
-**Current development version:** v0.7.0.2  
+**Current development version:** v0.8.0.0  
 **Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads and revision history
@@ -71,17 +82,17 @@ Version format: **MAJOR.MINOR.PATCH.HOTFIX**. Historical three-component version
 
 ## Update function
 
-Each transition from a hidden popup to the visible Lenovo Boot Selector UI starts one automatic read-only check for a newer app version, at the same lifecycle point as the existing fresh boot-target refresh. Starting the tray process alone does not perform that check; closing and later reopening the popup starts another one. If an update operation is already busy, the popup-open trigger does not start a competing second update worker. There is still **no periodic polling**. When a newer version is available, the popup header shows the current German UI text `Neue App-Version verfügbar` as long as no boot-target refresh is active. During a boot-target refresh, `Aktualisiere Bootziele…` takes precedence; the update indication returns afterward.
+Each transition from a hidden popup to the visible Lenovo Boot Selector UI starts one automatic read-only check for a newer app version, at the same lifecycle point as the existing fresh boot-target refresh. Starting the tray process alone does not perform that check; closing and later reopening the popup starts another one. If an update operation is already busy, the popup-open trigger does not start a competing second update worker. There is still **no periodic polling**. When a newer version is available, the popup header shows the localized update-available text (`New app version available` / `Neue App-Version verfügbar`) as long as no boot-target refresh is active. During a boot-target refresh, the localized refresh state takes precedence; the update indication returns afterward.
 
 The check reads `downloads/latest.json` from the fixed GitHub repository. A newer version is accepted only when manifest, semantic version, filename, tag, size, SHA-256, and package file list are valid. The automatic popup-open check does not download or install anything. Download and installation remain explicit user actions through the existing manual update path. The downloaded ZIP is checked again for size and SHA-256 before extraction. Installation runs unelevated with a local backup and rollback; the app then restarts through the existing VBS launcher.
 
-Since v0.6.3.1, `Neue App-Version verfügbar` in the popup header is directly interactive. Hover and keyboard focus highlight the indicator in Lenovo red; click, Enter, or Space opens the existing update dialog. The header uses only the already validated update manifest and does not start another version check. The indicator is not interactive while a boot-target refresh or maintenance operation is active.
+Since v0.6.3.1, the localized update-available status in the popup header is directly interactive. Hover and keyboard focus highlight the indicator in Lenovo red; click, Enter, or Space opens the existing update dialog. The header uses only the already validated update manifest and does not start another version check. The indicator is not interactive while a boot-target refresh or maintenance operation is active.
 
 Since v0.6.3.0, updater networking is encapsulated in `src/Infrastructure/UpdateTransport.ps1`. Runtime diagnostics distinguish transport failures structurally from manifest, package, hash, installation, and restart failures. Network failures also retain the error class and `WebExceptionStatus`. The security contract remains unchanged: fixed HTTPS source, fail-closed manifest/package validation, unelevated execution, and no periodic polling.
 
-Since v0.5.8.0, the result of an update attempt is persisted across process restart. The restarted app reports success only when the actually running version exactly matches the expected target version. The current German UI then shows `Update erfolgreich` once. On installation failure, the updater attempts to roll back to the previous version, restarts that version, and shows `Update fehlgeschlagen` once. The result is also copied into the runtime diagnostics of the new session. v0.5.8.1 adds one-time backward compatibility for the legacy `success/message/utc` result format written by older updater helpers; a legacy success is accepted only when `success` is a real Boolean, without inventing a target version that was never stored.
+Since v0.5.8.0, the result of an update attempt is persisted across process restart. The restarted app reports success only when the actually running version exactly matches the expected target version. The localized UI then reports update success once. On installation failure, the updater attempts to roll back to the previous version, restarts that version, and reports the failure/rollback state once in the selected language. The result is also copied into the runtime diagnostics of the new session. v0.5.8.1 adds one-time backward compatibility for the legacy `success/message/utc` result format written by older updater helpers; a legacy success is accepted only when `success` is a real Boolean, without inventing a target version that was never stored.
 
-Since v0.5.9.0, the `Neue Version verfügbar` dialog also offers `Jetzt aktualisieren`. The button uses the same existing manual update path as the maintenance action `App aktualisieren…`; no automatic or second update channel is introduced.
+Since v0.5.9.0, the available-update dialog also offers a localized manual install action. It uses the same existing update path as the localized maintenance action; no automatic or second update channel is introduced.
 
 The updater does not change firmware, BCD, or Scheduled Task configuration. Changes to privileged system functions remain exclusive to the existing explicit setup/repair/reinitialize path.
 
@@ -91,14 +102,16 @@ The updater does not change firmware, BCD, or Scheduled Task configuration. Chan
 
 When exactly one internal NVMe device is detected, the current version shows its physical model for the first internal slot. On the confirmed target system, for example:
 
-- **NVMe-SSD 1** — `Interne SSD: KXG8AZNV2T04 LA KIOXIA`
-- **NVMe-SSD 2** — `Kein Laufwerk erkannt`
+- **NVMe SSD 1** — `Internal SSD: KXG8AZNV2T04 LA KIOXIA`
+- **NVMe SSD 2** — `No drive detected`
+
+With German selected, the same confirmed state is shown as `NVMe-SSD 1 / Interne SSD: …` and `NVMe-SSD 2 / Kein Laufwerk erkannt`.
 
 When multiple internal NVMe devices are present, the application deliberately does not guess an unsupported physical NVMe0/NVMe1 mapping.
 
 ### USB boot media
 
-The firmware target intentionally remains the generic **USB HDD**. The physical drive is shown only as read-only storage context. With exactly one detected USB boot candidate, for example, the current German UI shows `USB-Startmedium: SanDisk Extreme Pro USB4`.
+The firmware target intentionally remains the generic **USB HDD**. The physical drive is shown only as read-only storage context. With exactly one detected USB boot candidate, for example, the default English UI shows `USB boot medium: SanDisk Extreme Pro USB4`; German shows `USB-Startmedium: SanDisk Extreme Pro USB4`.
 
 This presentation makes **no claim of direct 1:1 addressability** of the physical USB device through the generic firmware target `USB HDD`.
 
@@ -123,9 +136,10 @@ This presentation makes **no claim of direct 1:1 addressability** of the physica
 
 1. Download the release ZIP from `downloads/` and extract it completely into a **writable user directory**.
 2. Start `Start-LenovoBootMenuTray.cmd`.
-3. On first launch, run the offered system-functions setup through the maintenance menu and confirm the UAC prompt.
-4. Select the desired boot target in the popup.
-5. Opening the popup automatically performs a read-only version check. The existing maintenance action remains available for an explicit manual re-check or user-controlled update installation.
+3. English is used by default; choose **Language / Sprache** in the tray menu if you want German.
+4. On first launch, run the offered system-functions setup through the maintenance menu and confirm the UAC prompt.
+5. Select the desired boot target in the popup.
+6. Opening the popup automatically performs a read-only version check. The existing maintenance action remains available for an explicit manual re-check or user-controlled update installation.
 
 ## Project structure
 
@@ -139,6 +153,7 @@ This presentation makes **no claim of direct 1:1 addressability** of the physica
 | `tests/` | active canonical Python gates, native PowerShell tests, and baseline data |
 | `tests-history/` | frozen version-specific validators, named by category + version |
 | `docs/architecture/` | canonical and historical architecture baselines |
+| `docs/LOCALIZATION.md` | localization architecture, migration, contribution rules, and gates |
 | `audits/` | canonical and historical catch audits |
 | `tools/` | build, packaging, audit, and transition scripts |
 | `downloads/` | historical versioned release ZIPs and update manifests |
@@ -151,7 +166,7 @@ The central native Windows PowerShell 5.1 test wrapper is:
 .\tests\Test-WindowsPowerShell51.ps1
 ~~~
 
-Build and packaging helpers live under `tools/`. Detailed version history is in [CHANGELOG.md](CHANGELOG.md).
+Build and packaging helpers live under `tools/`. Detailed version history is in [CHANGELOG.md](CHANGELOG.md). Localization development rules are in [docs/LOCALIZATION.md](docs/LOCALIZATION.md).
 
 ### Agentic software engineering
 
@@ -161,7 +176,9 @@ No previous chat, chat summary, handover document or ZIP, model memory, stale lo
 
 Agentic work is constrained by the same engineering controls as any other contribution: Issue-backed scope where required, test-first regression handling, explicit safety boundaries, atomic candidate commits, deterministic builds, Linux and Windows PowerShell 5.1 gates, reproducibility checks, post-release verification, and native acceptance where hardware-specific behavior must be proven. Human direction remains authoritative for product intent, safety-sensitive decisions, and final acceptance.
 
-Since v0.6.5.0, a release is first validated as `candidate/v<version>`. Only a completely green candidate may be promoted automatically to `release/v<version>` on the exact same commit. Protected runtime fragments use a release-specific `protectedFragmentIntent` instead of permanent exception lists; runtime modules are registered exclusively through template include markers.
+For confirmed bugs and regressions the rule is **failing test first, not failing candidate first**: add a focused permanent regression test, prove that it fails for the expected reason against the unfixed canonical basis, apply the minimal fix, and prove the same test GREEN before exposing a Candidate branch. An intentionally failing Candidate Preflight is not used as RED evidence.
+
+Since v0.6.5.0, a release is first validated as `candidate/v<version>`. A Candidate is release-ready and is created only when its mandatory gates are expected to pass. Only a completely green candidate may be promoted automatically to `release/v<version>` on the exact same commit. Protected runtime fragments use a release-specific `protectedFragmentIntent` instead of permanent exception lists; runtime modules are registered exclusively through template include markers.
 
 Since v0.6.6.0, there are only two active release profiles: `version-only` for unchanged product code under `src/**`, and `patch` for functional product-code changes. The historical `release-architecture` special profile has been removed.
 

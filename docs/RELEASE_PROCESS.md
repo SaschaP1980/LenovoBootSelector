@@ -25,6 +25,20 @@ Before implementation/release preparation:
 
 For Issue-backed releases, the Issue is part of the audit trail: important implementation findings belong in comments, and closure occurs only after successful publication/post-release verification.
 
+## Test-first bug/regression preparation
+
+For every confirmed product bug or regression, use **failing test first, not failing candidate first**.
+
+Before implementing the fix:
+
+1. add a focused permanent regression test that specifies the corrected behavior;
+2. execute it against the current unfixed canonical basis and confirm RED for the expected defect-specific reason;
+3. record the RED evidence in the active Issue when Issue-backed, or in equivalent durable release history for an Issue-less Hotfix.
+
+Then implement the smallest fix, rerun the same regression test and require GREEN. Complete applicable broader prechecks before Candidate creation.
+
+The Candidate branch is **release-ready**, not a RED-test vehicle. Do not intentionally publish a known-failing Candidate or run Candidate Preflight merely to prove the pre-fix failure. Candidate Preflight is the mandatory integration/release-entry gate for a state that is already expected to pass. Unexpected Candidate failures continue to use the existing same-branch fast-forward correction path.
+
 ## Local release preparation
 
 1. Verify the version-level Issue prerequisite above.
@@ -32,8 +46,9 @@ For Issue-backed releases, the Issue is part of the audit trail: important imple
 3. Add the corresponding `CHANGELOG.md` section for **every** published version. This is mandatory even for a version-only Hotfix, a pure version bump, or a release-performance measurement.
 4. Set `protectedFragmentIntent` to exactly the protected fragments intentionally changed by this version; normally `[]`.
 5. Set `repositoryDeleteIntent` to exactly the repository paths intentionally deleted by this version; normally `[]`.
-6. Prepare one exact candidate commit based on current `main`.
-7. Push that commit only as `candidate/v<version>`. Do **not** manually create `release/v<version>`.
+6. For a bug/regression, complete the focused RED→GREEN proof described above and run applicable broader prechecks.
+7. Prepare one exact **release-ready** candidate commit based on current `main`.
+8. Push that commit only as `candidate/v<version>`. Do **not** manually create `release/v<version>`.
 
 ### Version-only minimum diff
 
@@ -48,7 +63,7 @@ This rule was empirically confirmed by the v0.6.7.1 release-cycle measurement.
 
 ## Mandatory candidate preflight
 
-`.github/workflows/candidate-preflight.yml` is the release-entry gate. From v0.6.9.0 onward it runs two mandatory candidate paths in parallel on the exact same SHA:
+`.github/workflows/candidate-preflight.yml` is the release-entry gate for a Candidate that is already expected to be GREEN. It is not the normal mechanism for obtaining pre-fix RED evidence. From v0.6.9.0 onward it runs two mandatory candidate paths in parallel on the exact same SHA:
 
 - **Linux Candidate Preflight** on `ubuntu-latest`, which runs `tools/candidate_preflight.py` against the immediately previous canonical source tag and performs deterministic preparation, two reproducibility builds, Release/Core/Boundary/Regression, protected-fragment intent, repository-delete intent and historical-ZIP checks. It writes `preflight/linux`.
 - **Windows PowerShell 5.1 Gate** through `.github/workflows/windows-powershell51.yml` on an ephemeral GitHub-hosted `windows-2025` runner. It verifies Windows PowerShell 5.1, deterministically regenerates/checks the candidate runtime, runs `tests/Test-WindowsPowerShell51.ps1`, emits `WINDOWS_POWERSHELL51_SUMMARY=<json>`, and writes `preflight/windows-powershell51`.

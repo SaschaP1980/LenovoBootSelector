@@ -1,4 +1,22 @@
-﻿function Show-PendingUpdateResultOnStartup {
+﻿function Get-LocalizedUpdateRestartMessage {
+    param([Parameter(Mandatory=$true)]$Resolved)
+
+    if ([bool]$Resolved.Success) {
+        return (Get-LocalizedString -Key 'Update.RestartSuccessMessage')
+    }
+    if ([bool]$Resolved.RollbackAttempted -and [bool]$Resolved.RollbackSucceeded) {
+        return (Get-LocalizedString -Key 'Update.RestartRollbackMessage')
+    }
+    if ([string]$Resolved.TargetVersion -and [string]$Resolved.RunningVersion -and ([string]$Resolved.TargetVersion -ne [string]$Resolved.RunningVersion)) {
+        return (Get-LocalizedString -Key 'Update.RestartMismatchMessage' -Values @{
+            TargetVersion = [string]$Resolved.TargetVersion
+            RunningVersion = [string]$Resolved.RunningVersion
+        })
+    }
+    return (Get-LocalizedString -Key 'Update.RestartFailureMessage')
+}
+
+function Show-PendingUpdateResultOnStartup {
     $result = Read-LenovoUpdateResult
     if (-not $result) { return $false }
 
@@ -25,10 +43,10 @@
     Remove-LenovoUpdateResult
 
     if ($resolved.Success) {
-        Show-LenovoNoticeDialog -Title 'Update erfolgreich' -Heading ('Lenovo Boot Selector v{0} ist installiert.' -f $resolved.DisplayVersion) -Message $resolved.Message -Kind Info
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.SuccessTitle') -Heading (Get-LocalizedString -Key 'Update.SuccessHeading' -Values @{ Version=$resolved.DisplayVersion }) -Message (Get-LocalizedUpdateRestartMessage -Resolved $resolved) -Kind Info
     }
     else {
-        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die App konnte nicht erfolgreich aktualisiert werden.' -Message $resolved.Message -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.RestartFailureHeading') -Message (Get-LocalizedUpdateRestartMessage -Resolved $resolved) -Kind Error
     }
     return $true
 }
@@ -39,7 +57,7 @@ function Update-UpdateMenuState {
     $busy = Test-UpdateRuntimeBusy -State $script:UpdateState
     if ($script:UpdateCheckMenuItem) { $script:UpdateCheckMenuItem.Enabled = -not $busy }
     if ($script:UpdateInstallMenuItem) {
-        $script:UpdateInstallMenuItem.Text = 'App aktualisieren…'
+        $script:UpdateInstallMenuItem.Text = Get-LocalizedString -Key 'Update.Install'
         $script:UpdateInstallMenuItem.Enabled = (-not $busy -and $null -ne $script:UpdateState.AvailableManifest)
     }
 }
@@ -49,7 +67,7 @@ function Show-AvailableUpdateDialog {
         return $false
     }
     $manifest = $script:UpdateState.AvailableManifest
-    Show-LenovoNoticeDialog -Title 'Neue App-Version verfügbar' -Heading ('Lenovo Boot Selector v{0} ist verfügbar.' -f $manifest.Version) -Message 'Du kannst die neue Version jetzt direkt installieren. Später findest du die Aktualisierung im Tray-Menü unter „Wartung“ → „App aktualisieren…“.' -Kind Info -SecondaryButtonText 'Jetzt aktualisieren' -SecondaryAction { Start-ManualAppUpdate }
+    Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.Available') -Heading (Get-LocalizedString -Key 'Update.AvailableHeading' -Values @{ Version=$manifest.Version }) -Message (Get-LocalizedString -Key 'Update.AvailableMessage') -Kind Info -SecondaryButtonText (Get-LocalizedString -Key 'Update.InstallNow') -SecondaryAction { Start-ManualAppUpdate }
     return $true
 }
 
@@ -66,7 +84,7 @@ function Complete-UpdateCheck {
     $isPopup = ($Mode -eq 'Popup')
     $failureCategory=''; $failureStage=''; $errorClass=''; $networkStatus=''
     try {
-        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { $failureCategory='runtime'; $failureStage='check-result'; throw 'Die Update-Prüfung hat kein Ergebnis geliefert.' }
+        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { $failureCategory='runtime'; $failureStage='check-result'; throw (Get-LocalizedString -Key 'Update.CheckNoResult') }
         $result=[System.IO.File]::ReadAllText($path,[System.Text.Encoding]::UTF8)|ConvertFrom-Json
         if (-not $result.Success) {
             $failureCategory=([string]$result.ErrorCategory).Trim().ToLowerInvariant()
@@ -79,7 +97,7 @@ function Complete-UpdateCheck {
             $validated=Test-LenovoUpdateManifestCore -Manifest $result.Manifest
             if (-not $validated.IsValid) { $failureCategory='manifest'; $failureStage='result-manifest-validation'; throw $validated.Error }
             [void](Set-UpdateRuntimeAvailable -State $script:UpdateState -Manifest $validated)
-            $script:LastStatusText = ('Neue App-Version verfügbar: v{0}' -f $validated.Version)
+            $script:LastStatusText = Get-LocalizedString -Key 'Update.AvailableStatus' -Values @{ Version=$validated.Version }
             if (-not $isPopup) {
                 [void](Show-AvailableUpdateDialog)
             }
@@ -89,8 +107,8 @@ function Complete-UpdateCheck {
             $script:UpdateState.AvailableManifest=$null
             [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
             if (-not $isPopup) {
-                $script:LastStatusText = ('Lenovo Boot Selector ist aktuell · v{0}' -f $script:AppVersion)
-                Show-LenovoNoticeDialog -Title 'Keine neue Version' -Heading ('Lenovo Boot Selector v{0} ist aktuell.' -f $script:AppVersion) -Message 'Es ist derzeit keine neuere Version verfügbar.' -Kind Info
+                $script:LastStatusText = Get-LocalizedString -Key 'Update.CurrentStatus' -Values @{ Version=$script:AppVersion }
+                Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.NoNewTitle') -Heading (Get-LocalizedString -Key 'Update.CurrentHeading' -Values @{ Version=$script:AppVersion }) -Message (Get-LocalizedString -Key 'Update.NoNewMessage') -Kind Info
             }
             Write-RuntimeDiagnosticEvent -Event $(if ($isPopup) { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$false; mode=$Mode })
         }
@@ -98,8 +116,8 @@ function Complete-UpdateCheck {
     catch {
         [void](Set-UpdateRuntimeFailed -State $script:UpdateState -Message $_.Exception.Message)
         if (-not $isPopup) {
-            $script:LastStatusText='Update-Prüfung fehlgeschlagen.'
-            Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die Prüfung auf eine neue Version ist fehlgeschlagen.' -Message $_.Exception.Message -Kind Error
+            $script:LastStatusText = Get-LocalizedString -Key 'Update.CheckFailedStatus'
+            Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.CheckFailedHeading') -Message (Get-LocalizedString -Key 'Update.CheckFailureMessage') -Kind Error
         }
         Write-RuntimeDiagnosticEvent -Event $(if ($isPopup) { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage $(if ($failureStage) { $failureStage } else { 'update-check' }) -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode=$Mode; errorCategory=$failureCategory; failureStage=$failureStage; errorClass=$errorClass; networkStatus=$networkStatus }) -Level warning
     }
@@ -131,7 +149,7 @@ function Start-UpdateCheckUiWorker {
     $script:UpdateState.CheckResultPath=$resultPath
     try {
         $proc=Start-UpdateCheckWorkerProcess -ResultPath $resultPath -RuntimeSessionId $script:RuntimeSessionId
-        if (-not $proc) { throw 'Update-Prüfung konnte nicht gestartet werden.' }
+        if (-not $proc) { throw (Get-LocalizedString -Key 'Update.CheckStartFailed') }
         $script:UpdateState.CheckProcess=$proc
         $timer=New-Object System.Windows.Forms.Timer; $timer.Interval=200
         $timer.Add_Tick({
@@ -165,11 +183,11 @@ function Start-ManualUpdateCheck {
     if (Test-MaintenanceBusy -or (Test-UpdateRuntimeBusy -State $script:UpdateState)) { return }
     try {
         if (-not (Start-UpdateCheckUiWorker -Mode 'Manual')) { return }
-        $script:LastStatusText='Auf neue Version wird geprüft…'
+        $script:LastStatusText = Get-LocalizedString -Key 'Update.CheckingStatus'
         Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_STARTED' -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ mode='Manual' })
     }
     catch {
-        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die Prüfung konnte nicht gestartet werden.' -Message $_.Exception.Message -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.CheckStartFailed') -Message (Get-LocalizedString -Key 'Update.CheckFailureMessage') -Kind Error
         Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_STARTED' -Stage 'update-check' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode='Manual' }) -Level warning
     }
     Update-UpdateMenuState
@@ -197,8 +215,12 @@ function Stop-UpdatePrepareUiWorker {
 
 function Exit-TrayForPreparedUpdate {
     param([Parameter(Mandatory=$true)][string]$WorkDir)
-    $helper=Start-LenovoUpdateInstallerHelper -WorkDir $WorkDir -SourceVersion $script:AppVersion
-    if (-not $helper) { throw 'Update-Installer konnte nicht gestartet werden.' }
+    $helper=Start-LenovoUpdateInstallerHelper `
+        -WorkDir $WorkDir `
+        -SourceVersion $script:AppVersion `
+        -FailurePrefix (Get-LocalizedString -Key 'Update.HelperFailurePrefix') `
+        -ManualRestartMessage (Get-LocalizedString -Key 'Update.HelperManualRestart')
+    if (-not $helper) { throw (Get-LocalizedString -Key 'Update.InstallerStartFailed') }
     Write-RuntimeDiagnosticEvent -Event 'UPDATE_INSTALL_HELPER_STARTED' -Stage 'update-install' -Success $true -Data (New-RuntimeDiagnosticData @{ processId=$helper.Id; version=$script:UpdateState.AvailableManifest.Version })
     try { $helper.Dispose() } catch { }
     $script:ExitRequested=$true
@@ -213,7 +235,7 @@ function Complete-ManualAppUpdatePrepare {
     $path=[string]$script:UpdateState.PrepareResultPath
     $failureCategory=''; $failureStage=''; $errorClass=''; $networkStatus=''
     try {
-        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { $failureCategory='runtime'; $failureStage='prepare-result'; throw 'Die Update-Vorbereitung hat kein Ergebnis geliefert.' }
+        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { $failureCategory='runtime'; $failureStage='prepare-result'; throw (Get-LocalizedString -Key 'Update.PrepareNoResult') }
         $result=[System.IO.File]::ReadAllText($path,[System.Text.Encoding]::UTF8)|ConvertFrom-Json
         if (-not $result.Success) {
             $failureCategory=([string]$result.ErrorCategory).Trim().ToLowerInvariant()
@@ -229,7 +251,7 @@ function Complete-ManualAppUpdatePrepare {
     catch {
         [void](Set-UpdateRuntimeFailed -State $script:UpdateState -Message $_.Exception.Message)
         Write-RuntimeDiagnosticEvent -Event 'UPDATE_PACKAGE_PREPARED' -Stage $(if ($failureStage) { $failureStage } else { 'update-prepare' }) -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ errorCategory=$failureCategory; failureStage=$failureStage; errorClass=$errorClass; networkStatus=$networkStatus }) -Level error
-        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die App konnte nicht aktualisiert werden.' -Message $_.Exception.Message -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.PrepareFailedHeading') -Message (Get-LocalizedString -Key 'Update.PrepareFailureMessage') -Kind Error
         [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
     }
     finally {
@@ -244,7 +266,7 @@ function Start-ManualAppUpdate {
     $manifest=$script:UpdateState.AvailableManifest
     if (-not $manifest) { return }
     if (-not (Test-UpdateInstallDirectoryWritable)) {
-        Show-LenovoNoticeDialog -Title 'Update nicht möglich' -Heading 'Der App-Ordner ist nicht beschreibbar.' -Message 'Verschiebe Lenovo Boot Selector in einen Ordner, den dein Benutzerkonto ändern darf, und versuche es erneut.' -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.NotPossibleTitle') -Heading (Get-LocalizedString -Key 'Update.DirectoryNotWritableHeading') -Message (Get-LocalizedString -Key 'Update.DirectoryNotWritableMessage') -Kind Error
         return
     }
     [void](Set-UpdateRuntimePreparing -State $script:UpdateState)
@@ -254,7 +276,7 @@ function Start-ManualAppUpdate {
     $script:UpdateState.ManifestPath=$manifestPath; $script:UpdateState.PrepareResultPath=$resultPath
     try {
         $proc=Start-UpdatePrepareWorkerProcess -ManifestPath $manifestPath -ResultPath $resultPath -RuntimeSessionId $script:RuntimeSessionId
-        if (-not $proc) { throw 'Update-Vorbereitung konnte nicht gestartet werden.' }
+        if (-not $proc) { throw (Get-LocalizedString -Key 'Update.PrepareStartFailed') }
         $script:UpdateState.PrepareProcess=$proc
         $timer=New-Object System.Windows.Forms.Timer; $timer.Interval=200
         $timer.Add_Tick({
@@ -265,13 +287,13 @@ function Start-ManualAppUpdate {
             } catch { Complete-ManualAppUpdatePrepare }
         })
         $script:UpdateState.PrepareTimer=$timer; $timer.Start()
-        $script:LastStatusText=('Update auf v{0} wird vorbereitet…' -f $manifest.Version)
+        $script:LastStatusText = Get-LocalizedString -Key 'Update.PreparingStatus' -Values @{ Version=$manifest.Version }
         Write-RuntimeDiagnosticEvent -Event 'UPDATE_PREPARE_STARTED' -Stage 'update-prepare' -Success $true -Data (New-RuntimeDiagnosticData @{ version=$manifest.Version })
     }
     catch {
         Stop-UpdatePrepareUiWorker
         [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
-        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die App konnte nicht aktualisiert werden.' -Message $_.Exception.Message -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.PrepareFailedHeading') -Message (Get-LocalizedString -Key 'Update.PrepareFailureMessage') -Kind Error
     }
     Update-UpdateMenuState
 }

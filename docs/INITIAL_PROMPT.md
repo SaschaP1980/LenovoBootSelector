@@ -71,7 +71,7 @@ The normal project contract is that user commands such as:
 
 mean, unless the user explicitly says otherwise:
 
-**analyze → implement → test → prepare candidate → Candidate Preflight → GitHub release → PR/merge → post-release verification → Issue completion.**
+**analyze → for confirmed bugs/regressions prove focused RED first → implement → prove GREEN → prepare release-ready candidate → Candidate Preflight → GitHub release → PR/merge → post-release verification → Issue completion.**
 
 Do not ask separately whether the project should be built or published after the user has already clearly said “Implementiere” or “Baue”.
 
@@ -154,6 +154,21 @@ These are hard boundaries and must not be weakened incidentally:
 
 On security/privilege uncertainty, **fail closed**.
 
+### Test-first defect workflow
+
+For every confirmed bug or regression, follow **failing test first, not failing candidate first**:
+
+1. add the smallest focused permanent regression test that captures the intended corrected behavior;
+2. run that test against the current unfixed canonical basis and confirm that it is RED for the expected bug-specific reason;
+3. when the work is Issue-backed, record the base SHA, failing test and relevant failure reason in the Issue; for an Issue-less Hotfix, retain equivalent durable evidence in the release/changelog audit trail;
+4. only then implement the smallest product fix;
+5. rerun the same regression test and require it to be GREEN;
+6. run the appropriate broader prechecks before preparing the Candidate.
+
+The RED proof should use the narrowest test/validator environment capable of reproducing the defect against the canonical basis. It does **not** require a Candidate branch or Candidate Preflight.
+
+A Candidate is a **release-ready state expected to pass all mandatory gates**. Do not intentionally publish a known-broken Candidate merely to obtain RED evidence. Candidate failures are reserved for unexpected integration/gate findings; if one occurs, use the existing same-branch correction procedure below.
+
 ## 9. Atomic candidate preparation
 
 Normal release entry model:
@@ -170,7 +185,7 @@ Before exposing a visible branch ref:
 6. inspect the candidate commit/diff once in full;
 7. only then create `candidate/v<version>` at that exact SHA.
 
-Do not publish partially assembled intermediate states.
+Do not publish partially assembled intermediate states. The exact Candidate must already be release-ready: all intended implementation, regression coverage, focused RED→GREEN evidence, release metadata and applicable prechecks are complete before the Candidate ref is exposed.
 
 For normal releases, **never create `release/v<version>` manually**. Only a successful Candidate Preflight may create it.
 
@@ -223,6 +238,8 @@ The explicit dispatch is required because a push performed with `GITHUB_TOKEN` d
 The permanent LBS-20 policy is **always mandatory** for Major, Minor, Patch, and Hotfix releases. The v0.6.9.0 production benchmark kept the complete candidate-to-release cycle at about 90 seconds, so the additional Windows coverage was judged worth the measured critical-path cost. Any later policy change must be explicit, deterministic, tested, and documented.
 
 ### Candidate failures
+
+A Candidate failure is an **unexpected validation/integration finding**, not a planned test-first RED step.
 
 If either mandatory candidate job fails:
 

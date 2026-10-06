@@ -70,9 +70,50 @@ function Test-GuidInList {
     }
     return $false
 }
+function Get-AppSettingsLocaleCore {
+    param(
+        $Source,
+        [int]$SourceSchemaVersion
+    )
+
+    if (-not $Source) { return 'en-US' }
+
+    $hasLocale = $false
+    $rawLocale = $null
+
+    if ($Source -is [System.Collections.IDictionary]) {
+        foreach ($key in @($Source.Keys)) {
+            if ([string]$key -and ([string]$key).Equals('locale', [System.StringComparison]::OrdinalIgnoreCase)) {
+                $hasLocale = $true
+                $rawLocale = [string]$Source[$key]
+                break
+            }
+        }
+    }
+    else {
+        $property = $Source.PSObject.Properties['locale']
+        if ($null -ne $property) {
+            $hasLocale = $true
+            $rawLocale = [string]$property.Value
+        }
+    }
+
+    if ($hasLocale) {
+        return Resolve-LocaleIdCore -Locale $rawLocale
+    }
+
+    # Existing settings created before localization represented the historical
+    # German-only UI. Preserve that user experience during migration.
+    if ($SourceSchemaVersion -lt 5) { return 'de-DE' }
+
+    # New/current settings without a valid explicit preference fail safe to English.
+    return 'en-US'
+}
+
 function New-DefaultAppSettingsCore {
     return [pscustomobject]@{
-        schemaVersion = 4
+        schemaVersion = 5
+        locale = 'en-US'
         defaultGuid = $null
         entryOrder = @()
         hiddenEntryGuids = @()
@@ -85,8 +126,11 @@ function ConvertTo-NormalizedAppSettingsCore {
 
     if (-not $Source) { return New-DefaultAppSettingsCore }
 
+    $sourceSchemaVersion = if ($Source.schemaVersion) { [int]$Source.schemaVersion } else { 1 }
+
     return [pscustomobject]@{
-        schemaVersion = if ($Source.schemaVersion) { [int]$Source.schemaVersion } else { 1 }
+        schemaVersion = 5
+        locale = Get-AppSettingsLocaleCore -Source $Source -SourceSchemaVersion $sourceSchemaVersion
         # defaultGuid is retained only as an upgrade/migration input from
         # v0.2.21 and earlier. v0.2.22 stores the live default system-wide.
         defaultGuid = if ($Source.defaultGuid) { ([string]$Source.defaultGuid).ToLowerInvariant() } else { $null }

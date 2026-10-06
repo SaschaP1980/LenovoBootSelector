@@ -1,5 +1,30 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.8.0.0 – LBS-17 English/German localization
+
+- Introduce a central deterministic localization layer with matching `en-US` and `de-DE` catalogs; English is the canonical default and fallback language.
+- Add explicit persisted language selection through the tray UI. A visible popup and tray labels relocalize immediately when the language changes.
+- Advance user settings to schema 5: new installations default to English, while pre-localization settings without a locale migrate deliberately to German.
+- Localize product-controlled tray, popup, boot/default-target, Friendly/Storage/NVMe/USB, dialog, maintenance, update, startup-recovery, diagnostics, busy/error, tooltip, and accessibility presentation.
+- Keep firmware descriptions, drive model names, GUIDs, paths, diagnostic codes, TaskBroker operations, schema fields, and other external/technical identities untranslated.
+- Prevent raw update-worker/restart technical messages from being rendered as product copy; the standalone installer fallback receives centrally localized text as Base64 data.
+- Add permanent catalog parity/duplicate-key checks and a static gate against uncontrolled hard-coded visible text in affected UI/presentation/template surfaces.
+- Add `Test-LocalizationRuntime.ps1` to the mandatory GitHub-hosted Windows PowerShell 5.1 aggregate for selection, persistence, reload, migration, fallback, parity, and formatting coverage.
+- Document localization architecture and contribution rules in `docs/LOCALIZATION.md`.
+- Preserve BootService, TaskBroker, Storage mutation, firmware/BCD, BootNext, privilege, polling, and updater safety boundaries.
+- Release profile: `patch` because product source changes. Intentional characterized protected-fragment delta:
+  - `ps:Complete-BackgroundBootRefresh`
+  - `ps:Get-FirmwareBootState`
+  - `ps:Get-FriendlyBootEntry`
+  - `ps:Load-AppSettings`
+  - `ps:New-PopupForm`
+  - `ps:Save-AppSettings`
+  - `ps:Save-RuntimeDiagnosticsFromUi`
+  - `ps:Show-LenovoNoticeDialog`
+  - `ps:Show-OrTogglePopup`
+  - `ps:Start-BackgroundBootRefresh`
+  - `ps:Update-PopupRows`
+
 ## v0.7.0.2 – LBS-22 child-worker runtime diagnostics correlation
 
 - Fix the runtime-diagnostics session hand-off so background-refresh, update-check, and update-prepare child processes reuse the parent tray session when `-RuntimeSessionId` is supplied.

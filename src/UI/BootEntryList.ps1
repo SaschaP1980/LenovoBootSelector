@@ -96,7 +96,7 @@ function Update-PopupRows {
             if (([datetime]::UtcNow - $script:ManageLastDragUtc).TotalMilliseconds -lt 350) { return }
             if ($script:ManageAliasEditGuid) { Commit-ActiveManageAliasEditor }
             Toggle-ManageEntryVisibility -Guid $guid
-            $script:LastStatusText = if (Test-ManageEntryHidden -Guid $guid) { 'Eintrag wird ausgeblendet.' } else { 'Eintrag wird angezeigt.' }
+            $script:LastStatusText = if (Test-ManageEntryHidden -Guid $guid) { Get-LocalizedString -Key 'Manage.EntryHiddenStatus' } else { Get-LocalizedString -Key 'Manage.EntryVisibleStatus' }
             Update-PopupRows
             return
         }
@@ -105,11 +105,11 @@ function Update-PopupRows {
             $entry = Get-EntryByGuid $guid
             Set-BootNextTarget -Guid $guid
             $script:SelectedGuid = $guid.ToLowerInvariant()
-            $script:LastStatusText = if ($entry) { "Nächster Start: $(Get-EntryDisplayTitle -Entry $entry)" } else { 'Nächstes Startziel wurde gesetzt.' }
+            $script:LastStatusText = if ($entry) { Get-LocalizedString -Key 'Status.NextBootTarget' -Values @{ Title=(Get-EntryDisplayTitle -Entry $entry) } } else { Get-LocalizedString -Key 'Status.NextBootSet' }
             Update-PopupRows
         }
         catch {
-            Show-LenovoNoticeDialog -Title 'Startziel konnte nicht geändert werden' -Heading 'Die Auswahl wurde nicht übernommen.' -Message 'Bitte versuche es erneut. Falls das Problem bestehen bleibt, öffne Wartung → Systemfunktionen reparieren.' -Kind Error
+            Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Boot.ChangeErrorTitle') -Heading (Get-LocalizedString -Key 'Boot.ChangeErrorHeading') -Message (Get-LocalizedString -Key 'Boot.ChangeErrorMessage') -Kind Error
         }
     }
 
@@ -171,7 +171,7 @@ function Update-PopupRows {
         $after = ($point.Y -gt ($targetRow.Height / 2))
         Move-ManageEntry -MovedGuid $movedGuid -TargetGuid ([string]$targetRow.Tag) -After:$after
         $script:ManageLastDragUtc = [datetime]::UtcNow
-        $script:LastStatusText = 'Reihenfolge geändert · Speichern übernimmt die Änderung.'
+        $script:LastStatusText = Get-LocalizedString -Key 'Manage.OrderChanged'
         Update-PopupRows
     }
 
@@ -258,10 +258,10 @@ function Update-PopupRows {
         if (-not $aliasEditActive) {
             $subtitleWidth = if ($script:IsManageEntriesMode) { 220 } else { 284 }
             $subtitleText = if ($script:IsManageEntriesMode -and $alias) {
-                "Originalname: $($entry.Title)"
+                Get-LocalizedString -Key 'Manage.OriginalName' -Values @{ Name=[string]$entry.Title }
             }
-            elseif ($script:IsManageEntriesMode -and ([string]$entry.Title -eq 'Lenovo Boot-Menü')) {
-                'Auswahlmenü für das nächste Startziel'
+            elseif ($script:IsManageEntriesMode -and ([string]$entry.RawDescription -eq 'Boot Menu')) {
+                Get-LocalizedString -Key 'Boot.MenuManageSubtitle'
             }
             else {
                 [string]$entry.Subtitle
@@ -357,13 +357,13 @@ function Update-PopupRows {
                     if ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
                         Set-ManageEntryAliasDraft -Guid ([string]$sender.Tag) -Alias ([string]$sender.Text)
                         $script:ManageAliasEditGuid = $null
-                        $script:LastStatusText = if ([string]::IsNullOrWhiteSpace([string]$sender.Text)) { 'Anzeigename entfernt · Speichern übernimmt die Änderung.' } else { 'Anzeigename geändert · Speichern übernimmt die Änderung.' }
+                        $script:LastStatusText = if ([string]::IsNullOrWhiteSpace([string]$sender.Text)) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
                         $eventArgs.SuppressKeyPress = $true
                         Update-PopupRows
                     }
                     elseif ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Escape) {
                         $script:ManageAliasEditGuid = $null
-                        $script:LastStatusText = 'Änderung am Anzeigenamen verworfen.'
+                        $script:LastStatusText = Get-LocalizedString -Key 'Manage.AliasDiscarded'
                         $eventArgs.SuppressKeyPress = $true
                         Update-PopupRows
                     }
@@ -373,7 +373,7 @@ function Update-PopupRows {
 
                 $applyAlias = New-Object System.Windows.Forms.Button
                 $applyAlias.Name = 'AliasApplyButton'
-                $applyAlias.Text = 'Übernehmen'
+                $applyAlias.Text = Get-LocalizedString -Key 'Common.Apply'
                 $applyAlias.Tag = $entry.Guid
                 $applyAlias.Font = New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Bold)
                 $applyAlias.ForeColor = $script:ColorAccent
@@ -392,7 +392,7 @@ function Update-PopupRows {
                         Set-ManageEntryAliasDraft -Guid ([string]$editor.Tag) -Alias ([string]$editor.Text)
                         $empty = [string]::IsNullOrWhiteSpace([string]$editor.Text)
                         $script:ManageAliasEditGuid = $null
-                        $script:LastStatusText = if ($empty) { 'Anzeigename entfernt · Speichern übernimmt die Änderung.' } else { 'Anzeigename geändert · Speichern übernimmt die Änderung.' }
+                        $script:LastStatusText = if ($empty) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
                         Update-PopupRows
                     }
                 })
@@ -400,7 +400,7 @@ function Update-PopupRows {
 
                 $cancelAlias = New-Object System.Windows.Forms.Button
                 $cancelAlias.Name = 'AliasCancelButton'
-                $cancelAlias.Text = 'Abbrechen'
+                $cancelAlias.Text = Get-LocalizedString -Key 'Common.Cancel'
                 $cancelAlias.Font = New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Regular)
                 $cancelAlias.ForeColor = $script:ColorSecondary
                 $cancelAlias.BackColor = $script:ColorRow
@@ -413,12 +413,12 @@ function Update-PopupRows {
                 $cancelAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
                 $cancelAlias.Add_Click({
                     $script:ManageAliasEditGuid = $null
-                    $script:LastStatusText = 'Änderung am Anzeigenamen verworfen.'
+                    $script:LastStatusText = Get-LocalizedString -Key 'Manage.AliasDiscarded'
                     Update-PopupRows
                 })
                 $row.Controls.Add($cancelAlias)
 
-                $originalHint = New-Label -Text 'Leer lassen = Originalname' -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Regular)) `
+                $originalHint = New-Label -Text (Get-LocalizedString -Key 'Manage.OriginalNameHint') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Regular)) `
                     -ForeColor ([Drawing.Color]::FromArgb(125,125,125)) -X 266 -Y 65 -Width 110 -Height 18
                 $originalHint.TextAlign = [Drawing.ContentAlignment]::MiddleRight
                 $row.Controls.Add($originalHint)
@@ -430,7 +430,7 @@ function Update-PopupRows {
                 $state.Name = 'VisibilityGlyph'
                 $state.Tag = $entry.Guid
                 $state.AccessibleName = if ($isHidden) { 'hidden' } else { 'visible' }
-                $state.AccessibleDescription = if ($isHidden) { 'Verborgen – klicken zum Einblenden' } else { 'Sichtbar – klicken zum Ausblenden' }
+                $state.AccessibleDescription = if ($isHidden) { Get-LocalizedString -Key 'Manage.HiddenAccessible' } else { Get-LocalizedString -Key 'Manage.VisibleAccessible' }
                 $state.Location = New-Object Drawing.Point(286, 12)
                 $state.Size = New-Object Drawing.Size(32, 34)
                 $state.BackColor = [Drawing.Color]::Transparent
@@ -471,7 +471,7 @@ function Update-PopupRows {
                     -ForeColor ([Drawing.Color]::FromArgb(190,190,190)) -X 321 -Y 12 -Width 25 -Height 34
                 $editAlias.Name = 'AliasEditButton'
                 $editAlias.Tag = $entry.Guid
-                $editAlias.AccessibleDescription = 'Anzeigename ändern'
+                $editAlias.AccessibleDescription = Get-LocalizedString -Key 'Manage.EditAliasAccessible'
                 $editAlias.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
                 $editAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
                 $editAlias.Add_MouseEnter({
@@ -494,7 +494,7 @@ function Update-PopupRows {
                         Commit-ActiveManageAliasEditor
                     }
                     $script:ManageAliasEditGuid = $guid
-                    $script:LastStatusText = 'Anzeigename bearbeiten · Enter übernimmt · Esc verwirft · leer = Originalname'
+                    $script:LastStatusText = Get-LocalizedString -Key 'Manage.EditAliasStatus'
                     Update-PopupRows
                     $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
                     if ($editor) {

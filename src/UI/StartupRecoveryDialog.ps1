@@ -1,4 +1,18 @@
-﻿function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
+﻿function Get-StartupRecoveryLocale {
+    try {
+        $settingsPath = Join-Path (Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray') 'settings.json'
+        if (-not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) { return 'en-US' }
+        $source = ([System.IO.File]::ReadAllText($settingsPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json)
+        $sourceSchema = if ($source.schemaVersion) { [int]$source.schemaVersion } else { 1 }
+        $property = $source.PSObject.Properties['locale']
+        if ($null -ne $property) { return (Resolve-LocaleIdCore -Locale ([string]$property.Value)) }
+        if ($sourceSchema -lt 5) { return 'de-DE' }
+    }
+    catch { }
+    return 'en-US'
+}
+
+function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
     $diagnosticSaved = $false
     $diagDir = $null
     $diagPath = $null
@@ -12,10 +26,11 @@
     } catch { }
 
     try {
+        $locale = Get-StartupRecoveryLocale
         Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
         Add-Type -AssemblyName System.Drawing -ErrorAction Stop
 
-        $isAlreadyRunning = ($Message -eq 'Lenovo Boot Selector läuft bereits.')
+        $isAlreadyRunning = (-not $AllowRestart)
         $form = New-Object System.Windows.Forms.Form
         $form.Text = 'Lenovo Boot Selector'
         $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
@@ -57,7 +72,7 @@
         $title.Size = New-Object System.Drawing.Size(452, 28)
         $title.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 11.0, [System.Drawing.FontStyle]::Bold)
         $title.ForeColor = [System.Drawing.Color]::White
-        $title.Text = $(if ($isAlreadyRunning) { 'Lenovo Boot Selector läuft bereits' } else { 'Lenovo Boot Selector konnte nicht gestartet werden' })
+        $title.Text = $(if ($isAlreadyRunning) { Get-LocalizedStringCore -Key 'Startup.AlreadyRunningTitle' -Locale $locale } else { Get-LocalizedStringCore -Key 'Startup.FailedTitle' -Locale $locale })
         $form.Controls.Add($title)
 
         $body = New-Object System.Windows.Forms.Label
@@ -66,13 +81,13 @@
         $body.Font = New-Object System.Drawing.Font('Segoe UI', 9.0, [System.Drawing.FontStyle]::Regular)
         $body.ForeColor = [System.Drawing.Color]::FromArgb(210, 210, 210)
         if ($isAlreadyRunning) {
-            $body.Text = 'Die App ist bereits geöffnet. Schließe dieses Fenster und verwende das vorhandene Tray-Symbol.'
+            $body.Text = Get-LocalizedStringCore -Key 'Startup.AlreadyRunningBody' -Locale $locale
         }
         elseif ($diagnosticSaved) {
-            $body.Text = "Beim Start ist ein Problem aufgetreten.`r`nEine Diagnose wurde gespeichert. Du kannst die App erneut starten oder die Diagnose öffnen."
+            $body.Text = Get-LocalizedStringCore -Key 'Startup.FailedSavedBody' -Locale $locale
         }
         else {
-            $body.Text = "Beim Start ist ein Problem aufgetreten.`r`nDie Diagnose konnte nicht gespeichert werden. Du kannst die App erneut starten."
+            $body.Text = Get-LocalizedStringCore -Key 'Startup.FailedNoDiagnosticBody' -Locale $locale
         }
         $form.Controls.Add($body)
 
@@ -82,10 +97,10 @@
         $diagLabel.Font = New-Object System.Drawing.Font('Segoe UI', 8.0, [System.Drawing.FontStyle]::Regular)
         $diagLabel.ForeColor = [System.Drawing.Color]::FromArgb(145, 145, 145)
         if ($diagnosticSaved -and $diagPath) {
-            $diagLabel.Text = ('Diagnose: {0}' -f (Split-Path -Leaf $diagPath))
+            $diagLabel.Text = Get-LocalizedStringCore -Key 'Startup.DiagnosticFile' -Locale $locale -Values @{ Name=(Split-Path -Leaf $diagPath) }
         }
         elseif (-not $isAlreadyRunning) {
-            $diagLabel.Text = 'Keine Diagnose-Datei verfügbar.'
+            $diagLabel.Text = Get-LocalizedStringCore -Key 'Startup.NoDiagnosticFile' -Locale $locale
         }
         $form.Controls.Add($diagLabel)
 
@@ -96,7 +111,7 @@
         $form.Controls.Add($buttonBar)
 
         $closeButton = New-Object System.Windows.Forms.Button
-        $closeButton.Text = 'Schließen'
+        $closeButton.Text = Get-LocalizedStringCore -Key 'Common.Close' -Locale $locale
         $closeButton.Location = New-Object System.Drawing.Point(433, 16)
         $closeButton.Size = New-Object System.Drawing.Size(100, 32)
         $closeButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
@@ -109,7 +124,7 @@
         $form.CancelButton = $closeButton
 
         $diagnosticButton = New-Object System.Windows.Forms.Button
-        $diagnosticButton.Text = 'Diagnose öffnen'
+        $diagnosticButton.Text = Get-LocalizedStringCore -Key 'Startup.OpenDiagnostics' -Locale $locale
         $diagnosticButton.Location = New-Object System.Drawing.Point(279, 16)
         $diagnosticButton.Size = New-Object System.Drawing.Size(142, 32)
         $diagnosticButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
@@ -124,7 +139,7 @@
         $buttonBar.Controls.Add($diagnosticButton)
 
         $retryButton = New-Object System.Windows.Forms.Button
-        $retryButton.Text = 'Erneut starten'
+        $retryButton.Text = Get-LocalizedStringCore -Key 'Startup.Retry' -Locale $locale
         $retryButton.Location = New-Object System.Drawing.Point(125, 16)
         $retryButton.Size = New-Object System.Drawing.Size(142, 32)
         $retryButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
@@ -157,7 +172,7 @@
             $owner.Show()
             [System.Windows.Forms.MessageBox]::Show(
                 $owner,
-                'Lenovo Boot Selector konnte nicht gestartet werden.',
+                (Get-LocalizedStringCore -Key 'Startup.FallbackError' -Locale $locale),
                 'Lenovo Boot Selector',
                 [System.Windows.Forms.MessageBoxButtons]::OK,
                 [System.Windows.Forms.MessageBoxIcon]::Error
