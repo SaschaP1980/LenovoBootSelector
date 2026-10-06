@@ -772,7 +772,7 @@ $script:RuntimeDiagnosticsErrorCount = 0
 $script:LastRuntimeDiagnosticPackage = $null
 $script:RuntimeDiagnosticMenuItem = $null
 
-$script:SupportedTaskBrokerVersions = @('0.2.12')
+$script:SupportedTaskBrokerVersions = @('0.2.13')
 $script:TaskBrokerStateDir = Join-Path $env:ProgramData 'Lenovo Boot Menu\TaskBroker'
 $script:TaskBrokerMetadataPath = Join-Path $script:TaskBrokerStateDir 'task-broker.json'
 $script:TaskBrokerInstallScript = Join-Path $PSScriptRoot 'Install-LenovoBootMenuTasks.ps1'

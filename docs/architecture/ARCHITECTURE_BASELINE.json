@@ -1,11 +1,11 @@
 {
-  "version": "0.6.3.1",
+  "version": "0.6.4.0",
   "runtime": {
-    "lines": 6917,
-    "functions": 216,
-    "scriptReferences": 1024,
+    "lines": 7024,
+    "functions": 220,
+    "scriptReferences": 1028,
     "scriptVariables": 112,
-    "catchBlocks": 176,
+    "catchBlocks": 177,
     "inlineSilentCatches": 105
   },
   "core": {
@@ -22,9 +22,9 @@
   },
   "infrastructure": {
     "files": 8,
-    "lines": 1309,
-    "functions": 68,
-    "scriptReferences": 98
+    "lines": 1416,
+    "functions": 72,
+    "scriptReferences": 102
   },
   "ui": {
     "files": 14,

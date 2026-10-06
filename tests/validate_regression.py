@@ -34,10 +34,13 @@ def main():
                 s.eq('Template architecture migration changes only version source',cur,txt(basis/rel))
             else:
                 s.eq(f'Product module byte-identical to basis: {rel}',sha(p),sha(basis/rel))
-    for rel in ['Install-LenovoBootMenuTasks.ps1','Uninstall-LenovoBootMenuTasks.ps1','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','LenovoBootMenuTray.ico','icon-preview.png']:
+    for rel in ['Uninstall-LenovoBootMenuTasks.ps1','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','LenovoBootMenuTray.ico','icon-preview.png']:
         s.eq(f'Runtime asset byte-identical to basis: {rel}',sha(root/'bin'/rel),sha(basis_runtime_path(basis,rel)))
+    if profile in {'version-only','release-architecture'}:
+        s.eq('Installer byte-identical for non-product release',sha(root/'bin/Install-LenovoBootMenuTasks.ps1'),sha(basis_runtime_path(basis,'Install-LenovoBootMenuTasks.ps1')))
     ui=txt(root/'src/UI/UpdatePresentation.ps1'); infra=txt(root/'src/Infrastructure/UpdateClient.ps1'); transport=txt(root/'src/Infrastructure/UpdateTransport.ps1')
     refresh_ui=txt(root/'src/UI/RefreshPresentation.ps1'); popup_ui=txt(root/'src/UI/Popup.ps1')
+    taskbroker=txt(root/'src/Infrastructure/TaskBroker.ps1'); install=txt(root/'bin/Install-LenovoBootMenuTasks.ps1')
     s.has('Update button unchanged',ui,"-SecondaryButtonText 'Jetzt aktualisieren' -SecondaryAction { Start-ManualAppUpdate }")
     s.has('LBS-14 shared update dialog title is canonical',ui,"-Title 'Neue App-Version verfügbar'")
     s.has('LBS-14 header message is canonical',refresh_ui,"'Neue App-Version verfügbar'")
@@ -61,7 +64,18 @@ def main():
     s.no('Updater remains unelevated',infra+'\n'+transport,'RunAs')
     s.no('Updater has no TaskBroker mutation',infra+'\n'+transport,'TaskBroker')
     s.no('Updater has no bcdedit',(infra+'\n'+transport).lower(),'bcdedit')
-    s.has('TaskBroker schema unchanged',tray,"$script:SupportedTaskBrokerVersions = @('0.2.12')")
+    s.has('LBS-6 TaskBroker schema is v0.2.13',tray,"$script:SupportedTaskBrokerVersions = @('0.2.13')")
+    s.has('LBS-6 installer schema is v0.2.13',install,"$version = '0.2.13'")
+    s.has('LBS-6 explicit metadata boundary contract retained',install,"boundaryContract = 'fixed-task-v1'")
+    s.no('LBS-6 no free TaskName call reaches runtime runner',taskbroker.lower(),'invoke-authorizedtask -taskname')
+    s.has('LBS-6 operation-only runtime runner retained',taskbroker,"[ValidateSet('ManagerRefresh','FirmwareRefresh','BootNext','DefaultSet','DefaultClear')]")
+    s.has('LBS-6 strict metadata contract retained',taskbroker,'function Test-TaskBrokerMetadataContract')
+    s.has('LBS-6 fixed task-name derivation retained',taskbroker,'function Get-TaskBrokerExpectedTargetTaskName')
+    s.has('LBS-6 task ACL dangerous-rights rejection retained',install,'$dangerousMask')
+    s.has('LBS-6 ProgramData ACL protection retained',install,'function Protect-TaskBrokerStateDirectory')
+    s.has('LBS-6 metadata ACL protection retained',install,'function Protect-TaskBrokerMetadataFile')
+    s.c('LBS-6 security boundary documentation retained',(root/'docs/SECURITY_BOUNDARY.md').is_file())
+    s.c('LBS-6 native boundary test retained',(root/'tests/Test-TaskBrokerBoundary.ps1').is_file())
     s.has('Settings schema unchanged',tray,'schemaVersion = 4')
     s.no('No permanent displayorder mutation',tray,"'/set', '{fwbootmgr}', 'displayorder'")
     for bad in ['SetFirmwareEnvironmentVariable','Lenovo_SetBiosSetting','Lenovo_SaveBiosSetting','Lenovo_SetFunctionRequest']:
