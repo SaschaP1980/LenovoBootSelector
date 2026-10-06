@@ -33,6 +33,9 @@ def main():
     s.has('LBS-18 initial prompt declares English repository language',initial_prompt,'English is the canonical language for **all repository and durable GitHub documentation**.')
     s.has('LBS-18 GitHub how-to declares English repository language',github_howto,'English is the canonical language for repository and durable GitHub documentation.')
     s.has('LBS-18 release process declares English repository language',release_process,'English is the canonical language for repository and durable GitHub documentation.')
+    prepare_release=txt(root/'tools/prepare_release.py')
+    s.has('LBS-18 prepare_release uses English README version marker',prepare_release,'**Current development version:**')
+    s.no('LBS-18 prepare_release no longer depends on German README version marker',prepare_release,'Aktueller Entwicklungsstand')
     vp=root/'bin/version.json'; s.c('Canonical bin/version.json exists',vp.is_file())
     meta={}
     if vp.is_file():
