@@ -75,9 +75,12 @@ def main():
     s.c('Persistent prepare_release tool exists',(root/'tools/prepare_release.py').is_file())
     s.c('LBS-15 candidate preflight tool exists',(root/'tools/candidate_preflight.py').is_file())
     s.c('LBS-15 protected fragment helper exists',(root/'tools/protected_fragments.py').is_file())
+    verification_path=root/'tools/release_verification.py'
+    s.c('LBS-16 release verification helper exists',verification_path.is_file())
     prepare=txt(root/'tools/prepare_release.py') if (root/'tools/prepare_release.py').is_file() else ''
     common=txt(root/'tools/release_common.py') if (root/'tools/release_common.py').is_file() else ''
     candidate_preflight=txt(root/'tools/candidate_preflight.py') if (root/'tools/candidate_preflight.py').is_file() else ''
+    release_verification=txt(verification_path) if verification_path.is_file() else ''
     runtime_builder=txt(root/'tools/build_runtime.py')
     s.has('Prepare tool accepts explicit publication timestamp',prepare,"ap.add_argument('--published-utc')")
     s.has('Prepare tool rejects missing schema-v2 publication timestamp',prepare,'publishedUtc must be supplied explicitly for schemaVersion 2')
@@ -94,6 +97,19 @@ def main():
     s.has('LBS-15 preflight checks protected intent exact delta',candidate_preflight,'protectedFragmentIntent mismatch')
     s.has('LBS-15 preflight checks repository delete intent exact delta',candidate_preflight,'repositoryDeleteIntent mismatch')
     s.has('LBS-15 preflight rejects historical ZIP changes',candidate_preflight,'candidate must not modify historical release ZIPs')
+    s.has('LBS-16 candidate preflight emits machine-readable summary',candidate_preflight,'CANDIDATE_PREFLIGHT_SUMMARY=')
+    s.has('LBS-16 release verification emits machine-readable summary',release_verification,'RELEASE_VERIFICATION_SUMMARY=')
+    s.has('LBS-16 release verification owns exact eight contexts',release_verification,"'release/tag'")
+    s.has('LBS-16 release verification checks candidate cleanup',release_verification,"candidateDeleted")
+    s.has('LBS-16 release verification checks release cleanup',release_verification,"releaseDeleted")
+    s.has('LBS-16 release verification checks latest metadata',release_verification,"downloads/latest.json")
+    s.has('LBS-16 release verification checks source tree ZIP freedom',release_verification,"source tree contains ZIP file")
+    s.has('LBS-16 release verification checks source tree cache freedom',release_verification,"source tree contains Python cache artifact")
+    s.has('LBS-16 release verification writes GitHub job summary',release_verification,'GITHUB_STEP_SUMMARY')
+    if verification_path.is_file():
+        cp=subprocess.run([sys.executable,str(verification_path),'--self-test'],capture_output=True,text=True)
+        s.eq('LBS-16 release verification helper self-test passes',cp.returncode,0)
+        s.has('LBS-16 helper self-test confirms pass',cp.stdout,'PASS release verification helper self-test')
     s.no('LBS-15 runtime builder has no static INCLUDES registry',runtime_builder,'INCLUDES = [')
     s.has('LBS-15 runtime builder derives includes from template',runtime_builder,'def template_include_paths')
     s.has('LBS-15 runtime builder rejects duplicate includes',runtime_builder,'duplicate runtime include marker')
@@ -131,6 +147,10 @@ def main():
         s.has('LBS-15 release core gate compares previous source basis',w,'tests/validate_core.py --root . --basis-root /tmp/lbs-basis')
         s.has('Release workflow runs permanent boundary validator',w,'tests/validate_boundary.py')
         s.has('Release workflow runs permanent regression validator',w,'tests/validate_regression.py')
+        s.has('LBS-16 release workflow records reproducibility marker',w,'/tmp/lbs-release/reproducible.ok')
+        s.has('LBS-16 release workflow runs aggregated post-release verification',w,'tools/release_verification.py')
+        s.has('LBS-16 release workflow passes candidate SHA into verification',w,'--candidate-sha "$CANDIDATE_SHA"')
+        s.has('LBS-16 release workflow passes final PR head into verification',w,'--final-sha "$FINAL_SHA"')
         s.has('Release workflow creates tag only after PR creation',w,'Tag only after all gates and successful PR creation')
         s.has('Release workflow merges and deletes release branch',w,'gh pr merge')
         s.no('Release workflow is not version-specific',w,'0.5.10.0')
