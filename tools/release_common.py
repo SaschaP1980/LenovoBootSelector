@@ -4,7 +4,7 @@ from pathlib import Path
 import json, re
 
 VERSION_RE = re.compile(r'^\d+\.\d+\.\d+\.\d+$')
-VALID_PROFILES = {'version-only','release-architecture','patch'}
+VALID_PROFILES = {'version-only','patch'}
 STAMP = (2026,10,5,0,0,0)
 
 

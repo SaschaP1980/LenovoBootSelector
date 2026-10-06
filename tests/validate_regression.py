@@ -26,19 +26,16 @@ def main():
     basis_tray=txt(basis_runtime_path(basis,'LenovoBootMenuTray.ps1')); tray=txt(root/'bin/LenovoBootMenuTray.ps1')
     bm=re.search(r"\$script:AppVersion = '([^']+)'",basis_tray); basis_version=bm.group(1) if bm else ''
     s.has('Generated runtime uses canonical version',tray,f"$script:AppVersion = '{version}'")
-    if profile in {'version-only','release-architecture'}:
+    s.c('LBS-10 active regression profile is version-only or patch',profile in {'version-only','patch'},profile)
+    if profile=='version-only':
         normalized=tray.replace(f"$script:AppVersion = '{version}'",f"$script:AppVersion = '{basis_version}'",1)
         s.eq('Product runtime unchanged except injected version',normalized,basis_tray)
         for p in sorted((root/'src').rglob('*.ps1')):
             rel=p.relative_to(root).as_posix()
-            if rel=='src/App/LenovoBootMenuTray.template.ps1' and profile=='release-architecture':
-                cur=txt(p).replace("$script:AppVersion = '@APP_VERSION@'",f"$script:AppVersion = '{basis_version}'",1)
-                s.eq('Template architecture migration changes only version source',cur,txt(basis/rel))
-            else:
-                s.eq(f'Product module byte-identical to basis: {rel}',sha(p),sha(basis/rel))
+            s.eq(f'Product module byte-identical to basis: {rel}',sha(p),sha(basis/rel))
     for rel in ['Uninstall-LenovoBootMenuTasks.ps1','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','LenovoBootMenuTray.ico','icon-preview.png']:
         s.eq(f'Runtime asset byte-identical to basis: {rel}',sha(root/'bin'/rel),sha(basis_runtime_path(basis,rel)))
-    if profile in {'version-only','release-architecture'}:
+    if profile=='version-only':
         s.eq('Installer byte-identical for non-product release',sha(root/'bin/Install-LenovoBootMenuTasks.ps1'),sha(basis_runtime_path(basis,'Install-LenovoBootMenuTasks.ps1')))
     ui=txt(root/'src/UI/UpdatePresentation.ps1'); infra=txt(root/'src/Infrastructure/UpdateClient.ps1'); transport=txt(root/'src/Infrastructure/UpdateTransport.ps1')
     refresh_ui=txt(root/'src/UI/RefreshPresentation.ps1'); popup_ui=txt(root/'src/UI/Popup.ps1')

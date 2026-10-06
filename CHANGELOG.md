@@ -1,5 +1,16 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.6.0 – LBS-10 historisches Releaseprofil entfernt
+
+- Das aktive Profil `release-architecture` wurde vollständig entfernt. Seine Sonderlogik bezog sich ausschließlich auf die längst abgeschlossene Migration von einer fest eingebauten AppVersion zum `@APP_VERSION@`-Template-Token.
+- Aktive Releaseprofile sind nur noch `version-only` und `patch`.
+- `version-only` ist die strikte Wahl, wenn Produktcode unter `src/**` unverändert bleibt: alle Produktmodule müssen byteidentisch zur unmittelbar vorherigen kanonischen Source-Basis sein; nur die injizierte Runtime-Version darf sich unterscheiden.
+- `patch` bleibt für fachliche Produktcodeänderungen vorgesehen.
+- Der Release-Config-Parser lehnt das historische Profil nun ab; Release- und Regression-Gates sichern die neue Zweiprofil-Semantik dauerhaft ab.
+- Historische Validatoren und frühere Releases bleiben unverändert in `tests-history/` bzw. `downloads/` erhalten.
+- v0.6.6.0 selbst verwendet korrekt `version-only`, da LBS-10 ausschließlich Release-Tooling, Tests und Dokumentation bereinigt und keinen Produktcode unter `src/**` verändert.
+- Keine Änderung an Produkt-Runtime, BootService, TaskBroker, Storage, Updater, Firmware-/BCD- oder Privilege-Logik.
+
 ## v0.6.5.0 – LBS-15 Release-Einstieg technisch gehärtet
 
 - Neuer vorgeschalteter **Candidate Preflight** über `candidate/v<version>`: Der exakte Candidate-SHA wird vollständig geprüft, bevor ein sichtbarer `release/v<version>`-Branch entstehen darf.
