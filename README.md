@@ -6,6 +6,20 @@
 
 **Lenovo Boot Selector** ist eine Windows-Tray-Anwendung für Lenovo-Systeme, mit der vorhandene Firmware-Startziele komfortabel als **einmaliges nächstes Bootziel** ausgewählt werden können.
 
+## Warum dieses Tool existiert
+
+Wer auf einem Lenovo-System regelmäßig zwischen mehreren vorhandenen Startzielen wechselt – zum Beispiel Windows-Installationen auf unterschiedlichen Laufwerken, einem USB-Startmedium oder einem anderen bereits im UEFI registrierten Bootziel – landet sonst schnell bei demselben umständlichen Ablauf: neu starten, Bootmenü beziehungsweise Firmware-Setup öffnen, den richtigen Eintrag auswählen und anschließend wieder in Windows zurückkehren.
+
+Lenovo Boot Selector soll genau diesen wiederkehrenden Schritt aus Windows heraus vereinfachen. Statt die **dauerhafte UEFI-Bootreihenfolge** umzubauen, wählt die Anwendung nur das Ziel für den **nächsten einzelnen Start** aus. Danach gilt wieder die normale Firmware-Konfiguration.
+
+Das Tool verfolgt dabei bewusst drei Ziele:
+
+- **schneller Wechsel:** vorhandene Firmware-Startziele direkt aus dem Tray auswählen;
+- **keine dauerhafte BootOrder-Manipulation:** die normale UEFI-Reihenfolge bleibt unangetastet;
+- **möglichst kleine Privilege-Grenze:** die Oberfläche läuft uneleviert, privilegierte Aktionen sind auf fest definierte und validierte Operationen begrenzt.
+
+Damit ist Lenovo Boot Selector kein Ersatz für das BIOS/UEFI-Setup und kein Bootloader. Es ist eine komfortable Windows-Oberfläche für einen häufigen, ansonsten unnötig manuellen **One-Shot-Boot-Wechsel**.
+
 Die Anwendung läuft im Normalbetrieb **uneleviert**. Privilegierte Firmwareänderungen werden ausschließlich über fest definierte, allowgelistete Windows-Scheduled-Tasks ausgeführt. Permanente Änderungen an der UEFI-Bootreihenfolge gehören ausdrücklich nicht zum Produktmodell.
 
 Ab v0.6.4.0 ist diese Grenze zusätzlich technisch fail-closed gehärtet: Der Runtime-TaskBroker akzeptiert keine freien Tasknamen mehr, sondern nur feste Operationsarten; zielbezogene Tasknamen werden ausschließlich aus validierten, installierten Firmware-GUIDs abgeleitet. TaskBroker-State und Metadaten sind für normale Benutzer read-only, und die Task-DACL wird auf ausschließlich Read+Execute geprüft bzw. repariert. Der kanonische Vertrag ist in [docs/SECURITY_BOUNDARY.md](docs/SECURITY_BOUNDARY.md) dokumentiert.
