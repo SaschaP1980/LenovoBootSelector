@@ -169,6 +169,8 @@ The central native Windows PowerShell 5.1 test wrapper is:
 
 Build and packaging helpers live under `tools/`. Detailed version history is in [CHANGELOG.md](CHANGELOG.md). Localization development rules are in [docs/LOCALIZATION.md](docs/LOCALIZATION.md). Long-running Major/Minor feature work follows [docs/DEVELOPMENT_GUIDELINES.md](docs/DEVELOPMENT_GUIDELINES.md).
 
+The project's engineering baseline favors Clean Code and SOLID with explicit responsibility boundaries. DRY is applied to genuinely shared rules and knowledge, not mechanically to similar-looking code; limited duplication is preferred over coupling responsibilities that have different reasons to change. The detailed rule is canonical in [docs/DEVELOPMENT_GUIDELINES.md](docs/DEVELOPMENT_GUIDELINES.md).
+
 ### Agentic software engineering
 
 Lenovo Boot Selector is developed as an **agentic software engineering** project. GitHub is the project's **single durable point of truth and continuity**: a fresh engineering agent must be able to reconstruct the complete current project state from the current repository, GitHub Issues/comments, workflows, tests, release metadata, and other tracked GitHub evidence alone.

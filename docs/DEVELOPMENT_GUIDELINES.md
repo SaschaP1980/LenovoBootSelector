@@ -28,6 +28,48 @@ For substantial feature work:
 - the Candidate remains **release-ready only**;
 - the Release PR remains the only normal product merge into `main`.
 
+### Engineering design principles: Clean Code, SOLID, and pragmatic DRY
+
+Implementation work should optimize for **clear responsibilities, maintainability, testability, and explicit boundaries**. Clean Code and SOLID are the default design direction, but they are engineering heuristics rather than goals to satisfy mechanically.
+
+Prefer:
+
+- small, cohesive functions/modules with one clear responsibility and one primary reason to change;
+- names that express domain intent instead of implementation mechanics;
+- explicit dependencies and narrow interfaces;
+- separation of domain/core logic from application workflow, infrastructure/IO, and UI concerns;
+- extension through well-defined seams rather than unrelated conditionals spread across modules;
+- abstractions that make ownership and behavior easier to understand, test, and change.
+
+Apply the SOLID principles pragmatically:
+
+- **Single Responsibility:** keep distinct responsibilities in distinct functions/modules even when some code looks similar.
+- **Open/Closed:** prefer stable extension points where repeated variation is expected, but do not build speculative frameworks for hypothetical future use.
+- **Liskov Substitution:** replacement implementations must preserve the behavioral contract expected by their callers.
+- **Interface Segregation:** expose the smallest useful contract instead of broad interfaces that force consumers to depend on unrelated capabilities.
+- **Dependency Inversion:** keep high-level product rules independent from concrete infrastructure where that separation materially improves testability, safety, or change isolation.
+
+#### DRY is subordinate to responsibility boundaries
+
+Use DRY to remove duplication of the **same knowledge, business rule, invariant, or responsibility**. Do not apply DRY merely because two code blocks currently look similar.
+
+The governing rule is:
+
+> **Same responsibility and same rule: prefer one canonical implementation. Different responsibilities or different reasons to change: keep them separate, even if some code is duplicated.**
+
+In particular:
+
+- do not merge Core, Application, Infrastructure, UI, TaskBroker, updater, storage, or other boundary-specific logic solely to eliminate superficial repetition;
+- do not create a shared helper when its callers have different ownership, lifecycle, safety constraints, failure semantics, or likely future changes;
+- prefer a small amount of obvious duplication over a premature or misleading abstraction that couples unrelated responsibilities;
+- extract shared code when the common concept is stable and semantically identical, not merely syntactically similar;
+- if an abstraction needs many mode flags, caller-specific branches, or knowledge of unrelated layers, reconsider whether the responsibilities should remain separate;
+- canonicalize genuinely shared rules such as version comparison, locale resolution, release-level classification, schema validation, or another invariant that must behave identically everywhere.
+
+**Responsibility boundaries outrank deduplication.** A future change that should be able to affect one path without affecting another is strong evidence that those paths do not share one responsibility and should not be forced through a common abstraction.
+
+Clean Code/SOLID/DRY refactoring must not weaken the project's explicit safety boundaries, deterministic build/release contracts, PowerShell 5.1 compatibility, or fail-closed behavior. Avoid refactoring for stylistic purity when it increases coupling, indirection, migration risk, or cognitive load without a concrete maintenance benefit.
+
 ## 2. Work branch
 
 ### Selection gate

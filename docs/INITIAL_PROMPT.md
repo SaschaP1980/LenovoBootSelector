@@ -78,6 +78,10 @@ Do not ask separately whether the project should be built or published after the
 
 A pure analysis/planning request without build authorization is excluded from this rule.
 
+### Engineering design baseline
+
+Use `docs/DEVELOPMENT_GUIDELINES.md` as the canonical design guidance. Favor Clean Code and SOLID with clear responsibility boundaries, cohesive modules, explicit dependencies, and testable behavior. Apply DRY pragmatically: deduplicate the same rule/knowledge/responsibility, not merely similar-looking code. When responsibilities, reasons to change, lifecycles, safety constraints, or failure semantics differ, keep the implementations separate even if limited duplication remains. Prefer small explicit duplication over a false abstraction that couples unrelated concerns.
+
 ## 5. Versioning and Issue rules
 
 Version format:
