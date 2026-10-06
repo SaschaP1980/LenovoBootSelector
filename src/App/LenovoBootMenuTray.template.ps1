@@ -34,6 +34,9 @@ function Start-LenovoBootSelectorHidden {
     }
 }
 
+# LBS-17: pure localization is loaded before startup recovery so duplicate-instance
+# and fatal-startup UI can honor the persisted locale safely.
+# @include src/Core/Localization.ps1
 # @include src/UI/StartupRecoveryDialog.ps1
 
 # v0.2.18: The tray intentionally runs unelevated. Privileged firmware operations
@@ -742,7 +745,8 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     if (-not $mutexOwned) {
         try { $mutex.Dispose() } catch { }
         $mutex = $null
-        Show-FatalMessage 'Lenovo Boot Selector läuft bereits.' -AllowRestart $false | Out-Null
+        $startupLocale = Get-StartupRecoveryLocale
+        Show-FatalMessage (Get-LocalizedStringCore -Key 'Startup.AlreadyRunningMessage' -Locale $startupLocale) -AllowRestart $false | Out-Null
         exit 0
     }
 }
@@ -891,7 +895,6 @@ $script:UpdateState = New-UpdateRuntimeState
 
 # @include src/UI/AutostartPresentation.ps1
 
-# @include src/Core/Localization.ps1
 # @include src/Application/LocalizationService.ps1
 # @include src/Core/EntryPreferences.ps1
 

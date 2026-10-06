@@ -34,6 +34,489 @@ function Start-LenovoBootSelectorHidden {
     }
 }
 
+# Lenovo Boot Selector - Functional Core: localization
+# Pure/deterministic functions only. No script state, WinForms, filesystem, registry,
+# network, process starts, Scheduled Tasks, or privileged broker access.
+
+function Get-SupportedLocaleIdsCore {
+    return @('en-US', 'de-DE')
+}
+
+function Resolve-LocaleIdCore {
+    param([string]$Locale)
+
+    $value = ([string]$Locale).Trim()
+    foreach ($supported in @(Get-SupportedLocaleIdsCore)) {
+        if ($value -and $value.Equals($supported, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $supported
+        }
+    }
+    return 'en-US'
+}
+
+function Get-LocalizationCatalogCore {
+    return [ordered]@{
+        'en-US' = [ordered]@{
+            'Common.OK' = 'OK'
+            'Common.Cancel' = 'Cancel'
+            'Common.Close' = 'Close'
+            'Common.TryAgain' = 'Please try again.'
+            'Settings.Language' = 'Language'
+            'Language.English' = 'English'
+            'Language.German' = 'Deutsch'
+            'Progress.StepOf' = 'Step {0} of {1}'
+            'Storage.InternalSsdModel' = 'Internal SSD: {Model}'
+            'Popup.HeaderUpdateAccessible' = 'Opens the dialog for the available app version.'
+            'Status.BootTargetsRefreshing' = 'Boot targets are being refreshed in the background…'
+            'Action.RefreshBootTargets' = 'Refresh boot targets'
+            'Popup.NextBootSection' = 'NEXT BOOT'
+            'Popup.Customize' = 'CUSTOMIZE'
+            'Status.ScrollPositionFailed' = 'The scroll position could not be updated.'
+            'Settings.Title' = 'SETTINGS'
+            'Settings.Autostart' = 'Start with Windows'
+            'Settings.DefaultTarget' = 'Default boot target'
+            'Settings.NoDefaultTarget' = 'No default target'
+            'Settings.DefaultTargetUnavailable' = 'Boot target unavailable'
+            'Status.Checking' = 'Checking …'
+            'Action.RestartWindows' = 'Restart Windows'
+            'Status.NextTargetDefaultOrder' = 'Next target: default order'
+            'Manage.Section' = 'ADJUST BOOT TARGETS'
+            'Manage.Title' = 'CHANGES'
+            'Manage.Hint' = 'Drag to sort · Click to show/hide'
+            'Manage.SubHint' = 'Pencil to rename · Leave empty = original name'
+            'Manage.Save' = 'Save changes'
+            'Manage.StatusEditing' = 'Customize boot targets · Drag to sort · Click to show/hide · Pencil for display name'
+            'Manage.StatusSaved' = 'Boot-target changes were saved.'
+            'Manage.StatusDiscarded' = 'Changes were discarded.'
+            'Autostart.Enabled' = 'Autostart is enabled.'
+            'Autostart.Disabled' = 'Autostart is disabled.'
+            'Autostart.ErrorHeading' = 'The setting could not be changed.'
+            'Default.SaveErrorHeading' = 'The default boot target could not be saved.'
+            'Default.SaveErrorMessage' = 'Please try again. If the problem persists, open Maintenance → Repair system functions.'
+            'Status.NewBootTargetDetected' = 'New boot target detected · Reinitialize system functions.'
+            'Status.BootTargetsChanged' = 'Boot targets changed · Reinitialize system functions.'
+            'Status.SystemFunctionsRepairRequired' = 'System functions need to be repaired.'
+            'Status.SystemFunctionsSetupRequired' = 'System functions need to be set up.'
+            'Header.Refreshing' = 'Updating boot targets…'
+            'Update.Available' = 'New app version available'
+            'Tray.Open' = 'Open Lenovo Boot Selector'
+            'Tray.Maintenance' = 'Maintenance'
+            'Maintenance.Setup' = 'Set up system functions…'
+            'Maintenance.Remove' = 'Remove system functions…'
+            'Update.Check' = 'Check for new version…'
+            'Update.Install' = 'Update app…'
+            'Diagnostics.Save' = 'Save diagnostics…'
+            'Boot.OtherTarget' = 'Other boot target'
+            'Boot.OtherTargetTooltip' = 'Gray: other boot target'
+            'Boot.MenuTitle' = 'Lenovo Boot Menu'
+            'Boot.MenuSubtitle' = 'Open the boot menu on the next startup'
+            'Boot.MenuTooltip' = 'Red: Lenovo Boot Menu'
+            'Boot.Nvme1Title' = 'NVMe SSD 1'
+            'Boot.Nvme2Title' = 'NVMe SSD 2'
+            'Boot.NoDrive' = 'No drive detected'
+            'Boot.InternalSsd' = 'Internal SSD'
+            'Boot.SecondInternalSsd' = 'Second internal SSD'
+            'Boot.InternalSsdTooltip' = 'Blue: internal SSD'
+            'Boot.UsbTooltip' = 'Yellow: USB drive'
+            'Boot.UsbChecking' = 'Checking USB drives …'
+            'Boot.UsbCheckFailed' = 'USB drives could not be checked'
+            'Boot.UsbBootMedium' = 'USB boot medium: {Model}'
+            'Boot.UsbMultipleBoot' = 'Multiple possible USB boot media detected'
+            'Boot.UsbNonBoot' = '{Model} detected · not detected as boot medium'
+            'Boot.UsbMultipleNoBoot' = 'USB drives detected · no boot medium found'
+            'Boot.UsbNone' = 'No USB drive connected'
+            'Boot.UsbFddTitle' = 'USB floppy drive'
+            'Boot.UsbFddSubtitle' = 'Boot from a USB floppy drive'
+            'Boot.UsbCdTitle' = 'USB CD/DVD drive'
+            'Boot.UsbCdSubtitle' = 'Boot from an optical USB drive'
+            'Boot.PxeTitle' = 'Network boot'
+            'Boot.PxeSubtitle' = 'Boot over the local network'
+            'Boot.PxeTooltip' = 'Purple: network boot'
+            'Boot.LenovoRecoveryTitle' = 'Lenovo recovery'
+            'Boot.LenovoRecoverySubtitle' = 'Recovery over the network'
+            'Boot.CyanTooltip' = 'Cyan: Lenovo or corporate network'
+            'Boot.CorporateTitle' = 'Corporate network boot'
+            'Boot.CorporateSubtitle' = 'Boot over the corporate network'
+            'Boot.OtherDriveTitle' = 'Other drive'
+            'Boot.OtherDriveSubtitle' = 'Other detected drive'
+            'Boot.OtherDriveTooltip' = 'Gray: other drive'
+            'Boot.OtherCdTitle' = 'Other CD/DVD drive'
+            'Boot.OtherCdSubtitle' = 'Other optical boot drive'
+            'Status.NextBootTarget' = 'Next boot: {Title}'
+            'Status.NextBootSet' = 'Next boot target was set.'
+            'Boot.ChangeErrorTitle' = 'Boot target could not be changed'
+            'Boot.ChangeErrorHeading' = 'The selection was not applied.'
+            'Boot.ChangeErrorMessage' = 'Please try again. If the problem persists, open Maintenance → Repair system functions.'
+            'Manage.OrderChanged' = 'Order changed · Save applies the change.'
+            'Manage.OriginalName' = 'Original name: {Name}'
+            'Boot.MenuManageSubtitle' = 'Selection menu for the next boot target'
+            'Manage.AliasRemoved' = 'Display name removed · Save applies the change.'
+            'Manage.AliasChanged' = 'Display name changed · Save applies the change.'
+            'Manage.AliasDiscarded' = 'Display-name change discarded.'
+            'Common.Apply' = 'Apply'
+            'Manage.OriginalNameHint' = 'Leave empty = original name'
+            'Manage.EditAliasAccessible' = 'Change display name'
+            'Manage.EditAliasStatus' = 'Edit display name · Enter applies · Esc discards · empty = original name'
+            'Maintenance.Dialog.RemoveTitle' = 'Remove system functions'
+            'Maintenance.Dialog.RemoveHeading' = 'Remove system functions?'
+            'Maintenance.Dialog.RemoveBody' = "After this, Lenovo Boot Selector cannot change boot targets until setup is completed again.`r`n`r`nThe saved default boot target will be reset.`r`n`r`nYour existing boot targets, personal app settings, and autostart setting will be kept."
+            'Maintenance.Action.Remove' = 'Remove'
+            'Maintenance.Dialog.RepairTitle' = 'Repair system functions'
+            'Maintenance.Dialog.RepairHeading' = 'System functions are already set up.'
+            'Maintenance.Dialog.RepairBody' = 'Set them up again and repair them? Your boot targets and personal settings will be kept.'
+            'Maintenance.Action.Repair' = 'Repair'
+            'Maintenance.Dialog.MigrateHeading' = 'The setup needs to be updated.'
+            'Maintenance.Dialog.MigrateBody' = 'An older or incomplete setup was found. Repair it so boot targets can be changed reliably again.'
+            'Maintenance.Dialog.ReinitializeTitle' = 'Reinitialize system functions'
+            'Maintenance.Dialog.ReinitializeHeading' = 'New boot target detected'
+            'Maintenance.Dialog.ReinitializeBody' = 'Lenovo Boot Selector detected a change to the available boot targets. Reinitialize the system functions so the new boot target can be used safely. Your personal settings will be kept.'
+            'Maintenance.Action.Reinitialize' = 'Reinitialize'
+            'Maintenance.Dialog.SetupTitle' = 'Set up system functions'
+            'Maintenance.Dialog.SetupHeading' = 'One-time setup required'
+            'Maintenance.Dialog.SetupBody' = 'Lenovo Boot Selector requires a one-time Windows confirmation before it can change boot targets. After that, you can select boot targets without further confirmation.'
+            'Maintenance.Action.Setup' = 'Set up'
+            'Restart.DialogTitle' = 'Restart Windows'
+            'Restart.Question' = 'Restart Windows now?'
+            'Restart.NextTarget' = 'NEXT TARGET'
+            'Restart.Action' = 'Restart'
+            'Maintenance.Busy.Remove' = 'Removing system functions…'
+            'Maintenance.Busy.Reinitialize' = 'Reinitializing system functions…'
+            'Maintenance.Busy.Repair' = 'Repairing system functions…'
+            'Maintenance.Busy.Setup' = 'Setting up system functions…'
+            'Maintenance.Caption' = 'SYSTEM FUNCTIONS'
+            'Maintenance.Panel.SetupHeading' = 'Set up system functions'
+            'Maintenance.Panel.SetupMessage' = 'A one-time Windows confirmation is required before Lenovo Boot Selector can change boot targets.'
+            'Maintenance.Panel.SetupHint' = 'Afterward, you can select boot targets without further confirmation.'
+            'Maintenance.Panel.RepairHeading' = 'Repair system functions'
+            'Maintenance.Panel.RepairMessage' = 'The existing setup is incomplete or needs to be updated.'
+            'Maintenance.Panel.RepairHint' = 'Your personal settings will be kept.'
+            'Maintenance.Panel.NewTargetHeading' = 'New boot target detected'
+            'Maintenance.Panel.NewTargetMessage' = 'Lenovo Boot Selector detected a new boot target. Reinitialize the system functions so it can be used safely.'
+            'Maintenance.Panel.TargetsChangedHeading' = 'Boot targets changed'
+            'Maintenance.Panel.TargetsChangedMessage' = 'The available boot targets have changed. Reinitialize the system functions so the selection is complete again.'
+            'Maintenance.Panel.BusyRemoveMessage' = 'The system functions are being removed safely. Please wait a moment.'
+            'Maintenance.Panel.BusyReinitializeMessage' = 'Windows is setting up the system functions again for the changed boot targets. Please wait a moment.'
+            'Maintenance.Panel.BusySetupMessage' = 'Windows is setting up the required system functions. Please wait a moment.'
+            'Maintenance.Panel.BusyHint' = 'The app updates automatically when the operation is complete.'
+            'Maintenance.SuccessRemovedTitle' = 'System functions removed'
+            'Maintenance.SuccessRemovedHeading' = 'System functions were removed.'
+            'Maintenance.SuccessRemovedMessage' = 'Boot targets can be changed again after you set up the system functions again.'
+            'Maintenance.SuccessReinitializedTitle' = 'Reinitialized'
+            'Maintenance.SuccessReinitializedHeading' = 'System functions were reinitialized.'
+            'Maintenance.SuccessReinitializedMessage' = 'The detected boot target can now be used safely.'
+            'Maintenance.SuccessReadyTitle' = 'System functions ready'
+            'Maintenance.SuccessReadyHeading' = 'System functions are ready.'
+            'Maintenance.SuccessReadyMessage' = 'Lenovo Boot Selector can now change boot targets.'
+            'Update.SuccessTitle' = 'Update successful'
+            'Update.SuccessHeading' = 'Lenovo Boot Selector v{Version} is installed.'
+            'Update.FailureTitle' = 'Update failed'
+            'Update.RestartFailureHeading' = 'The app could not be updated successfully.'
+            'Update.AvailableHeading' = 'Lenovo Boot Selector v{Version} is available.'
+            'Update.AvailableMessage' = 'You can install the new version now. You can also find the update later in the tray menu under Maintenance → Update app…'
+            'Update.InstallNow' = 'Update now'
+            'Update.CheckNoResult' = 'The update check did not return a result.'
+            'Update.AvailableStatus' = 'New app version available: v{Version}'
+            'Update.CurrentStatus' = 'Lenovo Boot Selector is up to date · v{Version}'
+            'Update.NoNewTitle' = 'No new version'
+            'Update.CurrentHeading' = 'Lenovo Boot Selector v{Version} is up to date.'
+            'Update.NoNewMessage' = 'No newer version is currently available.'
+            'Update.CheckFailedStatus' = 'Update check failed.'
+            'Update.CheckFailedHeading' = 'Checking for a new version failed.'
+            'Update.CheckStartFailed' = 'The update check could not be started.'
+            'Update.CheckingStatus' = 'Checking for a new version…'
+            'Update.InstallerStartFailed' = 'The update installer could not be started.'
+            'Update.PrepareNoResult' = 'Update preparation did not return a result.'
+            'Update.PrepareFailedHeading' = 'The app could not be updated.'
+            'Update.NotPossibleTitle' = 'Update not possible'
+            'Update.DirectoryNotWritableHeading' = 'The app folder is not writable.'
+            'Update.DirectoryNotWritableMessage' = 'Move Lenovo Boot Selector to a folder that your user account can modify, then try again.'
+            'Update.PrepareStartFailed' = 'Update preparation could not be started.'
+            'Update.PreparingStatus' = 'Preparing update to v{Version}…'
+            'Diagnostics.SavedTitle' = 'Diagnostics saved'
+            'Diagnostics.SavedHeading' = 'The diagnostic package was created.'
+            'Diagnostics.Location' = "Location:`r`n{Path}"
+            'Diagnostics.ShowFolder' = 'Show in folder'
+            'Diagnostics.NotSavedTitle' = 'Diagnostics not saved'
+            'Diagnostics.NotSavedHeading' = 'The diagnostic package could not be created.'
+            'Startup.AlreadyRunningTitle' = 'Lenovo Boot Selector is already running'
+            'Startup.FailedTitle' = 'Lenovo Boot Selector could not be started'
+            'Startup.AlreadyRunningBody' = 'The app is already open. Close this window and use the existing tray icon.'
+            'Startup.FailedSavedBody' = "A problem occurred during startup.`r`nA diagnostic file was saved. You can restart the app or open the diagnostics."
+            'Startup.FailedNoDiagnosticBody' = "A problem occurred during startup.`r`nThe diagnostic file could not be saved. You can restart the app."
+            'Startup.DiagnosticFile' = 'Diagnostics: {Name}'
+            'Startup.NoDiagnosticFile' = 'No diagnostic file is available.'
+            'Startup.OpenDiagnostics' = 'Open diagnostics'
+            'Startup.Retry' = 'Restart app'
+            'Startup.FallbackError' = 'Lenovo Boot Selector could not be started.'
+            'Startup.AlreadyRunningMessage' = 'Lenovo Boot Selector is already running.'
+            'Tray.Exit' = 'Exit'
+        }
+        'de-DE' = [ordered]@{
+            'Common.OK' = 'OK'
+            'Common.Cancel' = 'Abbrechen'
+            'Common.Close' = 'Schließen'
+            'Common.TryAgain' = 'Bitte versuche es erneut.'
+            'Settings.Language' = 'Sprache'
+            'Language.English' = 'English'
+            'Language.German' = 'Deutsch'
+            'Progress.StepOf' = 'Schritt {0} von {1}'
+            'Storage.InternalSsdModel' = 'Interne SSD: {Model}'
+            'Popup.HeaderUpdateAccessible' = 'Öffnet den Dialog zur verfügbaren App-Version.'
+            'Status.BootTargetsRefreshing' = 'Startziele werden im Hintergrund aktualisiert…'
+            'Action.RefreshBootTargets' = 'Startziele aktualisieren'
+            'Popup.NextBootSection' = 'NÄCHSTER START'
+            'Popup.Customize' = 'ANPASSEN'
+            'Status.ScrollPositionFailed' = 'Scrollposition konnte nicht aktualisiert werden.'
+            'Settings.Title' = 'EINSTELLUNGEN'
+            'Settings.Autostart' = 'Mit Windows starten'
+            'Settings.DefaultTarget' = 'Standard-Startziel'
+            'Settings.NoDefaultTarget' = 'Kein Standardziel'
+            'Settings.DefaultTargetUnavailable' = 'Nicht verfügbares Startziel'
+            'Status.Checking' = 'Wird geprüft …'
+            'Action.RestartWindows' = 'Windows neu starten'
+            'Status.NextTargetDefaultOrder' = 'Nächstes Ziel: Standardreihenfolge'
+            'Manage.Section' = 'STARTZIELE ANPASSEN'
+            'Manage.Title' = 'ÄNDERUNGEN'
+            'Manage.Hint' = 'Ziehen zum Sortieren · Klicken zum Ein-/Ausblenden'
+            'Manage.SubHint' = 'Stift zum Umbenennen · Leer lassen = Originalname'
+            'Manage.Save' = 'Änderungen speichern'
+            'Manage.StatusEditing' = 'Startziele anpassen · Ziehen zum Sortieren · Klicken zum Ein-/Ausblenden · Stift für Anzeigename'
+            'Manage.StatusSaved' = 'Änderungen an den Startzielen wurden gespeichert.'
+            'Manage.StatusDiscarded' = 'Änderungen wurden verworfen.'
+            'Autostart.Enabled' = 'Autostart ist aktiviert.'
+            'Autostart.Disabled' = 'Autostart ist deaktiviert.'
+            'Autostart.ErrorHeading' = 'Die Einstellung konnte nicht geändert werden.'
+            'Default.SaveErrorHeading' = 'Das Standard-Startziel konnte nicht gespeichert werden.'
+            'Default.SaveErrorMessage' = 'Bitte versuche es erneut. Falls das Problem bestehen bleibt, öffne Wartung → Systemfunktionen reparieren.'
+            'Status.NewBootTargetDetected' = 'Neues Startziel erkannt · Systemfunktionen neu initialisieren.'
+            'Status.BootTargetsChanged' = 'Startziele geändert · Systemfunktionen neu initialisieren.'
+            'Status.SystemFunctionsRepairRequired' = 'Systemfunktionen müssen repariert werden.'
+            'Status.SystemFunctionsSetupRequired' = 'Systemfunktionen müssen eingerichtet werden.'
+            'Header.Refreshing' = 'Aktualisiere Bootziele…'
+            'Update.Available' = 'Neue App-Version verfügbar'
+            'Tray.Open' = 'Lenovo Boot Selector öffnen'
+            'Tray.Maintenance' = 'Wartung'
+            'Maintenance.Setup' = 'Systemfunktionen einrichten…'
+            'Maintenance.Remove' = 'Systemfunktionen entfernen…'
+            'Update.Check' = 'Auf neue Version prüfen…'
+            'Update.Install' = 'App aktualisieren…'
+            'Diagnostics.Save' = 'Diagnose speichern…'
+            'Boot.OtherTarget' = 'Weiteres Startziel'
+            'Boot.OtherTargetTooltip' = 'Grau: weiteres Startziel'
+            'Boot.MenuTitle' = 'Lenovo Boot-Menü'
+            'Boot.MenuSubtitle' = 'Beim nächsten Start das Boot-Menü öffnen'
+            'Boot.MenuTooltip' = 'Rot: Lenovo Boot-Menü'
+            'Boot.Nvme1Title' = 'NVMe-SSD 1'
+            'Boot.Nvme2Title' = 'NVMe-SSD 2'
+            'Boot.NoDrive' = 'Kein Laufwerk erkannt'
+            'Boot.InternalSsd' = 'Interne SSD'
+            'Boot.SecondInternalSsd' = 'Zweite interne SSD'
+            'Boot.InternalSsdTooltip' = 'Blau: interne SSD'
+            'Boot.UsbTooltip' = 'Gelb: USB-Laufwerk'
+            'Boot.UsbChecking' = 'USB-Laufwerke werden geprüft …'
+            'Boot.UsbCheckFailed' = 'USB-Laufwerke konnten nicht geprüft werden'
+            'Boot.UsbBootMedium' = 'USB-Startmedium: {Model}'
+            'Boot.UsbMultipleBoot' = 'Mehrere mögliche USB-Startmedien erkannt'
+            'Boot.UsbNonBoot' = '{Model} erkannt · nicht als Startmedium erkannt'
+            'Boot.UsbMultipleNoBoot' = 'USB-Laufwerke erkannt · kein Startmedium gefunden'
+            'Boot.UsbNone' = 'Kein USB-Laufwerk angeschlossen'
+            'Boot.UsbFddTitle' = 'USB-Diskettenlaufwerk'
+            'Boot.UsbFddSubtitle' = 'Start von einem USB-Floppy-Laufwerk'
+            'Boot.UsbCdTitle' = 'USB-CD/DVD-Laufwerk'
+            'Boot.UsbCdSubtitle' = 'Start von einem optischen USB-Laufwerk'
+            'Boot.PxeTitle' = 'Netzwerkstart'
+            'Boot.PxeSubtitle' = 'Start über das lokale Netzwerk'
+            'Boot.PxeTooltip' = 'Violett: Netzwerkstart'
+            'Boot.LenovoRecoveryTitle' = 'Lenovo Wiederherstellung'
+            'Boot.LenovoRecoverySubtitle' = 'Wiederherstellung über das Netzwerk'
+            'Boot.CyanTooltip' = 'Cyan: Lenovo- oder Firmen-Netzwerk'
+            'Boot.CorporateTitle' = 'Firmen-Netzwerkstart'
+            'Boot.CorporateSubtitle' = 'Start über das Firmennetzwerk'
+            'Boot.OtherDriveTitle' = 'Weiteres Laufwerk'
+            'Boot.OtherDriveSubtitle' = 'Weiteres erkanntes Laufwerk'
+            'Boot.OtherDriveTooltip' = 'Grau: weiteres Laufwerk'
+            'Boot.OtherCdTitle' = 'Weiteres CD/DVD-Laufwerk'
+            'Boot.OtherCdSubtitle' = 'Anderes optisches Startlaufwerk'
+            'Status.NextBootTarget' = 'Nächster Start: {Title}'
+            'Status.NextBootSet' = 'Nächstes Startziel wurde gesetzt.'
+            'Boot.ChangeErrorTitle' = 'Startziel konnte nicht geändert werden'
+            'Boot.ChangeErrorHeading' = 'Die Auswahl wurde nicht übernommen.'
+            'Boot.ChangeErrorMessage' = 'Bitte versuche es erneut. Falls das Problem bestehen bleibt, öffne Wartung → Systemfunktionen reparieren.'
+            'Manage.OrderChanged' = 'Reihenfolge geändert · Speichern übernimmt die Änderung.'
+            'Manage.OriginalName' = 'Originalname: {Name}'
+            'Boot.MenuManageSubtitle' = 'Auswahlmenü für das nächste Startziel'
+            'Manage.AliasRemoved' = 'Anzeigename entfernt · Speichern übernimmt die Änderung.'
+            'Manage.AliasChanged' = 'Anzeigename geändert · Speichern übernimmt die Änderung.'
+            'Manage.AliasDiscarded' = 'Änderung am Anzeigenamen verworfen.'
+            'Common.Apply' = 'Übernehmen'
+            'Manage.OriginalNameHint' = 'Leer lassen = Originalname'
+            'Manage.EditAliasAccessible' = 'Anzeigename ändern'
+            'Manage.EditAliasStatus' = 'Anzeigename bearbeiten · Enter übernimmt · Esc verwirft · leer = Originalname'
+            'Maintenance.Dialog.RemoveTitle' = 'Systemfunktionen entfernen'
+            'Maintenance.Dialog.RemoveHeading' = 'Systemfunktionen wirklich entfernen?'
+            'Maintenance.Dialog.RemoveBody' = "Danach kann Lenovo Boot Selector keine Startziele mehr ändern, bis die Einrichtung erneut durchgeführt wird.`r`n`r`nDas gespeicherte Standard-Startziel wird zurückgesetzt.`r`n`r`nErhalten bleiben deine vorhandenen Startziele, persönlichen App-Einstellungen und die Autostart-Einstellung."
+            'Maintenance.Action.Remove' = 'Entfernen'
+            'Maintenance.Dialog.RepairTitle' = 'Systemfunktionen reparieren'
+            'Maintenance.Dialog.RepairHeading' = 'Die Systemfunktionen sind bereits eingerichtet.'
+            'Maintenance.Dialog.RepairBody' = 'Möchtest du sie erneut einrichten und reparieren? Deine Startziele und persönlichen Einstellungen bleiben dabei erhalten.'
+            'Maintenance.Action.Repair' = 'Reparieren'
+            'Maintenance.Dialog.MigrateHeading' = 'Die Einrichtung muss aktualisiert werden.'
+            'Maintenance.Dialog.MigrateBody' = 'Eine ältere oder unvollständige Einrichtung wurde gefunden. Repariere sie, damit Startziele wieder zuverlässig geändert werden können.'
+            'Maintenance.Dialog.ReinitializeTitle' = 'Systemfunktionen neu initialisieren'
+            'Maintenance.Dialog.ReinitializeHeading' = 'Neues Startziel erkannt'
+            'Maintenance.Dialog.ReinitializeBody' = 'Lenovo Boot Selector hat eine Änderung an den verfügbaren Startzielen erkannt. Initialisiere die Systemfunktionen neu, damit das neue Startziel sicher verwendet werden kann. Deine persönlichen Einstellungen bleiben erhalten.'
+            'Maintenance.Action.Reinitialize' = 'Neu initialisieren'
+            'Maintenance.Dialog.SetupTitle' = 'Systemfunktionen einrichten'
+            'Maintenance.Dialog.SetupHeading' = 'Einmalige Einrichtung erforderlich'
+            'Maintenance.Dialog.SetupBody' = 'Damit Lenovo Boot Selector Startziele ändern kann, ist einmalig eine Windows-Bestätigung erforderlich. Danach kannst du Startziele ohne weitere Bestätigung auswählen.'
+            'Maintenance.Action.Setup' = 'Einrichten'
+            'Restart.DialogTitle' = 'Windows neu starten'
+            'Restart.Question' = 'Windows jetzt neu starten?'
+            'Restart.NextTarget' = 'NÄCHSTES ZIEL'
+            'Restart.Action' = 'Neu starten'
+            'Maintenance.Busy.Remove' = 'Systemfunktionen werden entfernt…'
+            'Maintenance.Busy.Reinitialize' = 'Systemfunktionen werden neu initialisiert…'
+            'Maintenance.Busy.Repair' = 'Systemfunktionen werden repariert…'
+            'Maintenance.Busy.Setup' = 'Systemfunktionen werden eingerichtet…'
+            'Maintenance.Caption' = 'SYSTEMFUNKTIONEN'
+            'Maintenance.Panel.SetupHeading' = 'Systemfunktionen einrichten'
+            'Maintenance.Panel.SetupMessage' = 'Damit Lenovo Boot Selector Startziele ändern kann, ist einmalig eine Windows-Bestätigung erforderlich.'
+            'Maintenance.Panel.SetupHint' = 'Danach kannst du Startziele ohne weitere Bestätigung auswählen.'
+            'Maintenance.Panel.RepairHeading' = 'Systemfunktionen reparieren'
+            'Maintenance.Panel.RepairMessage' = 'Die vorhandene Einrichtung ist unvollständig oder muss aktualisiert werden.'
+            'Maintenance.Panel.RepairHint' = 'Deine persönlichen Einstellungen bleiben dabei erhalten.'
+            'Maintenance.Panel.NewTargetHeading' = 'Neues Startziel erkannt'
+            'Maintenance.Panel.NewTargetMessage' = 'Lenovo Boot Selector hat ein neues Startziel erkannt. Initialisiere die Systemfunktionen neu, damit es sicher verwendet werden kann.'
+            'Maintenance.Panel.TargetsChangedHeading' = 'Startziele wurden geändert'
+            'Maintenance.Panel.TargetsChangedMessage' = 'Die verfügbaren Startziele haben sich geändert. Initialisiere die Systemfunktionen neu, damit die Auswahl wieder vollständig passt.'
+            'Maintenance.Panel.BusyRemoveMessage' = 'Die Systemfunktionen werden sicher entfernt. Bitte warte einen Moment.'
+            'Maintenance.Panel.BusyReinitializeMessage' = 'Windows richtet die Systemfunktionen für die geänderten Startziele neu ein. Bitte warte einen Moment.'
+            'Maintenance.Panel.BusySetupMessage' = 'Windows richtet die benötigten Systemfunktionen ein. Bitte warte einen Moment.'
+            'Maintenance.Panel.BusyHint' = 'Die App wird nach Abschluss automatisch aktualisiert.'
+            'Maintenance.SuccessRemovedTitle' = 'Systemfunktionen entfernt'
+            'Maintenance.SuccessRemovedHeading' = 'Systemfunktionen wurden entfernt.'
+            'Maintenance.SuccessRemovedMessage' = 'Startziele können wieder geändert werden, nachdem du die Systemfunktionen erneut eingerichtet hast.'
+            'Maintenance.SuccessReinitializedTitle' = 'Neu initialisiert'
+            'Maintenance.SuccessReinitializedHeading' = 'Systemfunktionen wurden neu initialisiert.'
+            'Maintenance.SuccessReinitializedMessage' = 'Das erkannte Startziel kann jetzt sicher verwendet werden.'
+            'Maintenance.SuccessReadyTitle' = 'Systemfunktionen bereit'
+            'Maintenance.SuccessReadyHeading' = 'Systemfunktionen sind bereit.'
+            'Maintenance.SuccessReadyMessage' = 'Lenovo Boot Selector kann jetzt Startziele ändern.'
+            'Update.SuccessTitle' = 'Update erfolgreich'
+            'Update.SuccessHeading' = 'Lenovo Boot Selector v{Version} ist installiert.'
+            'Update.FailureTitle' = 'Update fehlgeschlagen'
+            'Update.RestartFailureHeading' = 'Die App konnte nicht erfolgreich aktualisiert werden.'
+            'Update.AvailableHeading' = 'Lenovo Boot Selector v{Version} ist verfügbar.'
+            'Update.AvailableMessage' = 'Du kannst die neue Version jetzt direkt installieren. Später findest du die Aktualisierung im Tray-Menü unter Wartung → App aktualisieren…'
+            'Update.InstallNow' = 'Jetzt aktualisieren'
+            'Update.CheckNoResult' = 'Die Update-Prüfung hat kein Ergebnis geliefert.'
+            'Update.AvailableStatus' = 'Neue App-Version verfügbar: v{Version}'
+            'Update.CurrentStatus' = 'Lenovo Boot Selector ist aktuell · v{Version}'
+            'Update.NoNewTitle' = 'Keine neue Version'
+            'Update.CurrentHeading' = 'Lenovo Boot Selector v{Version} ist aktuell.'
+            'Update.NoNewMessage' = 'Es ist derzeit keine neuere Version verfügbar.'
+            'Update.CheckFailedStatus' = 'Update-Prüfung fehlgeschlagen.'
+            'Update.CheckFailedHeading' = 'Die Prüfung auf eine neue Version ist fehlgeschlagen.'
+            'Update.CheckStartFailed' = 'Die Update-Prüfung konnte nicht gestartet werden.'
+            'Update.CheckingStatus' = 'Auf neue Version wird geprüft…'
+            'Update.InstallerStartFailed' = 'Update-Installer konnte nicht gestartet werden.'
+            'Update.PrepareNoResult' = 'Die Update-Vorbereitung hat kein Ergebnis geliefert.'
+            'Update.PrepareFailedHeading' = 'Die App konnte nicht aktualisiert werden.'
+            'Update.NotPossibleTitle' = 'Update nicht möglich'
+            'Update.DirectoryNotWritableHeading' = 'Der App-Ordner ist nicht beschreibbar.'
+            'Update.DirectoryNotWritableMessage' = 'Verschiebe Lenovo Boot Selector in einen Ordner, den dein Benutzerkonto ändern darf, und versuche es erneut.'
+            'Update.PrepareStartFailed' = 'Update-Vorbereitung konnte nicht gestartet werden.'
+            'Update.PreparingStatus' = 'Update auf v{Version} wird vorbereitet…'
+            'Diagnostics.SavedTitle' = 'Diagnose gespeichert'
+            'Diagnostics.SavedHeading' = 'Das Diagnosepaket wurde erstellt.'
+            'Diagnostics.Location' = "Speicherort:`r`n{Path}"
+            'Diagnostics.ShowFolder' = 'Im Ordner anzeigen'
+            'Diagnostics.NotSavedTitle' = 'Diagnose nicht gespeichert'
+            'Diagnostics.NotSavedHeading' = 'Das Diagnosepaket konnte nicht erstellt werden.'
+            'Startup.AlreadyRunningTitle' = 'Lenovo Boot Selector läuft bereits'
+            'Startup.FailedTitle' = 'Lenovo Boot Selector konnte nicht gestartet werden'
+            'Startup.AlreadyRunningBody' = 'Die App ist bereits geöffnet. Schließe dieses Fenster und verwende das vorhandene Tray-Symbol.'
+            'Startup.FailedSavedBody' = "Beim Start ist ein Problem aufgetreten.`r`nEine Diagnose wurde gespeichert. Du kannst die App erneut starten oder die Diagnose öffnen."
+            'Startup.FailedNoDiagnosticBody' = "Beim Start ist ein Problem aufgetreten.`r`nDie Diagnose konnte nicht gespeichert werden. Du kannst die App erneut starten."
+            'Startup.DiagnosticFile' = 'Diagnose: {Name}'
+            'Startup.NoDiagnosticFile' = 'Keine Diagnose-Datei verfügbar.'
+            'Startup.OpenDiagnostics' = 'Diagnose öffnen'
+            'Startup.Retry' = 'Erneut starten'
+            'Startup.FallbackError' = 'Lenovo Boot Selector konnte nicht gestartet werden.'
+            'Startup.AlreadyRunningMessage' = 'Lenovo Boot Selector läuft bereits.'
+            'Tray.Exit' = 'Beenden'
+        }
+    }
+}
+
+function Get-LocalizationKeySetCore {
+    param([string]$Locale = 'en-US')
+
+    $resolved = Resolve-LocaleIdCore -Locale $Locale
+    $catalogs = Get-LocalizationCatalogCore
+    return @($catalogs[$resolved].Keys | ForEach-Object { [string]$_ } | Sort-Object)
+}
+
+function Test-LocalizationCatalogParityCore {
+    $reference = @(Get-LocalizationKeySetCore -Locale 'en-US')
+    foreach ($locale in @(Get-SupportedLocaleIdsCore)) {
+        $keys = @(Get-LocalizationKeySetCore -Locale $locale)
+        if ($keys.Count -ne $reference.Count) { return $false }
+        for ($i = 0; $i -lt $reference.Count; $i++) {
+            if ($keys[$i] -ne $reference[$i]) { return $false }
+        }
+    }
+    return $true
+}
+
+function Get-LocalizedStringCore {
+    param(
+        [Parameter(Mandatory=$true)][string]$Key,
+        [string]$Locale = 'en-US',
+        [object[]]$Arguments,
+        [System.Collections.IDictionary]$Values
+    )
+
+    $resolved = Resolve-LocaleIdCore -Locale $Locale
+    $catalogs = Get-LocalizationCatalogCore
+    $active = $catalogs[$resolved]
+    $english = $catalogs['en-US']
+
+    if ($active.Contains($Key)) {
+        $text = [string]$active[$Key]
+    }
+    elseif ($english.Contains($Key)) {
+        $text = [string]$english[$Key]
+    }
+    else {
+        return $Key
+    }
+
+    if ($Values) {
+        foreach ($name in @($Values.Keys | ForEach-Object { [string]$_ } | Sort-Object)) {
+            $text = $text.Replace(('{' + $name + '}'), [string]$Values[$name])
+        }
+    }
+
+    if ($null -ne $Arguments -and @($Arguments).Count -gt 0) {
+        try { $text = $text -f @($Arguments) } catch { }
+    }
+    return $text
+}
+function Get-StartupRecoveryLocale {
+    try {
+        $settingsPath = Join-Path (Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray') 'settings.json'
+        if (-not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) { return 'en-US' }
+        $source = ([System.IO.File]::ReadAllText($settingsPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json)
+        $sourceSchema = if ($source.schemaVersion) { [int]$source.schemaVersion } else { 1 }
+        $property = $source.PSObject.Properties['locale']
+        if ($null -ne $property) { return (Resolve-LocaleIdCore -Locale ([string]$property.Value)) }
+        if ($sourceSchema -lt 5) { return 'de-DE' }
+    }
+    catch { }
+    return 'en-US'
+}
+
 function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
     $diagnosticSaved = $false
     $diagDir = $null
@@ -48,10 +531,11 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
     } catch { }
 
     try {
+        $locale = Get-StartupRecoveryLocale
         Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
         Add-Type -AssemblyName System.Drawing -ErrorAction Stop
 
-        $isAlreadyRunning = ($Message -eq 'Lenovo Boot Selector läuft bereits.')
+        $isAlreadyRunning = (-not $AllowRestart)
         $form = New-Object System.Windows.Forms.Form
         $form.Text = 'Lenovo Boot Selector'
         $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
@@ -93,7 +577,7 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
         $title.Size = New-Object System.Drawing.Size(452, 28)
         $title.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 11.0, [System.Drawing.FontStyle]::Bold)
         $title.ForeColor = [System.Drawing.Color]::White
-        $title.Text = $(if ($isAlreadyRunning) { 'Lenovo Boot Selector läuft bereits' } else { 'Lenovo Boot Selector konnte nicht gestartet werden' })
+        $title.Text = $(if ($isAlreadyRunning) { Get-LocalizedStringCore -Key 'Startup.AlreadyRunningTitle' -Locale $locale } else { Get-LocalizedStringCore -Key 'Startup.FailedTitle' -Locale $locale })
         $form.Controls.Add($title)
 
         $body = New-Object System.Windows.Forms.Label
@@ -102,13 +586,13 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
         $body.Font = New-Object System.Drawing.Font('Segoe UI', 9.0, [System.Drawing.FontStyle]::Regular)
         $body.ForeColor = [System.Drawing.Color]::FromArgb(210, 210, 210)
         if ($isAlreadyRunning) {
-            $body.Text = 'Die App ist bereits geöffnet. Schließe dieses Fenster und verwende das vorhandene Tray-Symbol.'
+            $body.Text = Get-LocalizedStringCore -Key 'Startup.AlreadyRunningBody' -Locale $locale
         }
         elseif ($diagnosticSaved) {
-            $body.Text = "Beim Start ist ein Problem aufgetreten.`r`nEine Diagnose wurde gespeichert. Du kannst die App erneut starten oder die Diagnose öffnen."
+            $body.Text = Get-LocalizedStringCore -Key 'Startup.FailedSavedBody' -Locale $locale
         }
         else {
-            $body.Text = "Beim Start ist ein Problem aufgetreten.`r`nDie Diagnose konnte nicht gespeichert werden. Du kannst die App erneut starten."
+            $body.Text = Get-LocalizedStringCore -Key 'Startup.FailedNoDiagnosticBody' -Locale $locale
         }
         $form.Controls.Add($body)
 
@@ -118,10 +602,10 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
         $diagLabel.Font = New-Object System.Drawing.Font('Segoe UI', 8.0, [System.Drawing.FontStyle]::Regular)
         $diagLabel.ForeColor = [System.Drawing.Color]::FromArgb(145, 145, 145)
         if ($diagnosticSaved -and $diagPath) {
-            $diagLabel.Text = ('Diagnose: {0}' -f (Split-Path -Leaf $diagPath))
+            $diagLabel.Text = Get-LocalizedStringCore -Key 'Startup.DiagnosticFile' -Locale $locale -Values @{ Name=(Split-Path -Leaf $diagPath) }
         }
         elseif (-not $isAlreadyRunning) {
-            $diagLabel.Text = 'Keine Diagnose-Datei verfügbar.'
+            $diagLabel.Text = Get-LocalizedStringCore -Key 'Startup.NoDiagnosticFile' -Locale $locale
         }
         $form.Controls.Add($diagLabel)
 
@@ -132,7 +616,7 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
         $form.Controls.Add($buttonBar)
 
         $closeButton = New-Object System.Windows.Forms.Button
-        $closeButton.Text = 'Schließen'
+        $closeButton.Text = Get-LocalizedStringCore -Key 'Common.Close' -Locale $locale
         $closeButton.Location = New-Object System.Drawing.Point(433, 16)
         $closeButton.Size = New-Object System.Drawing.Size(100, 32)
         $closeButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
@@ -145,7 +629,7 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
         $form.CancelButton = $closeButton
 
         $diagnosticButton = New-Object System.Windows.Forms.Button
-        $diagnosticButton.Text = 'Diagnose öffnen'
+        $diagnosticButton.Text = Get-LocalizedStringCore -Key 'Startup.OpenDiagnostics' -Locale $locale
         $diagnosticButton.Location = New-Object System.Drawing.Point(279, 16)
         $diagnosticButton.Size = New-Object System.Drawing.Size(142, 32)
         $diagnosticButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
@@ -160,7 +644,7 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
         $buttonBar.Controls.Add($diagnosticButton)
 
         $retryButton = New-Object System.Windows.Forms.Button
-        $retryButton.Text = 'Erneut starten'
+        $retryButton.Text = Get-LocalizedStringCore -Key 'Startup.Retry' -Locale $locale
         $retryButton.Location = New-Object System.Drawing.Point(125, 16)
         $retryButton.Size = New-Object System.Drawing.Size(142, 32)
         $retryButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
@@ -193,7 +677,7 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
             $owner.Show()
             [System.Windows.Forms.MessageBox]::Show(
                 $owner,
-                'Lenovo Boot Selector konnte nicht gestartet werden.',
+                (Get-LocalizedStringCore -Key 'Startup.FallbackError' -Locale $locale),
                 'Lenovo Boot Selector',
                 [System.Windows.Forms.MessageBoxButtons]::OK,
                 [System.Windows.Forms.MessageBoxIcon]::Error
@@ -915,7 +1399,8 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     if (-not $mutexOwned) {
         try { $mutex.Dispose() } catch { }
         $mutex = $null
-        Show-FatalMessage 'Lenovo Boot Selector läuft bereits.' -AllowRestart $false | Out-Null
+        $startupLocale = Get-StartupRecoveryLocale
+        Show-FatalMessage (Get-LocalizedStringCore -Key 'Startup.AlreadyRunningMessage' -Locale $startupLocale) -AllowRestart $false | Out-Null
         exit 0
     }
 }
@@ -2354,11 +2839,11 @@ function Save-RuntimeDiagnosticsFromUi {
         $path = Export-RuntimeDiagnosticPackage -Reason 'manual-ui'
         $revealPath = $path
         $revealAction = { Show-DiagnosticPackageInExplorer -Path $revealPath }.GetNewClosure()
-        Show-LenovoNoticeDialog -Title 'Diagnose gespeichert' -Heading 'Das Diagnosepaket wurde erstellt.' -Message ("Speicherort:`r`n{0}" -f $path) -Kind Info -SecondaryButtonText 'Im Ordner anzeigen' -SecondaryAction $revealAction
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.SavedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.SavedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.Location' -Values @{ Path=$path }) -Kind Info -SecondaryButtonText (Get-LocalizedString -Key 'Diagnostics.ShowFolder') -SecondaryAction $revealAction
     }
     catch {
         Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_EXPORT_FAILED' -Stage 'diagnostics' -Success $false -ErrorRecord $_ -Level error
-        Show-LenovoNoticeDialog -Title 'Diagnose nicht gespeichert' -Heading 'Das Diagnosepaket konnte nicht erstellt werden.' -Message 'Bitte versuche es erneut.' -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.NotSavedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.NotSavedHeading') -Message (Get-LocalizedString -Key 'Common.TryAgain') -Kind Error
     }
 }
 
@@ -2389,10 +2874,10 @@ function Show-PendingUpdateResultOnStartup {
     Remove-LenovoUpdateResult
 
     if ($resolved.Success) {
-        Show-LenovoNoticeDialog -Title 'Update erfolgreich' -Heading ('Lenovo Boot Selector v{0} ist installiert.' -f $resolved.DisplayVersion) -Message $resolved.Message -Kind Info
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.SuccessTitle') -Heading (Get-LocalizedString -Key 'Update.SuccessHeading' -Values @{ Version=$resolved.DisplayVersion }) -Message $resolved.Message -Kind Info
     }
     else {
-        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die App konnte nicht erfolgreich aktualisiert werden.' -Message $resolved.Message -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.RestartFailureHeading') -Message $resolved.Message -Kind Error
     }
     return $true
 }
@@ -2413,7 +2898,7 @@ function Show-AvailableUpdateDialog {
         return $false
     }
     $manifest = $script:UpdateState.AvailableManifest
-    Show-LenovoNoticeDialog -Title 'Neue App-Version verfügbar' -Heading ('Lenovo Boot Selector v{0} ist verfügbar.' -f $manifest.Version) -Message 'Du kannst die neue Version jetzt direkt installieren. Später findest du die Aktualisierung im Tray-Menü unter „Wartung“ → „App aktualisieren…“.' -Kind Info -SecondaryButtonText 'Jetzt aktualisieren' -SecondaryAction { Start-ManualAppUpdate }
+    Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.Available') -Heading (Get-LocalizedString -Key 'Update.AvailableHeading' -Values @{ Version=$manifest.Version }) -Message (Get-LocalizedString -Key 'Update.AvailableMessage') -Kind Info -SecondaryButtonText (Get-LocalizedString -Key 'Update.InstallNow') -SecondaryAction { Start-ManualAppUpdate }
     return $true
 }
 
@@ -2430,7 +2915,7 @@ function Complete-UpdateCheck {
     $isPopup = ($Mode -eq 'Popup')
     $failureCategory=''; $failureStage=''; $errorClass=''; $networkStatus=''
     try {
-        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { $failureCategory='runtime'; $failureStage='check-result'; throw 'Die Update-Prüfung hat kein Ergebnis geliefert.' }
+        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { $failureCategory='runtime'; $failureStage='check-result'; throw (Get-LocalizedString -Key 'Update.CheckNoResult') }
         $result=[System.IO.File]::ReadAllText($path,[System.Text.Encoding]::UTF8)|ConvertFrom-Json
         if (-not $result.Success) {
             $failureCategory=([string]$result.ErrorCategory).Trim().ToLowerInvariant()
@@ -2443,7 +2928,7 @@ function Complete-UpdateCheck {
             $validated=Test-LenovoUpdateManifestCore -Manifest $result.Manifest
             if (-not $validated.IsValid) { $failureCategory='manifest'; $failureStage='result-manifest-validation'; throw $validated.Error }
             [void](Set-UpdateRuntimeAvailable -State $script:UpdateState -Manifest $validated)
-            $script:LastStatusText = ('Neue App-Version verfügbar: v{0}' -f $validated.Version)
+            $script:LastStatusText = Get-LocalizedString -Key 'Update.AvailableStatus' -Values @{ Version=$validated.Version }
             if (-not $isPopup) {
                 [void](Show-AvailableUpdateDialog)
             }
@@ -2453,8 +2938,8 @@ function Complete-UpdateCheck {
             $script:UpdateState.AvailableManifest=$null
             [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
             if (-not $isPopup) {
-                $script:LastStatusText = ('Lenovo Boot Selector ist aktuell · v{0}' -f $script:AppVersion)
-                Show-LenovoNoticeDialog -Title 'Keine neue Version' -Heading ('Lenovo Boot Selector v{0} ist aktuell.' -f $script:AppVersion) -Message 'Es ist derzeit keine neuere Version verfügbar.' -Kind Info
+                $script:LastStatusText = Get-LocalizedString -Key 'Update.CurrentStatus' -Values @{ Version=$script:AppVersion }
+                Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.NoNewTitle') -Heading (Get-LocalizedString -Key 'Update.CurrentHeading' -Values @{ Version=$script:AppVersion }) -Message (Get-LocalizedString -Key 'Update.NoNewMessage') -Kind Info
             }
             Write-RuntimeDiagnosticEvent -Event $(if ($isPopup) { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$false; mode=$Mode })
         }
@@ -2462,8 +2947,8 @@ function Complete-UpdateCheck {
     catch {
         [void](Set-UpdateRuntimeFailed -State $script:UpdateState -Message $_.Exception.Message)
         if (-not $isPopup) {
-            $script:LastStatusText='Update-Prüfung fehlgeschlagen.'
-            Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die Prüfung auf eine neue Version ist fehlgeschlagen.' -Message $_.Exception.Message -Kind Error
+            $script:LastStatusText = Get-LocalizedString -Key 'Update.CheckFailedStatus'
+            Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.CheckFailedHeading') -Message $_.Exception.Message -Kind Error
         }
         Write-RuntimeDiagnosticEvent -Event $(if ($isPopup) { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage $(if ($failureStage) { $failureStage } else { 'update-check' }) -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode=$Mode; errorCategory=$failureCategory; failureStage=$failureStage; errorClass=$errorClass; networkStatus=$networkStatus }) -Level warning
     }
@@ -2495,7 +2980,7 @@ function Start-UpdateCheckUiWorker {
     $script:UpdateState.CheckResultPath=$resultPath
     try {
         $proc=Start-UpdateCheckWorkerProcess -ResultPath $resultPath -RuntimeSessionId $script:RuntimeSessionId
-        if (-not $proc) { throw 'Update-Prüfung konnte nicht gestartet werden.' }
+        if (-not $proc) { throw (Get-LocalizedString -Key 'Update.CheckStartFailed') }
         $script:UpdateState.CheckProcess=$proc
         $timer=New-Object System.Windows.Forms.Timer; $timer.Interval=200
         $timer.Add_Tick({
@@ -2529,11 +3014,11 @@ function Start-ManualUpdateCheck {
     if (Test-MaintenanceBusy -or (Test-UpdateRuntimeBusy -State $script:UpdateState)) { return }
     try {
         if (-not (Start-UpdateCheckUiWorker -Mode 'Manual')) { return }
-        $script:LastStatusText='Auf neue Version wird geprüft…'
+        $script:LastStatusText = Get-LocalizedString -Key 'Update.CheckingStatus'
         Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_STARTED' -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ mode='Manual' })
     }
     catch {
-        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die Prüfung konnte nicht gestartet werden.' -Message $_.Exception.Message -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.CheckStartFailed') -Message $_.Exception.Message -Kind Error
         Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_STARTED' -Stage 'update-check' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode='Manual' }) -Level warning
     }
     Update-UpdateMenuState
@@ -2562,7 +3047,7 @@ function Stop-UpdatePrepareUiWorker {
 function Exit-TrayForPreparedUpdate {
     param([Parameter(Mandatory=$true)][string]$WorkDir)
     $helper=Start-LenovoUpdateInstallerHelper -WorkDir $WorkDir -SourceVersion $script:AppVersion
-    if (-not $helper) { throw 'Update-Installer konnte nicht gestartet werden.' }
+    if (-not $helper) { throw (Get-LocalizedString -Key 'Update.InstallerStartFailed') }
     Write-RuntimeDiagnosticEvent -Event 'UPDATE_INSTALL_HELPER_STARTED' -Stage 'update-install' -Success $true -Data (New-RuntimeDiagnosticData @{ processId=$helper.Id; version=$script:UpdateState.AvailableManifest.Version })
     try { $helper.Dispose() } catch { }
     $script:ExitRequested=$true
@@ -2577,7 +3062,7 @@ function Complete-ManualAppUpdatePrepare {
     $path=[string]$script:UpdateState.PrepareResultPath
     $failureCategory=''; $failureStage=''; $errorClass=''; $networkStatus=''
     try {
-        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { $failureCategory='runtime'; $failureStage='prepare-result'; throw 'Die Update-Vorbereitung hat kein Ergebnis geliefert.' }
+        if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { $failureCategory='runtime'; $failureStage='prepare-result'; throw (Get-LocalizedString -Key 'Update.PrepareNoResult') }
         $result=[System.IO.File]::ReadAllText($path,[System.Text.Encoding]::UTF8)|ConvertFrom-Json
         if (-not $result.Success) {
             $failureCategory=([string]$result.ErrorCategory).Trim().ToLowerInvariant()
@@ -2593,7 +3078,7 @@ function Complete-ManualAppUpdatePrepare {
     catch {
         [void](Set-UpdateRuntimeFailed -State $script:UpdateState -Message $_.Exception.Message)
         Write-RuntimeDiagnosticEvent -Event 'UPDATE_PACKAGE_PREPARED' -Stage $(if ($failureStage) { $failureStage } else { 'update-prepare' }) -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ errorCategory=$failureCategory; failureStage=$failureStage; errorClass=$errorClass; networkStatus=$networkStatus }) -Level error
-        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die App konnte nicht aktualisiert werden.' -Message $_.Exception.Message -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.PrepareFailedHeading') -Message $_.Exception.Message -Kind Error
         [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
     }
     finally {
@@ -2608,7 +3093,7 @@ function Start-ManualAppUpdate {
     $manifest=$script:UpdateState.AvailableManifest
     if (-not $manifest) { return }
     if (-not (Test-UpdateInstallDirectoryWritable)) {
-        Show-LenovoNoticeDialog -Title 'Update nicht möglich' -Heading 'Der App-Ordner ist nicht beschreibbar.' -Message 'Verschiebe Lenovo Boot Selector in einen Ordner, den dein Benutzerkonto ändern darf, und versuche es erneut.' -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.NotPossibleTitle') -Heading (Get-LocalizedString -Key 'Update.DirectoryNotWritableHeading') -Message (Get-LocalizedString -Key 'Update.DirectoryNotWritableMessage') -Kind Error
         return
     }
     [void](Set-UpdateRuntimePreparing -State $script:UpdateState)
@@ -2618,7 +3103,7 @@ function Start-ManualAppUpdate {
     $script:UpdateState.ManifestPath=$manifestPath; $script:UpdateState.PrepareResultPath=$resultPath
     try {
         $proc=Start-UpdatePrepareWorkerProcess -ManifestPath $manifestPath -ResultPath $resultPath -RuntimeSessionId $script:RuntimeSessionId
-        if (-not $proc) { throw 'Update-Vorbereitung konnte nicht gestartet werden.' }
+        if (-not $proc) { throw (Get-LocalizedString -Key 'Update.PrepareStartFailed') }
         $script:UpdateState.PrepareProcess=$proc
         $timer=New-Object System.Windows.Forms.Timer; $timer.Interval=200
         $timer.Add_Tick({
@@ -2629,13 +3114,13 @@ function Start-ManualAppUpdate {
             } catch { Complete-ManualAppUpdatePrepare }
         })
         $script:UpdateState.PrepareTimer=$timer; $timer.Start()
-        $script:LastStatusText=('Update auf v{0} wird vorbereitet…' -f $manifest.Version)
+        $script:LastStatusText = Get-LocalizedString -Key 'Update.PreparingStatus' -Values @{ Version=$manifest.Version }
         Write-RuntimeDiagnosticEvent -Event 'UPDATE_PREPARE_STARTED' -Stage 'update-prepare' -Success $true -Data (New-RuntimeDiagnosticData @{ version=$manifest.Version })
     }
     catch {
         Stop-UpdatePrepareUiWorker
         [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
-        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die App konnte nicht aktualisiert werden.' -Message $_.Exception.Message -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.FailureTitle') -Heading (Get-LocalizedString -Key 'Update.PrepareFailedHeading') -Message $_.Exception.Message -Kind Error
     }
     Update-UpdateMenuState
 }
@@ -2766,291 +3251,6 @@ function Set-AutostartFromUi([bool]$Enabled) {
 }
 
 
-# Lenovo Boot Selector - Functional Core: localization
-# Pure/deterministic functions only. No script state, WinForms, filesystem, registry,
-# network, process starts, Scheduled Tasks, or privileged broker access.
-
-function Get-SupportedLocaleIdsCore {
-    return @('en-US', 'de-DE')
-}
-
-function Resolve-LocaleIdCore {
-    param([string]$Locale)
-
-    $value = ([string]$Locale).Trim()
-    foreach ($supported in @(Get-SupportedLocaleIdsCore)) {
-        if ($value -and $value.Equals($supported, [System.StringComparison]::OrdinalIgnoreCase)) {
-            return $supported
-        }
-    }
-    return 'en-US'
-}
-
-function Get-LocalizationCatalogCore {
-    return [ordered]@{
-        'en-US' = [ordered]@{
-            'Common.OK' = 'OK'
-            'Common.Cancel' = 'Cancel'
-            'Common.Close' = 'Close'
-            'Common.TryAgain' = 'Please try again.'
-            'Settings.Language' = 'Language'
-            'Language.English' = 'English'
-            'Language.German' = 'Deutsch'
-            'Progress.StepOf' = 'Step {0} of {1}'
-            'Storage.InternalSsdModel' = 'Internal SSD: {Model}'
-            'Popup.HeaderUpdateAccessible' = 'Opens the dialog for the available app version.'
-            'Status.BootTargetsRefreshing' = 'Boot targets are being refreshed in the background…'
-            'Action.RefreshBootTargets' = 'Refresh boot targets'
-            'Popup.NextBootSection' = 'NEXT BOOT'
-            'Popup.Customize' = 'CUSTOMIZE'
-            'Status.ScrollPositionFailed' = 'The scroll position could not be updated.'
-            'Settings.Title' = 'SETTINGS'
-            'Settings.Autostart' = 'Start with Windows'
-            'Settings.DefaultTarget' = 'Default boot target'
-            'Settings.NoDefaultTarget' = 'No default target'
-            'Settings.DefaultTargetUnavailable' = 'Boot target unavailable'
-            'Status.Checking' = 'Checking …'
-            'Action.RestartWindows' = 'Restart Windows'
-            'Status.NextTargetDefaultOrder' = 'Next target: default order'
-            'Manage.Section' = 'ADJUST BOOT TARGETS'
-            'Manage.Title' = 'CHANGES'
-            'Manage.Hint' = 'Drag to sort · Click to show/hide'
-            'Manage.SubHint' = 'Pencil to rename · Leave empty = original name'
-            'Manage.Save' = 'Save changes'
-            'Manage.StatusEditing' = 'Customize boot targets · Drag to sort · Click to show/hide · Pencil for display name'
-            'Manage.StatusSaved' = 'Boot-target changes were saved.'
-            'Manage.StatusDiscarded' = 'Changes were discarded.'
-            'Autostart.Enabled' = 'Autostart is enabled.'
-            'Autostart.Disabled' = 'Autostart is disabled.'
-            'Autostart.ErrorHeading' = 'The setting could not be changed.'
-            'Default.SaveErrorHeading' = 'The default boot target could not be saved.'
-            'Default.SaveErrorMessage' = 'Please try again. If the problem persists, open Maintenance → Repair system functions.'
-            'Status.NewBootTargetDetected' = 'New boot target detected · Reinitialize system functions.'
-            'Status.BootTargetsChanged' = 'Boot targets changed · Reinitialize system functions.'
-            'Status.SystemFunctionsRepairRequired' = 'System functions need to be repaired.'
-            'Status.SystemFunctionsSetupRequired' = 'System functions need to be set up.'
-            'Header.Refreshing' = 'Updating boot targets…'
-            'Update.Available' = 'New app version available'
-            'Tray.Open' = 'Open Lenovo Boot Selector'
-            'Tray.Maintenance' = 'Maintenance'
-            'Maintenance.Setup' = 'Set up system functions…'
-            'Maintenance.Remove' = 'Remove system functions…'
-            'Update.Check' = 'Check for new version…'
-            'Update.Install' = 'Update app…'
-            'Diagnostics.Save' = 'Save diagnostics…'
-            'Boot.OtherTarget' = 'Other boot target'
-            'Boot.OtherTargetTooltip' = 'Gray: other boot target'
-            'Boot.MenuTitle' = 'Lenovo Boot Menu'
-            'Boot.MenuSubtitle' = 'Open the boot menu on the next startup'
-            'Boot.MenuTooltip' = 'Red: Lenovo Boot Menu'
-            'Boot.Nvme1Title' = 'NVMe SSD 1'
-            'Boot.Nvme2Title' = 'NVMe SSD 2'
-            'Boot.NoDrive' = 'No drive detected'
-            'Boot.InternalSsd' = 'Internal SSD'
-            'Boot.SecondInternalSsd' = 'Second internal SSD'
-            'Boot.InternalSsdTooltip' = 'Blue: internal SSD'
-            'Boot.UsbTooltip' = 'Yellow: USB drive'
-            'Boot.UsbChecking' = 'Checking USB drives …'
-            'Boot.UsbCheckFailed' = 'USB drives could not be checked'
-            'Boot.UsbBootMedium' = 'USB boot medium: {Model}'
-            'Boot.UsbMultipleBoot' = 'Multiple possible USB boot media detected'
-            'Boot.UsbNonBoot' = '{Model} detected · not detected as boot medium'
-            'Boot.UsbMultipleNoBoot' = 'USB drives detected · no boot medium found'
-            'Boot.UsbNone' = 'No USB drive connected'
-            'Boot.UsbFddTitle' = 'USB floppy drive'
-            'Boot.UsbFddSubtitle' = 'Boot from a USB floppy drive'
-            'Boot.UsbCdTitle' = 'USB CD/DVD drive'
-            'Boot.UsbCdSubtitle' = 'Boot from an optical USB drive'
-            'Boot.PxeTitle' = 'Network boot'
-            'Boot.PxeSubtitle' = 'Boot over the local network'
-            'Boot.PxeTooltip' = 'Purple: network boot'
-            'Boot.LenovoRecoveryTitle' = 'Lenovo recovery'
-            'Boot.LenovoRecoverySubtitle' = 'Recovery over the network'
-            'Boot.CyanTooltip' = 'Cyan: Lenovo or corporate network'
-            'Boot.CorporateTitle' = 'Corporate network boot'
-            'Boot.CorporateSubtitle' = 'Boot over the corporate network'
-            'Boot.OtherDriveTitle' = 'Other drive'
-            'Boot.OtherDriveSubtitle' = 'Other detected drive'
-            'Boot.OtherDriveTooltip' = 'Gray: other drive'
-            'Boot.OtherCdTitle' = 'Other CD/DVD drive'
-            'Boot.OtherCdSubtitle' = 'Other optical boot drive'
-            'Status.NextBootTarget' = 'Next boot: {Title}'
-            'Status.NextBootSet' = 'Next boot target was set.'
-            'Boot.ChangeErrorTitle' = 'Boot target could not be changed'
-            'Boot.ChangeErrorHeading' = 'The selection was not applied.'
-            'Boot.ChangeErrorMessage' = 'Please try again. If the problem persists, open Maintenance → Repair system functions.'
-            'Manage.OrderChanged' = 'Order changed · Save applies the change.'
-            'Manage.OriginalName' = 'Original name: {Name}'
-            'Boot.MenuManageSubtitle' = 'Selection menu for the next boot target'
-            'Manage.AliasRemoved' = 'Display name removed · Save applies the change.'
-            'Manage.AliasChanged' = 'Display name changed · Save applies the change.'
-            'Manage.AliasDiscarded' = 'Display-name change discarded.'
-            'Common.Apply' = 'Apply'
-            'Manage.OriginalNameHint' = 'Leave empty = original name'
-            'Manage.EditAliasAccessible' = 'Change display name'
-            'Manage.EditAliasStatus' = 'Edit display name · Enter applies · Esc discards · empty = original name'
-            'Tray.Exit' = 'Exit'
-        }
-        'de-DE' = [ordered]@{
-            'Common.OK' = 'OK'
-            'Common.Cancel' = 'Abbrechen'
-            'Common.Close' = 'Schließen'
-            'Common.TryAgain' = 'Bitte versuche es erneut.'
-            'Settings.Language' = 'Sprache'
-            'Language.English' = 'English'
-            'Language.German' = 'Deutsch'
-            'Progress.StepOf' = 'Schritt {0} von {1}'
-            'Storage.InternalSsdModel' = 'Interne SSD: {Model}'
-            'Popup.HeaderUpdateAccessible' = 'Öffnet den Dialog zur verfügbaren App-Version.'
-            'Status.BootTargetsRefreshing' = 'Startziele werden im Hintergrund aktualisiert…'
-            'Action.RefreshBootTargets' = 'Startziele aktualisieren'
-            'Popup.NextBootSection' = 'NÄCHSTER START'
-            'Popup.Customize' = 'ANPASSEN'
-            'Status.ScrollPositionFailed' = 'Scrollposition konnte nicht aktualisiert werden.'
-            'Settings.Title' = 'EINSTELLUNGEN'
-            'Settings.Autostart' = 'Mit Windows starten'
-            'Settings.DefaultTarget' = 'Standard-Startziel'
-            'Settings.NoDefaultTarget' = 'Kein Standardziel'
-            'Settings.DefaultTargetUnavailable' = 'Nicht verfügbares Startziel'
-            'Status.Checking' = 'Wird geprüft …'
-            'Action.RestartWindows' = 'Windows neu starten'
-            'Status.NextTargetDefaultOrder' = 'Nächstes Ziel: Standardreihenfolge'
-            'Manage.Section' = 'STARTZIELE ANPASSEN'
-            'Manage.Title' = 'ÄNDERUNGEN'
-            'Manage.Hint' = 'Ziehen zum Sortieren · Klicken zum Ein-/Ausblenden'
-            'Manage.SubHint' = 'Stift zum Umbenennen · Leer lassen = Originalname'
-            'Manage.Save' = 'Änderungen speichern'
-            'Manage.StatusEditing' = 'Startziele anpassen · Ziehen zum Sortieren · Klicken zum Ein-/Ausblenden · Stift für Anzeigename'
-            'Manage.StatusSaved' = 'Änderungen an den Startzielen wurden gespeichert.'
-            'Manage.StatusDiscarded' = 'Änderungen wurden verworfen.'
-            'Autostart.Enabled' = 'Autostart ist aktiviert.'
-            'Autostart.Disabled' = 'Autostart ist deaktiviert.'
-            'Autostart.ErrorHeading' = 'Die Einstellung konnte nicht geändert werden.'
-            'Default.SaveErrorHeading' = 'Das Standard-Startziel konnte nicht gespeichert werden.'
-            'Default.SaveErrorMessage' = 'Bitte versuche es erneut. Falls das Problem bestehen bleibt, öffne Wartung → Systemfunktionen reparieren.'
-            'Status.NewBootTargetDetected' = 'Neues Startziel erkannt · Systemfunktionen neu initialisieren.'
-            'Status.BootTargetsChanged' = 'Startziele geändert · Systemfunktionen neu initialisieren.'
-            'Status.SystemFunctionsRepairRequired' = 'Systemfunktionen müssen repariert werden.'
-            'Status.SystemFunctionsSetupRequired' = 'Systemfunktionen müssen eingerichtet werden.'
-            'Header.Refreshing' = 'Aktualisiere Bootziele…'
-            'Update.Available' = 'Neue App-Version verfügbar'
-            'Tray.Open' = 'Lenovo Boot Selector öffnen'
-            'Tray.Maintenance' = 'Wartung'
-            'Maintenance.Setup' = 'Systemfunktionen einrichten…'
-            'Maintenance.Remove' = 'Systemfunktionen entfernen…'
-            'Update.Check' = 'Auf neue Version prüfen…'
-            'Update.Install' = 'App aktualisieren…'
-            'Diagnostics.Save' = 'Diagnose speichern…'
-            'Boot.OtherTarget' = 'Weiteres Startziel'
-            'Boot.OtherTargetTooltip' = 'Grau: weiteres Startziel'
-            'Boot.MenuTitle' = 'Lenovo Boot-Menü'
-            'Boot.MenuSubtitle' = 'Beim nächsten Start das Boot-Menü öffnen'
-            'Boot.MenuTooltip' = 'Rot: Lenovo Boot-Menü'
-            'Boot.Nvme1Title' = 'NVMe-SSD 1'
-            'Boot.Nvme2Title' = 'NVMe-SSD 2'
-            'Boot.NoDrive' = 'Kein Laufwerk erkannt'
-            'Boot.InternalSsd' = 'Interne SSD'
-            'Boot.SecondInternalSsd' = 'Zweite interne SSD'
-            'Boot.InternalSsdTooltip' = 'Blau: interne SSD'
-            'Boot.UsbTooltip' = 'Gelb: USB-Laufwerk'
-            'Boot.UsbChecking' = 'USB-Laufwerke werden geprüft …'
-            'Boot.UsbCheckFailed' = 'USB-Laufwerke konnten nicht geprüft werden'
-            'Boot.UsbBootMedium' = 'USB-Startmedium: {Model}'
-            'Boot.UsbMultipleBoot' = 'Mehrere mögliche USB-Startmedien erkannt'
-            'Boot.UsbNonBoot' = '{Model} erkannt · nicht als Startmedium erkannt'
-            'Boot.UsbMultipleNoBoot' = 'USB-Laufwerke erkannt · kein Startmedium gefunden'
-            'Boot.UsbNone' = 'Kein USB-Laufwerk angeschlossen'
-            'Boot.UsbFddTitle' = 'USB-Diskettenlaufwerk'
-            'Boot.UsbFddSubtitle' = 'Start von einem USB-Floppy-Laufwerk'
-            'Boot.UsbCdTitle' = 'USB-CD/DVD-Laufwerk'
-            'Boot.UsbCdSubtitle' = 'Start von einem optischen USB-Laufwerk'
-            'Boot.PxeTitle' = 'Netzwerkstart'
-            'Boot.PxeSubtitle' = 'Start über das lokale Netzwerk'
-            'Boot.PxeTooltip' = 'Violett: Netzwerkstart'
-            'Boot.LenovoRecoveryTitle' = 'Lenovo Wiederherstellung'
-            'Boot.LenovoRecoverySubtitle' = 'Wiederherstellung über das Netzwerk'
-            'Boot.CyanTooltip' = 'Cyan: Lenovo- oder Firmen-Netzwerk'
-            'Boot.CorporateTitle' = 'Firmen-Netzwerkstart'
-            'Boot.CorporateSubtitle' = 'Start über das Firmennetzwerk'
-            'Boot.OtherDriveTitle' = 'Weiteres Laufwerk'
-            'Boot.OtherDriveSubtitle' = 'Weiteres erkanntes Laufwerk'
-            'Boot.OtherDriveTooltip' = 'Grau: weiteres Laufwerk'
-            'Boot.OtherCdTitle' = 'Weiteres CD/DVD-Laufwerk'
-            'Boot.OtherCdSubtitle' = 'Anderes optisches Startlaufwerk'
-            'Status.NextBootTarget' = 'Nächster Start: {Title}'
-            'Status.NextBootSet' = 'Nächstes Startziel wurde gesetzt.'
-            'Boot.ChangeErrorTitle' = 'Startziel konnte nicht geändert werden'
-            'Boot.ChangeErrorHeading' = 'Die Auswahl wurde nicht übernommen.'
-            'Boot.ChangeErrorMessage' = 'Bitte versuche es erneut. Falls das Problem bestehen bleibt, öffne Wartung → Systemfunktionen reparieren.'
-            'Manage.OrderChanged' = 'Reihenfolge geändert · Speichern übernimmt die Änderung.'
-            'Manage.OriginalName' = 'Originalname: {Name}'
-            'Boot.MenuManageSubtitle' = 'Auswahlmenü für das nächste Startziel'
-            'Manage.AliasRemoved' = 'Anzeigename entfernt · Speichern übernimmt die Änderung.'
-            'Manage.AliasChanged' = 'Anzeigename geändert · Speichern übernimmt die Änderung.'
-            'Manage.AliasDiscarded' = 'Änderung am Anzeigenamen verworfen.'
-            'Common.Apply' = 'Übernehmen'
-            'Manage.OriginalNameHint' = 'Leer lassen = Originalname'
-            'Manage.EditAliasAccessible' = 'Anzeigename ändern'
-            'Manage.EditAliasStatus' = 'Anzeigename bearbeiten · Enter übernimmt · Esc verwirft · leer = Originalname'
-            'Tray.Exit' = 'Beenden'
-        }
-    }
-}
-
-function Get-LocalizationKeySetCore {
-    param([string]$Locale = 'en-US')
-
-    $resolved = Resolve-LocaleIdCore -Locale $Locale
-    $catalogs = Get-LocalizationCatalogCore
-    return @($catalogs[$resolved].Keys | ForEach-Object { [string]$_ } | Sort-Object)
-}
-
-function Test-LocalizationCatalogParityCore {
-    $reference = @(Get-LocalizationKeySetCore -Locale 'en-US')
-    foreach ($locale in @(Get-SupportedLocaleIdsCore)) {
-        $keys = @(Get-LocalizationKeySetCore -Locale $locale)
-        if ($keys.Count -ne $reference.Count) { return $false }
-        for ($i = 0; $i -lt $reference.Count; $i++) {
-            if ($keys[$i] -ne $reference[$i]) { return $false }
-        }
-    }
-    return $true
-}
-
-function Get-LocalizedStringCore {
-    param(
-        [Parameter(Mandatory=$true)][string]$Key,
-        [string]$Locale = 'en-US',
-        [object[]]$Arguments,
-        [System.Collections.IDictionary]$Values
-    )
-
-    $resolved = Resolve-LocaleIdCore -Locale $Locale
-    $catalogs = Get-LocalizationCatalogCore
-    $active = $catalogs[$resolved]
-    $english = $catalogs['en-US']
-
-    if ($active.Contains($Key)) {
-        $text = [string]$active[$Key]
-    }
-    elseif ($english.Contains($Key)) {
-        $text = [string]$english[$Key]
-    }
-    else {
-        return $Key
-    }
-
-    if ($Values) {
-        foreach ($name in @($Values.Keys | ForEach-Object { [string]$_ } | Sort-Object)) {
-            $text = $text.Replace(('{' + $name + '}'), [string]$Values[$name])
-        }
-    }
-
-    if ($null -ne $Arguments -and @($Arguments).Count -gt 0) {
-        try { $text = $text -f @($Arguments) } catch { }
-    }
-    return $text
-}
 
 function Get-ActiveLocale {
     return (Resolve-LocaleIdCore -Locale $script:UiLocale)
@@ -3872,7 +4072,7 @@ function Show-LenovoNoticeDialog {
     }
 
     $ok = New-Object System.Windows.Forms.Button
-    $ok.Text = 'OK'
+    $ok.Text = Get-LocalizedString -Key 'Common.OK'
     $ok.Font = New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)
     $ok.ForeColor = [Drawing.Color]::White
     $ok.BackColor = $script:ColorAccent
@@ -3914,42 +4114,42 @@ function Show-LenovoSystemFunctionsDialog {
     $form.Controls.Add($root)
 
     if ($Mode -eq 'Remove') {
-        $titleText = 'Systemfunktionen entfernen'
-        $headingText = 'Systemfunktionen wirklich entfernen?'
-        $bodyText = "Danach kann Lenovo Boot Selector keine Startziele mehr ändern, bis die Einrichtung erneut durchgeführt wird.`r`n`r`nDas gespeicherte Standard-Startziel wird zurückgesetzt.`r`n`r`nErhalten bleiben deine vorhandenen Startziele, persönlichen App-Einstellungen und die Autostart-Einstellung."
-        $primaryText = 'Entfernen'
+        $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.RemoveTitle'
+        $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.RemoveHeading'
+        $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.RemoveBody'
+        $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Remove'
         $glyphText = '!'
         $glyphColor = $script:ColorWarning
     }
     elseif ($Mode -eq 'Repair') {
-        $titleText = 'Systemfunktionen reparieren'
-        $headingText = 'Die Systemfunktionen sind bereits eingerichtet.'
-        $bodyText = 'Möchtest du sie erneut einrichten und reparieren? Deine Startziele und persönlichen Einstellungen bleiben dabei erhalten.'
-        $primaryText = 'Reparieren'
+        $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.RepairTitle'
+        $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.RepairHeading'
+        $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.RepairBody'
+        $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Repair'
         $glyphText = 'i'
         $glyphColor = $script:ColorCyan
     }
     elseif ($Mode -eq 'Migrate') {
-        $titleText = 'Systemfunktionen reparieren'
-        $headingText = 'Die Einrichtung muss aktualisiert werden.'
-        $bodyText = 'Eine ältere oder unvollständige Einrichtung wurde gefunden. Repariere sie, damit Startziele wieder zuverlässig geändert werden können.'
-        $primaryText = 'Reparieren'
+        $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.RepairTitle'
+        $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.MigrateHeading'
+        $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.MigrateBody'
+        $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Repair'
         $glyphText = 'i'
         $glyphColor = $script:ColorCyan
     }
     elseif ($Mode -eq 'Reinitialize') {
-        $titleText = 'Systemfunktionen neu initialisieren'
-        $headingText = 'Neues Startziel erkannt'
-        $bodyText = 'Lenovo Boot Selector hat eine Änderung an den verfügbaren Startzielen erkannt. Initialisiere die Systemfunktionen neu, damit das neue Startziel sicher verwendet werden kann. Deine persönlichen Einstellungen bleiben erhalten.'
-        $primaryText = 'Neu initialisieren'
+        $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.ReinitializeTitle'
+        $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.ReinitializeHeading'
+        $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.ReinitializeBody'
+        $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Reinitialize'
         $glyphText = '+'
         $glyphColor = $script:ColorCyan
     }
     else {
-        $titleText = 'Systemfunktionen einrichten'
-        $headingText = 'Einmalige Einrichtung erforderlich'
-        $bodyText = 'Damit Lenovo Boot Selector Startziele ändern kann, ist einmalig eine Windows-Bestätigung erforderlich. Danach kannst du Startziele ohne weitere Bestätigung auswählen.'
-        $primaryText = 'Einrichten'
+        $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.SetupTitle'
+        $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.SetupHeading'
+        $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.SetupBody'
+        $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Setup'
         $glyphText = 'i'
         $glyphColor = $script:ColorCyan
     }
@@ -3973,7 +4173,7 @@ function Show-LenovoSystemFunctionsDialog {
 
     $buttonY = $height - 54
     $cancel = New-Object System.Windows.Forms.Button
-    $cancel.Text = 'Abbrechen'
+    $cancel.Text = Get-LocalizedString -Key 'Common.Cancel'
     $cancel.Font = New-Object Drawing.Font('Segoe UI',8.5,[Drawing.FontStyle]::Regular)
     $cancel.ForeColor = $script:ColorPrimary
     $cancel.BackColor = [Drawing.Color]::FromArgb(34,34,34)
@@ -4032,7 +4232,7 @@ function Show-LenovoRestartDialog {
     $root.BackColor = [Drawing.Color]::FromArgb(22, 22, 22)
     $form.Controls.Add($root)
 
-    $title = New-Label -Text 'Windows neu starten' -Font (New-Object Drawing.Font('Segoe UI', 10.2, [Drawing.FontStyle]::Bold)) `
+    $title = New-Label -Text (Get-LocalizedString -Key 'Restart.DialogTitle') -Font (New-Object Drawing.Font('Segoe UI', 10.2, [Drawing.FontStyle]::Bold)) `
         -ForeColor $script:ColorPrimary -X 18 -Y 12 -Width 330 -Height 24
     $root.Controls.Add($title)
 
@@ -4047,11 +4247,11 @@ function Show-LenovoRestartDialog {
     $glyph.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $root.Controls.Add($glyph)
 
-    $question = New-Label -Text 'Windows jetzt neu starten?' -Font (New-Object Drawing.Font('Segoe UI', 10.0, [Drawing.FontStyle]::Bold)) `
+    $question = New-Label -Text (Get-LocalizedString -Key 'Restart.Question') -Font (New-Object Drawing.Font('Segoe UI', 10.0, [Drawing.FontStyle]::Bold)) `
         -ForeColor $script:ColorPrimary -X 54 -Y 58 -Width 340 -Height 24
     $root.Controls.Add($question)
 
-    $targetCaption = New-Label -Text 'NÄCHSTES ZIEL' -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
+    $targetCaption = New-Label -Text (Get-LocalizedString -Key 'Restart.NextTarget') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 54 -Y 92 -Width 330 -Height 18
     $root.Controls.Add($targetCaption)
 
@@ -4061,7 +4261,7 @@ function Show-LenovoRestartDialog {
     $root.Controls.Add($target)
 
     $cancel = New-Object System.Windows.Forms.Button
-    $cancel.Text = 'Abbrechen'
+    $cancel.Text = Get-LocalizedString -Key 'Common.Cancel'
     $cancel.Font = New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Regular)
     $cancel.ForeColor = $script:ColorPrimary
     $cancel.BackColor = [Drawing.Color]::FromArgb(34,34,34)
@@ -4077,7 +4277,7 @@ function Show-LenovoRestartDialog {
     $root.Controls.Add($cancel)
 
     $restart = New-Object System.Windows.Forms.Button
-    $restart.Text = 'Neu starten'
+    $restart.Text = Get-LocalizedString -Key 'Restart.Action'
     $restart.Font = New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)
     $restart.ForeColor = [Drawing.Color]::White
     $restart.BackColor = $script:ColorAccent
@@ -4129,10 +4329,10 @@ function Get-SystemFunctionsPresentationState {
 
 function Get-MaintenanceBusyStatusText {
     $mode = Get-MaintenanceMode
-    if ($mode -eq 'Remove') { return 'Systemfunktionen werden entfernt…' }
-    if ($mode -eq 'Reinitialize') { return 'Systemfunktionen werden neu initialisiert…' }
-    if ($mode -eq 'Repair' -or $mode -eq 'Migrate') { return 'Systemfunktionen werden repariert…' }
-    return 'Systemfunktionen werden eingerichtet…'
+    if ($mode -eq 'Remove') { return (Get-LocalizedString -Key 'Maintenance.Busy.Remove') }
+    if ($mode -eq 'Reinitialize') { return (Get-LocalizedString -Key 'Maintenance.Busy.Reinitialize') }
+    if ($mode -eq 'Repair' -or $mode -eq 'Migrate') { return (Get-LocalizedString -Key 'Maintenance.Busy.Repair') }
+    return (Get-LocalizedString -Key 'Maintenance.Busy.Setup')
 }
 
 function New-MaintenanceStatePanel {
@@ -4143,7 +4343,7 @@ function New-MaintenanceStatePanel {
     $panel.BackColor = $script:ColorBackground
     $panel.Visible = $false
 
-    $caption = New-Label -Text 'SYSTEMFUNKTIONEN' -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
+    $caption = New-Label -Text (Get-LocalizedString -Key 'Maintenance.Caption') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 106 -Width 358 -Height 18
     $caption.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $panel.Controls.Add($caption)
@@ -4168,7 +4368,7 @@ function New-MaintenanceStatePanel {
 
     $action = New-Object System.Windows.Forms.Button
     $action.Name = 'MaintenancePrimaryButton'
-    $action.Text = 'Systemfunktionen einrichten'
+    $action.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHeading'
     $action.Font = New-Object Drawing.Font('Segoe UI', 8.7, [Drawing.FontStyle]::Bold)
     $action.ForeColor = [Drawing.Color]::White
     $action.BackColor = $script:ColorAccent
@@ -4222,48 +4422,48 @@ function Update-MaintenanceUi {
             if ($state -eq 'SetupRequired') {
                 $glyph.Text = '⚙'
                 $glyph.ForeColor = $script:ColorAccent
-                $heading.Text = 'Systemfunktionen einrichten'
-                $message.Text = 'Damit Lenovo Boot Selector Startziele ändern kann, ist einmalig eine Windows-Bestätigung erforderlich.'
-                $action.Text = 'Systemfunktionen einrichten'
+                $heading.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHeading'
+                $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupMessage'
+                $action.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHeading'
                 $action.Visible = $true
                 $action.Enabled = $true
-                $hint.Text = 'Danach kannst du Startziele ohne weitere Bestätigung auswählen.'
+                $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHint'
             }
             elseif ($state -eq 'RepairRequired') {
                 $glyph.Text = '!'
                 $glyph.ForeColor = $script:ColorWarning
-                $heading.Text = 'Systemfunktionen reparieren'
-                $message.Text = 'Die vorhandene Einrichtung ist unvollständig oder muss aktualisiert werden.'
-                $action.Text = 'Systemfunktionen reparieren'
+                $heading.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHeading'
+                $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairMessage'
+                $action.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHeading'
                 $action.Visible = $true
                 $action.Enabled = $true
-                $hint.Text = 'Deine persönlichen Einstellungen bleiben dabei erhalten.'
+                $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHint'
             }
             elseif ($state -eq 'ReinitializeRequired') {
                 $glyph.Text = '+'
                 $glyph.ForeColor = $script:ColorCyan
                 if (Test-BootTargetDriftHasNewTargets) {
-                    $heading.Text = 'Neues Startziel erkannt'
-                    $message.Text = 'Lenovo Boot Selector hat ein neues Startziel erkannt. Initialisiere die Systemfunktionen neu, damit es sicher verwendet werden kann.'
+                    $heading.Text = Get-LocalizedString -Key 'Maintenance.Panel.NewTargetHeading'
+                    $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.NewTargetMessage'
                 }
                 else {
-                    $heading.Text = 'Startziele wurden geändert'
-                    $message.Text = 'Die verfügbaren Startziele haben sich geändert. Initialisiere die Systemfunktionen neu, damit die Auswahl wieder vollständig passt.'
+                    $heading.Text = Get-LocalizedString -Key 'Maintenance.Panel.TargetsChangedHeading'
+                    $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.TargetsChangedMessage'
                 }
-                $action.Text = 'Systemfunktionen neu initialisieren'
+                $action.Text = Get-LocalizedString -Key 'Maintenance.Action.Reinitialize'
                 $action.Visible = $true
                 $action.Enabled = $true
-                $hint.Text = 'Deine persönlichen Einstellungen bleiben dabei erhalten.'
+                $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHint'
             }
             else {
                 $mode = Get-MaintenanceMode
                 $glyph.Text = '…'
                 $glyph.ForeColor = $script:ColorCyan
-                $heading.Text = if ($mode -eq 'Remove') { 'Systemfunktionen werden entfernt…' } elseif ($mode -eq 'Reinitialize') { 'Systemfunktionen werden neu initialisiert…' } elseif ($mode -eq 'Repair' -or $mode -eq 'Migrate') { 'Systemfunktionen werden repariert…' } else { 'Systemfunktionen werden eingerichtet…' }
-                $message.Text = if ($mode -eq 'Remove') { 'Die Systemfunktionen werden sicher entfernt. Bitte warte einen Moment.' } elseif ($mode -eq 'Reinitialize') { 'Windows richtet die Systemfunktionen für die geänderten Startziele neu ein. Bitte warte einen Moment.' } else { 'Windows richtet die benötigten Systemfunktionen ein. Bitte warte einen Moment.' }
+                $heading.Text = Get-MaintenanceBusyStatusText
+                $message.Text = if ($mode -eq 'Remove') { Get-LocalizedString -Key 'Maintenance.Panel.BusyRemoveMessage' } elseif ($mode -eq 'Reinitialize') { Get-LocalizedString -Key 'Maintenance.Panel.BusyReinitializeMessage' } else { Get-LocalizedString -Key 'Maintenance.Panel.BusySetupMessage' }
                 $action.Visible = $false
                 $action.Enabled = $false
-                $hint.Text = 'Die App wird nach Abschluss automatisch aktualisiert.'
+                $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.BusyHint'
             }
         }
     }
@@ -4284,14 +4484,14 @@ function Update-MaintenanceUi {
 function Show-MaintenanceSuccessDialog {
     param([Parameter(Mandatory=$true)][ValidateSet('Setup','Repair','Migrate','Reinitialize','Remove')][string]$Mode)
     if ($Mode -eq 'Remove') {
-        Show-LenovoNoticeDialog -Title 'Systemfunktionen entfernt' -Heading 'Systemfunktionen wurden entfernt.' -Message 'Startziele können wieder geändert werden, nachdem du die Systemfunktionen erneut eingerichtet hast.' -Kind Info
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Maintenance.SuccessRemovedTitle') -Heading (Get-LocalizedString -Key 'Maintenance.SuccessRemovedHeading') -Message (Get-LocalizedString -Key 'Maintenance.SuccessRemovedMessage') -Kind Info
         return
     }
     if ($Mode -eq 'Reinitialize') {
-        Show-LenovoNoticeDialog -Title 'Neu initialisiert' -Heading 'Systemfunktionen wurden neu initialisiert.' -Message 'Das erkannte Startziel kann jetzt sicher verwendet werden.' -Kind Info
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Maintenance.SuccessReinitializedTitle') -Heading (Get-LocalizedString -Key 'Maintenance.SuccessReinitializedHeading') -Message (Get-LocalizedString -Key 'Maintenance.SuccessReinitializedMessage') -Kind Info
         return
     }
-    Show-LenovoNoticeDialog -Title 'Systemfunktionen bereit' -Heading 'Systemfunktionen sind bereit.' -Message 'Lenovo Boot Selector kann jetzt Startziele ändern.' -Kind Info
+    Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Maintenance.SuccessReadyTitle') -Heading (Get-LocalizedString -Key 'Maintenance.SuccessReadyHeading') -Message (Get-LocalizedString -Key 'Maintenance.SuccessReadyMessage') -Kind Info
 }
 
 

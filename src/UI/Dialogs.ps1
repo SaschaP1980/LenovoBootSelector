@@ -72,7 +72,7 @@
     }
 
     $ok = New-Object System.Windows.Forms.Button
-    $ok.Text = 'OK'
+    $ok.Text = Get-LocalizedString -Key 'Common.OK'
     $ok.Font = New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)
     $ok.ForeColor = [Drawing.Color]::White
     $ok.BackColor = $script:ColorAccent
@@ -114,42 +114,42 @@ function Show-LenovoSystemFunctionsDialog {
     $form.Controls.Add($root)
 
     if ($Mode -eq 'Remove') {
-        $titleText = 'Systemfunktionen entfernen'
-        $headingText = 'Systemfunktionen wirklich entfernen?'
-        $bodyText = "Danach kann Lenovo Boot Selector keine Startziele mehr ändern, bis die Einrichtung erneut durchgeführt wird.`r`n`r`nDas gespeicherte Standard-Startziel wird zurückgesetzt.`r`n`r`nErhalten bleiben deine vorhandenen Startziele, persönlichen App-Einstellungen und die Autostart-Einstellung."
-        $primaryText = 'Entfernen'
+        $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.RemoveTitle'
+        $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.RemoveHeading'
+        $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.RemoveBody'
+        $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Remove'
         $glyphText = '!'
         $glyphColor = $script:ColorWarning
     }
     elseif ($Mode -eq 'Repair') {
-        $titleText = 'Systemfunktionen reparieren'
-        $headingText = 'Die Systemfunktionen sind bereits eingerichtet.'
-        $bodyText = 'Möchtest du sie erneut einrichten und reparieren? Deine Startziele und persönlichen Einstellungen bleiben dabei erhalten.'
-        $primaryText = 'Reparieren'
+        $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.RepairTitle'
+        $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.RepairHeading'
+        $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.RepairBody'
+        $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Repair'
         $glyphText = 'i'
         $glyphColor = $script:ColorCyan
     }
     elseif ($Mode -eq 'Migrate') {
-        $titleText = 'Systemfunktionen reparieren'
-        $headingText = 'Die Einrichtung muss aktualisiert werden.'
-        $bodyText = 'Eine ältere oder unvollständige Einrichtung wurde gefunden. Repariere sie, damit Startziele wieder zuverlässig geändert werden können.'
-        $primaryText = 'Reparieren'
+        $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.RepairTitle'
+        $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.MigrateHeading'
+        $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.MigrateBody'
+        $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Repair'
         $glyphText = 'i'
         $glyphColor = $script:ColorCyan
     }
     elseif ($Mode -eq 'Reinitialize') {
-        $titleText = 'Systemfunktionen neu initialisieren'
-        $headingText = 'Neues Startziel erkannt'
-        $bodyText = 'Lenovo Boot Selector hat eine Änderung an den verfügbaren Startzielen erkannt. Initialisiere die Systemfunktionen neu, damit das neue Startziel sicher verwendet werden kann. Deine persönlichen Einstellungen bleiben erhalten.'
-        $primaryText = 'Neu initialisieren'
+        $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.ReinitializeTitle'
+        $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.ReinitializeHeading'
+        $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.ReinitializeBody'
+        $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Reinitialize'
         $glyphText = '+'
         $glyphColor = $script:ColorCyan
     }
     else {
-        $titleText = 'Systemfunktionen einrichten'
-        $headingText = 'Einmalige Einrichtung erforderlich'
-        $bodyText = 'Damit Lenovo Boot Selector Startziele ändern kann, ist einmalig eine Windows-Bestätigung erforderlich. Danach kannst du Startziele ohne weitere Bestätigung auswählen.'
-        $primaryText = 'Einrichten'
+        $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.SetupTitle'
+        $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.SetupHeading'
+        $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.SetupBody'
+        $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Setup'
         $glyphText = 'i'
         $glyphColor = $script:ColorCyan
     }
@@ -173,7 +173,7 @@ function Show-LenovoSystemFunctionsDialog {
 
     $buttonY = $height - 54
     $cancel = New-Object System.Windows.Forms.Button
-    $cancel.Text = 'Abbrechen'
+    $cancel.Text = Get-LocalizedString -Key 'Common.Cancel'
     $cancel.Font = New-Object Drawing.Font('Segoe UI',8.5,[Drawing.FontStyle]::Regular)
     $cancel.ForeColor = $script:ColorPrimary
     $cancel.BackColor = [Drawing.Color]::FromArgb(34,34,34)
@@ -232,7 +232,7 @@ function Show-LenovoRestartDialog {
     $root.BackColor = [Drawing.Color]::FromArgb(22, 22, 22)
     $form.Controls.Add($root)
 
-    $title = New-Label -Text 'Windows neu starten' -Font (New-Object Drawing.Font('Segoe UI', 10.2, [Drawing.FontStyle]::Bold)) `
+    $title = New-Label -Text (Get-LocalizedString -Key 'Restart.DialogTitle') -Font (New-Object Drawing.Font('Segoe UI', 10.2, [Drawing.FontStyle]::Bold)) `
         -ForeColor $script:ColorPrimary -X 18 -Y 12 -Width 330 -Height 24
     $root.Controls.Add($title)
 
@@ -247,11 +247,11 @@ function Show-LenovoRestartDialog {
     $glyph.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $root.Controls.Add($glyph)
 
-    $question = New-Label -Text 'Windows jetzt neu starten?' -Font (New-Object Drawing.Font('Segoe UI', 10.0, [Drawing.FontStyle]::Bold)) `
+    $question = New-Label -Text (Get-LocalizedString -Key 'Restart.Question') -Font (New-Object Drawing.Font('Segoe UI', 10.0, [Drawing.FontStyle]::Bold)) `
         -ForeColor $script:ColorPrimary -X 54 -Y 58 -Width 340 -Height 24
     $root.Controls.Add($question)
 
-    $targetCaption = New-Label -Text 'NÄCHSTES ZIEL' -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
+    $targetCaption = New-Label -Text (Get-LocalizedString -Key 'Restart.NextTarget') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 54 -Y 92 -Width 330 -Height 18
     $root.Controls.Add($targetCaption)
 
@@ -261,7 +261,7 @@ function Show-LenovoRestartDialog {
     $root.Controls.Add($target)
 
     $cancel = New-Object System.Windows.Forms.Button
-    $cancel.Text = 'Abbrechen'
+    $cancel.Text = Get-LocalizedString -Key 'Common.Cancel'
     $cancel.Font = New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Regular)
     $cancel.ForeColor = $script:ColorPrimary
     $cancel.BackColor = [Drawing.Color]::FromArgb(34,34,34)
@@ -277,7 +277,7 @@ function Show-LenovoRestartDialog {
     $root.Controls.Add($cancel)
 
     $restart = New-Object System.Windows.Forms.Button
-    $restart.Text = 'Neu starten'
+    $restart.Text = Get-LocalizedString -Key 'Restart.Action'
     $restart.Font = New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)
     $restart.ForeColor = [Drawing.Color]::White
     $restart.BackColor = $script:ColorAccent

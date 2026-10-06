@@ -20,10 +20,10 @@ function Get-SystemFunctionsPresentationState {
 
 function Get-MaintenanceBusyStatusText {
     $mode = Get-MaintenanceMode
-    if ($mode -eq 'Remove') { return 'Systemfunktionen werden entfernt…' }
-    if ($mode -eq 'Reinitialize') { return 'Systemfunktionen werden neu initialisiert…' }
-    if ($mode -eq 'Repair' -or $mode -eq 'Migrate') { return 'Systemfunktionen werden repariert…' }
-    return 'Systemfunktionen werden eingerichtet…'
+    if ($mode -eq 'Remove') { return (Get-LocalizedString -Key 'Maintenance.Busy.Remove') }
+    if ($mode -eq 'Reinitialize') { return (Get-LocalizedString -Key 'Maintenance.Busy.Reinitialize') }
+    if ($mode -eq 'Repair' -or $mode -eq 'Migrate') { return (Get-LocalizedString -Key 'Maintenance.Busy.Repair') }
+    return (Get-LocalizedString -Key 'Maintenance.Busy.Setup')
 }
 
 function New-MaintenanceStatePanel {
@@ -34,7 +34,7 @@ function New-MaintenanceStatePanel {
     $panel.BackColor = $script:ColorBackground
     $panel.Visible = $false
 
-    $caption = New-Label -Text 'SYSTEMFUNKTIONEN' -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
+    $caption = New-Label -Text (Get-LocalizedString -Key 'Maintenance.Caption') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 106 -Width 358 -Height 18
     $caption.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $panel.Controls.Add($caption)
@@ -59,7 +59,7 @@ function New-MaintenanceStatePanel {
 
     $action = New-Object System.Windows.Forms.Button
     $action.Name = 'MaintenancePrimaryButton'
-    $action.Text = 'Systemfunktionen einrichten'
+    $action.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHeading'
     $action.Font = New-Object Drawing.Font('Segoe UI', 8.7, [Drawing.FontStyle]::Bold)
     $action.ForeColor = [Drawing.Color]::White
     $action.BackColor = $script:ColorAccent
@@ -113,48 +113,48 @@ function Update-MaintenanceUi {
             if ($state -eq 'SetupRequired') {
                 $glyph.Text = '⚙'
                 $glyph.ForeColor = $script:ColorAccent
-                $heading.Text = 'Systemfunktionen einrichten'
-                $message.Text = 'Damit Lenovo Boot Selector Startziele ändern kann, ist einmalig eine Windows-Bestätigung erforderlich.'
-                $action.Text = 'Systemfunktionen einrichten'
+                $heading.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHeading'
+                $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupMessage'
+                $action.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHeading'
                 $action.Visible = $true
                 $action.Enabled = $true
-                $hint.Text = 'Danach kannst du Startziele ohne weitere Bestätigung auswählen.'
+                $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHint'
             }
             elseif ($state -eq 'RepairRequired') {
                 $glyph.Text = '!'
                 $glyph.ForeColor = $script:ColorWarning
-                $heading.Text = 'Systemfunktionen reparieren'
-                $message.Text = 'Die vorhandene Einrichtung ist unvollständig oder muss aktualisiert werden.'
-                $action.Text = 'Systemfunktionen reparieren'
+                $heading.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHeading'
+                $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairMessage'
+                $action.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHeading'
                 $action.Visible = $true
                 $action.Enabled = $true
-                $hint.Text = 'Deine persönlichen Einstellungen bleiben dabei erhalten.'
+                $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHint'
             }
             elseif ($state -eq 'ReinitializeRequired') {
                 $glyph.Text = '+'
                 $glyph.ForeColor = $script:ColorCyan
                 if (Test-BootTargetDriftHasNewTargets) {
-                    $heading.Text = 'Neues Startziel erkannt'
-                    $message.Text = 'Lenovo Boot Selector hat ein neues Startziel erkannt. Initialisiere die Systemfunktionen neu, damit es sicher verwendet werden kann.'
+                    $heading.Text = Get-LocalizedString -Key 'Maintenance.Panel.NewTargetHeading'
+                    $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.NewTargetMessage'
                 }
                 else {
-                    $heading.Text = 'Startziele wurden geändert'
-                    $message.Text = 'Die verfügbaren Startziele haben sich geändert. Initialisiere die Systemfunktionen neu, damit die Auswahl wieder vollständig passt.'
+                    $heading.Text = Get-LocalizedString -Key 'Maintenance.Panel.TargetsChangedHeading'
+                    $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.TargetsChangedMessage'
                 }
-                $action.Text = 'Systemfunktionen neu initialisieren'
+                $action.Text = Get-LocalizedString -Key 'Maintenance.Action.Reinitialize'
                 $action.Visible = $true
                 $action.Enabled = $true
-                $hint.Text = 'Deine persönlichen Einstellungen bleiben dabei erhalten.'
+                $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHint'
             }
             else {
                 $mode = Get-MaintenanceMode
                 $glyph.Text = '…'
                 $glyph.ForeColor = $script:ColorCyan
-                $heading.Text = if ($mode -eq 'Remove') { 'Systemfunktionen werden entfernt…' } elseif ($mode -eq 'Reinitialize') { 'Systemfunktionen werden neu initialisiert…' } elseif ($mode -eq 'Repair' -or $mode -eq 'Migrate') { 'Systemfunktionen werden repariert…' } else { 'Systemfunktionen werden eingerichtet…' }
-                $message.Text = if ($mode -eq 'Remove') { 'Die Systemfunktionen werden sicher entfernt. Bitte warte einen Moment.' } elseif ($mode -eq 'Reinitialize') { 'Windows richtet die Systemfunktionen für die geänderten Startziele neu ein. Bitte warte einen Moment.' } else { 'Windows richtet die benötigten Systemfunktionen ein. Bitte warte einen Moment.' }
+                $heading.Text = Get-MaintenanceBusyStatusText
+                $message.Text = if ($mode -eq 'Remove') { Get-LocalizedString -Key 'Maintenance.Panel.BusyRemoveMessage' } elseif ($mode -eq 'Reinitialize') { Get-LocalizedString -Key 'Maintenance.Panel.BusyReinitializeMessage' } else { Get-LocalizedString -Key 'Maintenance.Panel.BusySetupMessage' }
                 $action.Visible = $false
                 $action.Enabled = $false
-                $hint.Text = 'Die App wird nach Abschluss automatisch aktualisiert.'
+                $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.BusyHint'
             }
         }
     }
@@ -175,12 +175,12 @@ function Update-MaintenanceUi {
 function Show-MaintenanceSuccessDialog {
     param([Parameter(Mandatory=$true)][ValidateSet('Setup','Repair','Migrate','Reinitialize','Remove')][string]$Mode)
     if ($Mode -eq 'Remove') {
-        Show-LenovoNoticeDialog -Title 'Systemfunktionen entfernt' -Heading 'Systemfunktionen wurden entfernt.' -Message 'Startziele können wieder geändert werden, nachdem du die Systemfunktionen erneut eingerichtet hast.' -Kind Info
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Maintenance.SuccessRemovedTitle') -Heading (Get-LocalizedString -Key 'Maintenance.SuccessRemovedHeading') -Message (Get-LocalizedString -Key 'Maintenance.SuccessRemovedMessage') -Kind Info
         return
     }
     if ($Mode -eq 'Reinitialize') {
-        Show-LenovoNoticeDialog -Title 'Neu initialisiert' -Heading 'Systemfunktionen wurden neu initialisiert.' -Message 'Das erkannte Startziel kann jetzt sicher verwendet werden.' -Kind Info
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Maintenance.SuccessReinitializedTitle') -Heading (Get-LocalizedString -Key 'Maintenance.SuccessReinitializedHeading') -Message (Get-LocalizedString -Key 'Maintenance.SuccessReinitializedMessage') -Kind Info
         return
     }
-    Show-LenovoNoticeDialog -Title 'Systemfunktionen bereit' -Heading 'Systemfunktionen sind bereit.' -Message 'Lenovo Boot Selector kann jetzt Startziele ändern.' -Kind Info
+    Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Maintenance.SuccessReadyTitle') -Heading (Get-LocalizedString -Key 'Maintenance.SuccessReadyHeading') -Message (Get-LocalizedString -Key 'Maintenance.SuccessReadyMessage') -Kind Info
 }
