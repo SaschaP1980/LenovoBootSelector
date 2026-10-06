@@ -2,6 +2,7 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 . (Join-Path $root 'src\Core\UpdateModel.ps1')
+. (Join-Path $root 'src\Application\UpdateRuntime.ps1')
 $checks = 0
 function Assert-True([string]$Name,[bool]$Value) { if (-not $Value) { throw "FAIL $Name" }; $script:checks++; Write-Host "PASS  $Name" }
 function Assert-Equal([string]$Name,$Expected,$Actual) { if ($Expected -ne $Actual) { throw "FAIL $Name expected=[$Expected] actual=[$Actual]" }; $script:checks++; Write-Host "PASS  $Name" }
@@ -15,6 +16,11 @@ Assert-Equal 'Hotfix compares newer than legacy patch' 1 (Compare-LenovoAppVersi
 Assert-Equal 'Higher hotfix compares newer' 1 (Compare-LenovoAppVersionCore -Current '0.5.7.1' -Candidate '0.5.7.2')
 Assert-True 'Four-part version parses' ($null -ne (ConvertTo-LenovoVersionCore -Version '0.5.8.0'))
 Assert-True 'Invalid version returns null' ($null -eq (ConvertTo-LenovoVersionCore -Version '0.5'))
+
+$runtime=New-UpdateRuntimeState
+Assert-True 'Startup update check starts unattempted' (-not $runtime.StartupCheckStarted)
+Assert-True 'Startup update check starts incomplete' (-not $runtime.StartupCheckCompleted)
+Assert-Equal 'Update check mode starts empty' '' $runtime.CheckMode
 $threw=$false; try { [void](Compare-LenovoAppVersionCore -Current '0.5.7' -Candidate 'dev') } catch { $threw=$true }; Assert-True 'Invalid compare throws' $threw
 
 $files=@('BUILD_INTEGRITY.txt','icon-preview.png','Install-LenovoBootMenuTasks.ps1','LenovoBootMenuTray.ico','LenovoBootMenuTray.ps1','README.md','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','Uninstall-LenovoBootMenuTasks.ps1')
@@ -71,5 +77,5 @@ $malformed=[pscustomobject]@{success='true';message='not a Boolean'}
 $rr=Resolve-LenovoUpdateRestartResultCore -Result $malformed -RunningVersion '0.5.8.1'
 Assert-Equal 'Non-Boolean legacy success is rejected' 'unknown' $rr.ResultFormat
 Assert-True 'Malformed legacy result fails closed' (-not $rr.Success)
-Write-Host "UPDATE TOTAL $checks/44"
-if ($checks -ne 44) { throw "Unexpected update test count $checks" }
+Write-Host "UPDATE TOTAL $checks/47"
+if ($checks -ne 47) { throw "Unexpected update test count $checks" }

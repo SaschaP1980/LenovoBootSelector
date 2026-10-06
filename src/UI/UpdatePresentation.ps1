@@ -31,7 +31,7 @@
 }
 
 function Update-UpdateMenuState {
-    # Manual update check only: there is intentionally no periodic or startup polling.
+    # One automatic read-only check is allowed per tray process. There is no periodic polling.
     if (-not $script:UpdateState) { return }
     $busy = Test-UpdateRuntimeBusy -State $script:UpdateState
     if ($script:UpdateCheckMenuItem) { $script:UpdateCheckMenuItem.Enabled = -not $busy }
@@ -46,9 +46,12 @@ function Stop-UpdateCheckUiWorker {
     if ($script:UpdateState.CheckProcess) { try { $script:UpdateState.CheckProcess.Dispose() } catch { }; $script:UpdateState.CheckProcess=$null }
 }
 
-function Complete-ManualUpdateCheck {
+function Complete-UpdateCheck {
+    param([Parameter(Mandatory=$true)][ValidateSet('Manual','Startup')][string]$Mode)
+
     Stop-UpdateCheckUiWorker
     $path=[string]$script:UpdateState.CheckResultPath
+    $isStartup = ($Mode -eq 'Startup')
     try {
         if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Die Update-Prüfung hat kein Ergebnis geliefert.' }
         $result=[System.IO.File]::ReadAllText($path,[System.Text.Encoding]::UTF8)|ConvertFrom-Json
@@ -58,35 +61,55 @@ function Complete-ManualUpdateCheck {
             if (-not $validated.IsValid) { throw $validated.Error }
             [void](Set-UpdateRuntimeAvailable -State $script:UpdateState -Manifest $validated)
             $script:LastStatusText = ('Neue Version verfügbar: v{0}' -f $validated.Version)
-            Show-LenovoNoticeDialog -Title 'Neue Version verfügbar' -Heading ('Lenovo Boot Selector v{0} ist verfügbar.' -f $validated.Version) -Message 'Du kannst die neue Version jetzt direkt installieren. Später findest du die Aktualisierung im Tray-Menü unter „Wartung“ → „App aktualisieren…“.' -Kind Info -SecondaryButtonText 'Jetzt aktualisieren' -SecondaryAction { Start-ManualAppUpdate }
-            Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_COMPLETED' -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$true; availableVersion=$validated.Version })
+            if (-not $isStartup) {
+                Show-LenovoNoticeDialog -Title 'Neue Version verfügbar' -Heading ('Lenovo Boot Selector v{0} ist verfügbar.' -f $validated.Version) -Message 'Du kannst die neue Version jetzt direkt installieren. Später findest du die Aktualisierung im Tray-Menü unter „Wartung“ → „App aktualisieren…“.' -Kind Info -SecondaryButtonText 'Jetzt aktualisieren' -SecondaryAction { Start-ManualAppUpdate }
+            }
+            Write-RuntimeDiagnosticEvent -Event $(if ($isStartup) { 'STARTUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$true; availableVersion=$validated.Version; mode=$Mode })
         }
         else {
             $script:UpdateState.AvailableManifest=$null
             [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
-            $script:LastStatusText = ('Lenovo Boot Selector ist aktuell · v{0}' -f $script:AppVersion)
-            Show-LenovoNoticeDialog -Title 'Keine neue Version' -Heading ('Lenovo Boot Selector v{0} ist aktuell.' -f $script:AppVersion) -Message 'Es ist derzeit keine neuere Version verfügbar.' -Kind Info
-            Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_COMPLETED' -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$false })
+            if (-not $isStartup) {
+                $script:LastStatusText = ('Lenovo Boot Selector ist aktuell · v{0}' -f $script:AppVersion)
+                Show-LenovoNoticeDialog -Title 'Keine neue Version' -Heading ('Lenovo Boot Selector v{0} ist aktuell.' -f $script:AppVersion) -Message 'Es ist derzeit keine neuere Version verfügbar.' -Kind Info
+            }
+            Write-RuntimeDiagnosticEvent -Event $(if ($isStartup) { 'STARTUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$false; mode=$Mode })
         }
     }
     catch {
         [void](Set-UpdateRuntimeFailed -State $script:UpdateState -Message $_.Exception.Message)
-        $script:LastStatusText='Update-Prüfung fehlgeschlagen.'
-        Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_COMPLETED' -Stage 'update-check' -Success $false -ErrorRecord $_ -Level warning
-        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die Prüfung auf eine neue Version ist fehlgeschlagen.' -Message $_.Exception.Message -Kind Error
+        if (-not $isStartup) {
+            $script:LastStatusText='Update-Prüfung fehlgeschlagen.'
+            Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die Prüfung auf eine neue Version ist fehlgeschlagen.' -Message $_.Exception.Message -Kind Error
+        }
+        Write-RuntimeDiagnosticEvent -Event $(if ($isStartup) { 'STARTUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode=$Mode }) -Level warning
     }
     finally {
         try { if ($path -and (Test-Path -LiteralPath $path)) { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue } } catch { }
         $script:UpdateState.CheckResultPath=$null
+        $script:UpdateState.CheckMode=''
+        if ($isStartup) { $script:UpdateState.StartupCheckCompleted=$true }
         if ($script:UpdateState.Status -eq 'Failed') { [void](Set-UpdateRuntimeIdle -State $script:UpdateState) }
         Update-UpdateMenuState
+        Update-HeaderRefreshStatus
         if ($script:Popup -and -not $script:Popup.IsDisposed) { Update-PopupRows }
     }
 }
 
-function Start-ManualUpdateCheck {
-    if (Test-MaintenanceBusy -or (Test-UpdateRuntimeBusy -State $script:UpdateState)) { return }
+function Complete-ManualUpdateCheck {
+    Complete-UpdateCheck -Mode 'Manual'
+}
+
+function Complete-StartupUpdateCheck {
+    Complete-UpdateCheck -Mode 'Startup'
+}
+
+function Start-UpdateCheckUiWorker {
+    param([Parameter(Mandatory=$true)][ValidateSet('Manual','Startup')][string]$Mode)
+
+    if (Test-UpdateRuntimeBusy -State $script:UpdateState) { return $false }
     [void](Set-UpdateRuntimeChecking -State $script:UpdateState)
+    $script:UpdateState.CheckMode=$Mode
     $resultPath=Join-Path ([System.IO.Path]::GetTempPath()) ('LenovoBootSelector-UpdateCheck-{0}.json' -f ([guid]::NewGuid().ToString('N')))
     $script:UpdateState.CheckResultPath=$resultPath
     try {
@@ -98,18 +121,56 @@ function Start-ManualUpdateCheck {
             try {
                 if (-not $script:UpdateState.CheckProcess) { return }
                 $script:UpdateState.CheckProcess.Refresh()
-                if ($script:UpdateState.CheckProcess.HasExited) { Complete-ManualUpdateCheck }
-            } catch { Complete-ManualUpdateCheck }
+                if ($script:UpdateState.CheckProcess.HasExited) {
+                    if ([string]$script:UpdateState.CheckMode -eq 'Startup') { Complete-StartupUpdateCheck }
+                    else { Complete-ManualUpdateCheck }
+                }
+            }
+            catch {
+                if ([string]$script:UpdateState.CheckMode -eq 'Startup') { Complete-StartupUpdateCheck }
+                else { Complete-ManualUpdateCheck }
+            }
         })
         $script:UpdateState.CheckTimer=$timer; $timer.Start()
-        $script:LastStatusText='Auf neue Version wird geprüft…'
-        Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_STARTED' -Stage 'update-check' -Success $true
+        return $true
     }
     catch {
         [void](Set-UpdateRuntimeFailed -State $script:UpdateState -Message $_.Exception.Message)
         Stop-UpdateCheckUiWorker
-        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die Prüfung konnte nicht gestartet werden.' -Message $_.Exception.Message -Kind Error
+        $script:UpdateState.CheckResultPath=$null
+        $script:UpdateState.CheckMode=''
         [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
+        throw
+    }
+}
+
+function Start-ManualUpdateCheck {
+    if (Test-MaintenanceBusy -or (Test-UpdateRuntimeBusy -State $script:UpdateState)) { return }
+    try {
+        if (-not (Start-UpdateCheckUiWorker -Mode 'Manual')) { return }
+        $script:LastStatusText='Auf neue Version wird geprüft…'
+        Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_STARTED' -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ mode='Manual' })
+    }
+    catch {
+        Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die Prüfung konnte nicht gestartet werden.' -Message $_.Exception.Message -Kind Error
+        Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_STARTED' -Stage 'update-check' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode='Manual' }) -Level warning
+    }
+    Update-UpdateMenuState
+}
+
+function Start-StartupUpdateCheck {
+    if (-not $script:UpdateState -or $script:UpdateState.StartupCheckStarted) { return }
+    $script:UpdateState.StartupCheckStarted=$true
+    try {
+        if (-not (Start-UpdateCheckUiWorker -Mode 'Startup')) {
+            $script:UpdateState.StartupCheckCompleted=$true
+            return
+        }
+        Write-RuntimeDiagnosticEvent -Event 'STARTUP_UPDATE_CHECK_STARTED' -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ mode='Startup' })
+    }
+    catch {
+        $script:UpdateState.StartupCheckCompleted=$true
+        Write-RuntimeDiagnosticEvent -Event 'STARTUP_UPDATE_CHECK_STARTED' -Stage 'update-check' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode='Startup' }) -Level warning
     }
     Update-UpdateMenuState
 }
