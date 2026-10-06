@@ -69,7 +69,7 @@ The TaskBroker boundary is hardened fail-closed: the runtime accepts only fixed 
 
 Historical migration and repair details for v0.6.4.0/v0.6.4.1 are retained in [CHANGELOG.md](CHANGELOG.md) rather than presented as current maintenance instructions.
 
-**Current development version:** v0.8.0.2  
+**Current development version:** v0.8.0.3  
 **Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads and revision history

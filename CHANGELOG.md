@@ -1,5 +1,13 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.8.0.3 – Work-Branch Hotfix path performance measurement
+
+- Pure version-only Hotfix used to benchmark the optimized Work-Branch exception path against the immediately preceding branchless v0.8.0.2 measurement.
+- Canonical version raised from `0.8.0.2` to `0.8.0.3`.
+- `releaseProfile` is `version-only`; product code under `src/**` is unchanged.
+- `protectedFragmentIntent` and `repositoryDeleteIntent` are empty.
+- The work branch is intentional only for this performance benchmark; normal small Patch/Hotfix releases remain branchless by default.
+
 ## v0.8.0.2 – Version-only Hotfix path performance measurement
 
 - Pure version-only Hotfix used to measure the streamlined branchless Patch/Hotfix development and release path.
