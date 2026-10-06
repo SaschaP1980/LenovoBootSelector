@@ -1,9 +1,75 @@
-﻿function Get-TaskBrokerMetadata {
-    if ($script:TaskBrokerMetadata) { return $script:TaskBrokerMetadata }
+﻿function Normalize-TaskBrokerGuid {
+    param([AllowNull()][string]$Guid)
+    if ([string]::IsNullOrWhiteSpace($Guid)) { return $null }
+    $candidate = $Guid.Trim().ToLowerInvariant()
+    if ($candidate -notmatch '^\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\}$') { return $null }
+    return $candidate
+}
+
+function Get-TaskBrokerExpectedTargetTaskName {
+    param(
+        [Parameter(Mandatory=$true)][string]$Guid,
+        [switch]$DefaultTarget
+    )
+    $normalized = Normalize-TaskBrokerGuid -Guid $Guid
+    if (-not $normalized) { return $null }
+    $compact = $normalized.Trim('{}').Replace('-','')
+    if ($DefaultTarget) { return ('LenovoBootMenu-Default-Set-' + $compact) }
+    return ('LenovoBootMenu-Set-' + $compact)
+}
+
+function Test-TaskBrokerMetadataContract {
+    param([Parameter(Mandatory=$true)]$Metadata)
+    try {
+        if ($script:SupportedTaskBrokerVersions -notcontains [string]$Metadata.version) { return $false }
+        if ([string]$Metadata.boundaryContract -ne 'fixed-task-v1') { return $false }
+        if ([string]$Metadata.managerRefreshTask -ne 'LenovoBootMenu-RefreshManager') { return $false }
+        if ([string]$Metadata.firmwareRefreshTask -ne 'LenovoBootMenu-RefreshFirmware') { return $false }
+        if ([string]$Metadata.defaultClearTask -ne 'LenovoBootMenu-Default-Clear') { return $false }
+        if ([string]$Metadata.defaultRestoreTask -ne 'LenovoBootMenu-Default-Restore') { return $false }
+
+        $expectedManagerFile = Join-Path $script:TaskBrokerStateDir 'fwbootmgr.txt'
+        $expectedFirmwareFile = Join-Path $script:TaskBrokerStateDir 'firmware.txt'
+        $expectedDefaultFile = Join-Path (Join-Path $script:TaskBrokerStateDir 'Default') 'default-guid.txt'
+        if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$Metadata.managerFile),[System.IO.Path]::GetFullPath($expectedManagerFile),[System.StringComparison]::OrdinalIgnoreCase)) { return $false }
+        if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$Metadata.firmwareFile),[System.IO.Path]::GetFullPath($expectedFirmwareFile),[System.StringComparison]::OrdinalIgnoreCase)) { return $false }
+        if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$Metadata.defaultFile),[System.IO.Path]::GetFullPath($expectedDefaultFile),[System.StringComparison]::OrdinalIgnoreCase)) { return $false }
+
+        $targets = @($Metadata.targets)
+        if ($targets.Count -lt 1) { return $false }
+        $seenGuids = @{}
+        $seenTaskNames = @{}
+        foreach ($target in $targets) {
+            $normalized = Normalize-TaskBrokerGuid -Guid ([string]$target.guid)
+            if (-not $normalized -or [string]$target.guid -ne $normalized) { return $false }
+            $expectedBoot = Get-TaskBrokerExpectedTargetTaskName -Guid $normalized
+            $expectedDefault = Get-TaskBrokerExpectedTargetTaskName -Guid $normalized -DefaultTarget
+            if ([string]$target.taskName -ne $expectedBoot) { return $false }
+            if ([string]$target.defaultTaskName -ne $expectedDefault) { return $false }
+            if ($seenGuids.ContainsKey($normalized)) { return $false }
+            $bootKey = $expectedBoot.ToLowerInvariant()
+            $defaultKey = $expectedDefault.ToLowerInvariant()
+            if ($seenTaskNames.ContainsKey($bootKey) -or $seenTaskNames.ContainsKey($defaultKey)) { return $false }
+            $seenGuids[$normalized] = $true
+            $seenTaskNames[$bootKey] = $true
+            $seenTaskNames[$defaultKey] = $true
+        }
+        return $true
+    }
+    catch { return $false }
+}
+
+
+function Get-TaskBrokerMetadata {
+    if ($script:TaskBrokerMetadata) {
+        if (Test-TaskBrokerMetadataContract -Metadata $script:TaskBrokerMetadata) { return $script:TaskBrokerMetadata }
+        $script:TaskBrokerMetadata = $null
+    }
     if (-not (Test-Path -LiteralPath $script:TaskBrokerMetadataPath)) { return $null }
     try {
         $text = [System.IO.File]::ReadAllText($script:TaskBrokerMetadataPath, [System.Text.Encoding]::UTF8)
         $meta = $text | ConvertFrom-Json
+        if (-not (Test-TaskBrokerMetadataContract -Metadata $meta)) { return $null }
         $script:TaskBrokerMetadata = $meta
         return $meta
     }
@@ -14,49 +80,93 @@ function Get-TaskBrokerTarget {
     param([Parameter(Mandatory=$true)][string]$Guid)
     $meta = Get-TaskBrokerMetadata
     if (-not $meta) { return $null }
-    $normalized = $Guid.ToLowerInvariant()
+    $normalized = Normalize-TaskBrokerGuid -Guid $Guid
+    if (-not $normalized) { return $null }
     foreach ($target in @($meta.targets)) {
-        if ([string]$target.guid -and ([string]$target.guid).ToLowerInvariant() -eq $normalized) {
-            return $target
-        }
+        if ([string]$target.guid -eq $normalized) { return $target }
     }
     return $null
 }
+function Resolve-TaskBrokerAuthorizedTaskName {
+    param(
+        [Parameter(Mandatory=$true)]
+        [ValidateSet('ManagerRefresh','FirmwareRefresh','BootNext','DefaultSet','DefaultClear')]
+        [string]$Operation,
+        [AllowNull()][string]$Guid
+    )
+
+    if (-not (Test-TaskBrokerMetadataCompatible)) {
+        throw 'Die TaskBroker-Metadaten erfüllen den festen Privilege-Boundary-Vertrag nicht.'
+    }
+
+    switch ($Operation) {
+        'ManagerRefresh' { return 'LenovoBootMenu-RefreshManager' }
+        'FirmwareRefresh' { return 'LenovoBootMenu-RefreshFirmware' }
+        'DefaultClear' { return 'LenovoBootMenu-Default-Clear' }
+        'BootNext' {
+            $normalized = Normalize-TaskBrokerGuid -Guid $Guid
+            if (-not $normalized) { throw 'Ungültiges BootNext-Ziel.' }
+            $target = Get-TaskBrokerTarget -Guid $normalized
+            if (-not $target) { throw 'Für dieses Firmware-Ziel ist keine vorab autorisierte Windows-Aufgabe vorhanden.' }
+            $expected = Get-TaskBrokerExpectedTargetTaskName -Guid $normalized
+            if ([string]$target.taskName -ne $expected) { throw 'BootNext-Aufgabenname verletzt den festen TaskBroker-Vertrag.' }
+            return $expected
+        }
+        'DefaultSet' {
+            $normalized = Normalize-TaskBrokerGuid -Guid $Guid
+            if (-not $normalized) { throw 'Ungültiges Standardziel.' }
+            $target = Get-TaskBrokerTarget -Guid $normalized
+            if (-not $target) { throw 'Für dieses Firmware-Ziel ist keine autorisierte Standardziel-Aufgabe vorhanden.' }
+            $expected = Get-TaskBrokerExpectedTargetTaskName -Guid $normalized -DefaultTarget
+            if ([string]$target.defaultTaskName -ne $expected) { throw 'Standardziel-Aufgabenname verletzt den festen TaskBroker-Vertrag.' }
+            return $expected
+        }
+    }
+    throw 'Nicht unterstützte TaskBroker-Operation.'
+}
+
 
 function Invoke-AuthorizedTask {
     param(
-        [Parameter(Mandatory=$true)][string]$TaskName,
+        [Parameter(Mandatory=$true)]
+        [ValidateSet('ManagerRefresh','FirmwareRefresh','BootNext','DefaultSet','DefaultClear')]
+        [string]$Operation,
+        [AllowNull()][string]$Guid,
         [int]$TimeoutMs = $script:TaskBrokerTimeoutMs
     )
 
     $started = [datetime]::Now
     $diagSw = [System.Diagnostics.Stopwatch]::StartNew()
+    $taskName = ''
+    $normalizedGuid = Normalize-TaskBrokerGuid -Guid $Guid
     try {
+        $taskName = Resolve-TaskBrokerAuthorizedTaskName -Operation $Operation -Guid $normalizedGuid
+
         # IMPORTANT: exact-task access is retained; root enumeration is deliberately avoided.
         try {
             $scheduleService = New-Object -ComObject 'Schedule.Service'
             $scheduleService.Connect()
             $taskFolder = $scheduleService.GetFolder('\')
-            $registeredTask = $taskFolder.GetTask("\$TaskName")
+            $registeredTask = $taskFolder.GetTask("\$taskName")
             if (-not $registeredTask) { throw 'Aufgabe nicht gefunden.' }
         }
         catch {
-            throw "Die autorisierte Windows-Aufgabe '$TaskName' ist für den aktuellen Benutzer nicht lesbar: $($_.Exception.Message)"
+            throw "Die autorisierte Windows-Aufgabe '$taskName' ist für den aktuellen Benutzer nicht lesbar: $($_.Exception.Message)"
         }
 
-        try { Start-ScheduledTask -TaskName $TaskName -ErrorAction Stop }
-        catch { throw "Die autorisierte Windows-Aufgabe '$TaskName' konnte nicht gestartet werden: $($_.Exception.Message)" }
+        try { Start-ScheduledTask -TaskName $taskName -ErrorAction Stop }
+        catch { throw "Die autorisierte Windows-Aufgabe '$taskName' konnte nicht gestartet werden: $($_.Exception.Message)" }
 
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
         do {
             Start-Sleep -Milliseconds 75
             try {
-                $info = Get-ScheduledTaskInfo -TaskName $TaskName -ErrorAction Stop
-                $registeredTask = $taskFolder.GetTask("\$TaskName")
+                $info = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction Stop
+                $registeredTask = $taskFolder.GetTask("\$taskName")
                 $state = [int]$registeredTask.State
             }
             catch {
-                throw "Der Status der autorisierten Windows-Aufgabe '$TaskName' konnte nicht gelesen werden: $($_.Exception.Message)"
+                throw "Der Status der autorisierten Windows-Aufgabe '$taskName' konnte nicht gelesen werden: $($_.Exception.Message)"
             }
 
             $recent = ($info.LastRunTime -ge $started.AddSeconds(-2))
@@ -66,23 +176,22 @@ function Invoke-AuthorizedTask {
 
             if ($recent -and $state -ne 4) {
                 if ($result -ne 0) {
-                    throw ("Die autorisierte Windows-Aufgabe '{0}' ist mit 0x{1:X8} ({2}) fehlgeschlagen." -f $TaskName,$result,$result)
+                    throw ("Die autorisierte Windows-Aufgabe '{0}' ist mit 0x{1:X8} ({2}) fehlgeschlagen." -f $taskName,$result,$result)
                 }
                 $diagSw.Stop()
-                Write-RuntimeDiagnosticEvent -Event 'AUTHORIZED_TASK' -Stage 'task' -Success $true -DurationMs $diagSw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{ taskName = $TaskName; lastTaskResult = [uint32]$result; state = $state })
+                Write-RuntimeDiagnosticEvent -Event 'AUTHORIZED_TASK' -Stage 'task' -Success $true -DurationMs $diagSw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{ operation = $Operation; taskName = $taskName; targetGuid = $normalizedGuid; lastTaskResult = [uint32]$result; state = $state })
                 return $info
             }
         } while ($sw.ElapsedMilliseconds -lt $TimeoutMs)
 
-        throw "Zeitüberschreitung beim Warten auf die autorisierte Windows-Aufgabe '$TaskName'."
+        throw "Zeitüberschreitung beim Warten auf die autorisierte Windows-Aufgabe '$taskName'."
     }
     catch {
         $diagSw.Stop()
-        Write-RuntimeDiagnosticEvent -Event 'AUTHORIZED_TASK' -Stage 'task' -Success $false -DurationMs $diagSw.ElapsedMilliseconds -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ taskName = $TaskName; timeoutMs = $TimeoutMs }) -Level error
+        Write-RuntimeDiagnosticEvent -Event 'AUTHORIZED_TASK' -Stage 'task' -Success $false -DurationMs $diagSw.ElapsedMilliseconds -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ operation = $Operation; taskName = $taskName; targetGuid = $normalizedGuid; timeoutMs = $TimeoutMs }) -Level error
         throw
     }
 }
-
 function Read-TaskBrokerTextFile {
     param([Parameter(Mandatory=$true)][string]$Path)
     if (-not (Test-Path -LiteralPath $Path)) {
@@ -102,7 +211,7 @@ function Refresh-ManagerCache {
 
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     try {
-        Invoke-AuthorizedTask -TaskName ([string]$meta.managerRefreshTask) | Out-Null
+        Invoke-AuthorizedTask -Operation 'ManagerRefresh' | Out-Null
         $script:ManagerCacheText = Read-TaskBrokerTextFile -Path ([string]$meta.managerFile)
         $script:ManagerCacheUtc = [datetime]::UtcNow
         $sw.Stop()
@@ -127,7 +236,7 @@ function Refresh-FirmwareCache {
 
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     try {
-        Invoke-AuthorizedTask -TaskName ([string]$meta.firmwareRefreshTask) | Out-Null
+        Invoke-AuthorizedTask -Operation 'FirmwareRefresh' | Out-Null
         $script:FirmwareCacheText = Read-TaskBrokerTextFile -Path ([string]$meta.firmwareFile)
         $script:FirmwareCacheUtc = [datetime]::UtcNow
         $sw.Stop()
@@ -141,24 +250,18 @@ function Refresh-FirmwareCache {
     }
 }
 
+
 function Test-TaskBrokerMetadataCompatible {
     try {
         $meta = Get-TaskBrokerMetadata
         if (-not $meta) { return $false }
-        if ($script:SupportedTaskBrokerVersions -notcontains [string]$meta.version) { return $false }
+        if (-not (Test-TaskBrokerMetadataContract -Metadata $meta)) { return $false }
         $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
         if ([string]$meta.userSid -ne $sid) { return $false }
-        if (-not [string]$meta.managerRefreshTask -or -not [string]$meta.firmwareRefreshTask -or
-            -not [string]$meta.managerFile -or -not [string]$meta.firmwareFile -or
-            -not [string]$meta.defaultFile -or -not [string]$meta.defaultClearTask -or -not [string]$meta.defaultRestoreTask) { return $false }
-        foreach ($target in @($meta.targets)) {
-            if (-not [string]$target.guid -or -not [string]$target.taskName -or -not [string]$target.defaultTaskName) { return $false }
-        }
         return $true
     }
     catch { return $false }
 }
-
 function Get-TaskBrokerInteractiveReady {
     if ($null -ne $script:TaskBrokerReadyCached) { return [bool]$script:TaskBrokerReadyCached }
     return (Test-TaskBrokerMetadataCompatible)
@@ -168,6 +271,7 @@ function Reset-TaskBrokerReadyCache {
     $script:TaskBrokerReadyCached = $null
     $script:TaskBrokerReadyCachedUtc = [datetime]::MinValue
 }
+
 
 function Test-TaskBrokerReady {
     param([switch]$Force)
@@ -183,19 +287,24 @@ function Test-TaskBrokerReady {
     $failedTask = $null
     try {
         $meta = Get-TaskBrokerMetadata
-        if (-not $meta) { throw 'TaskBroker-Metadaten fehlen.' }
-        if ($script:SupportedTaskBrokerVersions -notcontains [string]$meta.version) { throw 'Nicht unterstützte TaskBroker-Version.' }
+        if (-not $meta -or -not (Test-TaskBrokerMetadataContract -Metadata $meta)) { throw 'TaskBroker-Metadaten verletzen den festen Boundary-Vertrag.' }
         $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
         if ([string]$meta.userSid -ne $sid) { throw 'TaskBroker ist nicht für den aktuellen Benutzer autorisiert.' }
-        if (-not [string]$meta.defaultFile -or -not [string]$meta.defaultClearTask -or -not [string]$meta.defaultRestoreTask) { throw 'TaskBroker-Metadaten sind unvollständig.' }
 
-        $required = @([string]$meta.managerRefreshTask,[string]$meta.firmwareRefreshTask,[string]$meta.defaultClearTask,[string]$meta.defaultRestoreTask)
+        $required = @(
+            'LenovoBootMenu-RefreshManager',
+            'LenovoBootMenu-RefreshFirmware',
+            'LenovoBootMenu-Default-Clear',
+            'LenovoBootMenu-Default-Restore'
+        )
         foreach ($target in @($meta.targets)) {
-            if (-not [string]$target.guid -or -not [string]$target.taskName -or -not [string]$target.defaultTaskName) { throw 'TaskBroker-Zielmetadaten sind unvollständig.' }
-            $required += [string]$target.taskName
-            $required += [string]$target.defaultTaskName
+            $normalized = Normalize-TaskBrokerGuid -Guid ([string]$target.guid)
+            if (-not $normalized) { throw 'TaskBroker-Zielmetadaten enthalten eine ungültige GUID.' }
+            $required += Get-TaskBrokerExpectedTargetTaskName -Guid $normalized
+            $required += Get-TaskBrokerExpectedTargetTaskName -Guid $normalized -DefaultTarget
         }
-        $requiredCount = @($required).Count
+        $required = @($required | Select-Object -Unique)
+        $requiredCount = $required.Count
         foreach ($name in $required) {
             if (-not $name) { throw 'Taskname fehlt.' }
             $failedTask = $name
@@ -215,7 +324,6 @@ function Test-TaskBrokerReady {
     $script:TaskBrokerReadyCachedUtc = [datetime]::UtcNow
     return $ready
 }
-
 function Test-TaskBrokerInstallationPresent {
     if (Test-Path -LiteralPath $script:TaskBrokerMetadataPath) { return $true }
     return $false
@@ -296,34 +404,33 @@ function Get-TaskBrokerDefaultTargetGuid {
     return $null
 }
 
+
 function Set-TaskBrokerBootNextTarget {
     param([Parameter(Mandatory=$true)][string]$Guid)
 
-    $normalized = $Guid.ToLowerInvariant()
-    $target = Get-TaskBrokerTarget -Guid $normalized
-    if (-not $target -or -not [string]$target.taskName) {
+    $normalized = Normalize-TaskBrokerGuid -Guid $Guid
+    if (-not $normalized) { throw 'Ungültiges Firmware-Ziel.' }
+    if (-not (Get-TaskBrokerTarget -Guid $normalized)) {
         throw "Für dieses Firmware-Ziel ist keine vorab autorisierte Windows-Aufgabe vorhanden: $normalized"
     }
 
-    Invoke-AuthorizedTask -TaskName ([string]$target.taskName) | Out-Null
+    Invoke-AuthorizedTask -Operation 'BootNext' -Guid $normalized | Out-Null
     return (Get-TaskBrokerFirmwareManagerText -Force)
 }
 
 function Set-TaskBrokerDefaultTarget {
     param([Parameter(Mandatory=$true)][string]$Guid)
 
-    $normalized = $Guid.ToLowerInvariant()
-    $target = Get-TaskBrokerTarget -Guid $normalized
-    if (-not $target -or -not [string]$target.defaultTaskName) {
+    $normalized = Normalize-TaskBrokerGuid -Guid $Guid
+    if (-not $normalized) { throw 'Ungültiges Standardziel.' }
+    if (-not (Get-TaskBrokerTarget -Guid $normalized)) {
         throw 'Für dieses Firmwareziel existiert keine autorisierte Standardziel-Aufgabe.'
     }
 
-    Invoke-AuthorizedTask -TaskName ([string]$target.defaultTaskName) | Out-Null
+    Invoke-AuthorizedTask -Operation 'DefaultSet' -Guid $normalized | Out-Null
 }
 
 function Clear-TaskBrokerDefaultTarget {
-    $meta = Get-TaskBrokerMetadata
-    if (-not $meta) { throw 'TaskBroker-Metadaten fehlen.' }
-    if (-not [string]$meta.defaultClearTask) { throw 'Die autorisierte Aufgabe zum Deaktivieren des Standardziels fehlt.' }
-    Invoke-AuthorizedTask -TaskName ([string]$meta.defaultClearTask) | Out-Null
+    if (-not (Test-TaskBrokerMetadataCompatible)) { throw 'TaskBroker-Metadaten verletzen den festen Boundary-Vertrag.' }
+    Invoke-AuthorizedTask -Operation 'DefaultClear' | Out-Null
 }

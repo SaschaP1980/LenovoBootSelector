@@ -11,6 +11,7 @@ CORE_FILES=[
     'src/Core/UpdateModel.ps1',
 ]
 CHANGED_WRAPPERS={'Get-AppSettings','Save-AppSettings','Load-AppSettings','Get-FirmwareBootState','Get-FriendlyBootEntry','Update-PopupRows','Complete-BackgroundBootRefresh','Start-BackgroundBootRefresh','Export-RuntimeDiagnosticPackage','Show-OrTogglePopup','New-PopupForm'}
+INTENTIONALLY_CHANGED_FROZEN=CHANGED_WRAPPERS|{'Test-TaskBrokerReady','Invoke-AuthorizedTask'}
 REMOVED_FROZEN={'Set-BootSequence','Invoke-BcdEdit'}
 
 class Suite:
@@ -147,11 +148,11 @@ def main():
             s.check(f'Critical fragment present: {name}',frag is not None)
             if frag is None: continue
             actual=sha(frag.encode('utf-8'))
-            if name in CHANGED_WRAPPERS:
-                s.check(f'Intentional wrapper refactor changed frozen fragment: {name}',actual!=expected)
+            if name in INTENTIONALLY_CHANGED_FROZEN:
+                s.check(f'Intentional protected fragment changed: {name}',actual!=expected)
             else:
                 s.eq(f'Unrelated critical fragment unchanged: {name}',actual,expected)
-        for fn in ['Install-LenovoBootMenuTasks.ps1','LenovoBootMenuTray.ico','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','icon-preview.png']:
+        for fn in ['LenovoBootMenuTray.ico','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','icon-preview.png']:
             s.eq(f'Unrelated runtime asset byte-identical to v0.3.4: {fn}',sha_file(root/'bin'/fn),baseline['source_sha256'][fn])
         uninstall_bytes=(root/'bin/Uninstall-LenovoBootMenuTasks.ps1').read_bytes()
         normalized_uninstall=uninstall_bytes[3:] if uninstall_bytes.startswith(b'\xef\xbb\xbf') else uninstall_bytes
@@ -160,8 +161,13 @@ def main():
 
     # Security invariants remain in shell/installer, never in core.
     install=txt(root/'bin/Install-LenovoBootMenuTasks.ps1'); uninstall=txt(root/'bin/Uninstall-LenovoBootMenuTasks.ps1')
-    s.contains('TaskBroker schema unchanged',tray,"$script:SupportedTaskBrokerVersions = @('0.2.12')")
-    s.contains('Installer schema unchanged',install,"$version = '0.2.12'")
+    taskbroker=txt(root/'src/Infrastructure/TaskBroker.ps1')
+    runner=ps_function(taskbroker,'Invoke-AuthorizedTask') or ''
+    s.contains('LBS-6 TaskBroker schema is hardened v0.2.13',tray,"$script:SupportedTaskBrokerVersions = @('0.2.13')")
+    s.contains('LBS-6 installer schema is hardened v0.2.13',install,"$version = '0.2.13'")
+    s.contains('LBS-6 metadata boundary marker is emitted',install,"boundaryContract = 'fixed-task-v1'")
+    s.absent('LBS-6 runtime task runner has no free TaskName parameter',runner.lower(),'[string]$taskname')
+    s.contains('LBS-6 runtime task runner uses operation ValidateSet',runner,"[ValidateSet('ManagerRefresh','FirmwareRefresh','BootNext','DefaultSet','DefaultClear')]")
     s.eq('Elevation prompts still restricted to setup/remove',tray.count('-Verb RunAs'),2)
     s.contains('Explicit BootNext broker operation bundled',tray,'function Set-TaskBrokerBootNextTarget')
     s.absent('Historical Invoke-BcdEdit removed from runtime',tray,'Invoke-BcdEdit')
@@ -169,6 +175,9 @@ def main():
     s.absent('No custom SYSTEM EXE introduced',install,'LenovoBootMenuBroker.exe')
     s.contains('Cleanup exact allowlist retained',uninstall,'$exactTaskNames = @(')
     s.contains('Cleanup owned prefixes retained',uninstall,'$ownedPrefixes = @(')
+    s.check('LBS-6 canonical security boundary document exists',(root/'docs/SECURITY_BOUNDARY.md').is_file())
+    s.check('LBS-6 native boundary test exists',(root/'tests/Test-TaskBrokerBoundary.ps1').is_file())
+    s.contains('LBS-6 native boundary test is aggregated',txt(root/'tests/Test-WindowsPowerShell51.ps1'),'Test-TaskBrokerBoundary.ps1')
 
     update_test=txt(root/'tests/Test-UpdateCore.ps1')
     s.contains('LBS-5 update tests source transport module',update_test,"src\\Infrastructure\\UpdateTransport.ps1")

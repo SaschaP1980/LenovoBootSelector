@@ -258,6 +258,15 @@ Before implementing an Issue:
 - update/implement only the remaining valid contract;
 - do not resurrect a `wontfix` item without explicit user direction.
 
+Every open Issue should carry exactly one priority label from the repository's canonical priority taxonomy:
+
+- `priority: critical` — active severe defect or security/safety boundary violation requiring immediate attention; release-blocking when applicable.
+- `priority: high` — high-impact correctness/security/architecture risk that should be addressed ahead of normal enhancements, but is not an active critical failure.
+- `priority: medium` — meaningful product/release/process improvement with clear value but no immediate safety or availability impact.
+- `priority: low` — parked, evidence-dependent, cosmetic, explicitly non-urgent or currently `wontfix` work.
+
+Priority is independent of type/status labels such as `enhancement` or `wontfix`; preserve those labels. Reassess priority whenever an Issue's evidence, scope, risk or implementation status materially changes.
+
 After a successful release that completes an Issue, close it as `completed`.
 
 ## Connector-specific operating notes
