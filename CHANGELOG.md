@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.9.1 – LBS-20 release-cycle performance measurement
+
+- Pure version-only Hotfix used to measure the now-parallel Candidate Preflight with the mandatory GitHub-hosted Windows PowerShell 5.1 gate.
+- Canonical version raised from `0.6.9.0` to `0.6.9.1`.
+- `releaseProfile` remains `version-only`; product code under `src/**` and release infrastructure are unchanged.
+- The run is intended to measure Linux/Windows queue time, parallel candidate critical-path impact, Windows PowerShell 5.1 execution time, and total candidate-to-release duration.
+
 ## v0.6.9.0 – LBS-20 parallel Windows PowerShell 5.1 candidate gate
 
 - Candidate validation now runs the existing Linux exact-candidate preflight and a real GitHub-hosted Windows PowerShell 5.1 contract-suite gate in parallel on the same candidate SHA.
