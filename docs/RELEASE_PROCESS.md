@@ -41,4 +41,4 @@ Interactive release supervision waits at most 60 seconds for a GitHub-hosted run
 
 ## Repository/runtime layout
 
-Repository runtime/release source files live under `bin/`. The downloadable Release ZIP intentionally remains a flat 10-file package: packaging maps the `bin/` source files back to their established top-level archive names. Historical architecture/catch JSON organization remains owned by LBS-1.
+Repository runtime/release source files live under `bin/`. The downloadable Release ZIP intentionally remains a flat 10-file package: packaging maps the `bin/` source files back to their established top-level archive names. Architecture baselines live under `docs/architecture/`; catch audits live under `audits/`. The canonical generated files are `docs/architecture/ARCHITECTURE_BASELINE.json` and `audits/CATCH_AUDIT.json`; historical versioned snapshots remain alongside them.

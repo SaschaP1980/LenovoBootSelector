@@ -187,7 +187,7 @@ def main():
     s.eq('PowerShell source count is 39',len(list(root.rglob('*.ps1'))),39)
 
     # Catch audit and deterministic runtime.
-    audit=root/'CATCH_AUDIT_v0.5.2.json'; s.c('v0.5.2 catch audit exists',audit.is_file()); s.c('v0.5.1 catch audit removed',not (root/'CATCH_AUDIT_v0.5.1.json').exists())
+    audit=root/'audits/CATCH_AUDIT_v0.5.2.json'; s.c('v0.5.2 catch audit exists',audit.is_file()); s.c('v0.5.1 catch audit removed',not (root/'audits/CATCH_AUDIT_v0.5.1.json').exists())
     if audit.is_file():
         data=json.loads(audit.read_text(encoding='utf-8')); s.eq('Catch audit version',data.get('version'),'0.5.2'); s.eq('Catch audit count matches entries',data.get('count'),len(data.get('entries',[])))
     cp=subprocess.run([sys.executable,str(root/'tools/build_catch_audit.py'),'--root',str(root),'--check'],capture_output=True,text=True); s.eq('Catch audit deterministic',cp.returncode,0)
