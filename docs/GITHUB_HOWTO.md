@@ -96,28 +96,23 @@ For Python release tooling use no-bytecode mode:
 
 The exact source tag must contain neither ZIP files nor `__pycache__`/`.pyc` artifacts.
 
-## Runtime module closure — mandatory when adding a module
+## Runtime module closure — template is the single source of truth
 
 Lenovo Boot Selector is modular in source but published as a deterministic single-file PowerShell runtime.
 
-A new runtime module is not integrated merely because the template contains an include marker.
+From v0.6.5.0 onward, the ordered `# @include <path>` markers in `src/App/LenovoBootMenuTray.template.ps1` are the **only runtime-module registry**. `tools/build_runtime.py` discovers the include list directly from the template; there is no second static `INCLUDES` list to keep in sync.
 
-For every new module that becomes part of the runtime, verify **both**:
+For every new runtime module:
 
-1. `src/App/LenovoBootMenuTray.template.ps1` contains exactly one matching `# @include <path>`.
-2. `tools/build_runtime.py::INCLUDES` contains the same module exactly once and in the intended order.
+1. add exactly one `# @include <path>` marker at the intended position in the template;
+2. ensure the path is a relative `src/**/*.ps1` file and exists;
+3. run the runtime builder/preflight.
 
-Then run the runtime builder/preparation path and verify that no unresolved include marker remains.
+The builder fails on duplicate markers, unsafe/invalid paths, missing files, unresolved include markers or an unresolved version token.
 
 ### Why this rule exists
 
-The first v0.6.3.0 publication attempt (GitHub Actions run #17) failed before the permanent gates because `UpdateTransport.ps1` was added to the template but not to the static `INCLUDES` list in `tools/build_runtime.py`.
-
-The observed failure was:
-
-`RuntimeError: unresolved include marker remains`
-
-No PR, tag or release was created by that failed attempt. The same release branch was corrected and the next normal push produced successful run #18.
+The first v0.6.3.0 publication attempt (GitHub Actions run #17) failed because `UpdateTransport.ps1` existed in the template but was omitted from the former static `tools/build_runtime.py::INCLUDES` registry. v0.6.5.0 removes that double bookkeeping entirely.
 
 ## Pre-publication validation
 
@@ -139,17 +134,64 @@ GitHub owns the canonical `publishedUtc`; a local timestamp is never the publica
 
 If native Windows/PowerShell/WinForms tests have not actually been executed on Windows, never report them as passed. Static/source-contract coverage is not a substitute for a native pass.
 
+## Candidate-tree preflight before release branch creation
+
+From v0.6.5.0 onward, a product release enters GitHub through a temporary **`candidate/v<version>`** branch, not directly through `release/v<version>`.
+
+The exact candidate SHA is processed by `.github/workflows/candidate-preflight.yml`. The workflow:
+
+1. verifies the candidate branch/version pairing and current `main` ancestry;
+2. checks that the target release branch/tag do not already exist;
+3. materializes the immediately previous canonical source tag as the regression basis;
+4. runs `tools/candidate_preflight.py`;
+5. performs deterministic preparation and two byte-identical provisional builds;
+6. runs Release/Core/Boundary/Regression;
+7. validates protected-fragment intent and repository-delete intent;
+8. rejects any pre-publication modification of historical `downloads/*.zip`;
+9. writes commit status `preflight/candidate=success`;
+10. only then creates `release/v<version>` on **the identical SHA**;
+11. explicitly dispatches `release.yml` for that ref;
+12. deletes the temporary candidate branch.
+
+The explicit dispatch is required because GitHub deliberately prevents a normal push performed with `GITHUB_TOKEN` from recursively starting another workflow. `workflow_dispatch` is the supported handoff. If dispatch fails, Candidate Preflight overwrites its status to failure and deletes the just-created release branch again.
+
+The Release Orchestrator independently requires that exact SHA to carry a successful `preflight/candidate` status and that current `origin/main` is still its ancestor. A manually created or stale release branch therefore fails closed.
+
+If Candidate Preflight fails, **no release branch exists yet**. Keep the same `candidate/v<version>` branch, apply the minimal fast-forward correction, and let the normal push rerun the preflight. Do not create a parallel candidate or release branch.
+
+### Protected-fragment intent is release-specific
+
+`bin/version.json` carries `protectedFragmentIntent`, an explicit list of protected fragment keys intentionally changed by that version.
+
+The protection inventory still comes from the canonical characterization baseline, but change detection compares the prepared candidate with the **immediately previous canonical source tag**. The required invariant is exact set equality:
+
+`actual protected changes == protectedFragmentIntent`
+
+Undeclared protected changes fail. Stale/extra declarations fail. If no protected fragment changes, the list is empty.
+
+The former permanent `INTENTIONALLY_CHANGED_FROZEN` bypass is removed. A function that was intentionally changed in an earlier release is fully protected again in the next release.
+
+### Repository deletion intent
+
+`bin/version.json` also carries `repositoryDeleteIntent`. Candidate Preflight compares all repository deletions against this exact list and rejects undeclared or stale deletion intent. Historical release ZIPs may not be changed by the candidate at all.
+
+The GitHub Release Orchestrator remains the authoritative second backstop and reruns the server-side release gates; Candidate Preflight reduces avoidable publication attempts but never replaces final GitHub verification.
+
 ## Canonical publication model
 
 For a product build:
 
-`1 build = 1 release branch = 1 PR = 1 merge`
+`1 exact candidate SHA = 1 release branch = 1 PR = 1 merge`
 
-Use:
+Entry branch:
+
+`candidate/v<version>`
+
+Promoted publication branch, created automatically only after GREEN:
 
 `release/v<version>`
 
-Do not manually add the new historical release ZIP to the branch. The Release Orchestrator builds and adds it.
+The candidate branch is temporary and is deleted by the Candidate Preflight workflow after successful promotion. Do not manually create `release/v<version>` for a normal product release and do not manually add the new historical release ZIP. The Release Orchestrator builds and adds it.
 
 The persistent `.github/workflows/release.yml` is the publication authority. There is intentionally no version-specific workflow, no helper source branch, no Base64 patch transport, no separate PR workflow and no required post-merge finalizer.
 
@@ -245,10 +287,40 @@ Do not declare a release complete until all relevant items are verified:
 10. Previously published ZIPs are unchanged.
 11. The release branch has been deleted.
 12. Only after this should the corresponding implementation Issue be closed as `completed`.
+13. For Issue-backed work, add the final release/version/PR result to the Issue before closing it.
+14. If the release is a corrective Hotfix for a reopened Issue, close it only after the Hotfix itself is published and verified.
 
 ## GitHub Issues / backlog discipline
 
-GitHub Issues are the backlog.
+GitHub Issues are the backlog and the canonical implementation/audit trail for planned product work.
+
+### Issue requirement by version level
+
+The version level determines whether an Issue is mandatory **before implementation starts**:
+
+- **MAJOR:** at least one relevant GitHub Issue is mandatory before implementation.
+- **MINOR:** at least one relevant GitHub Issue is mandatory before implementation.
+- **PATCH:** at least one relevant GitHub Issue is mandatory before implementation.
+- **HOTFIX:** a pre-existing/new Issue is optional. A narrowly scoped defect may be fixed, built, tested and released directly when no Issue already covers it.
+
+A Major/Minor/Patch release must not be started as issue-less work and must not reach `release/v<version>` without a relevant Issue that existed before implementation. If several independent product changes are bundled, each substantive work item should be represented by an Issue rather than hidden only in a changelog/PR.
+
+The Hotfix exception exists to keep urgent, narrow corrections fast. Even when a Hotfix has no Issue, the root cause, scope, tests and release result must still be documented in the changelog/PR/release history.
+
+### Issue-backed implementation lifecycle — best practice
+
+When work is backed by an Issue, keep that Issue as the durable lifecycle record:
+
+1. Read/reconcile the Issue against current `main` before changing code.
+2. Keep/reopen the Issue while its implementation or a directly related corrective Hotfix is actively unresolved.
+3. Preserve the Issue's type/status labels and maintain exactly one current `priority:*` label.
+4. During implementation or corrective work, add concise comments for materially important findings such as confirmed root cause, changed scope, migration impact or the planned Hotfix version.
+5. Close the Issue as `completed` **only after** the implementing release is successfully published and post-release verification is complete.
+6. Before closing, add a final implementation/release comment that records at least the released version and relevant release PR; include important migration/testing notes when applicable.
+
+If a released implementation later proves defective and the defect is a **direct regression or incomplete fulfillment of that same Issue**, reopen the original Issue instead of silently fixing around it. Add a comment with the confirmed failure/root cause and Hotfix plan, reassess its priority for the active incident, and keep it open until the corrective release is published and verified. Then add the Hotfix release result and close it again as `completed`.
+
+Create a new Issue instead when the newly found problem is materially different in scope from the original Issue rather than a regression/incomplete implementation of it.
 
 Before implementing an Issue:
 
@@ -280,7 +352,9 @@ The currently available connector can create/read/move branch refs but does not 
 Consequences:
 
 - Do not create throwaway documentation/feature branches unless a workflow/merge path will delete them.
-- If a stale branch must be deleted and no delete action is available, report that limitation rather than pretending it was removed.
+- The v0.6.5.0 Candidate Preflight is an intentional exception: its temporary `candidate/**` branch is deleted server-side by the GitHub workflow after successful promotion, so it does not depend on a connector delete-ref action.
+- A branch push made by a GitHub Actions job with `GITHUB_TOKEN` does not normally trigger another workflow. Cross-workflow promotion therefore uses explicit `workflow_dispatch`; do not rely on recursive push triggering.
+- If another stale branch must be deleted and no workflow owns its cleanup, report the connector limitation rather than pretending it was removed.
 - A stale branch must never be reused merely to avoid creating a new branch.
 
 ### Atomic Git-object preparation

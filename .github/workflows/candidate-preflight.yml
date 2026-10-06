@@ -1,0 +1,87 @@
+name: Candidate Preflight
+
+on:
+  push:
+    branches:
+      - 'candidate/**'
+
+concurrency:
+  group: candidate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: write
+  contents: write
+  statuses: write
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Preflight exact candidate and promote release ref
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          VERSION=$(python3 -c "import json; print(json.load(open('bin/version.json',encoding='utf-8'))['version'])")
+          EXPECTED_CANDIDATE="candidate/v$VERSION"
+          EXPECTED_RELEASE="release/v$VERSION"
+          test "$GITHUB_REF_NAME" = "$EXPECTED_CANDIDATE"
+
+          status_preflight() {
+            gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+              -f state="$1" -f context='preflight/candidate' -f description="$2" >/dev/null
+          }
+
+          status_preflight pending 'Exact candidate preflight is running'
+          git fetch origin main --tags --force
+
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            status_preflight failure "Tag v$VERSION already exists"
+            echo "Tag v$VERSION already exists." >&2
+            exit 1
+          fi
+          if git ls-remote --exit-code --heads origin "$EXPECTED_RELEASE" >/dev/null 2>&1; then
+            status_preflight failure "Release branch already exists"
+            echo "Release branch $EXPECTED_RELEASE already exists." >&2
+            exit 1
+          fi
+
+          PREVIOUS_VERSION=$(git show origin/main:bin/version.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+          rm -rf /tmp/lbs-candidate-basis
+          git worktree add --detach /tmp/lbs-candidate-basis "v$PREVIOUS_VERSION^{commit}"
+
+          set +e
+          python3 -B tools/candidate_preflight.py \
+            --root . \
+            --basis-root /tmp/lbs-candidate-basis \
+            --main-ref origin/main \
+            --published-utc '2000-01-01T00:00:00Z'
+          PREFLIGHT_RC=$?
+          set -e
+
+          if [ "$PREFLIGHT_RC" -ne 0 ]; then
+            status_preflight failure 'Exact candidate preflight failed'
+            exit "$PREFLIGHT_RC"
+          fi
+
+          status_preflight success 'Exact candidate preflight passed'
+          git push origin "$GITHUB_SHA:refs/heads/$EXPECTED_RELEASE"
+
+          # A push made with GITHUB_TOKEN does not recursively trigger another workflow.
+          # workflow_dispatch is the explicit, supported handoff to the Release Orchestrator.
+          if ! gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/release.yml/dispatches" \
+            -f ref="$EXPECTED_RELEASE"; then
+            status_preflight failure 'Release workflow dispatch failed'
+            git push origin --delete "$EXPECTED_RELEASE" || true
+            exit 1
+          fi
+
+          git push origin --delete "$GITHUB_REF_NAME"

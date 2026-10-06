@@ -10,8 +10,6 @@ CORE_FILES=[
     'src/Core/BootTargetModel.ps1',
     'src/Core/UpdateModel.ps1',
 ]
-CHANGED_WRAPPERS={'Get-AppSettings','Save-AppSettings','Load-AppSettings','Get-FirmwareBootState','Get-FriendlyBootEntry','Update-PopupRows','Complete-BackgroundBootRefresh','Start-BackgroundBootRefresh','Export-RuntimeDiagnosticPackage','Show-OrTogglePopup','New-PopupForm'}
-INTENTIONALLY_CHANGED_FROZEN=CHANGED_WRAPPERS|{'Test-TaskBrokerReady','Invoke-AuthorizedTask'}
 REMOVED_FROZEN={'Set-BootSequence','Invoke-BcdEdit'}
 
 class Suite:
@@ -65,7 +63,11 @@ def balanced_fragment(source,marker):
     return None
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); args=ap.parse_args(); root=args.root
+    ap=argparse.ArgumentParser()
+    ap.add_argument('--root',type=Path,default=ROOT_DEFAULT)
+    ap.add_argument('--basis-root',type=Path)
+    args=ap.parse_args()
+    root=args.root
     s=Suite()
     tray_path=root/'bin/LenovoBootMenuTray.ps1'; template_path=root/'src/App/LenovoBootMenuTray.template.ps1'; builder=root/'tools/build_runtime.py'
     s.check('Generated runtime exists',tray_path.is_file())
@@ -134,24 +136,31 @@ def main():
         s.eq('Runtime builder --check succeeds',cp.returncode,0)
         s.contains('Runtime builder confirms exact match',cp.stdout,'matches modular source')
 
-    # Preserve all frozen native/security fragments except the three deliberately refactored wrappers.
+    # The historical baseline defines the protected-fragment inventory only.
+    # Release intent is checked against the immediately previous canonical source basis.
     base_path=root/'tests/characterization-baseline-v0.3.4.json'
     s.check('v0.3.4 characterization baseline retained',base_path.is_file())
+    release_meta=json.loads((root/'bin/version.json').read_text(encoding='utf-8'))
+    declared_protected=sorted(release_meta.get('protectedFragmentIntent',[]))
     if base_path.is_file():
         baseline=json.loads(base_path.read_text(encoding='utf-8'))
-        for key,expected in baseline['critical_fragment_sha256'].items():
+        for key in baseline['critical_fragment_sha256']:
             kind,name=key.split(':',1)
             frag=ps_function(tray,name) if kind=='ps' else balanced_fragment(tray,name)
             if name in REMOVED_FROZEN:
-                s.check(f'Historical frozen fragment intentionally removed: {name}',frag is None)
+                s.check(f'Historical protected fragment intentionally removed: {name}',frag is None)
                 continue
-            s.check(f'Critical fragment present: {name}',frag is not None)
-            if frag is None: continue
-            actual=sha(frag.encode('utf-8'))
-            if name in INTENTIONALLY_CHANGED_FROZEN:
-                s.check(f'Intentional protected fragment changed: {name}',actual!=expected)
-            else:
-                s.eq(f'Unrelated critical fragment unchanged: {name}',actual,expected)
+            s.check(f'Protected fragment present: {name}',frag is not None)
+
+        if args.basis_root:
+            tools_path=str(root/'tools')
+            if tools_path not in sys.path: sys.path.insert(0,tools_path)
+            from protected_fragments import changed_protected_fragments
+            actual_protected=changed_protected_fragments(root,args.basis_root.resolve())
+            s.eq('Per-release protected fragment intent exactly matches candidate delta',actual_protected,declared_protected)
+        else:
+            s.check('Protected fragment intent is empty when no basis root is supplied',not declared_protected,declared_protected)
+
         for fn in ['LenovoBootMenuTray.ico','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','icon-preview.png']:
             s.eq(f'Unrelated runtime asset byte-identical to v0.3.4: {fn}',sha_file(root/'bin'/fn),baseline['source_sha256'][fn])
         uninstall_bytes=(root/'bin/Uninstall-LenovoBootMenuTasks.ps1').read_bytes()
