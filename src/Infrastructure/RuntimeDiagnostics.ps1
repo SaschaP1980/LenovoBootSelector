@@ -38,8 +38,9 @@ function New-RuntimeDiagnosticData {
 
 function Initialize-RuntimeDiagnostics {
     try {
-        $candidate = ([string]$RuntimeSessionId).Trim()
+        $candidate = ([string]$script:InheritedRuntimeSessionId).Trim()
         if ($candidate) { $candidate = ($candidate -replace '[^A-Za-z0-9-]', '') }
+        $hasParentSession = [bool]$candidate
         if (-not $candidate) { $candidate = [guid]::NewGuid().ToString('D') }
 
         $script:RuntimeSessionId = $candidate
@@ -65,7 +66,7 @@ function Initialize-RuntimeDiagnostics {
 
         Write-RuntimeDiagnosticEvent -Event $(if ($BackgroundRefresh) { 'BACKGROUND_WORKER_STARTED' } elseif ($UpdateCheck) { 'UPDATE_CHECK_WORKER_STARTED' } elseif ($UpdatePrepare) { 'UPDATE_PREPARE_WORKER_STARTED' } else { 'SESSION_STARTED' }) -Stage 'startup' -Success $true -Data (New-RuntimeDiagnosticData @{
             role = (Get-RuntimeDiagnosticRole)
-            parentSession = [bool]([string]$RuntimeSessionId)
+            parentSession = $hasParentSession
         })
     }
     catch {
