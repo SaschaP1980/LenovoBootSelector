@@ -1,5 +1,13 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.7.0.1 – Version-only Hotfix for popup-open update-check acceptance
+
+- Pure version-only Hotfix used to provide a newer release target for native acceptance of the v0.7.0.0 popup-open automatic update-check behavior.
+- Canonical version raised from `0.7.0.0` to `0.7.0.1`.
+- `releaseProfile` is `version-only`; product code under `src/**` is unchanged.
+- `protectedFragmentIntent` and `repositoryDeleteIntent` are empty because this Hotfix intentionally changes no protected product fragment and deletes no repository path.
+- The release cycle is also used to measure current Candidate Preflight, Windows PowerShell 5.1, promotion, Release Orchestrator, and total candidate-to-release performance without mixing in a functional code change.
+
 ## v0.7.0.0 – LBS-21 popup-open automatic update checks
 
 - Automatic read-only app-version discovery moves from tray-process startup to each actual popup-open transition.

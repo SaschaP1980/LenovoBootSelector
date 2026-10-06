@@ -1,9 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "0.7.0.0",
-  "releaseProfile": "patch",
-  "protectedFragmentIntent": [
-    "ps:Show-OrTogglePopup"
-  ],
+  "version": "0.7.0.1",
+  "releaseProfile": "version-only",
+  "protectedFragmentIntent": [],
   "repositoryDeleteIntent": []
 }
