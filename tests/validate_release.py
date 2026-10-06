@@ -61,6 +61,23 @@ def main():
     historical_categories={x.name.split('-v',1)[0] for x in historical_validators}
     s.eq('LBS-13 all historical test categories retained',historical_categories,{'release','core','boundary','regression'})
     s.eq('LBS-13 historical validator count retained',len(historical_validators),74)
+    # Native harness count contracts: protect against silent assertion-count drift.
+    update_test=txt(root/'tests/Test-UpdateCore.ps1')
+    update_assertion_calls=0
+    for line in update_test.splitlines():
+        if re.match(r'\s*function\s+Assert-(?:True|Equal)\b',line,re.I):
+            continue
+        update_assertion_calls += len(re.findall(r'(?:^|;\s*)Assert-(?:True|Equal)\b',line))
+    s.eq('Update native test has exact 62 assertion call sites',update_assertion_calls,62)
+    s.has('Update native test self-audits source via PowerShell AST',update_test,'[System.Management.Automation.Language.Parser]::ParseFile')
+    s.has('Update native test derives command names from AST',update_test,'$node.GetCommandName()')
+    s.has('Update native test compares executed and source assertion counts',update_test,'if ($checks -ne $sourceAssertionCount)')
+    s.has('Update native test keeps explicit source coverage guard 62',update_test,'if ($sourceAssertionCount -ne 62) { throw "Unexpected update assertion source count $sourceAssertionCount" }')
+    s.has('Update native test keeps explicit runtime coverage output 62',update_test,'Write-Host "UPDATE TOTAL $checks/62"')
+    s.has('Update native test keeps explicit runtime coverage guard 62',update_test,'if ($checks -ne 62) { throw "Unexpected update test count $checks" }')
+    mutex_test=txt(root/'tests/Test-SingleInstanceMutex.ps1')
+    s.has('Mutex native test keeps explicit total output',mutex_test,'Write-Host "MUTEX TOTAL $checks/4"')
+    s.has('Mutex native test fails closed on count drift',mutex_test,'if ($checks -ne 4) { throw "Unexpected mutex test count $checks" }')
     tray=txt(root/'bin/LenovoBootMenuTray.ps1') if (root/'bin/LenovoBootMenuTray.ps1').is_file() else ''
     template=txt(root/'src/App/LenovoBootMenuTray.template.ps1')
     expected=f"$script:AppVersion = '{version}'"
