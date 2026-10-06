@@ -5,7 +5,7 @@ import argparse,json,re,sys
 from release_common import load_version
 
 ROOT_DEFAULT=Path(__file__).resolve().parents[1]
-OUTPUT_NAME='CATCH_AUDIT.json'
+OUTPUT_REL=Path('audits/CATCH_AUDIT.json')
 ALLOWED={'cleanup_best_effort','presentation_best_effort','telemetry_best_effort','optional_probe_best_effort','cache_metadata_best_effort','legacy_cleanup_best_effort','self_repair_best_effort','migration_persistence_best_effort','migration_autostart_best_effort','lifecycle_race_best_effort'}
 
 def classify(rel:str,line:str)->tuple[str,str]:
@@ -32,10 +32,10 @@ def collect(root:Path)->dict:
     return {'version':load_version(root),'scope':'Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.','policy':'Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.','allowed_categories':sorted(ALLOWED),'count':len(entries),'entries':entries}
 
 def main()->int:
-    ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); ap.add_argument('--check',action='store_true'); args=ap.parse_args(); root=args.root.resolve(); path=root/OUTPUT_NAME
+    ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); ap.add_argument('--check',action='store_true'); args=ap.parse_args(); root=args.root.resolve(); path=root/OUTPUT_REL
     data=collect(root); rendered=(json.dumps(data,ensure_ascii=False,indent=2,sort_keys=False)+'\n').encode('utf-8')
     if args.check:
-        if not path.is_file() or path.read_bytes()!=rendered: print(f'FAIL {OUTPUT_NAME} differs from current source',file=sys.stderr); return 1
-        print(f'PASS {OUTPUT_NAME} covers {data["count"]} inline silent catches'); return 0
-    path.write_bytes(rendered); print(path); return 0
+        if not path.is_file() or path.read_bytes()!=rendered: print(f'FAIL {OUTPUT_REL.as_posix()} differs from current source',file=sys.stderr); return 1
+        print(f'PASS {OUTPUT_REL.as_posix()} covers {data["count"]} inline silent catches'); return 0
+    path.parent.mkdir(parents=True,exist_ok=True); path.write_bytes(rendered); print(path); return 0
 if __name__=='__main__': raise SystemExit(main())

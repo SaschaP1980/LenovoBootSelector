@@ -97,6 +97,8 @@ Diese Anzeige behauptet **keine direkte 1:1-Adressierbarkeit** des physischen US
 | `src/Infrastructure/` | Windows-, Storage-, Update-, TaskBroker- und IO-Adapter |
 | `src/UI/` | WinForms-Präsentation |
 | `tests/` | PowerShell- und Python-Regressions-/Boundary-Tests |
+| `docs/architecture/` | kanonische und historische Architektur-Baselines |
+| `audits/` | kanonische und historische Catch-Audits |
 | `tools/` | Build-, Packaging-, Audit- und Transition-Skripte |
 | `downloads/` | historische versionierte Release-ZIPs und Update-Manifeste |
 
