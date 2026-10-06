@@ -8,16 +8,11 @@
             $script:AutostartCheckbox.Text = ''
         }
         if ($script:AutostartTextLabel -and -not $script:AutostartTextLabel.IsDisposed) {
-            $script:AutostartTextLabel.Text = 'Mit Windows starten'
+            $script:AutostartTextLabel.Text = Get-LocalizedString -Key 'Settings.Autostart'
         }
         if ($script:AutostartMenuItem) {
             $script:AutostartMenuItem.Checked = [bool]$info.Enabled
-            if ($info.Enabled -and -not $info.CurrentPath) {
-                $script:AutostartMenuItem.Text = 'Mit Windows starten'
-            }
-            else {
-                $script:AutostartMenuItem.Text = 'Mit Windows starten'
-            }
+            $script:AutostartMenuItem.Text = Get-LocalizedString -Key 'Settings.Autostart'
         }
     }
     finally {
@@ -33,8 +28,8 @@ function Set-AutostartFromUi([bool]$Enabled) {
     try {
         Set-AutostartEnabled -Enabled:$Enabled
         $info = Update-AutostartUi
-        if ($Enabled) { $script:LastStatusText = 'Autostart ist aktiviert.' }
-        else { $script:LastStatusText = 'Autostart ist deaktiviert.' }
+        if ($Enabled) { $script:LastStatusText = Get-LocalizedString -Key 'Autostart.Enabled' }
+        else { $script:LastStatusText = Get-LocalizedString -Key 'Autostart.Disabled' }
 
         if ($script:Popup -and -not $script:Popup.IsDisposed) {
             $matches = $script:Popup.Controls.Find('StatusLabel', $true)
@@ -47,6 +42,6 @@ function Set-AutostartFromUi([bool]$Enabled) {
         $sw.Stop()
         Write-RuntimeDiagnosticEvent -Event 'AUTOSTART_CHANGE' -Stage 'autostart' -Success $false -DurationMs $sw.ElapsedMilliseconds -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ enabled = $Enabled }) -Level error
         Update-AutostartUi | Out-Null
-        Show-LenovoNoticeDialog -Title 'Mit Windows starten' -Heading 'Die Einstellung konnte nicht geändert werden.' -Message 'Bitte versuche es erneut.' -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Settings.Autostart') -Heading (Get-LocalizedString -Key 'Autostart.ErrorHeading') -Message (Get-LocalizedString -Key 'Common.TryAgain') -Kind Error
     }
 }

@@ -99,7 +99,7 @@ function Update-ManageEntriesUiState {
     $restartPanel = $script:Popup.Controls.Find('RestartPanel', $true) | Select-Object -First 1
     $footerPanel = $script:Popup.Controls.Find('FooterPanel', $true) | Select-Object -First 1
 
-    if ($sectionLabel) { $sectionLabel.Text = if ($script:IsManageEntriesMode) { 'STARTZIELE ANPASSEN' } else { 'NÄCHSTER START' } }
+    if ($sectionLabel) { $sectionLabel.Text = if ($script:IsManageEntriesMode) { Get-LocalizedString -Key 'Manage.Section' } else { Get-LocalizedString -Key 'Popup.NextBootSection' } }
     if ($manageButton) {
         $manageButton.Visible = -not $script:IsManageEntriesMode
         $manageButton.Enabled = (-not $script:IsManageEntriesMode -and -not (Test-BootTargetDriftDetected) -and $script:CurrentEntries.Count -gt 0)
@@ -130,7 +130,7 @@ function Start-ManageEntriesMode {
     $script:ManageBaselineEntryAliases = Copy-EntryAliasMap $script:ManageEntryAliases
     $script:ManageAliasEditGuid = $null
     $script:IsManageEntriesMode = $true
-    $script:LastStatusText = 'Startziele anpassen · Ziehen zum Sortieren · Klicken zum Ein-/Ausblenden · Stift für Anzeigename'
+    $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusEditing'
     Update-ManageEntriesUiState
     Update-PopupRows
     Update-ManageSaveButtonState
@@ -146,10 +146,10 @@ function Stop-ManageEntriesMode {
         $script:HiddenEntryGuids = @($script:ManageHiddenEntryGuids | Select-Object -Unique)
         $script:EntryAliases = Copy-EntryAliasMap $script:ManageEntryAliases
         Save-AppSettings
-        $script:LastStatusText = 'Änderungen an den Startzielen wurden gespeichert.'
+        $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusSaved'
     }
     else {
-        $script:LastStatusText = 'Änderungen wurden verworfen.'
+        $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusDiscarded'
     }
 
     $script:IsManageEntriesMode = $false

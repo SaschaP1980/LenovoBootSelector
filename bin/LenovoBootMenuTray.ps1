@@ -978,6 +978,12 @@ $script:BootTargetDriftState = $null
 $script:UpdateState = $null
 $script:UpdateCheckMenuItem = $null
 $script:UpdateInstallMenuItem = $null
+$script:TrayOpenMenuItem = $null
+$script:LanguageMenuRoot = $null
+$script:LanguageEnglishMenuItem = $null
+$script:LanguageGermanMenuItem = $null
+$script:MaintenanceRootMenuItem = $null
+$script:TrayExitMenuItem = $null
 $script:RefreshButton = $null
 $script:RefreshButtonHovered = $false
 $script:HeaderTitleLabel = $null
@@ -1594,10 +1600,10 @@ function Update-HeaderRefreshStatus {
 
     if ($script:HeaderStatusLabel -and -not $script:HeaderStatusLabel.IsDisposed) {
         $script:HeaderStatusLabel.Text = if ($active) {
-            'Aktualisiere Bootziele…'
+            Get-LocalizedString -Key 'Header.Refreshing'
         }
         elseif ($updateAvailable) {
-            'Neue App-Version verfügbar'
+            Get-LocalizedString -Key 'Update.Available'
         }
         else {
             ''
@@ -2397,7 +2403,7 @@ function Update-UpdateMenuState {
     $busy = Test-UpdateRuntimeBusy -State $script:UpdateState
     if ($script:UpdateCheckMenuItem) { $script:UpdateCheckMenuItem.Enabled = -not $busy }
     if ($script:UpdateInstallMenuItem) {
-        $script:UpdateInstallMenuItem.Text = 'App aktualisieren…'
+        $script:UpdateInstallMenuItem.Text = Get-LocalizedString -Key 'Update.Install'
         $script:UpdateInstallMenuItem.Enabled = (-not $busy -and $null -ne $script:UpdateState.AvailableManifest)
     }
 }
@@ -2721,16 +2727,11 @@ function Update-AutostartUi {
             $script:AutostartCheckbox.Text = ''
         }
         if ($script:AutostartTextLabel -and -not $script:AutostartTextLabel.IsDisposed) {
-            $script:AutostartTextLabel.Text = 'Mit Windows starten'
+            $script:AutostartTextLabel.Text = Get-LocalizedString -Key 'Settings.Autostart'
         }
         if ($script:AutostartMenuItem) {
             $script:AutostartMenuItem.Checked = [bool]$info.Enabled
-            if ($info.Enabled -and -not $info.CurrentPath) {
-                $script:AutostartMenuItem.Text = 'Mit Windows starten'
-            }
-            else {
-                $script:AutostartMenuItem.Text = 'Mit Windows starten'
-            }
+            $script:AutostartMenuItem.Text = Get-LocalizedString -Key 'Settings.Autostart'
         }
     }
     finally {
@@ -2746,8 +2747,8 @@ function Set-AutostartFromUi([bool]$Enabled) {
     try {
         Set-AutostartEnabled -Enabled:$Enabled
         $info = Update-AutostartUi
-        if ($Enabled) { $script:LastStatusText = 'Autostart ist aktiviert.' }
-        else { $script:LastStatusText = 'Autostart ist deaktiviert.' }
+        if ($Enabled) { $script:LastStatusText = Get-LocalizedString -Key 'Autostart.Enabled' }
+        else { $script:LastStatusText = Get-LocalizedString -Key 'Autostart.Disabled' }
 
         if ($script:Popup -and -not $script:Popup.IsDisposed) {
             $matches = $script:Popup.Controls.Find('StatusLabel', $true)
@@ -2760,7 +2761,7 @@ function Set-AutostartFromUi([bool]$Enabled) {
         $sw.Stop()
         Write-RuntimeDiagnosticEvent -Event 'AUTOSTART_CHANGE' -Stage 'autostart' -Success $false -DurationMs $sw.ElapsedMilliseconds -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ enabled = $Enabled }) -Level error
         Update-AutostartUi | Out-Null
-        Show-LenovoNoticeDialog -Title 'Mit Windows starten' -Heading 'Die Einstellung konnte nicht geändert werden.' -Message 'Bitte versuche es erneut.' -Kind Error
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Settings.Autostart') -Heading (Get-LocalizedString -Key 'Autostart.ErrorHeading') -Message (Get-LocalizedString -Key 'Common.TryAgain') -Kind Error
     }
 }
 
@@ -2791,21 +2792,105 @@ function Get-LocalizationCatalogCore {
             'Common.OK' = 'OK'
             'Common.Cancel' = 'Cancel'
             'Common.Close' = 'Close'
+            'Common.TryAgain' = 'Please try again.'
             'Settings.Language' = 'Language'
             'Language.English' = 'English'
             'Language.German' = 'Deutsch'
             'Progress.StepOf' = 'Step {0} of {1}'
             'Storage.InternalSsdModel' = 'Internal SSD: {Model}'
+            'Popup.HeaderUpdateAccessible' = 'Opens the dialog for the available app version.'
+            'Status.BootTargetsRefreshing' = 'Boot targets are being refreshed in the background…'
+            'Action.RefreshBootTargets' = 'Refresh boot targets'
+            'Popup.NextBootSection' = 'NEXT BOOT'
+            'Popup.Customize' = 'CUSTOMIZE'
+            'Status.ScrollPositionFailed' = 'The scroll position could not be updated.'
+            'Settings.Title' = 'SETTINGS'
+            'Settings.Autostart' = 'Start with Windows'
+            'Settings.DefaultTarget' = 'Default boot target'
+            'Settings.NoDefaultTarget' = 'No default target'
+            'Settings.DefaultTargetUnavailable' = 'Boot target unavailable'
+            'Status.Checking' = 'Checking …'
+            'Action.RestartWindows' = 'Restart Windows'
+            'Status.NextTargetDefaultOrder' = 'Next target: default order'
+            'Manage.Section' = 'ADJUST BOOT TARGETS'
+            'Manage.Title' = 'CHANGES'
+            'Manage.Hint' = 'Drag to sort · Click to show/hide'
+            'Manage.SubHint' = 'Pencil to rename · Leave empty = original name'
+            'Manage.Save' = 'Save changes'
+            'Manage.StatusEditing' = 'Customize boot targets · Drag to sort · Click to show/hide · Pencil for display name'
+            'Manage.StatusSaved' = 'Boot-target changes were saved.'
+            'Manage.StatusDiscarded' = 'Changes were discarded.'
+            'Autostart.Enabled' = 'Autostart is enabled.'
+            'Autostart.Disabled' = 'Autostart is disabled.'
+            'Autostart.ErrorHeading' = 'The setting could not be changed.'
+            'Default.SaveErrorHeading' = 'The default boot target could not be saved.'
+            'Default.SaveErrorMessage' = 'Please try again. If the problem persists, open Maintenance → Repair system functions.'
+            'Status.NewBootTargetDetected' = 'New boot target detected · Reinitialize system functions.'
+            'Status.BootTargetsChanged' = 'Boot targets changed · Reinitialize system functions.'
+            'Status.SystemFunctionsRepairRequired' = 'System functions need to be repaired.'
+            'Status.SystemFunctionsSetupRequired' = 'System functions need to be set up.'
+            'Header.Refreshing' = 'Updating boot targets…'
+            'Update.Available' = 'New app version available'
+            'Tray.Open' = 'Open Lenovo Boot Selector'
+            'Tray.Maintenance' = 'Maintenance'
+            'Maintenance.Setup' = 'Set up system functions…'
+            'Maintenance.Remove' = 'Remove system functions…'
+            'Update.Check' = 'Check for new version…'
+            'Update.Install' = 'Update app…'
+            'Diagnostics.Save' = 'Save diagnostics…'
+            'Tray.Exit' = 'Exit'
         }
         'de-DE' = [ordered]@{
             'Common.OK' = 'OK'
             'Common.Cancel' = 'Abbrechen'
             'Common.Close' = 'Schließen'
+            'Common.TryAgain' = 'Bitte versuche es erneut.'
             'Settings.Language' = 'Sprache'
             'Language.English' = 'English'
             'Language.German' = 'Deutsch'
             'Progress.StepOf' = 'Schritt {0} von {1}'
             'Storage.InternalSsdModel' = 'Interne SSD: {Model}'
+            'Popup.HeaderUpdateAccessible' = 'Öffnet den Dialog zur verfügbaren App-Version.'
+            'Status.BootTargetsRefreshing' = 'Startziele werden im Hintergrund aktualisiert…'
+            'Action.RefreshBootTargets' = 'Startziele aktualisieren'
+            'Popup.NextBootSection' = 'NÄCHSTER START'
+            'Popup.Customize' = 'ANPASSEN'
+            'Status.ScrollPositionFailed' = 'Scrollposition konnte nicht aktualisiert werden.'
+            'Settings.Title' = 'EINSTELLUNGEN'
+            'Settings.Autostart' = 'Mit Windows starten'
+            'Settings.DefaultTarget' = 'Standard-Startziel'
+            'Settings.NoDefaultTarget' = 'Kein Standardziel'
+            'Settings.DefaultTargetUnavailable' = 'Nicht verfügbares Startziel'
+            'Status.Checking' = 'Wird geprüft …'
+            'Action.RestartWindows' = 'Windows neu starten'
+            'Status.NextTargetDefaultOrder' = 'Nächstes Ziel: Standardreihenfolge'
+            'Manage.Section' = 'STARTZIELE ANPASSEN'
+            'Manage.Title' = 'ÄNDERUNGEN'
+            'Manage.Hint' = 'Ziehen zum Sortieren · Klicken zum Ein-/Ausblenden'
+            'Manage.SubHint' = 'Stift zum Umbenennen · Leer lassen = Originalname'
+            'Manage.Save' = 'Änderungen speichern'
+            'Manage.StatusEditing' = 'Startziele anpassen · Ziehen zum Sortieren · Klicken zum Ein-/Ausblenden · Stift für Anzeigename'
+            'Manage.StatusSaved' = 'Änderungen an den Startzielen wurden gespeichert.'
+            'Manage.StatusDiscarded' = 'Änderungen wurden verworfen.'
+            'Autostart.Enabled' = 'Autostart ist aktiviert.'
+            'Autostart.Disabled' = 'Autostart ist deaktiviert.'
+            'Autostart.ErrorHeading' = 'Die Einstellung konnte nicht geändert werden.'
+            'Default.SaveErrorHeading' = 'Das Standard-Startziel konnte nicht gespeichert werden.'
+            'Default.SaveErrorMessage' = 'Bitte versuche es erneut. Falls das Problem bestehen bleibt, öffne Wartung → Systemfunktionen reparieren.'
+            'Status.NewBootTargetDetected' = 'Neues Startziel erkannt · Systemfunktionen neu initialisieren.'
+            'Status.BootTargetsChanged' = 'Startziele geändert · Systemfunktionen neu initialisieren.'
+            'Status.SystemFunctionsRepairRequired' = 'Systemfunktionen müssen repariert werden.'
+            'Status.SystemFunctionsSetupRequired' = 'Systemfunktionen müssen eingerichtet werden.'
+            'Header.Refreshing' = 'Aktualisiere Bootziele…'
+            'Update.Available' = 'Neue App-Version verfügbar'
+            'Tray.Open' = 'Lenovo Boot Selector öffnen'
+            'Tray.Maintenance' = 'Wartung'
+            'Maintenance.Setup' = 'Systemfunktionen einrichten…'
+            'Maintenance.Remove' = 'Systemfunktionen entfernen…'
+            'Update.Check' = 'Auf neue Version prüfen…'
+            'Update.Install' = 'App aktualisieren…'
+            'Diagnostics.Save' = 'Diagnose speichern…'
+            'Tray.Exit' = 'Beenden'
         }
     }
 }
@@ -3209,6 +3294,67 @@ function Load-AppSettings {
     # login-time restore. v0.2.22 no longer uses that mechanism.
     Remove-LegacySessionRestoreMarker -RegistryPath $script:LegacySessionRestoreRegistryPath -ValueName $script:LegacySessionRestoreValueName
 }
+function Update-LanguageMenuState {
+    $locale = Get-ActiveLocale
+    if ($script:LanguageMenuRoot) { $script:LanguageMenuRoot.Text = Get-LocalizedString -Key 'Settings.Language' }
+    if ($script:LanguageEnglishMenuItem) {
+        $script:LanguageEnglishMenuItem.Text = Get-LocalizedString -Key 'Language.English'
+        $script:LanguageEnglishMenuItem.Checked = ($locale -eq 'en-US')
+    }
+    if ($script:LanguageGermanMenuItem) {
+        $script:LanguageGermanMenuItem.Text = Get-LocalizedString -Key 'Language.German'
+        $script:LanguageGermanMenuItem.Checked = ($locale -eq 'de-DE')
+    }
+}
+
+function Update-TrayLocalizedText {
+    if ($script:TrayOpenMenuItem) { $script:TrayOpenMenuItem.Text = Get-LocalizedString -Key 'Tray.Open' }
+    if ($script:AutostartMenuItem) { $script:AutostartMenuItem.Text = Get-LocalizedString -Key 'Settings.Autostart' }
+    if ($script:MaintenanceRootMenuItem) { $script:MaintenanceRootMenuItem.Text = Get-LocalizedString -Key 'Tray.Maintenance' }
+    if ($script:TaskBrokerSetupMenuItem) { $script:TaskBrokerSetupMenuItem.Text = Get-LocalizedString -Key 'Maintenance.Setup' }
+    if ($script:TaskBrokerRemoveMenuItem) { $script:TaskBrokerRemoveMenuItem.Text = Get-LocalizedString -Key 'Maintenance.Remove' }
+    if ($script:UpdateCheckMenuItem) { $script:UpdateCheckMenuItem.Text = Get-LocalizedString -Key 'Update.Check' }
+    if ($script:UpdateInstallMenuItem) { $script:UpdateInstallMenuItem.Text = Get-LocalizedString -Key 'Update.Install' }
+    if ($script:RuntimeDiagnosticMenuItem) { $script:RuntimeDiagnosticMenuItem.Text = Get-LocalizedString -Key 'Diagnostics.Save' }
+    if ($script:RestartMenuItem) { $script:RestartMenuItem.Text = Get-LocalizedString -Key 'Action.RestartWindows' }
+    if ($script:TrayExitMenuItem) { $script:TrayExitMenuItem.Text = Get-LocalizedString -Key 'Tray.Exit' }
+    Update-LanguageMenuState
+}
+
+function Rebuild-PopupForLocale {
+    $wasVisible = ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible)
+    try {
+        if ($script:Popup -and -not $script:Popup.IsDisposed) {
+            $script:Popup.Hide()
+            $script:Popup.Dispose()
+        }
+    } catch { }
+
+    $script:Popup = New-PopupForm
+    try { Update-AutostartUi | Out-Null } catch { }
+    try { Update-MaintenanceUi } catch { }
+    try { Update-ManageEntriesUiState } catch { }
+    try { Update-PopupRows } catch { }
+
+    if ($wasVisible) {
+        Position-Popup
+        $script:Popup.Show()
+        $script:Popup.Activate()
+    }
+}
+
+function Set-LanguageFromUi {
+    param([Parameter(Mandatory=$true)][ValidateSet('en-US','de-DE')][string]$Locale)
+
+    $before = Get-ActiveLocale
+    $after = Set-ActiveLocale -Locale $Locale -Persist
+    Update-TrayLocalizedText
+
+    if ($after -ne $before) {
+        Rebuild-PopupForLocale
+    }
+    return $after
+}
 
 
 function Get-EntryAlias {
@@ -3336,7 +3482,7 @@ function Update-ManageEntriesUiState {
     $restartPanel = $script:Popup.Controls.Find('RestartPanel', $true) | Select-Object -First 1
     $footerPanel = $script:Popup.Controls.Find('FooterPanel', $true) | Select-Object -First 1
 
-    if ($sectionLabel) { $sectionLabel.Text = if ($script:IsManageEntriesMode) { 'STARTZIELE ANPASSEN' } else { 'NÄCHSTER START' } }
+    if ($sectionLabel) { $sectionLabel.Text = if ($script:IsManageEntriesMode) { Get-LocalizedString -Key 'Manage.Section' } else { Get-LocalizedString -Key 'Popup.NextBootSection' } }
     if ($manageButton) {
         $manageButton.Visible = -not $script:IsManageEntriesMode
         $manageButton.Enabled = (-not $script:IsManageEntriesMode -and -not (Test-BootTargetDriftDetected) -and $script:CurrentEntries.Count -gt 0)
@@ -3367,7 +3513,7 @@ function Start-ManageEntriesMode {
     $script:ManageBaselineEntryAliases = Copy-EntryAliasMap $script:ManageEntryAliases
     $script:ManageAliasEditGuid = $null
     $script:IsManageEntriesMode = $true
-    $script:LastStatusText = 'Startziele anpassen · Ziehen zum Sortieren · Klicken zum Ein-/Ausblenden · Stift für Anzeigename'
+    $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusEditing'
     Update-ManageEntriesUiState
     Update-PopupRows
     Update-ManageSaveButtonState
@@ -3383,10 +3529,10 @@ function Stop-ManageEntriesMode {
         $script:HiddenEntryGuids = @($script:ManageHiddenEntryGuids | Select-Object -Unique)
         $script:EntryAliases = Copy-EntryAliasMap $script:ManageEntryAliases
         Save-AppSettings
-        $script:LastStatusText = 'Änderungen an den Startzielen wurden gespeichert.'
+        $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusSaved'
     }
     else {
-        $script:LastStatusText = 'Änderungen wurden verworfen.'
+        $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusDiscarded'
     }
 
     $script:IsManageEntriesMode = $false
@@ -3403,10 +3549,10 @@ function Stop-ManageEntriesMode {
 
 
 function Get-DefaultEntryTitle {
-    if (-not $script:DefaultGuid) { return 'Kein Standardziel' }
+    if (-not $script:DefaultGuid) { return (Get-LocalizedString -Key 'Settings.NoDefaultTarget') }
     $entry = Get-EntryByGuid $script:DefaultGuid
     if ($entry) { return (Get-EntryDisplayTitle -Entry $entry) }
-    return 'Nicht verfügbares Startziel'
+    return (Get-LocalizedString -Key 'Settings.DefaultTargetUnavailable')
 }
 
 function Update-DefaultUi {
@@ -3422,7 +3568,7 @@ function Update-DefaultUi {
         $script:DefaultButton.Cursor = if ($enabled) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
 
         if ($script:DefaultValueLabel -and -not $script:DefaultValueLabel.IsDisposed) {
-            $script:DefaultValueLabel.Text = if ($checking) { 'Wird geprüft …' } else { Get-DefaultEntryTitle }
+            $script:DefaultValueLabel.Text = if ($checking) { Get-LocalizedString -Key 'Status.Checking' } else { Get-DefaultEntryTitle }
             $script:DefaultValueLabel.ForeColor = if ($visualEnabled) { $script:ColorPrimary } else { [Drawing.Color]::FromArgb(110,110,110) }
         }
         if ($script:DefaultArrowLabel -and -not $script:DefaultArrowLabel.IsDisposed) {
@@ -3513,12 +3659,12 @@ function New-DefaultTargetMenu {
     $menu.TargetWidth = 260
     Initialize-LenovoMenuAppearance -Menu $menu
 
-    $none = New-Object System.Windows.Forms.ToolStripMenuItem('Kein Standardziel')
+    $none = New-Object System.Windows.Forms.ToolStripMenuItem((Get-LocalizedString -Key 'Settings.NoDefaultTarget'))
     $none.Checked = -not [bool]$script:DefaultGuid
     $none.Padding = New-Object System.Windows.Forms.Padding(18, 3, 32, 3)
     $none.Add_Click({
         try { Set-DefaultGuid -Guid $null }
-        catch { Show-LenovoNoticeDialog -Title 'Standard-Startziel' -Heading 'Das Standard-Startziel konnte nicht gespeichert werden.' -Message 'Bitte versuche es erneut. Falls das Problem bestehen bleibt, öffne Wartung → Systemfunktionen reparieren.' -Kind Error }
+        catch { Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Settings.DefaultTarget') -Heading (Get-LocalizedString -Key 'Default.SaveErrorHeading') -Message (Get-LocalizedString -Key 'Default.SaveErrorMessage') -Kind Error }
     })
     [void]$menu.Items.Add($none)
     [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
@@ -3530,7 +3676,7 @@ function New-DefaultTargetMenu {
         $item.Padding = New-Object System.Windows.Forms.Padding(18, 3, 32, 3)
         $item.Add_Click({
             try { Set-DefaultGuid -Guid ([string]$this.Tag) }
-            catch { Show-LenovoNoticeDialog -Title 'Standard-Startziel' -Heading 'Das Standard-Startziel konnte nicht gespeichert werden.' -Message 'Bitte versuche es erneut. Falls das Problem bestehen bleibt, öffne Wartung → Systemfunktionen reparieren.' -Kind Error }
+            catch { Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Settings.DefaultTarget') -Heading (Get-LocalizedString -Key 'Default.SaveErrorHeading') -Message (Get-LocalizedString -Key 'Default.SaveErrorMessage') -Kind Error }
         })
         [void]$menu.Items.Add($item)
     }
@@ -6268,10 +6414,10 @@ function Apply-BackgroundRefreshResult {
             $script:TaskBrokerReadyCached = $false
             $script:TaskBrokerReadyCachedUtc = [datetime]::UtcNow
             if (Test-TaskBrokerInstallationPresent) {
-                $script:LastStatusText = 'Systemfunktionen müssen repariert werden.'
+                $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsRepairRequired'
             }
             else {
-                $script:LastStatusText = 'Systemfunktionen müssen eingerichtet werden.'
+                $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsSetupRequired'
             }
             Update-TaskBrokerUiState -Fast | Out-Null
             Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_COMPLETED' -Stage 'ready' -Success $false -DurationMs $Result.Timings.TotalMs -Data (New-RuntimeDiagnosticData @{ workerError = [string]$Result.Error }) -Level error
@@ -6542,7 +6688,7 @@ function New-PopupForm {
     $headerSub.Cursor = [System.Windows.Forms.Cursors]::Default
     $headerSub.Name = 'HeaderStatusLabel'
     $headerSub.Visible = $false
-    $headerSub.AccessibleDescription = 'Öffnet den Dialog zur verfügbaren App-Version.'
+    $headerSub.AccessibleDescription = Get-LocalizedString -Key 'Popup.HeaderUpdateAccessible'
     $headerSub.Add_MouseEnter({
         $script:HeaderStatusHovered = $true
         Update-HeaderStatusInteractionVisual
@@ -6583,13 +6729,13 @@ function New-PopupForm {
     })
     $refresh.Add_Click({
         if (Test-MaintenanceBusy) { return }
-        $script:LastStatusText = 'Startziele werden im Hintergrund aktualisiert…'
+        $script:LastStatusText = Get-LocalizedString -Key 'Status.BootTargetsRefreshing'
         Update-PopupRows
         Start-BackgroundBootRefresh -RefreshStorage
         Update-RefreshButtonVisual
     })
     $header.Controls.Add($refresh)
-    if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($refresh, 'Startziele aktualisieren') }
+    if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($refresh, (Get-LocalizedString -Key 'Action.RefreshBootTargets')) }
     Update-RefreshButtonVisual
     $root.Controls.Add($header)
 
@@ -6604,14 +6750,14 @@ function New-PopupForm {
     $section.Size = New-Object Drawing.Size(390, 28)
     $section.BackColor = $script:ColorBackground
 
-    $sectionLabel = New-Label -Text 'NÄCHSTER START' -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
+    $sectionLabel = New-Label -Text (Get-LocalizedString -Key 'Popup.NextBootSection') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 4 -Width 200 -Height 20
     $sectionLabel.Name = 'SectionLabel'
     $section.Controls.Add($sectionLabel)
 
     $manageButton = New-Object System.Windows.Forms.Button
     $manageButton.Name = 'ManageEntriesButton'
-    $manageButton.Text = 'ANPASSEN'
+    $manageButton.Text = Get-LocalizedString -Key 'Popup.Customize'
     $manageButton.Font = New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)
     $manageButton.ForeColor = $script:ColorSecondary
     $manageButton.BackColor = $script:ColorBackground
@@ -6659,7 +6805,7 @@ function New-PopupForm {
             }
         }
         catch {
-            $script:LastStatusText = 'Scrollposition konnte nicht aktualisiert werden.'
+            $script:LastStatusText = Get-LocalizedString -Key 'Status.ScrollPositionFailed'
         }
     })
     $listPanel.Controls.Add($entryScroll)
@@ -6685,7 +6831,7 @@ function New-PopupForm {
     $configSection.Size = New-Object Drawing.Size(390, 20)
     $configSection.BackColor = $script:ColorSurface
 
-    $configLabel = New-Label -Text 'EINSTELLUNGEN' -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
+    $configLabel = New-Label -Text (Get-LocalizedString -Key 'Settings.Title') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 2 -Width 220 -Height 17
     $configSection.Controls.Add($configLabel)
     $root.Controls.Add($configSection)
@@ -6696,7 +6842,7 @@ function New-PopupForm {
     $settings.Size = New-Object Drawing.Size(390, 38)
     $settings.BackColor = $script:ColorSurface
 
-    $autostartText = New-Label -Text 'Mit Windows starten' -Font (New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)) `
+    $autostartText = New-Label -Text (Get-LocalizedString -Key 'Settings.Autostart') -Font (New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)) `
         -ForeColor $script:ColorPrimary -X 16 -Y 8 -Width 280 -Height 22
     $autostartText.Cursor = [System.Windows.Forms.Cursors]::Hand
     $settings.Controls.Add($autostartText)
@@ -6728,12 +6874,12 @@ function New-PopupForm {
     $defaultPanel.BackColor = $script:ColorSurface
     $defaultPanel.Cursor = [System.Windows.Forms.Cursors]::Hand
 
-    $defaultName = New-Label -Text 'Standard-Startziel' -Font (New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)) `
+    $defaultName = New-Label -Text (Get-LocalizedString -Key 'Settings.DefaultTarget') -Font (New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)) `
         -ForeColor $script:ColorPrimary -X 16 -Y 8 -Width 150 -Height 22
     $defaultName.Cursor = [System.Windows.Forms.Cursors]::Hand
     $defaultPanel.Controls.Add($defaultName)
 
-    $defaultValue = New-Label -Text 'Kein Standardziel' -Font (New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)) `
+    $defaultValue = New-Label -Text (Get-LocalizedString -Key 'Settings.NoDefaultTarget') -Font (New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)) `
         -ForeColor $script:ColorPrimary -X 164 -Y 8 -Width 184 -Height 22
     $defaultValue.TextAlign = [Drawing.ContentAlignment]::MiddleRight
     $defaultValue.Cursor = [System.Windows.Forms.Cursors]::Hand
@@ -6780,7 +6926,7 @@ function New-PopupForm {
     $restartPanel.BackColor = $script:ColorSurface
 
     $restartButton = New-Object System.Windows.Forms.Button
-    $restartButton.Text = 'Windows neu starten'
+    $restartButton.Text = Get-LocalizedString -Key 'Action.RestartWindows'
     $restartButton.Font = New-Object Drawing.Font('Segoe UI', 8.6, [Drawing.FontStyle]::Bold)
     $restartButton.ForeColor = $script:ColorPrimary
     $restartButton.BackColor = [Drawing.Color]::FromArgb(34, 34, 34)
@@ -6795,7 +6941,7 @@ function New-PopupForm {
     $restartButton.Add_Click({ Restart-Windows })
     $restartPanel.Controls.Add($restartButton)
 
-    $restartTarget = New-Label -Text 'Nächstes Ziel: Standardreihenfolge' -Font (New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Regular)) `
+    $restartTarget = New-Label -Text (Get-LocalizedString -Key 'Status.NextTargetDefaultOrder') -Font (New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Regular)) `
         -ForeColor ([Drawing.Color]::FromArgb(155,155,155)) -X 16 -Y 39 -Width 358 -Height 18
     $restartTarget.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $restartTarget.Name = 'RestartTargetLabel'
@@ -6830,20 +6976,20 @@ function New-PopupForm {
     $manageDivider.BackColor = [Drawing.Color]::FromArgb(54,54,54)
     $managePanel.Controls.Add($manageDivider)
 
-    $manageTitle = New-Label -Text 'ÄNDERUNGEN' -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
+    $manageTitle = New-Label -Text (Get-LocalizedString -Key 'Manage.Title') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 8 -Width 350 -Height 18
     $managePanel.Controls.Add($manageTitle)
 
-    $manageHint = New-Label -Text 'Ziehen zum Sortieren · Klicken zum Ein-/Ausblenden' -Font (New-Object Drawing.Font('Segoe UI', 7.5, [Drawing.FontStyle]::Regular)) `
+    $manageHint = New-Label -Text (Get-LocalizedString -Key 'Manage.Hint') -Font (New-Object Drawing.Font('Segoe UI', 7.5, [Drawing.FontStyle]::Regular)) `
         -ForeColor $script:ColorSecondary -X 16 -Y 29 -Width 358 -Height 17
     $managePanel.Controls.Add($manageHint)
 
-    $manageSubHint = New-Label -Text 'Stift zum Umbenennen · Leer lassen = Originalname' -Font (New-Object Drawing.Font('Segoe UI', 7.2, [Drawing.FontStyle]::Regular)) `
+    $manageSubHint = New-Label -Text (Get-LocalizedString -Key 'Manage.SubHint') -Font (New-Object Drawing.Font('Segoe UI', 7.2, [Drawing.FontStyle]::Regular)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 46 -Width 358 -Height 17
     $managePanel.Controls.Add($manageSubHint)
 
     $cancelManage = New-Object System.Windows.Forms.Button
-    $cancelManage.Text = 'Abbrechen'
+    $cancelManage.Text = Get-LocalizedString -Key 'Common.Cancel'
     $cancelManage.Font = New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)
     $cancelManage.ForeColor = $script:ColorPrimary
     $cancelManage.BackColor = [Drawing.Color]::FromArgb(34,34,34)
@@ -6859,7 +7005,7 @@ function New-PopupForm {
     $managePanel.Controls.Add($cancelManage)
 
     $saveManage = New-Object System.Windows.Forms.Button
-    $saveManage.Text = 'Änderungen speichern'
+    $saveManage.Text = Get-LocalizedString -Key 'Manage.Save'
     $saveManage.Font = New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Bold)
     $saveManage.ForeColor = [Drawing.Color]::FromArgb(135,135,135)
     $saveManage.BackColor = [Drawing.Color]::FromArgb(35,35,35)
@@ -6931,13 +7077,13 @@ function Show-OrTogglePopup {
             $script:CurrentEntries = @()
             $script:SelectedGuid = $null
             if (Test-BootTargetDriftDetected) {
-                $script:LastStatusText = if (Test-BootTargetDriftHasNewTargets) { 'Neues Startziel erkannt · Systemfunktionen neu initialisieren.' } else { 'Startziele geändert · Systemfunktionen neu initialisieren.' }
+                $script:LastStatusText = if (Test-BootTargetDriftHasNewTargets) { Get-LocalizedString -Key 'Status.NewBootTargetDetected' } else { Get-LocalizedString -Key 'Status.BootTargetsChanged' }
             }
             elseif (Test-TaskBrokerInstallationPresent) {
-                $script:LastStatusText = 'Systemfunktionen müssen repariert werden.'
+                $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsRepairRequired'
             }
             else {
-                $script:LastStatusText = 'Systemfunktionen müssen eingerichtet werden.'
+                $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsSetupRequired'
             }
         }
         Update-PopupRows
@@ -7026,7 +7172,9 @@ try {
     $context.TargetWidth = 260
     Initialize-LenovoMenuAppearance -Menu $context
 
-    $openItem = New-Object System.Windows.Forms.ToolStripMenuItem('Lenovo Boot Selector öffnen')
+    $openItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $openItem.Text = Get-LocalizedString -Key 'Tray.Open'
+    $script:TrayOpenMenuItem = $openItem
     $openItem.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
     $openItem.ForeColor = $script:ColorAccent
     $openItem.Add_Click({ Show-OrTogglePopup })
@@ -7034,7 +7182,8 @@ try {
 
     # v0.2.32: Refresh and Standard-Startziel remain in the main popup only.
     # The tray menu is intentionally reduced to quick actions and maintenance.
-    $autostartItem = New-Object System.Windows.Forms.ToolStripMenuItem('Mit Windows starten')
+    $autostartItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $autostartItem.Text = Get-LocalizedString -Key 'Settings.Autostart'
     $autostartItem.Add_Click({
         $desired = -not (Get-AutostartInfo).Enabled
         Set-AutostartFromUi -Enabled:$desired
@@ -7042,35 +7191,66 @@ try {
     $script:AutostartMenuItem = $autostartItem
     [void]$context.Items.Add($autostartItem)
 
+    $languageRoot = New-Object System.Windows.Forms.ToolStripMenuItem
+    $languageRoot.Text = Get-LocalizedString -Key 'Settings.Language'
+    $languageRoot.DropDown = New-Object LenovoDropDownMenu
+    $languageRoot.DropDown.TargetWidth = 220
+    Initialize-LenovoMenuAppearance -Menu $languageRoot.DropDown
+    $languageRoot.Add_DropDownOpening({ Initialize-LenovoMenuAppearance -Menu $this.DropDown })
+    $script:LanguageMenuRoot = $languageRoot
+
+    $languageEnglish = New-Object System.Windows.Forms.ToolStripMenuItem
+    $languageEnglish.Text = Get-LocalizedString -Key 'Language.English'
+    $languageEnglish.Padding = New-Object System.Windows.Forms.Padding(18, 4, 32, 4)
+    $languageEnglish.Add_Click({ [void](Set-LanguageFromUi -Locale 'en-US') })
+    $script:LanguageEnglishMenuItem = $languageEnglish
+    [void]$languageRoot.DropDownItems.Add($languageEnglish)
+
+    $languageGerman = New-Object System.Windows.Forms.ToolStripMenuItem
+    $languageGerman.Text = Get-LocalizedString -Key 'Language.German'
+    $languageGerman.Padding = New-Object System.Windows.Forms.Padding(18, 4, 32, 4)
+    $languageGerman.Add_Click({ [void](Set-LanguageFromUi -Locale 'de-DE') })
+    $script:LanguageGermanMenuItem = $languageGerman
+    [void]$languageRoot.DropDownItems.Add($languageGerman)
+
+    Update-LanguageMenuState
+    [void]$context.Items.Add($languageRoot)
+
     $script:DefaultContextRoot = $null
     $script:ManageEntriesMenuItem = $null
 
-    $maintenanceRoot = New-Object System.Windows.Forms.ToolStripMenuItem('Wartung')
+    $maintenanceRoot = New-Object System.Windows.Forms.ToolStripMenuItem
+    $maintenanceRoot.Text = Get-LocalizedString -Key 'Tray.Maintenance'
+    $script:MaintenanceRootMenuItem = $maintenanceRoot
     $maintenanceRoot.DropDown = New-Object LenovoDropDownMenu
     $maintenanceRoot.DropDown.TargetWidth = 260
     Initialize-LenovoMenuAppearance -Menu $maintenanceRoot.DropDown
     $maintenanceRoot.Add_DropDownOpening({ Initialize-LenovoMenuAppearance -Menu $this.DropDown })
 
-    $setupItem = New-Object System.Windows.Forms.ToolStripMenuItem('Systemfunktionen einrichten…')
+    $setupItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $setupItem.Text = Get-LocalizedString -Key 'Maintenance.Setup'
     $setupItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
     $setupItem.Add_Click({ Prompt-TaskBrokerInstall })
     $script:TaskBrokerSetupMenuItem = $setupItem
     [void]$maintenanceRoot.DropDownItems.Add($setupItem)
 
-    $removeTasksItem = New-Object System.Windows.Forms.ToolStripMenuItem('Systemfunktionen entfernen…')
+    $removeTasksItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $removeTasksItem.Text = Get-LocalizedString -Key 'Maintenance.Remove'
     $removeTasksItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
     $removeTasksItem.Add_Click({ Prompt-TaskBrokerRemove })
     $script:TaskBrokerRemoveMenuItem = $removeTasksItem
     [void]$maintenanceRoot.DropDownItems.Add($removeTasksItem)
 
     [void]$maintenanceRoot.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
-    $updateCheckItem = New-Object System.Windows.Forms.ToolStripMenuItem('Auf neue Version prüfen…')
+    $updateCheckItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $updateCheckItem.Text = Get-LocalizedString -Key 'Update.Check'
     $updateCheckItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
     $updateCheckItem.Add_Click({ Start-ManualUpdateCheck })
     $script:UpdateCheckMenuItem = $updateCheckItem
     [void]$maintenanceRoot.DropDownItems.Add($updateCheckItem)
 
-    $updateInstallItem = New-Object System.Windows.Forms.ToolStripMenuItem('App aktualisieren…')
+    $updateInstallItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $updateInstallItem.Text = Get-LocalizedString -Key 'Update.Install'
     $updateInstallItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
     $updateInstallItem.Enabled = $false
     $updateInstallItem.Add_Click({ Start-ManualAppUpdate })
@@ -7079,7 +7259,8 @@ try {
     Update-UpdateMenuState
 
     [void]$maintenanceRoot.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
-    $diagnosticItem = New-Object System.Windows.Forms.ToolStripMenuItem('Diagnose speichern…')
+    $diagnosticItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $diagnosticItem.Text = Get-LocalizedString -Key 'Diagnostics.Save'
     $diagnosticItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
     $diagnosticItem.Add_Click({ Save-RuntimeDiagnosticsFromUi })
     $script:RuntimeDiagnosticMenuItem = $diagnosticItem
@@ -7089,14 +7270,17 @@ try {
 
     [void]$context.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
 
-    $restartItem = New-Object System.Windows.Forms.ToolStripMenuItem('Windows neu starten')
+    $restartItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $restartItem.Text = Get-LocalizedString -Key 'Action.RestartWindows'
     $restartItem.Add_Click({ Restart-Windows })
     $script:RestartMenuItem = $restartItem
     [void]$context.Items.Add($restartItem)
 
     [void]$context.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
 
-    $exitItem = New-Object System.Windows.Forms.ToolStripMenuItem('Beenden')
+    $exitItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $exitItem.Text = Get-LocalizedString -Key 'Tray.Exit'
+    $script:TrayExitMenuItem = $exitItem
     $exitItem.Add_Click({
         $script:ExitRequested = $true
         try { $context.Close() } catch { }
@@ -7135,14 +7319,14 @@ try {
         $script:TaskBrokerReadyCached = $false
         $script:TaskBrokerReadyCachedUtc = [datetime]::UtcNow
         if (Test-TaskBrokerInstallationPresent) {
-            $script:LastStatusText = 'Systemfunktionen müssen repariert werden.'
+            $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsRepairRequired'
         }
         else {
-            $script:LastStatusText = 'Systemfunktionen müssen eingerichtet werden.'
+            $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsSetupRequired'
         }
     }
     else {
-        $script:LastStatusText = 'Startziele werden im Hintergrund aktualisiert…'
+        $script:LastStatusText = Get-LocalizedString -Key 'Status.BootTargetsRefreshing'
     }
     Update-TaskBrokerUiState -Fast | Out-Null
     Update-ManageEntriesUiState

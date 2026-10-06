@@ -805,6 +805,12 @@ $script:BootTargetDriftState = $null
 $script:UpdateState = $null
 $script:UpdateCheckMenuItem = $null
 $script:UpdateInstallMenuItem = $null
+$script:TrayOpenMenuItem = $null
+$script:LanguageMenuRoot = $null
+$script:LanguageEnglishMenuItem = $null
+$script:LanguageGermanMenuItem = $null
+$script:MaintenanceRootMenuItem = $null
+$script:TrayExitMenuItem = $null
 $script:RefreshButton = $null
 $script:RefreshButtonHovered = $false
 $script:HeaderTitleLabel = $null
@@ -898,6 +904,7 @@ $script:UpdateState = New-UpdateRuntimeState
 # @include src/Infrastructure/SettingsRepository.ps1
 
 # @include src/Application/SettingsService.ps1
+# @include src/UI/LanguagePresentation.ps1
 
 function Get-EntryAlias {
     param(
@@ -1595,10 +1602,10 @@ function Apply-BackgroundRefreshResult {
             $script:TaskBrokerReadyCached = $false
             $script:TaskBrokerReadyCachedUtc = [datetime]::UtcNow
             if (Test-TaskBrokerInstallationPresent) {
-                $script:LastStatusText = 'Systemfunktionen müssen repariert werden.'
+                $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsRepairRequired'
             }
             else {
-                $script:LastStatusText = 'Systemfunktionen müssen eingerichtet werden.'
+                $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsSetupRequired'
             }
             Update-TaskBrokerUiState -Fast | Out-Null
             Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_COMPLETED' -Stage 'ready' -Success $false -DurationMs $Result.Timings.TotalMs -Data (New-RuntimeDiagnosticData @{ workerError = [string]$Result.Error }) -Level error
@@ -1864,7 +1871,9 @@ try {
     $context.TargetWidth = 260
     Initialize-LenovoMenuAppearance -Menu $context
 
-    $openItem = New-Object System.Windows.Forms.ToolStripMenuItem('Lenovo Boot Selector öffnen')
+    $openItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $openItem.Text = Get-LocalizedString -Key 'Tray.Open'
+    $script:TrayOpenMenuItem = $openItem
     $openItem.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
     $openItem.ForeColor = $script:ColorAccent
     $openItem.Add_Click({ Show-OrTogglePopup })
@@ -1872,7 +1881,8 @@ try {
 
     # v0.2.32: Refresh and Standard-Startziel remain in the main popup only.
     # The tray menu is intentionally reduced to quick actions and maintenance.
-    $autostartItem = New-Object System.Windows.Forms.ToolStripMenuItem('Mit Windows starten')
+    $autostartItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $autostartItem.Text = Get-LocalizedString -Key 'Settings.Autostart'
     $autostartItem.Add_Click({
         $desired = -not (Get-AutostartInfo).Enabled
         Set-AutostartFromUi -Enabled:$desired
@@ -1880,35 +1890,66 @@ try {
     $script:AutostartMenuItem = $autostartItem
     [void]$context.Items.Add($autostartItem)
 
+    $languageRoot = New-Object System.Windows.Forms.ToolStripMenuItem
+    $languageRoot.Text = Get-LocalizedString -Key 'Settings.Language'
+    $languageRoot.DropDown = New-Object LenovoDropDownMenu
+    $languageRoot.DropDown.TargetWidth = 220
+    Initialize-LenovoMenuAppearance -Menu $languageRoot.DropDown
+    $languageRoot.Add_DropDownOpening({ Initialize-LenovoMenuAppearance -Menu $this.DropDown })
+    $script:LanguageMenuRoot = $languageRoot
+
+    $languageEnglish = New-Object System.Windows.Forms.ToolStripMenuItem
+    $languageEnglish.Text = Get-LocalizedString -Key 'Language.English'
+    $languageEnglish.Padding = New-Object System.Windows.Forms.Padding(18, 4, 32, 4)
+    $languageEnglish.Add_Click({ [void](Set-LanguageFromUi -Locale 'en-US') })
+    $script:LanguageEnglishMenuItem = $languageEnglish
+    [void]$languageRoot.DropDownItems.Add($languageEnglish)
+
+    $languageGerman = New-Object System.Windows.Forms.ToolStripMenuItem
+    $languageGerman.Text = Get-LocalizedString -Key 'Language.German'
+    $languageGerman.Padding = New-Object System.Windows.Forms.Padding(18, 4, 32, 4)
+    $languageGerman.Add_Click({ [void](Set-LanguageFromUi -Locale 'de-DE') })
+    $script:LanguageGermanMenuItem = $languageGerman
+    [void]$languageRoot.DropDownItems.Add($languageGerman)
+
+    Update-LanguageMenuState
+    [void]$context.Items.Add($languageRoot)
+
     $script:DefaultContextRoot = $null
     $script:ManageEntriesMenuItem = $null
 
-    $maintenanceRoot = New-Object System.Windows.Forms.ToolStripMenuItem('Wartung')
+    $maintenanceRoot = New-Object System.Windows.Forms.ToolStripMenuItem
+    $maintenanceRoot.Text = Get-LocalizedString -Key 'Tray.Maintenance'
+    $script:MaintenanceRootMenuItem = $maintenanceRoot
     $maintenanceRoot.DropDown = New-Object LenovoDropDownMenu
     $maintenanceRoot.DropDown.TargetWidth = 260
     Initialize-LenovoMenuAppearance -Menu $maintenanceRoot.DropDown
     $maintenanceRoot.Add_DropDownOpening({ Initialize-LenovoMenuAppearance -Menu $this.DropDown })
 
-    $setupItem = New-Object System.Windows.Forms.ToolStripMenuItem('Systemfunktionen einrichten…')
+    $setupItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $setupItem.Text = Get-LocalizedString -Key 'Maintenance.Setup'
     $setupItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
     $setupItem.Add_Click({ Prompt-TaskBrokerInstall })
     $script:TaskBrokerSetupMenuItem = $setupItem
     [void]$maintenanceRoot.DropDownItems.Add($setupItem)
 
-    $removeTasksItem = New-Object System.Windows.Forms.ToolStripMenuItem('Systemfunktionen entfernen…')
+    $removeTasksItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $removeTasksItem.Text = Get-LocalizedString -Key 'Maintenance.Remove'
     $removeTasksItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
     $removeTasksItem.Add_Click({ Prompt-TaskBrokerRemove })
     $script:TaskBrokerRemoveMenuItem = $removeTasksItem
     [void]$maintenanceRoot.DropDownItems.Add($removeTasksItem)
 
     [void]$maintenanceRoot.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
-    $updateCheckItem = New-Object System.Windows.Forms.ToolStripMenuItem('Auf neue Version prüfen…')
+    $updateCheckItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $updateCheckItem.Text = Get-LocalizedString -Key 'Update.Check'
     $updateCheckItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
     $updateCheckItem.Add_Click({ Start-ManualUpdateCheck })
     $script:UpdateCheckMenuItem = $updateCheckItem
     [void]$maintenanceRoot.DropDownItems.Add($updateCheckItem)
 
-    $updateInstallItem = New-Object System.Windows.Forms.ToolStripMenuItem('App aktualisieren…')
+    $updateInstallItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $updateInstallItem.Text = Get-LocalizedString -Key 'Update.Install'
     $updateInstallItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
     $updateInstallItem.Enabled = $false
     $updateInstallItem.Add_Click({ Start-ManualAppUpdate })
@@ -1917,7 +1958,8 @@ try {
     Update-UpdateMenuState
 
     [void]$maintenanceRoot.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
-    $diagnosticItem = New-Object System.Windows.Forms.ToolStripMenuItem('Diagnose speichern…')
+    $diagnosticItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $diagnosticItem.Text = Get-LocalizedString -Key 'Diagnostics.Save'
     $diagnosticItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
     $diagnosticItem.Add_Click({ Save-RuntimeDiagnosticsFromUi })
     $script:RuntimeDiagnosticMenuItem = $diagnosticItem
@@ -1927,14 +1969,17 @@ try {
 
     [void]$context.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
 
-    $restartItem = New-Object System.Windows.Forms.ToolStripMenuItem('Windows neu starten')
+    $restartItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $restartItem.Text = Get-LocalizedString -Key 'Action.RestartWindows'
     $restartItem.Add_Click({ Restart-Windows })
     $script:RestartMenuItem = $restartItem
     [void]$context.Items.Add($restartItem)
 
     [void]$context.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
 
-    $exitItem = New-Object System.Windows.Forms.ToolStripMenuItem('Beenden')
+    $exitItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $exitItem.Text = Get-LocalizedString -Key 'Tray.Exit'
+    $script:TrayExitMenuItem = $exitItem
     $exitItem.Add_Click({
         $script:ExitRequested = $true
         try { $context.Close() } catch { }
@@ -1973,14 +2018,14 @@ try {
         $script:TaskBrokerReadyCached = $false
         $script:TaskBrokerReadyCachedUtc = [datetime]::UtcNow
         if (Test-TaskBrokerInstallationPresent) {
-            $script:LastStatusText = 'Systemfunktionen müssen repariert werden.'
+            $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsRepairRequired'
         }
         else {
-            $script:LastStatusText = 'Systemfunktionen müssen eingerichtet werden.'
+            $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsSetupRequired'
         }
     }
     else {
-        $script:LastStatusText = 'Startziele werden im Hintergrund aktualisiert…'
+        $script:LastStatusText = Get-LocalizedString -Key 'Status.BootTargetsRefreshing'
     }
     Update-TaskBrokerUiState -Fast | Out-Null
     Update-ManageEntriesUiState

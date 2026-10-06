@@ -39,7 +39,7 @@ function Update-UpdateMenuState {
     $busy = Test-UpdateRuntimeBusy -State $script:UpdateState
     if ($script:UpdateCheckMenuItem) { $script:UpdateCheckMenuItem.Enabled = -not $busy }
     if ($script:UpdateInstallMenuItem) {
-        $script:UpdateInstallMenuItem.Text = 'App aktualisieren…'
+        $script:UpdateInstallMenuItem.Text = Get-LocalizedString -Key 'Update.Install'
         $script:UpdateInstallMenuItem.Enabled = (-not $busy -and $null -ne $script:UpdateState.AvailableManifest)
     }
 }
