@@ -813,6 +813,7 @@ $script:LegacyAutostartTaskName = 'Lenovo Boot Menu Tray Autostart'
 $script:AutostartRunValueName = 'Lenovo Boot Menu Tray'
 $script:SettingsDir = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray'
 $script:SettingsPath = Join-Path $script:SettingsDir 'settings.json'
+$script:UiLocale = 'en-US'
 $script:DefaultGuid = $null
 $script:LegacyDefaultGuid = $null
 $script:DefaultButton = $null
@@ -885,6 +886,7 @@ $script:UpdateState = New-UpdateRuntimeState
 # @include src/UI/AutostartPresentation.ps1
 
 # @include src/Core/Localization.ps1
+# @include src/Application/LocalizationService.ps1
 # @include src/Core/EntryPreferences.ps1
 
 

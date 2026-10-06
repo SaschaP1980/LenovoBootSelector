@@ -986,6 +986,7 @@ $script:LegacyAutostartTaskName = 'Lenovo Boot Menu Tray Autostart'
 $script:AutostartRunValueName = 'Lenovo Boot Menu Tray'
 $script:SettingsDir = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray'
 $script:SettingsPath = Join-Path $script:SettingsDir 'settings.json'
+$script:UiLocale = 'en-US'
 $script:DefaultGuid = $null
 $script:LegacyDefaultGuid = $null
 $script:DefaultButton = $null
@@ -2864,6 +2865,36 @@ function Get-LocalizedStringCore {
     return $text
 }
 
+function Get-ActiveLocale {
+    return (Resolve-LocaleIdCore -Locale $script:UiLocale)
+}
+
+function Set-ActiveLocale {
+    param(
+        [Parameter(Mandatory=$true)][string]$Locale,
+        [switch]$Persist
+    )
+
+    $resolved = Resolve-LocaleIdCore -Locale $Locale
+    $changed = ([string]$script:UiLocale) -ne $resolved
+    $script:UiLocale = $resolved
+
+    if ($Persist -and $changed) {
+        Save-AppSettings
+    }
+    return $resolved
+}
+
+function Get-LocalizedString {
+    param(
+        [Parameter(Mandatory=$true)][string]$Key,
+        [object[]]$Arguments,
+        [System.Collections.IDictionary]$Values
+    )
+
+    return Get-LocalizedStringCore -Key $Key -Locale (Get-ActiveLocale) -Arguments $Arguments -Values $Values
+}
+
 # Lenovo Boot Selector v0.4.1 - Functional Core: entry preferences/settings normalization
 # Pure/deterministic functions only. No global script state, WinForms, filesystem, registry,
 # Scheduled Tasks, process starts, or privileged broker access are permitted in this file.
@@ -2936,9 +2967,50 @@ function Test-GuidInList {
     }
     return $false
 }
+function Get-AppSettingsLocaleCore {
+    param(
+        $Source,
+        [int]$SourceSchemaVersion
+    )
+
+    if (-not $Source) { return 'en-US' }
+
+    $hasLocale = $false
+    $rawLocale = $null
+
+    if ($Source -is [System.Collections.IDictionary]) {
+        foreach ($key in @($Source.Keys)) {
+            if ([string]$key -and ([string]$key).Equals('locale', [System.StringComparison]::OrdinalIgnoreCase)) {
+                $hasLocale = $true
+                $rawLocale = [string]$Source[$key]
+                break
+            }
+        }
+    }
+    else {
+        $property = $Source.PSObject.Properties['locale']
+        if ($null -ne $property) {
+            $hasLocale = $true
+            $rawLocale = [string]$property.Value
+        }
+    }
+
+    if ($hasLocale) {
+        return Resolve-LocaleIdCore -Locale $rawLocale
+    }
+
+    # Existing settings created before localization represented the historical
+    # German-only UI. Preserve that user experience during migration.
+    if ($SourceSchemaVersion -lt 5) { return 'de-DE' }
+
+    # New/current settings without a valid explicit preference fail safe to English.
+    return 'en-US'
+}
+
 function New-DefaultAppSettingsCore {
     return [pscustomobject]@{
-        schemaVersion = 4
+        schemaVersion = 5
+        locale = 'en-US'
         defaultGuid = $null
         entryOrder = @()
         hiddenEntryGuids = @()
@@ -2951,8 +3023,11 @@ function ConvertTo-NormalizedAppSettingsCore {
 
     if (-not $Source) { return New-DefaultAppSettingsCore }
 
+    $sourceSchemaVersion = if ($Source.schemaVersion) { [int]$Source.schemaVersion } else { 1 }
+
     return [pscustomobject]@{
-        schemaVersion = if ($Source.schemaVersion) { [int]$Source.schemaVersion } else { 1 }
+        schemaVersion = 5
+        locale = Get-AppSettingsLocaleCore -Source $Source -SourceSchemaVersion $sourceSchemaVersion
         # defaultGuid is retained only as an upgrade/migration input from
         # v0.2.21 and earlier. v0.2.22 stores the live default system-wide.
         defaultGuid = if ($Source.defaultGuid) { ([string]$Source.defaultGuid).ToLowerInvariant() } else { $null }
@@ -3107,7 +3182,8 @@ function Save-AppSettings {
     }
 
     $payload = [ordered]@{
-        schemaVersion = 4
+        schemaVersion = 5
+        locale = Resolve-LocaleIdCore -Locale $script:UiLocale
         # Keep an unmigrated legacy default only until the new SYSTEM-backed
         # default architecture has been installed successfully.
         defaultGuid = $script:LegacyDefaultGuid
@@ -3122,6 +3198,7 @@ function Save-AppSettings {
 
 function Load-AppSettings {
     $settings = Get-AppSettings
+    $script:UiLocale = Resolve-LocaleIdCore -Locale ([string]$settings.locale)
     $script:LegacyDefaultGuid = if ($settings.defaultGuid) { ([string]$settings.defaultGuid).ToLowerInvariant() } else { $null }
     $script:DefaultGuid = $null
     $script:EntryOrder = @($settings.entryOrder)

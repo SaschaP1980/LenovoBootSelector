@@ -104,7 +104,9 @@ def main():
     s.has('v0.6.4.1 native regression accepts ReadAndExecute',native_boundary,'ReadAndExecute is accepted as non-mutating')
     s.has('v0.6.4.1 native regression rejects Modify',native_boundary,'Modify is rejected as mutating')
     s.has('v0.6.4.1 native regression rejects FullControl',native_boundary,'FullControl is rejected as mutating')
-    s.has('Settings schema unchanged',tray,'schemaVersion = 4')
+    s.has('LBS-17 settings schema is v5',tray,'schemaVersion = 5')
+    s.has('LBS-17 settings persist locale',tray,'locale = Resolve-LocaleIdCore -Locale $script:UiLocale')
+    s.has('LBS-17 localization service is bundled',tray,'function Get-LocalizedString')
     s.no('No permanent displayorder mutation',tray,"'/set', '{fwbootmgr}', 'displayorder'")
     for bad in ['SetFirmwareEnvironmentVariable','Lenovo_SetBiosSetting','Lenovo_SaveBiosSetting','Lenovo_SetFunctionRequest']:
         s.no(f'No firmware/WMI write path: {bad}',tray,bad)

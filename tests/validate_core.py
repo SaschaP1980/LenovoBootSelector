@@ -107,7 +107,7 @@ def main():
     s.contains('Localization missing active key falls back to English',localization,"$english = $catalogs['en-US']")
     s.absent('Localization core excludes dynamic execution',localization,'Invoke-Expression')
     boot=core_text.get('src/Core/BootTargetModel.ps1','')
-    for fn in ['Convert-EntryAliasesToHashtable','Copy-EntryAliasMap','Test-StringSequenceEqual','Test-EntryAliasMapsEqual','Test-GuidInList','New-DefaultAppSettingsCore','ConvertTo-NormalizedAppSettingsCore','Get-OrderedEntriesCore']:
+    for fn in ['Convert-EntryAliasesToHashtable','Copy-EntryAliasMap','Test-StringSequenceEqual','Test-EntryAliasMapsEqual','Test-GuidInList','Get-AppSettingsLocaleCore','New-DefaultAppSettingsCore','ConvertTo-NormalizedAppSettingsCore','Get-OrderedEntriesCore']:
         s.eq(f'Entry core function once in module: {fn}',len(re.findall(rf'(?m)^function\s+{re.escape(fn)}\b',entry)),1)
         s.eq(f'Entry core function once in bundle: {fn}',len(re.findall(rf'(?m)^function\s+{re.escape(fn)}\b',tray)),1)
     for fn in ['Parse-GuidFromLine','ConvertFrom-FirmwareEntriesText','ConvertFrom-FirmwareManagerText']:
@@ -118,12 +118,22 @@ def main():
 
     # Thin shell adapters actually consume the core; no dead extraction.
     getset=ps_function(tray,'Get-AppSettings') or ''
+    saveset=ps_function(tray,'Save-AppSettings') or ''
+    loadset=ps_function(tray,'Load-AppSettings') or ''
+    localize_service=txt(root/'src/Application/LocalizationService.ps1') if (root/'src/Application/LocalizationService.ps1').is_file() else ''
+    getlocalized=ps_function(tray,'Get-LocalizedString') or ''
     order=ps_function(tray,'Get-OrderedEntriesForUi') or ''
     friendly=ps_function(tray,'Get-FriendlyBootEntry') or ''
     fwstate=ps_function(tray,'Get-FirmwareBootState') or ''
     s.contains('Settings shell calls default core',getset,'New-DefaultAppSettingsCore')
     s.contains('Settings shell calls normalization core',getset,'ConvertTo-NormalizedAppSettingsCore')
     s.contains('Settings shell delegates repository read',getset,'Read-AppSettingsRepository')
+    s.contains('LBS-17 settings save current schema',saveset,'schemaVersion = 5')
+    s.contains('LBS-17 settings save locale',saveset,'locale = Resolve-LocaleIdCore -Locale $script:UiLocale')
+    s.contains('LBS-17 settings load locale',loadset,'$script:UiLocale = Resolve-LocaleIdCore')
+    s.check('LBS-17 localization application service exists',bool(localize_service))
+    s.contains('LBS-17 localized-string service delegates to core',getlocalized,'Get-LocalizedStringCore')
+    s.contains('LBS-17 localized-string service uses active locale',getlocalized,'Get-ActiveLocale')
     s.contains('Entry-order shell calls pure core',order,'Get-OrderedEntriesCore')
     s.contains('Entry-order shell passes CurrentEntries explicitly',order,'-Source @($script:CurrentEntries)')
     s.contains('Friendly shell calls presentation-neutral core',friendly,'Get-FriendlyBootEntryCore')

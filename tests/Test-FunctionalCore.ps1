@@ -62,7 +62,8 @@ Assert-Equal @($g1.ToLowerInvariant(),$g2.ToLowerInvariant()) @($mgr.DisplayOrde
 Assert-Equal $g2.ToLowerInvariant() $mgr.SelectedGuid 'Manager parser bootsequence'
 
 $defaults = New-DefaultAppSettingsCore
-Assert-Equal 4 $defaults.schemaVersion 'Default settings schema'
+Assert-Equal 5 $defaults.schemaVersion 'Default settings schema'
+Assert-Equal 'en-US' $defaults.locale 'New settings default to English'
 Assert-Equal 0 @($defaults.entryOrder).Count 'Default settings empty order'
 Assert-Equal 0 @($defaults.hiddenEntryGuids).Count 'Default settings empty hidden list'
 
@@ -74,10 +75,22 @@ $source = [pscustomobject]@{
     entryAliases = [pscustomobject]@{ ($g1.ToUpperInvariant()) = '  Test Alias  ' }
 }
 $norm = ConvertTo-NormalizedAppSettingsCore $source
+Assert-Equal 5 $norm.schemaVersion 'Legacy settings normalize to current schema'
+Assert-Equal 'de-DE' $norm.locale 'Legacy pre-localization settings migrate to German'
 Assert-Equal $g1.ToLowerInvariant() $norm.defaultGuid 'Settings default GUID normalization'
 Assert-Equal @($g2.ToLowerInvariant(),$g1.ToLowerInvariant()) @($norm.entryOrder) 'Settings order lowercase unique'
 Assert-Equal @($g1.ToLowerInvariant()) @($norm.hiddenEntryGuids) 'Settings hidden lowercase unique'
 Assert-Equal 'Test Alias' $norm.entryAliases[$g1.ToLowerInvariant()] 'Alias trim and lowercase key'
+
+
+$currentEnglish = ConvertTo-NormalizedAppSettingsCore ([pscustomobject]@{ schemaVersion=5; locale='en-US' })
+Assert-Equal 'en-US' $currentEnglish.locale 'Explicit English locale persists'
+$currentGerman = ConvertTo-NormalizedAppSettingsCore ([pscustomobject]@{ schemaVersion=5; locale='de-de' })
+Assert-Equal 'de-DE' $currentGerman.locale 'Explicit German locale normalizes'
+$currentInvalid = ConvertTo-NormalizedAppSettingsCore ([pscustomobject]@{ schemaVersion=5; locale='fr-FR' })
+Assert-Equal 'en-US' $currentInvalid.locale 'Invalid stored locale falls back to English'
+$currentMissing = ConvertTo-NormalizedAppSettingsCore ([pscustomobject]@{ schemaVersion=5 })
+Assert-Equal 'en-US' $currentMissing.locale 'Current settings without locale fall back to English'
 
 $entries = @(
     [pscustomobject]@{ Guid=$g1.ToLowerInvariant(); Title='One' },
