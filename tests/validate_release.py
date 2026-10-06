@@ -306,6 +306,16 @@ def main():
     taskbroker=txt(root/'src/Infrastructure/TaskBroker.ps1')
     installer=txt(root/'bin/Install-LenovoBootMenuTasks.ps1')
     diagnostics=txt(root/'src/Infrastructure/RuntimeDiagnostics.ps1')
+    diagnostics_init=fn(diagnostics,'Initialize-RuntimeDiagnostics')
+    refresh_native=txt(root/'tests/Test-RefreshRuntime.ps1')
+    inherited_capture='$script:InheritedRuntimeSessionId = [string]$RuntimeSessionId'
+    active_reset='$script:RuntimeSessionId = $null'
+    s.c('LBS-22 inherited runtime session is captured before active diagnostics reset',template.find(inherited_capture)>=0 and template.find(active_reset)>template.find(inherited_capture))
+    s.has('LBS-22 diagnostics initialization consumes captured inherited session',diagnostics_init,'$candidate = ([string]$script:InheritedRuntimeSessionId).Trim()')
+    s.has('LBS-22 parent-session flag is captured before fresh ID generation',diagnostics_init,'$hasParentSession = [bool]$candidate')
+    s.has('LBS-22 diagnostics event uses genuine inherited-session flag',diagnostics_init,'parentSession = $hasParentSession')
+    s.has('LBS-22 native refresh suite covers all child roles',refresh_native,'All three child roles share one parent diagnostics log')
+    s.has('LBS-22 native refresh suite retains 28-check guard',refresh_native,'if ($checks -ne 28) { throw "Expected 28 refresh checks, got $checks" }')
     state_acl=fn(installer,'Test-TaskBrokerStatePathLeastPrivilege')
     rights_predicate=fn(installer,'Test-TaskBrokerRightsContainMutation')
     broker_summary=fn(diagnostics,'Get-RuntimeDiagnosticBrokerSummary')

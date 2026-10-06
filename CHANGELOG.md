@@ -1,5 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.7.0.2 – LBS-22 child-worker runtime diagnostics correlation
+
+- Fix the runtime-diagnostics session hand-off so background-refresh, update-check, and update-prepare child processes reuse the parent tray session when `-RuntimeSessionId` is supplied.
+- Preserve the incoming child-process session identifier before active runtime diagnostics state is initialized; a child without an inherited identifier still creates a fresh session.
+- Make `parentSession` describe a genuinely inherited, sanitized session identifier rather than the post-initialization active session value.
+- Add native Windows regression coverage for all three child-worker roles plus fresh-session behavior, and permanent Release/Regression contracts for the bootstrap wiring.
+- No BootService, TaskBroker, Storage, firmware/BCD, BootNext, privilege, or updater-install boundary changes are made.
+- The release uses the `patch` profile. No characterized protected fragment changes, so `protectedFragmentIntent=[]`.
+
 ## v0.7.0.1 – Version-only Hotfix for popup-open update-check acceptance
 
 - Pure version-only Hotfix used to provide a newer release target for native acceptance of the v0.7.0.0 popup-open automatic update-check behavior.
