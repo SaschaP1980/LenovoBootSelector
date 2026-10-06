@@ -23,6 +23,19 @@ def fn(src,name):
 
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); a=ap.parse_args(); root=a.root.resolve(); s=S()
+    markdown_gate=root/'tools/validate_markdown_language.py'
+    s.c('LBS-18 Markdown language validator exists',markdown_gate.is_file())
+    markdown_cp=subprocess.run([sys.executable,'-B',str(markdown_gate),'--root',str(root)],capture_output=True,text=True) if markdown_gate.is_file() else None
+    s.eq('LBS-18 repository Markdown language gate passes',markdown_cp.returncode if markdown_cp else 1,0)
+    initial_prompt=txt(root/'docs/INITIAL_PROMPT.md') if (root/'docs/INITIAL_PROMPT.md').is_file() else ''
+    github_howto=txt(root/'docs/GITHUB_HOWTO.md') if (root/'docs/GITHUB_HOWTO.md').is_file() else ''
+    release_process=txt(root/'docs/RELEASE_PROCESS.md') if (root/'docs/RELEASE_PROCESS.md').is_file() else ''
+    s.has('LBS-18 initial prompt declares English repository language',initial_prompt,'English is the canonical language for **all repository and durable GitHub documentation**.')
+    s.has('LBS-18 GitHub how-to declares English repository language',github_howto,'English is the canonical language for repository and durable GitHub documentation.')
+    s.has('LBS-18 release process declares English repository language',release_process,'English is the canonical language for repository and durable GitHub documentation.')
+    prepare_release=txt(root/'tools/prepare_release.py')
+    s.has('LBS-18 prepare_release uses English README version marker',prepare_release,'**Current development version:**')
+    s.no('LBS-18 prepare_release no longer depends on German README version marker',prepare_release,'Aktueller Entwicklungsstand')
     vp=root/'bin/version.json'; s.c('Canonical bin/version.json exists',vp.is_file())
     meta={}
     if vp.is_file():

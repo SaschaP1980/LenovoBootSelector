@@ -12,7 +12,7 @@ Operational companion for ChatGPT/release supervision: [`GITHUB_HOWTO.md`](GITHU
 - `tools/prepare_release.py` owns generated release metadata and packages. For schema v2, publication time must be supplied explicitly with `--published-utc`.
 - Canonical `publishedUtc` is owned by GitHub: the Release Orchestrator captures one UTC timestamp only after the hosted runner is executing the publication job and reuses that exact value for both deterministic rebuilds. Local preparation timestamps are provisional and are never committed as canonical publication metadata.
 - `version-only`: use when product code under `src/**` is unchanged. Regression requires product-source byte identity to the previous canonical source basis, apart from the injected runtime version.
-- `patch`: use when product code under `src/**` changes fachlich.
+- `patch`: use when product code under `src/**` changes functionally.
 - The former `release-architecture` profile was removed in v0.6.6.0. Its only special behavior covered the already completed migration from a hard-coded AppVersion to the `@APP_VERSION@` template token. Historical validators remain in `tests-history/`; there is no active selectable migration profile.
 
 ## Issue prerequisite by version level
@@ -89,6 +89,18 @@ Interactive release supervision waits at most 60 seconds for a GitHub-hosted run
 ## Repository/runtime layout
 
 Repository runtime/release source files live under `bin/`. The downloadable Release ZIP intentionally remains a flat 10-file package: packaging maps the `bin/` source files back to their established top-level archive names. Architecture baselines live under `docs/architecture/`; catch audits live under `audits/`. The canonical generated files are `docs/architecture/ARCHITECTURE_BASELINE.json` and `audits/CATCH_AUDIT.json`; historical versioned snapshots remain alongside them.
+
+## Documentation language
+
+English is the canonical language for repository and durable GitHub documentation.
+
+- All tracked `*.md` files, including `README.md`, `CHANGELOG.md`, `docs/**`, `tests/**`, `tests-history/**`, and `downloads/README.md`, use English prose.
+- New Markdown documentation must be written in English.
+- Durable GitHub Issue/PR/release/process documentation uses English.
+- Stable technical literals and exact UI strings may remain unchanged when intentionally quoted.
+- Interactive chat with the user is outside this repository-language contract and may remain in German with English technical terminology.
+
+The permanent release validation includes a practical Markdown-language guard so that accidental reintroduction of German prose fails before publication.
 
 ## Operational guide maintenance and handovers
 
