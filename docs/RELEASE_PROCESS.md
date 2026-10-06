@@ -25,6 +25,23 @@ Before implementation/release preparation:
 
 For Issue-backed releases, the Issue is part of the audit trail: important implementation findings belong in comments, and closure occurs only after successful publication/post-release verification.
 
+## Release level and work-branch policy
+
+Release level is derived from the first changed component of the four-part numeric version relative to the currently published version:
+
+- component 1 → **Major**;
+- component 2 → **Minor**;
+- component 3 → **Patch**;
+- component 4 → **Hotfix**.
+
+Work-branch policy is intentionally asymmetric:
+
+- **Major / Minor:** `work/LBS-<issue>` is mandatory.
+- **Patch / Hotfix:** default to **no work branch** and the shortest safe atomic implementation path.
+- Before Patch/Hotfix implementation, perform a brief effort/risk analysis. Use a work branch only as an exception when the change is likely to be substantial, cross-cutting, migration-heavy, interruption-prone, or otherwise likely to require several recoverable checkpoints.
+- A Patch/Hotfix exception must be recorded durably before implementation and the Candidate must contain exactly one `Work-Branch-Reason: <reason>` trailer.
+- Do not escalate a small Patch/Hotfix merely to reuse the Major/Minor process.
+
 ## Test-first bug/regression preparation
 
 For every confirmed product bug or regression, use **failing test first, not failing candidate first**.
@@ -49,9 +66,10 @@ The Candidate branch is **release-ready**, not a RED-test vehicle. Do not intent
 6. For a bug/regression, complete the focused RED→GREEN proof described above and run applicable broader prechecks.
 7. Prepare one exact **release-ready** candidate commit based on current `main`.
 8. The candidate-only commit range must contain exactly one unique `Work-Branch:` trailer:
-   - use `Work-Branch: work/LBS-<issue>` when development used a durable work branch;
-   - use `Work-Branch: none` when no work branch exists.
-   Same-candidate correction commits may omit the trailer, but must not introduce a conflicting value. When a work branch is declared, its current tree must exactly match the Candidate tree.
+   - Major/Minor: `Work-Branch: work/LBS-<issue>` is mandatory;
+   - Patch/Hotfix normal path: `Work-Branch: none`;
+   - Patch/Hotfix exception: `Work-Branch: work/LBS-<issue>` plus exactly one `Work-Branch-Reason: <reason>` from the pre-implementation effort/risk analysis.
+   Same-candidate correction commits may omit these trailers, but must not introduce conflicting values. When a work branch is declared, its current tree must exactly match the Candidate tree.
 9. Push that commit only as `candidate/v<version>`. Do **not** manually create `release/v<version>`.
 
 ### Version-only minimum diff

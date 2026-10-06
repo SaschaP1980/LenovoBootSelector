@@ -2,7 +2,11 @@
 
 This document defines the durable development workflow for substantial Lenovo Boot Selector feature work.
 
-It applies **by default to Major and Minor releases**. Apply it to a Patch release when the user explicitly requests the work-branch/checkpoint model or when the Issue itself declares that model. Hotfixes normally use the shortest safe test-first path unless explicitly escalated.
+It applies **by default to Major and Minor releases**.
+
+Patch and Hotfix work uses the shortest safe atomic path **without a work branch by default**. Before implementation begins, perform a brief effort/risk analysis. Escalate a Patch or Hotfix to the work-branch/checkpoint model only when that analysis indicates that the work is likely to be substantial, cross-cutting, migration-heavy, interruption-prone, or otherwise unlikely to fit safely into one short implementation cycle. Record the reason durably and carry it into the Candidate as exactly one `Work-Branch-Reason:` trailer.
+
+Do not use a work branch for a small Patch/Hotfix merely for consistency with Major/Minor releases; the resilience machinery must not become routine overhead for short fixes.
 
 The release path remains defined by `docs/RELEASE_PROCESS.md`. Connector/GitHub operating details remain defined by `docs/GITHUB_HOWTO.md`.
 
@@ -26,7 +30,18 @@ For substantial feature work:
 
 ## 2. Work branch
 
-Create the work branch from a freshly verified current `main`:
+### Selection gate
+
+Use a work branch when:
+
+- the release is **Major or Minor**; or
+- a **Patch or Hotfix** has been explicitly escalated by the pre-implementation effort/risk analysis.
+
+For Patch/Hotfix analysis, indicators for escalation include multiple independently risky phases, settings/data migration, broad cross-module behavior changes, expected work substantially beyond a short atomic patch cycle, or a realistic need for several recoverable checkpoints. A narrow bug fix, text/UI correction, small validator change, or isolated behavior patch should normally remain branchless.
+
+When a Patch/Hotfix is escalated, record the concise reason in the Issue when Issue-backed (or equivalent durable release history for an Issue-less Hotfix) and later include the same decision as `Work-Branch-Reason: <reason>` in the Candidate history.
+
+Create the selected work branch from a freshly verified current `main`:
 
 `work/LBS-<issue-number>`
 
@@ -41,7 +56,7 @@ Rules:
 3. One work branch belongs to one Issue/scope.
 4. Never use `candidate/v<version>` as an intermediate checkpoint branch.
 5. Re-read `main` before final Candidate preparation. If `main` advanced, reconcile deliberately; never force a stale work state over it.
-6. After a successful release, delete the work branch when the available GitHub mechanism supports it. If the active connector cannot delete refs, fast-forward the work branch to final `main` and report the remaining cleanup honestly.
+6. After a successful release, the Release Orchestrator owns tree-verified work-branch deletion. Do not keep or manually fast-forward a completed work branch merely because the interactive connector cannot delete refs.
 
 ## 3. Product-decision gate before implementation
 
@@ -277,7 +292,7 @@ For any Candidate derived from a durable work branch, include exactly one unique
 
 `Work-Branch: work/LBS-<issue>`
 
-Use `Work-Branch: none` only when no work branch exists. Candidate Preflight requires an exact tree match between the declared work branch and the Candidate. After successful publication, the Release Orchestrator rechecks the tree and deletes that work branch automatically. If the branch changed after Candidate creation, cleanup fails closed and preserves the branch. The final `RELEASE_VERIFICATION_SUMMARY` must confirm candidate, release, and declared work-branch cleanup.
+Use `Work-Branch: none` for the normal Patch/Hotfix path and whenever no work branch exists. Major/Minor releases may not use `none`. If a Patch/Hotfix declares `work/LBS-*`, Candidate Preflight additionally requires exactly one non-empty `Work-Branch-Reason:` trailer documenting the pre-implementation effort/risk exception. Candidate Preflight requires an exact tree match between the declared work branch and the Candidate. After successful publication, the Release Orchestrator rechecks the tree and deletes that work branch automatically. If the branch changed after Candidate creation, cleanup fails closed and preserves the branch. The final `RELEASE_VERIFICATION_SUMMARY` must confirm candidate, release, and declared work-branch cleanup.
 
 LBS-17 included several unnecessary repeated job-status reads and redundant post-release API verification calls even though the repository already had aggregated summaries.
 
@@ -325,7 +340,7 @@ For a comparable feature, aim for:
 
 1. Issue and explicit product-decision gate;
 2. verified `main`;
-3. one `work/LBS-<issue>` branch;
+3. one `work/LBS-<issue>` branch (Major/Minor, or an explicitly escalated Patch/Hotfix exception);
 4. roughly 3–5 coherent checkpoints rather than many tiny checkpoints;
 5. no more than about 10–15 minutes of completed unpersisted work;
 6. bounded connector operations;

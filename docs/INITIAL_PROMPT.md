@@ -86,7 +86,9 @@ Version format:
 
 Before implementation:
 
-For **MAJOR and MINOR** feature work, follow the persistent work-branch/checkpoint model in `docs/DEVELOPMENT_GUIDELINES.md`. Apply that model to PATCH work only when the user explicitly requests it or the Issue declares it.
+For **MAJOR and MINOR** work, follow the persistent work-branch/checkpoint model in `docs/DEVELOPMENT_GUIDELINES.md`.
+
+For **PATCH and HOTFIX**, default to the shortest safe branchless atomic path. Before implementation, perform a brief effort/risk analysis. Escalate to the work-branch/checkpoint model only when that analysis shows the work is likely to be substantial, cross-cutting, migration-heavy, interruption-prone, or otherwise likely to require several recoverable checkpoints. Record the exception reason durably and carry it into the Candidate as `Work-Branch-Reason:`.
 
 - **MAJOR:** a relevant GitHub Issue is mandatory.
 - **MINOR:** a relevant GitHub Issue is mandatory.

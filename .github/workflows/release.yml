@@ -39,6 +39,15 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main --tags --force
 
+          if git cat-file -e origin/main:bin/version.json 2>/dev/null; then
+            PREVIOUS_VERSION=$(git show origin/main:bin/version.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+          elif git cat-file -e origin/main:version.json 2>/dev/null; then
+            PREVIOUS_VERSION=$(git show origin/main:version.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+          else
+            PREVIOUS_VERSION=$(git show origin/main:downloads/latest.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+          fi
+          RELEASE_LEVEL=$(python3 -c 'import sys; sys.path.insert(0,"tools"); from release_common import classify_release_level; print(classify_release_level(sys.argv[1],sys.argv[2]))' "$PREVIOUS_VERSION" "$VERSION")
+
           WORK_BRANCH_VALUES=$(git log --format='%B' origin/main..HEAD | sed -n 's/^Work-Branch:[[:space:]]*//p' | sed '/^[[:space:]]*$/d' | sort -u)
           WORK_BRANCH_COUNT=$(printf '%s\n' "$WORK_BRANCH_VALUES" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')
           test "$WORK_BRANCH_COUNT" = "1" || {
@@ -46,6 +55,35 @@ jobs:
             exit 1
           }
           WORK_BRANCH=$(printf '%s\n' "$WORK_BRANCH_VALUES" | head -n 1)
+          WORK_BRANCH_REASON_VALUES=$(git log --format='%B' origin/main..HEAD | sed -n 's/^Work-Branch-Reason:[[:space:]]*//p' | sed '/^[[:space:]]*$/d' | sort -u)
+          WORK_BRANCH_REASON_COUNT=$(printf '%s\n' "$WORK_BRANCH_REASON_VALUES" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')
+
+          case "$RELEASE_LEVEL" in
+            major|minor)
+              test "$WORK_BRANCH" != "none" || {
+                echo "$RELEASE_LEVEL releases require a durable work/LBS-* branch." >&2
+                exit 1
+              }
+              test "$WORK_BRANCH_REASON_COUNT" = "0" || {
+                echo "Work-Branch-Reason is reserved for Patch/Hotfix exceptions." >&2
+                exit 1
+              }
+              ;;
+            patch|hotfix)
+              if [ "$WORK_BRANCH" = "none" ]; then
+                test "$WORK_BRANCH_REASON_COUNT" = "0" || {
+                  echo "Work-Branch-Reason is invalid when Work-Branch is none." >&2
+                  exit 1
+                }
+              else
+                test "$WORK_BRANCH_REASON_COUNT" = "1" || {
+                  echo "$RELEASE_LEVEL work-branch exception requires exactly one Work-Branch-Reason trailer." >&2
+                  exit 1
+                }
+              fi
+              ;;
+          esac
+
           CANDIDATE_TREE=$(git rev-parse "$CANDIDATE_SHA^{tree}")
           if [ "$WORK_BRANCH" != "none" ]; then
             [[ "$WORK_BRANCH" =~ ^work/LBS-[0-9]+$ ]] || {
@@ -87,15 +125,6 @@ jobs:
           if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
             echo "Tag v$VERSION already exists; refusing to overwrite." >&2
             exit 1
-          fi
-
-          if git cat-file -e origin/main:bin/version.json 2>/dev/null; then
-            PREVIOUS_VERSION=$(git show origin/main:bin/version.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
-          elif git cat-file -e origin/main:version.json 2>/dev/null; then
-            # One-release migration compatibility for pre-LBS-2 history only.
-            PREVIOUS_VERSION=$(git show origin/main:version.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
-          else
-            PREVIOUS_VERSION=$(git show origin/main:downloads/latest.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
           fi
 
           # GitHub owns publication time. Capture it only after the hosted runner is actually executing

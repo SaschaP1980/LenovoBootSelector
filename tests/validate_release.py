@@ -142,6 +142,14 @@ def main():
     s.has('Release config keeps legacy schema 1 readable',common,"schema not in {1,2}")
     s.has('Release config forbids publishedUtc in schema 2',common,'schemaVersion 2 must not contain publishedUtc')
     s.has('LBS-10 active release profiles are exactly version-only and patch',common,"VALID_PROFILES = {'version-only','patch'}")
+    s.has('Release common owns four-part level classification',common,'def classify_release_level(previous_version: str, version: str) -> str:')
+    level_cp=subprocess.run(
+        [sys.executable,'-c',
+         'import sys;sys.path.insert(0,sys.argv[1]);from release_common import classify_release_level as c;print("|".join([c("0.8.0.1","1.0.0.0"),c("0.8.0.1","0.9.0.0"),c("0.8.0.1","0.8.1.0"),c("0.8.0.1","0.8.0.2")]))',
+         str(root/'tools')],
+        capture_output=True,text=True
+    )
+    s.eq('Four-part release levels classify major/minor/patch/hotfix',level_cp.stdout.strip() if level_cp.returncode==0 else '', 'major|minor|patch|hotfix')
     s.no('LBS-10 historical architecture profile is not active in release config',common,"'release-architecture'")
     s.has('LBS-15 release config validates protected intent',common,'protectedFragmentIntent must be an array of non-empty strings')
     s.has('LBS-15 release config validates delete intent',common,'repositoryDeleteIntent must be an array of non-empty strings')
@@ -197,6 +205,11 @@ def main():
         s.has('Candidate workflow requires work-branch provenance',cw,'Work-Branch:')
         s.has('Candidate workflow validates safe work-branch namespace',cw,'^work/LBS-[0-9]+$')
         s.has('Candidate workflow requires exact work/candidate tree equality',cw,'Declared work branch tree does not match exact candidate tree')
+        s.has('Candidate workflow derives release level',cw,'classify_release_level')
+        s.has('Major/minor candidate requires work branch',cw,'releases require a durable work/LBS-* branch.')
+        s.has('Patch/hotfix candidate supports branchless normal path',cw,'patch|hotfix)')
+        s.has('Patch/hotfix work-branch exception requires reason',cw,'work-branch exception requires exactly one Work-Branch-Reason trailer.')
+        s.has('Candidate reads Work-Branch-Reason trailer',cw,'Work-Branch-Reason:')
     if (root/'.github/workflows/release.yml').is_file():
         w=txt(root/'.github/workflows/release.yml')
         s.has('Release workflow targets one release branch family',w,'release/**')
@@ -225,6 +238,8 @@ def main():
         s.has('LBS-16 release workflow passes final PR head into verification',w,'--final-sha "$FINAL_SHA"')
         s.has('Release workflow deletes verified work branch after merge',w,'git push origin --delete "$WORK_BRANCH"')
         s.has('Release workflow fail-closes if work branch changed',w,'Work branch changed during release; refusing to delete')
+        s.has('Release workflow independently derives release level',w,'classify_release_level')
+        s.has('Release workflow rechecks Patch/Hotfix exception reason',w,'work-branch exception requires exactly one Work-Branch-Reason trailer.')
         s.has('Release workflow creates tag only after PR creation',w,'Tag only after all gates and successful PR creation')
         s.has('Release workflow merges and deletes release branch',w,'gh pr merge')
         s.no('Release workflow is not version-specific',w,'0.5.10.0')

@@ -11,7 +11,7 @@ Mandatory order:
 1. **Read current `main` and record its SHA/tree.**
 2. **Read this `docs/GITHUB_HOWTO.md` in full from current `main`.**
 3. **Read `docs/RELEASE_PROCESS.md` in full.**
-4. **Read `docs/DEVELOPMENT_GUIDELINES.md` in full** for Major/Minor work and whenever the user explicitly requests the work-branch/checkpoint model.
+4. **Read `docs/DEVELOPMENT_GUIDELINES.md` in full** for Major/Minor work and for Patch/Hotfix work only when the pre-implementation effort/risk analysis escalates it to the work-branch/checkpoint model.
 5. For Issue-backed work, read the **current GitHub Issue** including state, labels, comments, and acceptance criteria.
 6. Read **`bin/version.json`** and verify current version, `releaseProfile`, `protectedFragmentIntent`, and `repositoryDeleteIntent`.
 7. Read the relevant executable contracts:
@@ -21,7 +21,7 @@ Mandatory order:
    - `tools/candidate_preflight.py`
    - `tools/release_verification.py`
    - the four permanent validators under `tests/`
-8. Only then determine scope, target version, and implementation/release plan and prepare changes.
+8. Only then determine scope, target version, and implementation/release plan. For Patch/Hotfix, perform the brief effort/risk analysis **before implementation** and default to the branchless atomic path unless the analysis justifies escalation.
 
 ### Authority order
 
@@ -505,10 +505,11 @@ The currently available ChatGPT GitHub connector can create/read/move branch ref
 
 Candidate provenance is mandatory:
 
-- the candidate-only commit range relative to current `main` contains exactly one unique trailer `Work-Branch: work/LBS-<issue>` when a durable work branch was used;
-- use `Work-Branch: none` when no work branch exists;
-- same-candidate correction commits may omit the trailer, but they must not introduce a conflicting value;
-- Candidate Preflight verifies that a declared work branch exists and that its current tree exactly matches the exact Candidate tree.
+- Major/Minor Candidates require exactly one unique `Work-Branch: work/LBS-<issue>` trailer;
+- Patch/Hotfix Candidates default to exactly one `Work-Branch: none` trailer;
+- a Patch/Hotfix may declare `Work-Branch: work/LBS-<issue>` only after a pre-implementation effort/risk escalation and must then also contain exactly one unique `Work-Branch-Reason: <reason>` trailer;
+- same-candidate correction commits may omit the trailers, but they must not introduce conflicting values;
+- Candidate Preflight verifies the release-level policy, the declared branch, and exact Candidate/work-tree equality.
 
 After successful publication/merge, the Release Orchestrator owns cleanup:
 
