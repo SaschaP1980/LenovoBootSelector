@@ -53,6 +53,73 @@ jobs:
           test "$GITHUB_REF_NAME" = "$EXPECTED_CANDIDATE"
 
           git fetch origin main --tags --force
+          PREVIOUS_VERSION=$(git show origin/main:bin/version.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+          RELEASE_LEVEL=$(python3 -c 'import sys; sys.path.insert(0,"tools"); from release_common import classify_release_level; print(classify_release_level(sys.argv[1],sys.argv[2]))' "$PREVIOUS_VERSION" "$VERSION")
+
+          # Every candidate carries one work-branch provenance marker. Major/Minor
+          # require durable work state. Patch/Hotfix default to no work branch and
+          # require an explicit pre-implementation effort/risk reason for exceptions.
+          WORK_BRANCH_VALUES=$(git log --format='%B' origin/main..HEAD | sed -n 's/^Work-Branch:[[:space:]]*//p' | sed '/^[[:space:]]*$/d' | sort -u)
+          WORK_BRANCH_COUNT=$(printf '%s\n' "$WORK_BRANCH_VALUES" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')
+          test "$WORK_BRANCH_COUNT" = "1" || {
+            echo "Candidate must contain exactly one unique Work-Branch trailer; found $WORK_BRANCH_COUNT." >&2
+            exit 1
+          }
+          WORK_BRANCH=$(printf '%s\n' "$WORK_BRANCH_VALUES" | head -n 1)
+
+          WORK_BRANCH_REASON_VALUES=$(git log --format='%B' origin/main..HEAD | sed -n 's/^Work-Branch-Reason:[[:space:]]*//p' | sed '/^[[:space:]]*$/d' | sort -u)
+          WORK_BRANCH_REASON_COUNT=$(printf '%s\n' "$WORK_BRANCH_REASON_VALUES" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')
+
+          case "$RELEASE_LEVEL" in
+            major|minor)
+              test "$WORK_BRANCH" != "none" || {
+                echo "$RELEASE_LEVEL releases require a durable work/LBS-* branch." >&2
+                exit 1
+              }
+              test "$WORK_BRANCH_REASON_COUNT" = "0" || {
+                echo "Work-Branch-Reason is reserved for Patch/Hotfix exceptions." >&2
+                exit 1
+              }
+              ;;
+            patch|hotfix)
+              if [ "$WORK_BRANCH" = "none" ]; then
+                test "$WORK_BRANCH_REASON_COUNT" = "0" || {
+                  echo "Work-Branch-Reason is invalid when Work-Branch is none." >&2
+                  exit 1
+                }
+              else
+                test "$WORK_BRANCH_REASON_COUNT" = "1" || {
+                  echo "$RELEASE_LEVEL work-branch exception requires exactly one Work-Branch-Reason trailer." >&2
+                  exit 1
+                }
+              fi
+              ;;
+            *)
+              echo "Unsupported release level: $RELEASE_LEVEL" >&2
+              exit 1
+              ;;
+          esac
+
+          if [ "$WORK_BRANCH" != "none" ]; then
+            [[ "$WORK_BRANCH" =~ ^work/LBS-[0-9]+$ ]] || {
+              echo "Invalid Work-Branch trailer: $WORK_BRANCH" >&2
+              exit 1
+            }
+            REMOTE_WORK_SHA=$(git ls-remote --heads origin "refs/heads/$WORK_BRANCH" | awk '{print $1}')
+            test -n "$REMOTE_WORK_SHA" || {
+              echo "Declared work branch does not exist: $WORK_BRANCH" >&2
+              exit 1
+            }
+            git fetch origin "refs/heads/$WORK_BRANCH:refs/remotes/origin/$WORK_BRANCH" --force
+            CANDIDATE_TREE=$(git rev-parse "$GITHUB_SHA^{tree}")
+            WORK_TREE=$(git rev-parse "refs/remotes/origin/$WORK_BRANCH^{tree}")
+            test "$WORK_TREE" = "$CANDIDATE_TREE" || {
+              echo "Declared work branch tree does not match exact candidate tree: $WORK_BRANCH" >&2
+              exit 1
+            }
+          fi
+          echo "Candidate release level: $RELEASE_LEVEL"
+          echo "Candidate work branch: $WORK_BRANCH"
 
           if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
             echo "Tag v$VERSION already exists." >&2
@@ -63,7 +130,6 @@ jobs:
             exit 1
           fi
 
-          PREVIOUS_VERSION=$(git show origin/main:bin/version.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
           rm -rf /tmp/lbs-candidate-basis
           git worktree add --detach /tmp/lbs-candidate-basis "v$PREVIOUS_VERSION^{commit}"
 

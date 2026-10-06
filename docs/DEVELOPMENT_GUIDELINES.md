@@ -2,7 +2,11 @@
 
 This document defines the durable development workflow for substantial Lenovo Boot Selector feature work.
 
-It applies **by default to Major and Minor releases**. Apply it to a Patch release when the user explicitly requests the work-branch/checkpoint model or when the Issue itself declares that model. Hotfixes normally use the shortest safe test-first path unless explicitly escalated.
+It applies **by default to Major and Minor releases**.
+
+Patch and Hotfix work uses the shortest safe atomic path **without a work branch by default**. Before implementation begins, perform a brief effort/risk analysis. Escalate a Patch or Hotfix to the work-branch/checkpoint model only when that analysis indicates that the work is likely to be substantial, cross-cutting, migration-heavy, interruption-prone, or otherwise unlikely to fit safely into one short implementation cycle. Record the reason durably and carry it into the Candidate as exactly one `Work-Branch-Reason:` trailer.
+
+Do not use a work branch for a small Patch/Hotfix merely for consistency with Major/Minor releases; the resilience machinery must not become routine overhead for short fixes.
 
 The release path remains defined by `docs/RELEASE_PROCESS.md`. Connector/GitHub operating details remain defined by `docs/GITHUB_HOWTO.md`.
 
@@ -26,7 +30,34 @@ For substantial feature work:
 
 ## 2. Work branch
 
-Create the work branch from a freshly verified current `main`:
+### Selection gate
+
+Use a work branch when:
+
+- the release is **Major or Minor**; or
+- a **Patch or Hotfix** has been explicitly escalated by the pre-implementation effort/risk analysis.
+
+For Patch/Hotfix analysis, indicators for escalation include multiple independently risky phases, settings/data migration, broad cross-module behavior changes, expected work substantially beyond a short atomic patch cycle, or a realistic need for several recoverable checkpoints. A narrow bug fix, text/UI correction, small validator change, or isolated behavior patch should normally remain branchless.
+
+When a Patch/Hotfix is escalated, record the concise reason in the Issue when Issue-backed (or equivalent durable release history for an Issue-less Hotfix) and later include the same decision as `Work-Branch-Reason: <reason>` in the Candidate history.
+
+### Patch/Hotfix atomic fast path
+
+For a Patch/Hotfix that is **not** escalated to a work branch, prefer one short atomic development cycle:
+
+1. pin current `main`;
+2. reproduce the bug and establish the focused RED regression against the unfixed canonical basis;
+3. prepare the complete source/test/documentation/release-metadata change in memory/Git objects without creating a chain of visible intermediate commits;
+4. run the focused GREEN regression plus the smallest relevant syntax/encoding/determinism checks;
+5. create **one unreferenced candidate commit** from the pinned `main`;
+6. inspect the complete candidate diff/scope once;
+7. re-read `main` and expose `candidate/v<version>` only if the base lease still holds.
+
+Do not create a durable RED commit merely to prove test-first work for a normal branchless Patch/Hotfix. Durable RED evidence belongs in the Issue/release audit trail; the Candidate itself remains release-ready only.
+
+If the work can no longer fit safely in this atomic path because scope or duration grows materially, stop before accumulating many intermediate commits and explicitly reconsider whether the Patch/Hotfix should be escalated to the work-branch model.
+
+Create the selected work branch from a freshly verified current `main`:
 
 `work/LBS-<issue-number>`
 
@@ -41,7 +72,7 @@ Rules:
 3. One work branch belongs to one Issue/scope.
 4. Never use `candidate/v<version>` as an intermediate checkpoint branch.
 5. Re-read `main` before final Candidate preparation. If `main` advanced, reconcile deliberately; never force a stale work state over it.
-6. After a successful release, delete the work branch when the available GitHub mechanism supports it. If the active connector cannot delete refs, fast-forward the work branch to final `main` and report the remaining cleanup honestly.
+6. After a successful release, the Release Orchestrator owns tree-verified work-branch deletion. Do not keep or manually fast-forward a completed work branch merely because the interactive connector cannot delete refs.
 
 ## 3. Product-decision gate before implementation
 
@@ -63,6 +94,8 @@ LBS-17 demonstrated why this matters: the implementation deliberately migrated p
 ## 4. Checkpoints are persistence gates, not stop points
 
 A checkpoint is a coherent, recoverable development state.
+
+A checkpoint is **not required to have the complete repository test matrix GREEN**. Its purpose is durable recovery, not release qualification. A checkpoint may intentionally contain a known RED focused regression, an intermediate migration state, or a phase for which some broader/native tests have not yet run, as long as the commit body states the validation status honestly.
 
 **Checkpoint != stop point.**
 
@@ -91,6 +124,8 @@ For a normal checkpoint, target no more than about **1–2 minutes of agent/conn
 
 A checkpoint must not become a separate mini-build project. In particular:
 
+- do not run the complete Release/Core/Boundary/Regression/native matrix before every checkpoint commit;
+- run only the focused checks needed to prove that the checkpoint is coherent enough for its stated phase;
 - do not manually reconstruct the generated single-file runtime through large connector string transformations;
 - do not repeat permanent validator logic with ad-hoc remote reads once the repository already owns the corresponding executable check;
 - do not create a second metadata-only commit with the same tree merely to label an implementation commit as a checkpoint;
@@ -244,6 +279,33 @@ LBS-17 created many temporary/unreferenced staging commits while incrementally r
 
 The Candidate is expected GREEN.
 
+### Commit validation versus Candidate validation
+
+Do **not** use the rule "every commit requires every test suite to be GREEN."
+
+Use validation proportional to the Git object's role:
+
+- **RED-evidence state:** the focused regression is expected to fail for the defect-specific reason.
+- **Work-branch checkpoint:** run the focused checks needed to establish a coherent recoverable phase; broader/native suites may remain pending and must be recorded honestly.
+- **Branchless Patch/Hotfix candidate preparation:** require the same focused test that proved RED to be GREEN, plus directly relevant syntax/encoding/determinism smoke checks before exposing the Candidate.
+- **Release-ready Candidate:** all available prechecks should indicate expected GREEN; GitHub Candidate Preflight then runs the authoritative Linux and Windows PowerShell 5.1 gates on the exact exposed SHA.
+- **Release:** the Release Orchestrator reruns the publication/reproducibility/status gates as defense in depth.
+
+The full repository matrix belongs at the Candidate/Release boundary, not mechanically before every persistence commit.
+
+### Test ownership and redundancy
+
+Prefer the **lowest existing permanent test layer that directly proves the behavior**. Add a second test layer only when it protects a meaningfully different risk.
+
+Once a repository invariant is owned by a permanent executable test or validator:
+
+- execute that test/validator instead of reconstructing the same assertion with multiple connector reads;
+- do not add an issue-specific validator that merely duplicates existing Functional Core/native/integration coverage;
+- do not assert exact documentation wording, capitalization, punctuation, or implementation-detail strings unless the text is itself a machine-consumed compatibility contract;
+- do not keep both ad-hoc structural checks and a permanent regression when they prove the same fact.
+
+A new permanent regression should normally encode behavior or a stable architectural invariant, not incidental source spelling.
+
 Hand-written structural checks are useful focused prechecks, but they must not be mistaken for the actual repository validators.
 
 Before Candidate creation, the final development-completion gate should execute the closest available equivalent of the real Candidate checks:
@@ -257,6 +319,10 @@ Before Candidate creation, the final development-completion gate should execute 
 If the current environment cannot execute the real full-worktree checks, record that limitation explicitly. Do not manufacture dozens of approximate checks as a substitute.
 
 LBS-17's first Candidate failed because a regression assertion was too broad. The product behavior was correct; the exact permanent validator had not been executed against the work branch before Candidate exposure. A hosted work-branch preflight would have caught this earlier.
+
+LBS-23/v0.8.0.1 reinforced the opposite efficiency lesson for small fixes: the work branch accumulated **24 commits** for an 18-file Hotfix, while several manual structural checks and an issue-specific Python validator duplicated behavior already covered by Functional Core and the native localization suite. The extra validator also created avoidable quote/prose-literal corrections. Future small Patch/Hotfix work should therefore favor the atomic branchless path, one behavioral regression at the lowest useful layer, and only distinct integration coverage.
+
+The LBS-23 Candidate also found a displaced UTF-8 BOM on a PowerShell file. For changed PowerShell sources containing non-ASCII text, a cheap encoding/BOM/parser smoke check is appropriate before Candidate exposure; that is a targeted precheck, not justification for running the full repository suite before every commit.
 
 ## 11. Candidate and release supervision
 
@@ -272,6 +338,12 @@ Use:
 4. after release, the authoritative `RELEASE_VERIFICATION_SUMMARY`.
 
 Do not reconstruct fields already covered by a successful aggregate summary through many additional connector calls unless investigating an inconsistency.
+
+For any Candidate derived from a durable work branch, include exactly one unique candidate-history trailer:
+
+`Work-Branch: work/LBS-<issue>`
+
+Use `Work-Branch: none` for the normal Patch/Hotfix path and whenever no work branch exists. Major/Minor releases may not use `none`. If a Patch/Hotfix declares `work/LBS-*`, Candidate Preflight additionally requires exactly one non-empty `Work-Branch-Reason:` trailer documenting the pre-implementation effort/risk exception. Candidate Preflight requires an exact tree match between the declared work branch and the Candidate. After successful publication, the Release Orchestrator rechecks the tree and deletes that work branch automatically. If the branch changed after Candidate creation, cleanup fails closed and preserves the branch. The final `RELEASE_VERIFICATION_SUMMARY` must confirm candidate, release, and declared work-branch cleanup.
 
 LBS-17 included several unnecessary repeated job-status reads and redundant post-release API verification calls even though the repository already had aggregated summaries.
 
@@ -319,7 +391,7 @@ For a comparable feature, aim for:
 
 1. Issue and explicit product-decision gate;
 2. verified `main`;
-3. one `work/LBS-<issue>` branch;
+3. one `work/LBS-<issue>` branch (Major/Minor, or an explicitly escalated Patch/Hotfix exception);
 4. roughly 3–5 coherent checkpoints rather than many tiny checkpoints;
 5. no more than about 10–15 minutes of completed unpersisted work;
 6. bounded connector operations;
@@ -327,9 +399,9 @@ For a comparable feature, aim for:
 8. no manual incremental generated-runtime reconstruction;
 9. use the Work Checkpoint Gate for deterministic runtime synchronization and standardized checkpoint validation as soon as that hosted path exists;
 10. one development-completion validation gate using the real validators as closely as the environment permits;
-11. one release-ready Candidate;
+11. one release-ready Candidate carrying the exact `Work-Branch:` provenance trailer;
 12. normal Candidate/Release automation;
-13. work-branch cleanup.
+13. automatic, tree-verified work-branch cleanup after successful publication.
 
 Never optimize by weakening validation, safety boundaries, reproducibility, or release verification.
 

@@ -25,6 +25,23 @@ Before implementation/release preparation:
 
 For Issue-backed releases, the Issue is part of the audit trail: important implementation findings belong in comments, and closure occurs only after successful publication/post-release verification.
 
+## Release level and work-branch policy
+
+Release level is derived from the first changed component of the four-part numeric version relative to the currently published version:
+
+- component 1 → **Major**;
+- component 2 → **Minor**;
+- component 3 → **Patch**;
+- component 4 → **Hotfix**.
+
+Work-branch policy is intentionally asymmetric:
+
+- **Major / Minor:** `work/LBS-<issue>` is mandatory.
+- **Patch / Hotfix:** default to **no work branch** and the shortest safe atomic implementation path.
+- Before Patch/Hotfix implementation, perform a brief effort/risk analysis. Use a work branch only as an exception when the change is likely to be substantial, cross-cutting, migration-heavy, interruption-prone, or otherwise likely to require several recoverable checkpoints.
+- A Patch/Hotfix exception must be recorded durably before implementation and the Candidate must contain exactly one `Work-Branch-Reason: <reason>` trailer.
+- Do not escalate a small Patch/Hotfix merely to reuse the Major/Minor process.
+
 ## Test-first bug/regression preparation
 
 For every confirmed product bug or regression, use **failing test first, not failing candidate first**.
@@ -37,6 +54,14 @@ Before implementing the fix:
 
 Then implement the smallest fix, rerun the same regression test and require GREEN. Complete applicable broader prechecks before Candidate creation.
 
+For a normal branchless Patch/Hotfix, RED evidence does **not** require a durable RED commit. Run the focused regression against the unfixed canonical basis, record the failure durably, then prepare the complete fix as one atomic candidate state. Avoid a chain of intermediate commits unless the work has been deliberately escalated to the work-branch model.
+
+Do not run the entire repository/native test matrix before every intermediate commit. Before Candidate exposure, require:
+- the defect-specific RED→GREEN regression;
+- directly relevant syntax/parser/encoding checks for changed source types;
+- relevant deterministic-generation checks when generated artifacts are affected;
+- any additional focused test that protects a distinct risk introduced by the change.
+
 The Candidate branch is **release-ready**, not a RED-test vehicle. Do not intentionally publish a known-failing Candidate or run Candidate Preflight merely to prove the pre-fix failure. Candidate Preflight is the mandatory integration/release-entry gate for a state that is already expected to pass. Unexpected Candidate failures continue to use the existing same-branch fast-forward correction path.
 
 ## Local release preparation
@@ -47,8 +72,14 @@ The Candidate branch is **release-ready**, not a RED-test vehicle. Do not intent
 4. Set `protectedFragmentIntent` to exactly the protected fragments intentionally changed by this version; normally `[]`.
 5. Set `repositoryDeleteIntent` to exactly the repository paths intentionally deleted by this version; normally `[]`.
 6. For a bug/regression, complete the focused RED→GREEN proof described above and run applicable broader prechecks.
-7. Prepare one exact **release-ready** candidate commit based on current `main`.
-8. Push that commit only as `candidate/v<version>`. Do **not** manually create `release/v<version>`.
+7. For a normal Patch/Hotfix without a work branch, assemble the complete intended change as one atomic candidate tree/commit rather than persisting file-by-file implementation commits.
+8. Prepare one exact **release-ready** candidate commit based on current `main`.
+9. The candidate-only commit range must contain exactly one unique `Work-Branch:` trailer:
+   - Major/Minor: `Work-Branch: work/LBS-<issue>` is mandatory;
+   - Patch/Hotfix normal path: `Work-Branch: none`;
+   - Patch/Hotfix exception: `Work-Branch: work/LBS-<issue>` plus exactly one `Work-Branch-Reason: <reason>` from the pre-implementation effort/risk analysis.
+   Same-candidate correction commits may omit these trailers, but must not introduce conflicting values. When a work branch is declared, its current tree must exactly match the Candidate tree.
+10. Push that commit only as `candidate/v<version>`. Do **not** manually create `release/v<version>`.
 
 ### Version-only minimum diff
 
@@ -90,7 +121,9 @@ The v0.6.9.0 production benchmark measured the Windows job at about 25.0 seconds
 
 The single permanent `release.yml` workflow runs the full release/core/boundary/regression gates itself before PR creation, writes the successful gate states directly onto the final PR-head commit, creates the annotated ZIP-free source tag only after successful PR creation, then merges the PR and deletes the release branch. A separate `pull_request` workflow is intentionally not used: pull requests created with the repository `GITHUB_TOKEN` do not recursively start another workflow.
 
-After the merge, the same workflow runs `tools/release_verification.py`. This integrated verifier checks PR/merge state, exactly one publication PR, 8/8 release statuses, all 3/3 candidate statuses, source tag/source tree, `downloads/latest.json`, published release ZIP hash/size, candidate/release branch cleanup and the completed reproducibility marker. It emits one machine-readable `RELEASE_VERIFICATION_SUMMARY=<json>` line and a human-readable GitHub Job Summary.
+After the merge, the Release Orchestrator also owns **work-branch cleanup**. If the Candidate declared `Work-Branch: work/LBS-<issue>`, the workflow re-reads that branch immediately before deletion and deletes it only when its current tree still exactly equals the released Candidate tree. If the branch advanced or diverged, cleanup fails closed and the branch is preserved; the workflow never force-deletes active development state. `Work-Branch: none` means no work-branch deletion is expected.
+
+After cleanup, the same workflow runs `tools/release_verification.py`. This integrated verifier checks PR/merge state, exactly one publication PR, 8/8 release statuses, all 3/3 candidate statuses, source tag/source tree, `downloads/latest.json`, published release ZIP hash/size, candidate/release/work-branch cleanup and the completed reproducibility marker. It emits one machine-readable `RELEASE_VERIFICATION_SUMMARY=<json>` line and a human-readable GitHub Job Summary.
 
 There is no version-specific workflow, separate PR-verification workflow, Base64 patch transport, helper source branch, separate required post-merge finalizer, or per-version validator copy.
 

@@ -11,7 +11,7 @@ Mandatory order:
 1. **Read current `main` and record its SHA/tree.**
 2. **Read this `docs/GITHUB_HOWTO.md` in full from current `main`.**
 3. **Read `docs/RELEASE_PROCESS.md` in full.**
-4. **Read `docs/DEVELOPMENT_GUIDELINES.md` in full** for Major/Minor work and whenever the user explicitly requests the work-branch/checkpoint model.
+4. **Read `docs/DEVELOPMENT_GUIDELINES.md` in full** for Major/Minor work and for Patch/Hotfix work only when the pre-implementation effort/risk analysis escalates it to the work-branch/checkpoint model.
 5. For Issue-backed work, read the **current GitHub Issue** including state, labels, comments, and acceptance criteria.
 6. Read **`bin/version.json`** and verify current version, `releaseProfile`, `protectedFragmentIntent`, and `repositoryDeleteIntent`.
 7. Read the relevant executable contracts:
@@ -21,7 +21,7 @@ Mandatory order:
    - `tools/candidate_preflight.py`
    - `tools/release_verification.py`
    - the four permanent validators under `tests/`
-8. Only then determine scope, target version, and implementation/release plan and prepare changes.
+8. Only then determine scope, target version, and implementation/release plan. For Patch/Hotfix, perform the brief effort/risk analysis **before implementation** and default to the branchless atomic path unless the analysis justifies escalation.
 
 ### Authority order
 
@@ -312,16 +312,30 @@ For connector-supervised releases, optimize the **number of orchestration roundt
 Use phase snapshots:
 
 1. **Preparation snapshot:** read current `main` SHA/tree, implementation Issue, version and all files required for the planned change in one batched/parallel read where technically possible. Reuse that snapshot while its base SHA remains current.
-2. **Atomic candidate preparation:** create all intended blobs, one tree and one candidate commit; inspect that commit once before exposing `candidate/v<version>`.
-3. **Candidate observation:** perform one initial run lookup. Do not tight-poll. When the run is terminal, read run/jobs/logs together where possible and consume `CANDIDATE_PREFLIGHT_SUMMARY=<json>`.
-4. **Release observation:** after dispatch, avoid re-reading unchanged candidate facts. On terminal success, consume the single `RELEASE_VERIFICATION_SUMMARY=<json>` emitted by the Release Orchestrator.
-5. **Issue completion:** use the verified summary for the release facts, add the final Issue comment and close the Issue. Do not repeat individual PR/tag/status/latest/ZIP/source-tree reads merely to reconstruct facts already verified in the summary.
+2. **Patch/Hotfix focused validation:** for the normal branchless path, run the bug-specific RED regression against the unfixed canonical basis, then require that same regression GREEN after the fix. Add only source-type smoke checks that protect distinct risks (for example Python syntax, PowerShell parser/encoding/BOM, deterministic generated-output checks). Do not run or reconstruct the full repository matrix before every intermediate Git object.
+3. **Atomic candidate preparation:** create all intended blobs, one tree and one candidate commit; inspect that commit once before exposing `candidate/v<version>`. For a normal Patch/Hotfix, avoid file-by-file visible implementation commits.
+4. **Candidate observation:** perform one initial run lookup. Do not tight-poll. When the run is terminal, read run/jobs/logs together where possible and consume `CANDIDATE_PREFLIGHT_SUMMARY=<json>`.
+5. **Release observation:** after dispatch, avoid re-reading unchanged candidate facts. On terminal success, consume the single `RELEASE_VERIFICATION_SUMMARY=<json>` emitted by the Release Orchestrator.
+6. **Issue completion:** use the verified summary for the release facts, add the final Issue comment and close the Issue. Do not repeat individual PR/tag/status/latest/ZIP/source-tree reads merely to reconstruct facts already verified in the summary.
 
 `tools/release_verification.py` performs the complete server-side post-release aggregation after the merge. It verifies the merged PR, exactly one publication PR, 8/8 release statuses, all 3/3 candidate statuses (`preflight/candidate`, `preflight/linux`, `preflight/windows-powershell51`), annotated source tag/commit, ZIP-/cache-free source tree, `downloads/latest.json`, published release ZIP size/hash, candidate/release branch cleanup and the prior reproducibility marker.
 
 The structured summary is an **aggregation of completed checks**, not a replacement for them. If the workflow is not terminal success, the summary is missing, `result != PASS`, or a requested fact is absent, fall back to the full direct post-release checklist below.
 
 The practical target for a small conflict-free patch, once code is ready and runners are available, is roughly **2–3 minutes of interactive orchestration**, while GitHub still executes all existing gates.
+
+### Avoid duplicate validation
+
+Once a behavior/invariant has a permanent executable owner, call that test or validator instead of rebuilding the same proof with connector-side string searches. An additional test is justified only when it covers a distinct layer or failure mode.
+
+In particular:
+
+- prefer an existing Functional Core/native/integration test over a new issue-specific validator that only mirrors it;
+- avoid exact prose/punctuation assertions for human documentation unless tooling genuinely consumes that exact text;
+- do not manually repeat catalog parity, runtime closure, protected-fragment or other checks already owned by permanent validators;
+- do not re-verify fields individually after a successful aggregate Candidate/Release summary unless investigating an inconsistency.
+
+LBS-23/v0.8.0.1 demonstrated the cost of violating this rule: duplicated structural checks and an issue-specific validator created extra quote/prose-literal corrections without adding equivalent product protection.
 
 ## The eight release status gates
 
@@ -475,7 +489,7 @@ Use this procedure:
    - create one commit with the pinned current `main` commit as parent;
    - inspect the complete commit/diff before creating any visible Candidate ref.
 6. Re-read `main` immediately before exposing the Candidate branch. If `main` advanced, stop and rebuild/reconcile the candidate from the new canonical `main`; never force the stale candidate onto the new base.
-7. Use `candidate/v<version>` only after the exact candidate commit is complete and inspected. Candidate Preflight then performs the authoritative repository-wide Linux validation and GitHub-hosted Windows PowerShell 5.1 validation on that exact SHA.
+7. Use `candidate/v<version>` only after the exact candidate commit is complete and inspected. Its candidate-only history must carry exactly one `Work-Branch:` trailer as defined below so the release can safely clean durable work state. Candidate Preflight then performs the authoritative repository-wide Linux validation and GitHub-hosted Windows PowerShell 5.1 validation on that exact SHA.
 8. For documentation-only changes that do not touch product/runtime/release inputs, use the same connector-first reads and lease check, then make one atomic documentation commit directly on current `main` as allowed by the documentation-only policy.
 
 Local/container checks built from connector-fetched files may be used as focused prechecks, but they are **not** a substitute for the repository-wide Candidate/Release gates and must not be reported as such. Conversely, lack of a local clone must not block a valid implementation or release when the connector and GitHub workflows provide the required canonical reads, Git-object writes and authoritative tests.
@@ -499,16 +513,34 @@ If repository-archive materialization is unavailable and direct container GitHub
 
 LBS-17/v0.8.0.0 established this rule: the connector had no general archive action and the container could not resolve `github.com`; neither condition was caused by `work/LBS-17`.
 
-### Branch deletion limitation
+### Branch deletion and release-owned work-branch cleanup
 
-The currently available connector can create/read/move branch refs but does not expose a general delete-branch/delete-ref action.
+The currently available ChatGPT GitHub connector can create/read/move branch refs but does not expose a general delete-branch/delete-ref action. **Normal release cleanup must therefore be owned by GitHub Actions, not by the interactive connector.**
 
-Consequences:
+Candidate provenance is mandatory:
 
-- Do not create throwaway documentation/feature branches unless a workflow/merge path will delete them.
-- The v0.6.5.0 Candidate Preflight is an intentional exception: its temporary `candidate/**` branch is deleted server-side by the GitHub workflow after successful promotion, so it does not depend on a connector delete-ref action.
+- Major/Minor Candidates require exactly one unique `Work-Branch: work/LBS-<issue>` trailer;
+- Patch/Hotfix Candidates default to exactly one `Work-Branch: none` trailer;
+- a Patch/Hotfix may declare `Work-Branch: work/LBS-<issue>` only after a pre-implementation effort/risk escalation and must then also contain exactly one unique `Work-Branch-Reason: <reason>` trailer;
+- same-candidate correction commits may omit the trailers, but they must not introduce conflicting values;
+- Candidate Preflight verifies the release-level policy, the declared branch, and exact Candidate/work-tree equality.
+
+After successful publication/merge, the Release Orchestrator owns cleanup:
+
+1. it re-reads the declared `work/LBS-*` branch;
+2. it compares that branch's current tree with the released Candidate tree again;
+3. only an exact tree match may be deleted;
+4. if the branch advanced or diverged, deletion fails closed and the branch is preserved;
+5. `tools/release_verification.py` requires the declared work branch to be absent before emitting `RELEASE_VERIFICATION_SUMMARY=... PASS`.
+
+This makes a work branch durable recovery state **during development** and disposable state **only after its exact content has been published successfully**. Never force-delete an advanced work branch merely to satisfy cleanup.
+
+Other consequences remain:
+
+- Do not create throwaway documentation/feature branches unless a workflow/merge path owns their cleanup.
+- Temporary `candidate/**` branches are deleted server-side after successful promotion.
+- Temporary `release/**` branches are deleted by the publication merge path.
 - A branch push made by a GitHub Actions job with `GITHUB_TOKEN` does not normally trigger another workflow. Cross-workflow promotion therefore uses explicit `workflow_dispatch`; do not rely on recursive push triggering.
-- If another stale branch must be deleted and no workflow owns its cleanup, report the connector limitation rather than pretending it was removed.
 - A stale branch must never be reused merely to avoid creating a new branch.
 
 ### Bounded connector orchestration
@@ -585,7 +617,7 @@ A release report should distinguish:
 - which automated GitHub gates passed;
 - exact version, PR, `main` SHA and source-tag commit;
 - release ZIP size/SHA-256;
-- whether candidate and release branches were removed;
+- whether candidate, release, and declared work branches were removed;
 - whether the implementation Issue was closed;
 - which native Windows tests were actually executed versus only represented by source/static contracts.
 

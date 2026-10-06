@@ -60,6 +60,24 @@ def load_version(root: Path) -> str:
     return load_release_config(root)['version']
 
 
+def classify_release_level(previous_version: str, version: str) -> str:
+    if not VERSION_RE.fullmatch(str(previous_version)) or not VERSION_RE.fullmatch(str(version)):
+        raise RuntimeError('release-level classification requires four-part numeric versions')
+    previous = tuple(int(x) for x in str(previous_version).split('.'))
+    current = tuple(int(x) for x in str(version).split('.'))
+    if current <= previous:
+        raise RuntimeError(f'version must increase: {previous_version} -> {version}')
+    if current[0] != previous[0]:
+        return 'major'
+    if current[1] != previous[1]:
+        return 'minor'
+    if current[2] != previous[2]:
+        return 'patch'
+    if current[3] != previous[3]:
+        return 'hotfix'
+    raise RuntimeError(f'unclassifiable version transition: {previous_version} -> {version}')
+
+
 def release_tag(version: str) -> str:
     return f'v{version}'
 

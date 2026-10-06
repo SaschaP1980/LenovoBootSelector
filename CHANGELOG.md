@@ -1,5 +1,13 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.8.0.2 – Version-only Hotfix path performance measurement
+
+- Pure version-only Hotfix used to measure the streamlined branchless Patch/Hotfix development and release path.
+- Canonical version raised from `0.8.0.1` to `0.8.0.2`.
+- `releaseProfile` is `version-only`; product code under `src/**` is unchanged.
+- `protectedFragmentIntent` and `repositoryDeleteIntent` are empty.
+- The run measures preparation, Candidate Preflight, promotion, Release Orchestrator, and total end-to-end release timing without mixing in a functional product change.
+
 ## v0.8.0.1 – LBS-23 English-default localization migration hotfix
 
 - Fix the v0.8.0.0 localization migration so pre-localization settings without an explicit locale resolve to English (`en-US`) instead of German.

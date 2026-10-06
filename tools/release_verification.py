@@ -93,6 +93,13 @@ def wait_branch_deleted(root:Path,branch:str)->bool:
             time.sleep(1)
     return False
 
+def validate_work_branch(value:str)->str:
+    value=(value or '').strip()
+    if value=='none':
+        return value
+    require(bool(re.fullmatch(r'work/LBS-[0-9]+',value)),f'invalid work branch: {value!r}')
+    return value
+
 def sha256_bytes(data:bytes)->str:
     return hashlib.sha256(data).hexdigest()
 
@@ -117,6 +124,14 @@ def self_test()->int:
         pass
     else:
         raise RuntimeError('self-test accepted missing candidate status')
+    require(validate_work_branch('none')=='none','self-test rejected no-work-branch marker')
+    require(validate_work_branch('work/LBS-23')=='work/LBS-23','self-test rejected valid work branch')
+    try:
+        validate_work_branch('work/not-safe')
+    except RuntimeError:
+        pass
+    else:
+        raise RuntimeError('self-test accepted invalid work branch')
     print('PASS release verification helper self-test')
     return 0
 
@@ -126,6 +141,7 @@ def main()->int:
     ap.add_argument('--root',type=Path)
     ap.add_argument('--version')
     ap.add_argument('--candidate-sha')
+    ap.add_argument('--work-branch')
     ap.add_argument('--final-sha')
     ap.add_argument('--source-commit')
     ap.add_argument('--pr-url')
@@ -145,7 +161,7 @@ def main()->int:
     try:
         required={
             'root':args.root,'version':args.version,'candidate-sha':args.candidate_sha,
-            'final-sha':args.final_sha,'source-commit':args.source_commit,
+            'work-branch':args.work_branch,'final-sha':args.final_sha,'source-commit':args.source_commit,
             'pr-url':args.pr_url,'published-utc':args.published_utc,
             'release-build-json':args.release_build_json,
             'reproducibility-marker':args.reproducibility_marker,'output':args.output,
@@ -156,6 +172,7 @@ def main()->int:
         root=args.root.resolve()
         repo=os.environ.get('GITHUB_REPOSITORY','').strip()
         require(bool(re.fullmatch(r'[^/]+/[^/]+',repo)),f'invalid GITHUB_REPOSITORY: {repo!r}')
+        work_branch=validate_work_branch(args.work_branch)
         pr_match=re.search(r'/pull/(\d+)(?:$|[/?#])',args.pr_url)
         require(pr_match is not None,f'invalid PR URL: {args.pr_url!r}')
         pr_number=int(pr_match.group(1))
@@ -225,8 +242,10 @@ def main()->int:
         release_branch=f'release/v{args.version}'
         candidate_deleted=wait_branch_deleted(root,candidate_branch)
         release_deleted=wait_branch_deleted(root,release_branch)
+        work_deleted=True if work_branch=='none' else wait_branch_deleted(root,work_branch)
         require(candidate_deleted,'candidate branch still exists')
         require(release_deleted,'release branch still exists')
+        require(work_deleted,f'work branch still exists: {work_branch}')
 
         summary={
             'schemaVersion':1,
@@ -261,6 +280,8 @@ def main()->int:
             'branches':{
                 'candidateDeleted':candidate_deleted,
                 'releaseDeleted':release_deleted,
+                'workBranch':work_branch,
+                'workDeleted':work_deleted,
             },
             'latestConsistent':True,
             'releaseZipConsistent':release_zip_consistent,
@@ -287,6 +308,10 @@ def main()->int:
                 f.write(f'- Main SHA: `{main_sha}`\n')
                 f.write(f'- Release ZIP SHA-256: `{release.get("sha256")}`\n')
                 f.write('- Candidate/release branches: **deleted**\n')
+                if work_branch=='none':
+                    f.write('- Work branch: **none declared**\n')
+                else:
+                    f.write(f'- Work branch: `{work_branch}` — **deleted**\n')
                 f.write('- Source tree: **ZIP/cache-free**\n')
         return 0
     except Exception as e:

@@ -39,6 +39,68 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main --tags --force
 
+          if git cat-file -e origin/main:bin/version.json 2>/dev/null; then
+            PREVIOUS_VERSION=$(git show origin/main:bin/version.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+          elif git cat-file -e origin/main:version.json 2>/dev/null; then
+            PREVIOUS_VERSION=$(git show origin/main:version.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+          else
+            PREVIOUS_VERSION=$(git show origin/main:downloads/latest.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+          fi
+          RELEASE_LEVEL=$(python3 -c 'import sys; sys.path.insert(0,"tools"); from release_common import classify_release_level; print(classify_release_level(sys.argv[1],sys.argv[2]))' "$PREVIOUS_VERSION" "$VERSION")
+
+          WORK_BRANCH_VALUES=$(git log --format='%B' origin/main..HEAD | sed -n 's/^Work-Branch:[[:space:]]*//p' | sed '/^[[:space:]]*$/d' | sort -u)
+          WORK_BRANCH_COUNT=$(printf '%s\n' "$WORK_BRANCH_VALUES" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')
+          test "$WORK_BRANCH_COUNT" = "1" || {
+            echo "Release candidate must contain exactly one unique Work-Branch trailer; found $WORK_BRANCH_COUNT." >&2
+            exit 1
+          }
+          WORK_BRANCH=$(printf '%s\n' "$WORK_BRANCH_VALUES" | head -n 1)
+          WORK_BRANCH_REASON_VALUES=$(git log --format='%B' origin/main..HEAD | sed -n 's/^Work-Branch-Reason:[[:space:]]*//p' | sed '/^[[:space:]]*$/d' | sort -u)
+          WORK_BRANCH_REASON_COUNT=$(printf '%s\n' "$WORK_BRANCH_REASON_VALUES" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')
+
+          case "$RELEASE_LEVEL" in
+            major|minor)
+              test "$WORK_BRANCH" != "none" || {
+                echo "$RELEASE_LEVEL releases require a durable work/LBS-* branch." >&2
+                exit 1
+              }
+              test "$WORK_BRANCH_REASON_COUNT" = "0" || {
+                echo "Work-Branch-Reason is reserved for Patch/Hotfix exceptions." >&2
+                exit 1
+              }
+              ;;
+            patch|hotfix)
+              if [ "$WORK_BRANCH" = "none" ]; then
+                test "$WORK_BRANCH_REASON_COUNT" = "0" || {
+                  echo "Work-Branch-Reason is invalid when Work-Branch is none." >&2
+                  exit 1
+                }
+              else
+                test "$WORK_BRANCH_REASON_COUNT" = "1" || {
+                  echo "$RELEASE_LEVEL work-branch exception requires exactly one Work-Branch-Reason trailer." >&2
+                  exit 1
+                }
+              fi
+              ;;
+          esac
+
+          CANDIDATE_TREE=$(git rev-parse "$CANDIDATE_SHA^{tree}")
+          if [ "$WORK_BRANCH" != "none" ]; then
+            [[ "$WORK_BRANCH" =~ ^work/LBS-[0-9]+$ ]] || {
+              echo "Invalid Work-Branch trailer: $WORK_BRANCH" >&2
+              exit 1
+            }
+            REMOTE_WORK_SHA=$(git ls-remote --heads origin "refs/heads/$WORK_BRANCH" | awk '{print $1}')
+            if [ -n "$REMOTE_WORK_SHA" ]; then
+              git fetch origin "refs/heads/$WORK_BRANCH:refs/remotes/origin/$WORK_BRANCH" --force
+              WORK_TREE=$(git rev-parse "refs/remotes/origin/$WORK_BRANCH^{tree}")
+              test "$WORK_TREE" = "$CANDIDATE_TREE" || {
+                echo "Work branch advanced or diverged after candidate creation; refusing release cleanup: $WORK_BRANCH" >&2
+                exit 1
+              }
+            fi
+          fi
+
           PREFLIGHT_STATUS_JSON=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/status")
           PREFLIGHT_STATE=$(printf '%s' "$PREFLIGHT_STATUS_JSON" | jq -r '[.statuses[] | select(.context=="preflight/candidate")][0].state // ""')
           LINUX_PREFLIGHT_STATE=$(printf '%s' "$PREFLIGHT_STATUS_JSON" | jq -r '[.statuses[] | select(.context=="preflight/linux")][0].state // ""')
@@ -63,15 +125,6 @@ jobs:
           if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
             echo "Tag v$VERSION already exists; refusing to overwrite." >&2
             exit 1
-          fi
-
-          if git cat-file -e origin/main:bin/version.json 2>/dev/null; then
-            PREVIOUS_VERSION=$(git show origin/main:bin/version.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
-          elif git cat-file -e origin/main:version.json 2>/dev/null; then
-            # One-release migration compatibility for pre-LBS-2 history only.
-            PREVIOUS_VERSION=$(git show origin/main:version.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
-          else
-            PREVIOUS_VERSION=$(git show origin/main:downloads/latest.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
           fi
 
           # GitHub owns publication time. Capture it only after the hosted runner is actually executing
@@ -242,12 +295,29 @@ jobs:
 
           gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --merge --delete-branch
 
+          # Work branches are durable recovery state during development, but they are
+          # disposable only after successful publication. Re-check the exact tree at
+          # deletion time so an active/advanced branch can never be removed by accident.
+          if [ "$WORK_BRANCH" != "none" ]; then
+            REMOTE_WORK_SHA=$(git ls-remote --heads origin "refs/heads/$WORK_BRANCH" | awk '{print $1}')
+            if [ -n "$REMOTE_WORK_SHA" ]; then
+              git fetch origin "refs/heads/$WORK_BRANCH:refs/remotes/origin/$WORK_BRANCH" --force
+              WORK_TREE=$(git rev-parse "refs/remotes/origin/$WORK_BRANCH^{tree}")
+              test "$WORK_TREE" = "$CANDIDATE_TREE" || {
+                echo "Work branch changed during release; refusing to delete $WORK_BRANCH." >&2
+                exit 1
+              }
+              git push origin --delete "$WORK_BRANCH"
+            fi
+          fi
+
           # LBS-16: aggregate the complete post-release checklist server-side so interactive
           # supervision needs one terminal workflow/log read instead of many GitHub roundtrips.
           python3 -B tools/release_verification.py \
             --root . \
             --version "$VERSION" \
             --candidate-sha "$CANDIDATE_SHA" \
+            --work-branch "$WORK_BRANCH" \
             --final-sha "$FINAL_SHA" \
             --source-commit "$SOURCE_COMMIT" \
             --pr-url "$PR_URL" \
