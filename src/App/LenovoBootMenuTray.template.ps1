@@ -884,6 +884,7 @@ $script:UpdateState = New-UpdateRuntimeState
 
 # @include src/UI/AutostartPresentation.ps1
 
+# @include src/Core/Localization.ps1
 # @include src/Core/EntryPreferences.ps1
 
 

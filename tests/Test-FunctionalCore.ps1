@@ -1,6 +1,7 @@
 ﻿#requires -version 5.1
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+. (Join-Path $root 'src\Core\Localization.ps1')
 . (Join-Path $root 'src\Core\EntryPreferences.ps1')
 . (Join-Path $root 'src\Core\FirmwareParsing.ps1')
 . (Join-Path $root 'src\Core\BootTargetModel.ps1')
@@ -18,6 +19,18 @@ function Assert-Equal($Expected, $Actual, [string]$Name) {
     $script:Pass++
     Write-Host "PASS  $Name"
 }
+
+Assert-Equal @('en-US','de-DE') @(Get-SupportedLocaleIdsCore) 'Localization supported locales'
+Assert-Equal 'en-US' (Resolve-LocaleIdCore -Locale $null) 'Localization default locale is English'
+Assert-Equal 'de-DE' (Resolve-LocaleIdCore -Locale 'de-de') 'Localization locale matching is case-insensitive'
+Assert-Equal 'en-US' (Resolve-LocaleIdCore -Locale 'fr-FR') 'Localization unknown locale falls back to English'
+Assert-Equal $true (Test-LocalizationCatalogParityCore) 'Localization catalogs have identical key sets'
+Assert-Equal 'Cancel' (Get-LocalizedStringCore -Key 'Common.Cancel' -Locale 'en-US') 'Localization English lookup'
+Assert-Equal 'Abbrechen' (Get-LocalizedStringCore -Key 'Common.Cancel' -Locale 'de-DE') 'Localization German lookup'
+Assert-Equal 'Cancel' (Get-LocalizedStringCore -Key 'Common.Cancel' -Locale 'invalid') 'Localization invalid locale lookup falls back to English'
+Assert-Equal 'Unknown.Key' (Get-LocalizedStringCore -Key 'Unknown.Key' -Locale 'de-DE') 'Localization unknown key is deterministic'
+Assert-Equal 'Step 2 of 5' (Get-LocalizedStringCore -Key 'Progress.StepOf' -Locale 'en-US' -Arguments @(2,5)) 'Localization positional formatting'
+Assert-Equal 'Interne SSD: KXG8AZNV2T04 LA KIOXIA' (Get-LocalizedStringCore -Key 'Storage.InternalSsdModel' -Locale 'de-DE' -Values @{ Model='KXG8AZNV2T04 LA KIOXIA' }) 'Localization named formatting'
 
 $g1 = '{ABCDEF12-3456-7890-ABCD-EF1234567890}'
 $g2 = '{11111111-2222-3333-4444-555555555555}'

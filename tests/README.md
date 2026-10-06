@@ -17,7 +17,7 @@ These four files are the permanent Python gates used by the GitHub Release Orche
 
 | File | Category | Purpose |
 | --- | --- | --- |
-| `Test-FunctionalCore.ps1` | Core | Parsers, settings, and functional core behavior |
+| `Test-FunctionalCore.ps1` | Core | Parsers, settings, localization resolution/formatting, and functional core behavior |
 | `Test-UpdateCore.ps1` | Core | Update model, transport failure contract, and update contracts |
 | `Test-RefreshRuntime.ps1` | Runtime | Background refresh state/request lifecycle and child-worker diagnostics-session correlation |
 | `Test-MaintenanceRuntime.ps1` | Runtime | Maintenance state and modes |

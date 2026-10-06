@@ -5,6 +5,7 @@ import argparse, hashlib, json, re, subprocess, sys
 
 ROOT_DEFAULT=Path(__file__).resolve().parents[1]
 CORE_FILES=[
+    'src/Core/Localization.ps1',
     'src/Core/EntryPreferences.ps1',
     'src/Core/FirmwareParsing.ps1',
     'src/Core/BootTargetModel.ps1',
@@ -94,8 +95,17 @@ def main():
         s.eq(f'Template include marker exactly once: {rel}',template.count(marker),1)
         s.absent(f'Generated runtime contains no include marker: {rel}',tray,marker)
 
+    localization=core_text.get('src/Core/Localization.ps1','')
     entry=core_text.get('src/Core/EntryPreferences.ps1','')
     firmware=core_text.get('src/Core/FirmwareParsing.ps1','')
+    for fn in ['Get-SupportedLocaleIdsCore','Resolve-LocaleIdCore','Get-LocalizationCatalogCore','Get-LocalizationKeySetCore','Test-LocalizationCatalogParityCore','Get-LocalizedStringCore']:
+        s.eq(f'Localization core function once in module: {fn}',len(re.findall(rf'(?m)^function\s+{re.escape(fn)}\b',localization)),1)
+        s.eq(f'Localization core function once in bundle: {fn}',len(re.findall(rf'(?m)^function\s+{re.escape(fn)}\b',tray)),1)
+    s.contains('Localization catalog contains English',localization,"'en-US' = [ordered]@{")
+    s.contains('Localization catalog contains German',localization,"'de-DE' = [ordered]@{")
+    s.contains('Localization invalid locale fallback is English',localization,"return 'en-US'")
+    s.contains('Localization missing active key falls back to English',localization,"$english = $catalogs['en-US']")
+    s.absent('Localization core excludes dynamic execution',localization,'Invoke-Expression')
     boot=core_text.get('src/Core/BootTargetModel.ps1','')
     for fn in ['Convert-EntryAliasesToHashtable','Copy-EntryAliasMap','Test-StringSequenceEqual','Test-EntryAliasMapsEqual','Test-GuidInList','New-DefaultAppSettingsCore','ConvertTo-NormalizedAppSettingsCore','Get-OrderedEntriesCore']:
         s.eq(f'Entry core function once in module: {fn}',len(re.findall(rf'(?m)^function\s+{re.escape(fn)}\b',entry)),1)
