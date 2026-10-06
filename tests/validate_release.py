@@ -23,7 +23,7 @@ def fn(src,name):
 
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); a=ap.parse_args(); root=a.root.resolve(); s=S()
-    vp=root/'version.json'; s.c('Canonical version.json exists',vp.is_file())
+    vp=root/'bin/version.json'; s.c('Canonical bin/version.json exists',vp.is_file())
     meta={}
     if vp.is_file():
         try: meta=json.loads(vp.read_text(encoding='utf-8'))
@@ -33,7 +33,15 @@ def main():
     s.c('Canonical version input excludes publishedUtc','publishedUtc' not in meta)
     s.c('Canonical version is four numeric components',bool(re.fullmatch(r'\d+\.\d+\.\d+\.\d+',version)),version)
     s.c('Release profile declared',profile in {'version-only','release-architecture','patch'},profile)
-    tray=txt(root/'LenovoBootMenuTray.ps1') if (root/'LenovoBootMenuTray.ps1').is_file() else ''
+    runtime_names=['BUILD_INTEGRITY.txt','icon-preview.png','Install-LenovoBootMenuTasks.ps1','LenovoBootMenuTray.ico','LenovoBootMenuTray.ps1','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','Uninstall-LenovoBootMenuTasks.ps1','version.json']
+    for name in runtime_names:
+        s.c(f'LBS-2 runtime/project file moved to bin: {name}',(root/'bin'/name).is_file())
+        s.c(f'LBS-2 obsolete root path removed: {name}',not (root/name).exists())
+    s.c('README remains repository-root file',(root/'README.md').is_file())
+    s.c('CHANGELOG remains repository-root file',(root/'CHANGELOG.md').is_file())
+    s.c('Git control file remains at repository root',(root/'.gitignore').is_file())
+    s.c('LBS-1 JSON artifacts remain outside LBS-2 scope',(root/'ARCHITECTURE_BASELINE.json').is_file() and (root/'CATCH_AUDIT.json').is_file())
+    tray=txt(root/'bin/LenovoBootMenuTray.ps1') if (root/'bin/LenovoBootMenuTray.ps1').is_file() else ''
     template=txt(root/'src/App/LenovoBootMenuTray.template.ps1')
     expected=f"$script:AppVersion = '{version}'"
     s.has('Generated runtime uses canonical version',tray,expected)

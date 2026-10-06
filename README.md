@@ -1,7 +1,7 @@
 ﻿# Lenovo Boot Selector
 
 <p align="center">
-  <img src="icon-preview.png" alt="Lenovo Boot Selector" width="96">
+  <img src="bin/icon-preview.png" alt="Lenovo Boot Selector" width="96">
 </p>
 
 **Lenovo Boot Selector** ist eine Windows-Tray-Anwendung für Lenovo-Systeme, mit der vorhandene Firmware-Startziele komfortabel als **einmaliges nächstes Bootziel** ausgewählt werden können.
@@ -91,7 +91,7 @@ Diese Anzeige behauptet **keine direkte 1:1-Adressierbarkeit** des physischen US
 
 | Pfad | Zweck |
 | --- | --- |
-| `LenovoBootMenuTray.ps1` | deterministisch erzeugte Single-File-Runtime |
+| `bin/` | kanonische Runtime-/Release-Quelldateien, inklusive generierter Single-File-Runtime und `version.json` |
 | `src/Core/` | zustandsfreie Fachlogik / Functional Core |
 | `src/Application/` | Anwendungs- und Workflowlogik |
 | `src/Infrastructure/` | Windows-, Storage-, Update-, TaskBroker- und IO-Adapter |
