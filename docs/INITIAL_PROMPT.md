@@ -14,7 +14,7 @@ Repository:
 
 `SaschaP1980/LenovoBootSelector`
 
-Always work from the **current GitHub `main`**, not from memory, old chat summaries, previous source ZIPs, or a potentially stale handover.
+Always work from the **current GitHub `main`** and current GitHub project state. Previous chats, chat summaries, model memory, local checkouts, source ZIPs, or off-repository transition artifacts are neither required nor authoritative.
 
 If a GitHub connector is available, use it for repository, Issue, Pull Request, workflow, and commit work. Repository changes must be guarded against the current state; on concurrent changes, do not guess or overwrite blindly.
 
@@ -57,11 +57,9 @@ When information conflicts, use this precedence from strongest to weakest:
 
 1. current GitHub `main`, especially executable workflows, tools, and validators;
 2. current normative documents `docs/GITHUB_HOWTO.md` and `docs/RELEASE_PROCESS.md`;
-3. current GitHub Issues including comments;
-4. handover documents;
-5. chat history or model memory.
+3. current GitHub Issues including comments and acceptance evidence.
 
-A handover is an onboarding aid, **not the source of truth**. Old conversation information must never override a newer repository state.
+No previous chat, model memory, handover artifact, local file, or prior source ZIP participates in the authority order. If durable project knowledge is needed for future work but is not represented in GitHub, treat that as an incomplete project record and capture it in the appropriate repository document, Issue/comment, test, workflow, or source change before relying on it.
 
 ## 4. User-command semantics
 
@@ -416,11 +414,13 @@ Interactive communication with the user is separate from this repository policy:
 
 Do not introduce new German prose into repository/GitHub documentation. When a change establishes a new durable rule, document that rule in English.
 
-## 20. Handover rule
+## 20. GitHub-only continuity rule
 
-Every handover must contain at least the **complete current** `docs/GITHUB_HOWTO.md` from canonical `main`.
+GitHub is the sole durable continuity mechanism for this project. No cross-chat handover document, knowledge ZIP, chat summary, or model memory is required to continue development.
 
-This `INITIAL_PROMPT.md` is the bootstrap entry point for new chats. It does not replace rereading the current normative documents and workflows.
+This `INITIAL_PROMPT.md` is the bootstrap entry point for a fresh engineering session. It instructs the agent to reconstruct the current state from GitHub; it does not carry project state itself and does not replace rereading the current normative documents, Issues, workflows, tests, and release metadata.
+
+Any durable finding discovered during interactive work must be recorded in GitHub before future work depends on it. Diagnostic files or chat discussion may provide evidence, but the resulting durable conclusion belongs in the appropriate Issue/comment, documentation, test, workflow, or source change.
 
 ## 21. Final report after a release
 
@@ -447,6 +447,6 @@ After reading this file and all referenced current sources:
 
 - work according to the reconstructed current repository contract;
 - do not ask the user to restate old rules;
-- do not use a stale project version from chat memory;
+- do not use or request a stale project version, prior-chat handover, or remembered project state;
 - if the user subsequently says, for example, `Implementiere LBS-XX`, immediately reconcile the Issue and carry out the end-to-end implementation under this process;
-- if a new real-world finding changes the durable GitHub/build/release process, update the canonical English documentation so the next chat receives it too.
+- if a new real-world finding changes product knowledge or the durable GitHub/build/release process, record it in the appropriate canonical GitHub artifact so a completely fresh session can recover it without access to this chat.

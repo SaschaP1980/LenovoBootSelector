@@ -4,7 +4,7 @@
 
 The canonical one-line entry point for a completely new chat is `docs/INITIAL_PROMPT.md`. If the user only points to that file, the new chat must execute the complete bootstrap described there and then read this guide and the other current contracts.
 
-When a new chat takes over development, a build, a Hotfix, or a GitHub release for Lenovo Boot Selector, it must **not** act directly from conversation memory or an old handover. It must first reconstruct the current canonical repository state.
+When a fresh engineering session takes over development, a build, a Hotfix, or a GitHub release for Lenovo Boot Selector, it must reconstruct the complete current project state from GitHub. No previous chat, handover artifact, model memory, local checkout, or prior source ZIP is required or authoritative.
 
 Mandatory order:
 
@@ -28,10 +28,9 @@ When information conflicts:
 
 1. current GitHub `main`, including executable workflows/tools;
 2. current normative documents `docs/GITHUB_HOWTO.md` and `docs/RELEASE_PROCESS.md`;
-3. current GitHub Issues and their comments;
-4. handover documents and chat history.
+3. current GitHub Issues and their comments, including recorded acceptance evidence.
 
-A handover is an **onboarding aid, not the source of truth**. Before any actual change, the new chat must verify the current GitHub state again.
+Off-repository material such as previous chats, model memory, local files, source ZIPs, or handover artifacts has no authority. If a durable fact is missing from GitHub, capture it there rather than carrying it forward privately.
 
 ### Minimum start check before any implementation
 
@@ -54,10 +53,9 @@ Use this precedence when information disagrees:
 
 1. The current GitHub repository state and executable workflow/build code on `main`.
 2. Normative repository documentation, especially `docs/RELEASE_PROCESS.md` and this document.
-3. Current GitHub Issues for backlog/status.
-4. A transition handover or prior chat summary.
+3. Current GitHub Issues/comments for backlog, implementation status, and acceptance evidence.
 
-A handover is context, not an excuse to override newer repository facts.
+Previous chat context is not part of the authority chain. A fresh session must be able to derive every durable project fact needed for safe continuation from GitHub alone.
 
 Never use a stale feature branch as a development basis merely because it still exists. The canonical development basis is GitHub `main`, unless the user explicitly names another verified branch.
 
@@ -69,17 +67,16 @@ Whenever work reveals a new durable fact about the GitHub integration, repositor
 
 Likewise, whenever the GitHub integration or its release/operating process is intentionally changed, update this guide so that it describes the new behavior rather than preserving an obsolete procedure.
 
-Do not rely on chat memory or a handover alone for such knowledge. Durable GitHub-operating knowledge belongs here.
+Do not rely on chat memory or off-repository transition artifacts for such knowledge. Durable GitHub-operating knowledge belongs in this guide or another appropriate GitHub artifact.
 
-Before finalizing any handover, first read the current `docs/GITHUB_HOWTO.md` from canonical `main`. **Every handover must include the complete latest contents of this guide**, not a summary, excerpt or stale copy. The handover may add release-specific context around it, but it must not omit or replace the current guide.
-
-If the guide changes after a handover draft was created, regenerate/update the handover so the embedded copy matches the current canonical guide before delivering it.
+When interactive work reveals a durable fact that a future engineering session will need, update the appropriate repository documentation, Issue/comment, test, workflow, or source contract in the same workstream. The continuity test is simple: a fresh session with access only to GitHub must be able to recover the fact.
 
 ## Source of truth
 
 - `main` is the canonical development basis.
 - `bin/version.json` is the only authoritative release version input.
 - GitHub Issues are the only authoritative backlog. Do not maintain a competing local backlog.
+- GitHub repository state plus durable GitHub Issues/comments form the complete project continuity record; previous chats and handover artifacts are never required.
 - Existing files under `downloads/*.zip` are immutable historical releases.
 - The annotated version tag points to the exact ZIP-free source commit.
 - `main` after a release points to the merged publication state and therefore also contains the newly added historical release ZIP.
@@ -527,17 +524,15 @@ This rule was established by the v0.6.8.0 / LBS-18 Candidate Preflight finding: 
 
 The permanent Markdown-language validation is a practical guard against accidental reintroduction of German prose. It deliberately ignores fenced code, inline code, and clearly delimited literal UI text so that compatibility examples remain possible.
 
-## Handover artifact policy
+## GitHub-only continuity policy
 
-For ordinary hotfix/patch releases, successful GitHub publication is normally sufficient; do not manufacture extra chat artifacts unless requested.
+Do not create or require cross-chat handover documents, knowledge-only ZIPs, or chat summaries as a project-continuity mechanism. They create a second, potentially stale state outside GitHub and are therefore outside the canonical project model.
 
-For a minor/major transition where a future conversation needs substantial context, additionally produce a **knowledge-only handover ZIP**. It must not duplicate Source ZIPs or release binaries.
+A fresh engineering session starts from `docs/INITIAL_PROMPT.md` on current `main` and reconstructs the complete working state from the repository, current Issues/comments, executable workflows/tests, tags, release metadata, and other durable GitHub evidence.
 
-**Mandatory for every handover, regardless of release type or handover format:** include the complete current `docs/GITHUB_HOWTO.md` from canonical `main` in its latest version. Do not substitute a summary or an older embedded copy. Read the canonical guide immediately before final handover assembly and verify that the included copy is identical/current.
+If an external diagnostic file, native test result, or interactive discussion establishes a fact that matters beyond the current session, distill that fact into GitHub immediately: use an Issue/comment for backlog or acceptance evidence, documentation for durable operating/architecture rules, and code/tests/workflows for executable contracts. The external artifact may remain supporting evidence, but it must never be the only durable record.
 
-If new GitHub integration knowledge or a GitHub-process change is discovered while preparing the handover, update `docs/GITHUB_HOWTO.md` first, then include that updated canonical version in the handover.
-
-A handover should record durable rules and current state, but the next session must still verify current GitHub facts before acting.
+Release ZIPs and Source ZIPs remain publication artifacts; they are not substitutes for the canonical GitHub development state.
 
 ## Final reporting
 

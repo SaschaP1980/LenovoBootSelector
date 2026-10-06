@@ -101,7 +101,7 @@ Interactive release supervision waits at most 60 seconds for a GitHub-hosted run
 
 ## Repository/runtime layout
 
-Repository runtime/release source files live under `bin/`. The downloadable Release ZIP intentionally remains a flat 10-file package: packaging maps the `bin/` source files back to their established top-level archive names. Architecture baselines live under `docs/architecture/`; catch audits live under `audits/`. The canonical generated files are `docs/architecture/ARCHITECTURE_BASELINE.json` and `audits/CATCH_AUDIT.json`; historical versioned snapshots remain alongside them.
+Product runtime source is modular under `src/**`, with `src/App/LenovoBootMenuTray.template.ps1` providing the ordered runtime include registry. The deterministic build produces the single-file runtime under `bin/`; `bin/version.json` is the authoritative release-version source and the remaining `bin/` files are release/package inputs or generated runtime assets. The downloadable Release ZIP intentionally remains a flat 10-file package. Architecture baselines live under `docs/architecture/`; catch audits live under `audits/`. The canonical generated files are `docs/architecture/ARCHITECTURE_BASELINE.json` and `audits/CATCH_AUDIT.json`; historical versioned snapshots remain alongside them.
 
 ## Documentation language
 
@@ -115,9 +115,9 @@ English is the canonical language for repository and durable GitHub documentatio
 
 The permanent release validation includes a practical Markdown-language guard so that accidental reintroduction of German prose fails before publication.
 
-## Operational guide maintenance and handovers
+## Operational guide maintenance and GitHub-only continuity
 
 `docs/GITHUB_HOWTO.md` is a mandatory living operational artifact. New durable findings about GitHub integration/release behavior and intentional changes to that integration must be documented there when established.
 
-Every project handover must include the **complete latest version** of `docs/GITHUB_HOWTO.md` from canonical `main`. A summary, excerpt or stale embedded copy is not sufficient. If the guide changes during handover preparation, update/regenerate the handover before delivery.
+GitHub is the sole durable continuity mechanism for release work. A future engineering session must not require a previous chat, handover document/ZIP, model memory, or local artifact to reconstruct release state or operating rules. Any durable release-process finding established during a session must be written to the appropriate repository document, Issue/comment, workflow, test, or source contract before future work depends on it.
 
