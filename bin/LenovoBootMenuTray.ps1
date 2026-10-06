@@ -66,6 +66,11 @@ function Get-LocalizationCatalogCore {
             'Settings.Language' = 'Language'
             'Language.English' = 'English'
             'Language.German' = 'Deutsch'
+            'Language.MigrationTitle' = 'Choose app language'
+            'Language.MigrationHeading' = 'Confirm your language'
+            'Language.MigrationMessage' = 'Version 0.8.0.0 may have selected German automatically during an upgrade. Choose the language you want Lenovo Boot Selector to use. This choice is saved and will not be changed automatically.'
+            'Language.MigrationUseEnglish' = 'Use English'
+            'Language.MigrationKeepGerman' = 'Use German'
             'Progress.StepOf' = 'Step {0} of {1}'
             'Storage.InternalSsdModel' = 'Internal SSD: {Model}'
             'Popup.HeaderUpdateAccessible' = 'Opens the dialog for the available app version.'
@@ -314,6 +319,11 @@ function Get-LocalizationCatalogCore {
             'Settings.Language' = 'Sprache'
             'Language.English' = 'English'
             'Language.German' = 'Deutsch'
+            'Language.MigrationTitle' = 'App-Sprache auswählen'
+            'Language.MigrationHeading' = 'Sprache bestätigen'
+            'Language.MigrationMessage' = 'Version 0.8.0.0 kann bei einer Aktualisierung automatisch Deutsch ausgewählt haben. Wähle die Sprache, die Lenovo Boot Selector verwenden soll. Diese Auswahl wird gespeichert und nicht automatisch geändert.'
+            'Language.MigrationUseEnglish' = 'English verwenden'
+            'Language.MigrationKeepGerman' = 'Deutsch verwenden'
             'Progress.StepOf' = 'Schritt {0} von {1}'
             'Storage.InternalSsdModel' = 'Interne SSD: {Model}'
             'Popup.HeaderUpdateAccessible' = 'Öffnet den Dialog zur verfügbaren App-Version.'
@@ -612,15 +622,247 @@ function Get-LocalizedStringCore {
     return $text
 }
 
+# Lenovo Boot Selector v0.4.1 - Functional Core: entry preferences/settings normalization
+# Pure/deterministic functions only. No global script state, WinForms, filesystem, registry,
+# Scheduled Tasks, process starts, or privileged broker access are permitted in this file.
+
+function Convert-EntryAliasesToHashtable {
+    param($Source)
+
+    $result = @{}
+    if (-not $Source) { return $result }
+
+    if ($Source -is [System.Collections.IDictionary]) {
+        foreach ($key in @($Source.Keys)) {
+            if (-not $key) { continue }
+            $normalized = ([string]$key).ToLowerInvariant()
+            $value = ([string]$Source[$key]).Trim()
+            if ($value) { $result[$normalized] = $value }
+        }
+        return $result
+    }
+
+    foreach ($property in @($Source.PSObject.Properties)) {
+        if (-not $property.Name) { continue }
+        $normalized = ([string]$property.Name).ToLowerInvariant()
+        $value = ([string]$property.Value).Trim()
+        if ($value) { $result[$normalized] = $value }
+    }
+    return $result
+}
+function Copy-EntryAliasMap {
+    param($Source)
+    $copy = @{}
+    if (-not $Source) { return $copy }
+    foreach ($key in @($Source.Keys)) {
+        $value = ([string]$Source[$key]).Trim()
+        if ($key -and $value) { $copy[([string]$key).ToLowerInvariant()] = $value }
+    }
+    return $copy
+}
+function Test-StringSequenceEqual {
+    param([object[]]$Left, [object[]]$Right, [switch]$Sort)
+    $a = @($Left | ForEach-Object { if ($_){ ([string]$_).ToLowerInvariant() } })
+    $b = @($Right | ForEach-Object { if ($_){ ([string]$_).ToLowerInvariant() } })
+    if ($Sort) { $a = @($a | Sort-Object -Unique); $b = @($b | Sort-Object -Unique) }
+    if ($a.Count -ne $b.Count) { return $false }
+    for ($i = 0; $i -lt $a.Count; $i++) {
+        if ($a[$i] -ne $b[$i]) { return $false }
+    }
+    return $true
+}
+function Test-EntryAliasMapsEqual {
+    param($Left, $Right)
+    $a = Copy-EntryAliasMap $Left
+    $b = Copy-EntryAliasMap $Right
+    $aKeys = @($a.Keys | Sort-Object)
+    $bKeys = @($b.Keys | Sort-Object)
+    if (-not (Test-StringSequenceEqual -Left $aKeys -Right $bKeys)) { return $false }
+    foreach ($key in $aKeys) {
+        if (([string]$a[$key]).Trim() -ne ([string]$b[$key]).Trim()) { return $false }
+    }
+    return $true
+}
+function Test-GuidInList {
+    param(
+        [Parameter(Mandatory=$true)][string]$Guid,
+        [object[]]$List
+    )
+    $normalized = $Guid.ToLowerInvariant()
+    foreach ($item in @($List)) {
+        if ([string]$item -and ([string]$item).ToLowerInvariant() -eq $normalized) { return $true }
+    }
+    return $false
+}
+function Get-AppSettingsSourcePropertyCore {
+    param(
+        $Source,
+        [Parameter(Mandatory=$true)][string]$Name
+    )
+
+    if (-not $Source) {
+        return [pscustomobject]@{ HasValue = $false; Value = $null }
+    }
+
+    if ($Source -is [System.Collections.IDictionary]) {
+        foreach ($key in @($Source.Keys)) {
+            if ([string]$key -and ([string]$key).Equals($Name, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return [pscustomobject]@{ HasValue = $true; Value = $Source[$key] }
+            }
+        }
+        return [pscustomobject]@{ HasValue = $false; Value = $null }
+    }
+
+    $property = $Source.PSObject.Properties[$Name]
+    if ($null -ne $property) {
+        return [pscustomobject]@{ HasValue = $true; Value = $property.Value }
+    }
+    return [pscustomobject]@{ HasValue = $false; Value = $null }
+}
+
+function Get-AppSettingsLocalePreferenceSourceCore {
+    param(
+        $Source,
+        [int]$SourceSchemaVersion
+    )
+
+    if (-not $Source) { return 'default' }
+
+    $sourceProperty = Get-AppSettingsSourcePropertyCore -Source $Source -Name 'localePreferenceSource'
+    if ($sourceProperty.HasValue) {
+        $value = ([string]$sourceProperty.Value).Trim().ToLowerInvariant()
+        if ($value -in @('default','user','migration-pending')) { return $value }
+    }
+
+    # v0.8.0.0 persisted schema 5 with locale=de-DE both for the incorrect
+    # automatic migration and for a possible explicit user choice. Without
+    # additional metadata those states are indistinguishable, so preserve the
+    # current locale temporarily and require one explicit choice.
+    if ($SourceSchemaVersion -eq 5) {
+        $localeProperty = Get-AppSettingsSourcePropertyCore -Source $Source -Name 'locale'
+        if ($localeProperty.HasValue -and (Resolve-LocaleIdCore -Locale ([string]$localeProperty.Value)) -eq 'de-DE') {
+            return 'migration-pending'
+        }
+    }
+
+    return 'default'
+}
+
+function Get-AppSettingsLocaleCore {
+    param(
+        $Source,
+        [int]$SourceSchemaVersion
+    )
+
+    if (-not $Source) { return 'en-US' }
+
+    $preferenceSource = Get-AppSettingsLocalePreferenceSourceCore -Source $Source -SourceSchemaVersion $SourceSchemaVersion
+    if ($preferenceSource -in @('user','migration-pending')) {
+        $localeProperty = Get-AppSettingsSourcePropertyCore -Source $Source -Name 'locale'
+        if ($localeProperty.HasValue) {
+            return Resolve-LocaleIdCore -Locale ([string]$localeProperty.Value)
+        }
+    }
+
+    # English is the canonical default whenever there is no demonstrable
+    # explicit user preference.
+    return 'en-US'
+}
+
+function Test-AppSettingsLocaleConfirmationRequiredCore {
+    param(
+        $Source,
+        [int]$SourceSchemaVersion
+    )
+
+    return ((Get-AppSettingsLocalePreferenceSourceCore -Source $Source -SourceSchemaVersion $SourceSchemaVersion) -eq 'migration-pending')
+}
+
+function New-DefaultAppSettingsCore {
+    return [pscustomobject]@{
+        schemaVersion = 6
+        locale = 'en-US'
+        localePreferenceSource = 'default'
+        localePreferenceNeedsConfirmation = $false
+        defaultGuid = $null
+        entryOrder = @()
+        hiddenEntryGuids = @()
+        entryAliases = @{}
+    }
+}
+
+function ConvertTo-NormalizedAppSettingsCore {
+    param($Source)
+
+    if (-not $Source) { return New-DefaultAppSettingsCore }
+
+    $sourceSchemaVersion = if ($Source.schemaVersion) { [int]$Source.schemaVersion } else { 1 }
+    $preferenceSource = Get-AppSettingsLocalePreferenceSourceCore -Source $Source -SourceSchemaVersion $sourceSchemaVersion
+
+    return [pscustomobject]@{
+        schemaVersion = 6
+        locale = Get-AppSettingsLocaleCore -Source $Source -SourceSchemaVersion $sourceSchemaVersion
+        localePreferenceSource = $preferenceSource
+        localePreferenceNeedsConfirmation = ($preferenceSource -eq 'migration-pending')
+        # defaultGuid is retained only as an upgrade/migration input from
+        # v0.2.21 and earlier. v0.2.22 stores the live default system-wide.
+        defaultGuid = if ($Source.defaultGuid) { ([string]$Source.defaultGuid).ToLowerInvariant() } else { $null }
+        entryOrder = @(
+            @($Source.entryOrder) |
+                ForEach-Object { if ($_){ ([string]$_).ToLowerInvariant() } } |
+                Select-Object -Unique
+        )
+        hiddenEntryGuids = @(
+            @($Source.hiddenEntryGuids) |
+                ForEach-Object { if ($_){ ([string]$_).ToLowerInvariant() } } |
+                Select-Object -Unique
+        )
+        entryAliases = Convert-EntryAliasesToHashtable $Source.entryAliases
+    }
+}
+
+function Get-OrderedEntriesCore {
+    param(
+        [object[]]$Source,
+        [object[]]$Order,
+        [object[]]$Hidden,
+        [switch]$IncludeHidden
+    )
+
+    $sourceItems = @($Source)
+    if ($sourceItems.Count -eq 0) { return @() }
+
+    $result = New-Object System.Collections.Generic.List[object]
+    $added = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+
+    foreach ($guid in @($Order)) {
+        if (-not $guid) { continue }
+        $entry = $sourceItems | Where-Object { $_.Guid -eq ([string]$guid).ToLowerInvariant() } | Select-Object -First 1
+        if ($entry -and $added.Add([string]$entry.Guid)) {
+            if ($IncludeHidden -or -not (Test-GuidInList -Guid $entry.Guid -List $Hidden)) {
+                [void]$result.Add($entry)
+            }
+        }
+    }
+
+    foreach ($entry in $sourceItems) {
+        if ($added.Add([string]$entry.Guid)) {
+            if ($IncludeHidden -or -not (Test-GuidInList -Guid $entry.Guid -List $Hidden)) {
+                [void]$result.Add($entry)
+            }
+        }
+    }
+
+    return @($result.ToArray())
+}
+
 function Get-StartupRecoveryLocale {
     try {
         $settingsPath = Join-Path (Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray') 'settings.json'
         if (-not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) { return 'en-US' }
         $source = ([System.IO.File]::ReadAllText($settingsPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json)
         $sourceSchema = if ($source.schemaVersion) { [int]$source.schemaVersion } else { 1 }
-        $property = $source.PSObject.Properties['locale']
-        if ($null -ne $property) { return (Resolve-LocaleIdCore -Locale ([string]$property.Value)) }
-        if ($sourceSchema -lt 5) { return 'de-DE' }
+        return (Get-AppSettingsLocaleCore -Source $source -SourceSchemaVersion $sourceSchema)
     }
     catch { }
     return 'en-US'
@@ -1514,7 +1756,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.8.0.0'
+$script:AppVersion = '0.8.0.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -1587,6 +1829,8 @@ $script:AutostartRunValueName = 'Lenovo Boot Menu Tray'
 $script:SettingsDir = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray'
 $script:SettingsPath = Join-Path $script:SettingsDir 'settings.json'
 $script:UiLocale = 'en-US'
+$script:LocalePreferenceSource = 'default'
+$script:LocalePreferenceNeedsConfirmation = $false
 $script:DefaultGuid = $null
 $script:LegacyDefaultGuid = $null
 $script:DefaultButton = $null
@@ -3404,7 +3648,11 @@ function Set-ActiveLocale {
     $changed = ([string]$script:UiLocale) -ne $resolved
     $script:UiLocale = $resolved
 
-    if ($Persist -and $changed) {
+    if ($Persist) {
+        # An explicit UI/API language action is evidence of user intent even
+        # when the selected locale already matches the current locale.
+        $script:LocalePreferenceSource = 'user'
+        $script:LocalePreferenceNeedsConfirmation = $false
         Save-AppSettings
     }
     return $resolved
@@ -3418,191 +3666,6 @@ function Get-LocalizedString {
     )
 
     return Get-LocalizedStringCore -Key $Key -Locale (Get-ActiveLocale) -Arguments $Arguments -Values $Values
-}
-
-# Lenovo Boot Selector v0.4.1 - Functional Core: entry preferences/settings normalization
-# Pure/deterministic functions only. No global script state, WinForms, filesystem, registry,
-# Scheduled Tasks, process starts, or privileged broker access are permitted in this file.
-
-function Convert-EntryAliasesToHashtable {
-    param($Source)
-
-    $result = @{}
-    if (-not $Source) { return $result }
-
-    if ($Source -is [System.Collections.IDictionary]) {
-        foreach ($key in @($Source.Keys)) {
-            if (-not $key) { continue }
-            $normalized = ([string]$key).ToLowerInvariant()
-            $value = ([string]$Source[$key]).Trim()
-            if ($value) { $result[$normalized] = $value }
-        }
-        return $result
-    }
-
-    foreach ($property in @($Source.PSObject.Properties)) {
-        if (-not $property.Name) { continue }
-        $normalized = ([string]$property.Name).ToLowerInvariant()
-        $value = ([string]$property.Value).Trim()
-        if ($value) { $result[$normalized] = $value }
-    }
-    return $result
-}
-function Copy-EntryAliasMap {
-    param($Source)
-    $copy = @{}
-    if (-not $Source) { return $copy }
-    foreach ($key in @($Source.Keys)) {
-        $value = ([string]$Source[$key]).Trim()
-        if ($key -and $value) { $copy[([string]$key).ToLowerInvariant()] = $value }
-    }
-    return $copy
-}
-function Test-StringSequenceEqual {
-    param([object[]]$Left, [object[]]$Right, [switch]$Sort)
-    $a = @($Left | ForEach-Object { if ($_){ ([string]$_).ToLowerInvariant() } })
-    $b = @($Right | ForEach-Object { if ($_){ ([string]$_).ToLowerInvariant() } })
-    if ($Sort) { $a = @($a | Sort-Object -Unique); $b = @($b | Sort-Object -Unique) }
-    if ($a.Count -ne $b.Count) { return $false }
-    for ($i = 0; $i -lt $a.Count; $i++) {
-        if ($a[$i] -ne $b[$i]) { return $false }
-    }
-    return $true
-}
-function Test-EntryAliasMapsEqual {
-    param($Left, $Right)
-    $a = Copy-EntryAliasMap $Left
-    $b = Copy-EntryAliasMap $Right
-    $aKeys = @($a.Keys | Sort-Object)
-    $bKeys = @($b.Keys | Sort-Object)
-    if (-not (Test-StringSequenceEqual -Left $aKeys -Right $bKeys)) { return $false }
-    foreach ($key in $aKeys) {
-        if (([string]$a[$key]).Trim() -ne ([string]$b[$key]).Trim()) { return $false }
-    }
-    return $true
-}
-function Test-GuidInList {
-    param(
-        [Parameter(Mandatory=$true)][string]$Guid,
-        [object[]]$List
-    )
-    $normalized = $Guid.ToLowerInvariant()
-    foreach ($item in @($List)) {
-        if ([string]$item -and ([string]$item).ToLowerInvariant() -eq $normalized) { return $true }
-    }
-    return $false
-}
-function Get-AppSettingsLocaleCore {
-    param(
-        $Source,
-        [int]$SourceSchemaVersion
-    )
-
-    if (-not $Source) { return 'en-US' }
-
-    $hasLocale = $false
-    $rawLocale = $null
-
-    if ($Source -is [System.Collections.IDictionary]) {
-        foreach ($key in @($Source.Keys)) {
-            if ([string]$key -and ([string]$key).Equals('locale', [System.StringComparison]::OrdinalIgnoreCase)) {
-                $hasLocale = $true
-                $rawLocale = [string]$Source[$key]
-                break
-            }
-        }
-    }
-    else {
-        $property = $Source.PSObject.Properties['locale']
-        if ($null -ne $property) {
-            $hasLocale = $true
-            $rawLocale = [string]$property.Value
-        }
-    }
-
-    if ($hasLocale) {
-        return Resolve-LocaleIdCore -Locale $rawLocale
-    }
-
-    # Existing settings created before localization represented the historical
-    # German-only UI. Preserve that user experience during migration.
-    if ($SourceSchemaVersion -lt 5) { return 'de-DE' }
-
-    # New/current settings without a valid explicit preference fail safe to English.
-    return 'en-US'
-}
-
-function New-DefaultAppSettingsCore {
-    return [pscustomobject]@{
-        schemaVersion = 5
-        locale = 'en-US'
-        defaultGuid = $null
-        entryOrder = @()
-        hiddenEntryGuids = @()
-        entryAliases = @{}
-    }
-}
-
-function ConvertTo-NormalizedAppSettingsCore {
-    param($Source)
-
-    if (-not $Source) { return New-DefaultAppSettingsCore }
-
-    $sourceSchemaVersion = if ($Source.schemaVersion) { [int]$Source.schemaVersion } else { 1 }
-
-    return [pscustomobject]@{
-        schemaVersion = 5
-        locale = Get-AppSettingsLocaleCore -Source $Source -SourceSchemaVersion $sourceSchemaVersion
-        # defaultGuid is retained only as an upgrade/migration input from
-        # v0.2.21 and earlier. v0.2.22 stores the live default system-wide.
-        defaultGuid = if ($Source.defaultGuid) { ([string]$Source.defaultGuid).ToLowerInvariant() } else { $null }
-        entryOrder = @(
-            @($Source.entryOrder) |
-                ForEach-Object { if ($_){ ([string]$_).ToLowerInvariant() } } |
-                Select-Object -Unique
-        )
-        hiddenEntryGuids = @(
-            @($Source.hiddenEntryGuids) |
-                ForEach-Object { if ($_){ ([string]$_).ToLowerInvariant() } } |
-                Select-Object -Unique
-        )
-        entryAliases = Convert-EntryAliasesToHashtable $Source.entryAliases
-    }
-}
-
-function Get-OrderedEntriesCore {
-    param(
-        [object[]]$Source,
-        [object[]]$Order,
-        [object[]]$Hidden,
-        [switch]$IncludeHidden
-    )
-
-    $sourceItems = @($Source)
-    if ($sourceItems.Count -eq 0) { return @() }
-
-    $result = New-Object System.Collections.Generic.List[object]
-    $added = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-
-    foreach ($guid in @($Order)) {
-        if (-not $guid) { continue }
-        $entry = $sourceItems | Where-Object { $_.Guid -eq ([string]$guid).ToLowerInvariant() } | Select-Object -First 1
-        if ($entry -and $added.Add([string]$entry.Guid)) {
-            if ($IncludeHidden -or -not (Test-GuidInList -Guid $entry.Guid -List $Hidden)) {
-                [void]$result.Add($entry)
-            }
-        }
-    }
-
-    foreach ($entry in $sourceItems) {
-        if ($added.Add([string]$entry.Guid)) {
-            if ($IncludeHidden -or -not (Test-GuidInList -Guid $entry.Guid -List $Hidden)) {
-                [void]$result.Add($entry)
-            }
-        }
-    }
-
-    return @($result.ToArray())
 }
 
 
@@ -3706,9 +3769,13 @@ function Save-AppSettings {
         if ($key -and $value) { $aliases[[string]$key] = $value }
     }
 
+    $preferenceSource = ([string]$script:LocalePreferenceSource).Trim().ToLowerInvariant()
+    if ($preferenceSource -notin @('default','user','migration-pending')) { $preferenceSource = 'default' }
+
     $payload = [ordered]@{
-        schemaVersion = 5
+        schemaVersion = 6
         locale = Resolve-LocaleIdCore -Locale $script:UiLocale
+        localePreferenceSource = $preferenceSource
         # Keep an unmigrated legacy default only until the new SYSTEM-backed
         # default architecture has been installed successfully.
         defaultGuid = $script:LegacyDefaultGuid
@@ -3724,6 +3791,8 @@ function Save-AppSettings {
 function Load-AppSettings {
     $settings = Get-AppSettings
     $script:UiLocale = Resolve-LocaleIdCore -Locale ([string]$settings.locale)
+    $script:LocalePreferenceSource = [string]$settings.localePreferenceSource
+    $script:LocalePreferenceNeedsConfirmation = [bool]$settings.localePreferenceNeedsConfirmation
     $script:LegacyDefaultGuid = if ($settings.defaultGuid) { ([string]$settings.defaultGuid).ToLowerInvariant() } else { $null }
     $script:DefaultGuid = $null
     $script:EntryOrder = @($settings.entryOrder)
@@ -3733,6 +3802,16 @@ function Load-AppSettings {
     # v0.2.21 and earlier used an HKCU Volatile Environment marker for a
     # login-time restore. v0.2.22 no longer uses that mechanism.
     Remove-LegacySessionRestoreMarker -RegistryPath $script:LegacySessionRestoreRegistryPath -ValueName $script:LegacySessionRestoreValueName
+}
+
+function Resolve-PendingLocalePreference {
+    if (-not $script:LocalePreferenceNeedsConfirmation) { return $false }
+
+    $choice = Show-LocaleMigrationDialog
+    if ([string]::IsNullOrWhiteSpace([string]$choice)) { return $false }
+
+    [void](Set-ActiveLocale -Locale $choice -Persist)
+    return $true
 }
 
 function Update-LanguageMenuState {
@@ -4229,6 +4308,72 @@ function Show-LenovoNoticeDialog {
     try {
         $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
         if ($owner) { [void]$form.ShowDialog($owner) } else { [void]$form.ShowDialog() }
+    }
+    finally { $form.Dispose() }
+}
+
+function Show-LocaleMigrationDialog {
+    $form = New-Object System.Windows.Forms.Form
+    $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
+    $form.ShowInTaskbar = $false
+    $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
+    $form.TopMost = $true
+    $form.BackColor = [Drawing.Color]::FromArgb(22,22,22)
+    $form.ClientSize = New-Object Drawing.Size(500, 260)
+    $form.KeyPreview = $true
+    $form.Tag = $null
+
+    $root = New-Object System.Windows.Forms.Panel
+    $root.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $root.BackColor = [Drawing.Color]::FromArgb(22,22,22)
+    $form.Controls.Add($root)
+
+    $title = New-Label -Text (Get-LocalizedString -Key 'Language.MigrationTitle') -Font (New-Object Drawing.Font('Segoe UI',10.2,[Drawing.FontStyle]::Bold)) -ForeColor $script:ColorPrimary -X 18 -Y 12 -Width 450 -Height 24
+    $root.Controls.Add($title)
+    $divider = New-Object System.Windows.Forms.Panel
+    $divider.Location = New-Object Drawing.Point(18,43)
+    $divider.Size = New-Object Drawing.Size(464,1)
+    $divider.BackColor = $script:ColorAccent
+    $root.Controls.Add($divider)
+
+    $heading = New-Label -Text (Get-LocalizedString -Key 'Language.MigrationHeading') -Font (New-Object Drawing.Font('Segoe UI',9.6,[Drawing.FontStyle]::Bold)) -ForeColor $script:ColorPrimary -X 28 -Y 62 -Width 440 -Height 24
+    $root.Controls.Add($heading)
+    $message = New-Label -Text (Get-LocalizedString -Key 'Language.MigrationMessage') -Font (New-Object Drawing.Font('Segoe UI',8.5,[Drawing.FontStyle]::Regular)) -ForeColor $script:ColorSecondary -X 28 -Y 92 -Width 440 -Height 92
+    $message.TextAlign = [Drawing.ContentAlignment]::TopLeft
+    $root.Controls.Add($message)
+
+    $german = New-Object System.Windows.Forms.Button
+    $german.Text = Get-LocalizedString -Key 'Language.MigrationKeepGerman'
+    $german.Font = New-Object Drawing.Font('Segoe UI',8.5,[Drawing.FontStyle]::Regular)
+    $german.ForeColor = $script:ColorPrimary
+    $german.BackColor = [Drawing.Color]::FromArgb(34,34,34)
+    $german.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $german.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(70,70,70)
+    $german.FlatAppearance.BorderSize = 1
+    $german.Location = New-Object Drawing.Point(196,204)
+    $german.Size = New-Object Drawing.Size(136,34)
+    $german.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $german.Add_Click({ $form.Tag = 'de-DE'; $form.Close() })
+    $root.Controls.Add($german)
+
+    $english = New-Object System.Windows.Forms.Button
+    $english.Text = Get-LocalizedString -Key 'Language.MigrationUseEnglish'
+    $english.Font = New-Object Drawing.Font('Segoe UI',8.5,[Drawing.FontStyle]::Bold)
+    $english.ForeColor = [Drawing.Color]::White
+    $english.BackColor = $script:ColorAccent
+    $english.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $english.FlatAppearance.BorderSize = 0
+    $english.Location = New-Object Drawing.Point(344,204)
+    $english.Size = New-Object Drawing.Size(136,34)
+    $english.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $english.Add_Click({ $form.Tag = 'en-US'; $form.Close() })
+    $root.Controls.Add($english)
+    $form.AcceptButton = $english
+
+    try {
+        $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
+        if ($owner) { [void]$form.ShowDialog($owner) } else { [void]$form.ShowDialog() }
+        return [string]$form.Tag
     }
     finally { $form.Dispose() }
 }
@@ -7598,6 +7743,7 @@ try {
     } catch { }
     Write-RuntimeDiagnosticEvent -Event 'TRAY_STARTUP' -Stage 'startup' -Success $true
     Load-AppSettings
+    [void](Resolve-PendingLocalePreference)
     $script:LastStatusText = Get-LocalizedString -Key 'Status.Ready'
     Repair-AutostartLauncherIfNeeded
 
