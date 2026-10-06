@@ -29,7 +29,31 @@ def load_release_config(root: Path) -> dict:
             raise RuntimeError(f'invalid publishedUtc: {published!r}')
     elif 'publishedUtc' in data:
         raise RuntimeError('version.json schemaVersion 2 must not contain publishedUtc; GitHub owns publication time')
-    return {'schemaVersion':schema,'version':version,'releaseProfile':profile,'publishedUtc':published}
+
+    protected=data.get('protectedFragmentIntent',[])
+    if not isinstance(protected,list) or any(not isinstance(x,str) or not x.strip() for x in protected):
+        raise RuntimeError('protectedFragmentIntent must be an array of non-empty strings')
+    if len(protected)!=len(set(protected)):
+        raise RuntimeError('protectedFragmentIntent must not contain duplicates')
+
+    deletes=data.get('repositoryDeleteIntent',[])
+    if not isinstance(deletes,list) or any(not isinstance(x,str) or not x.strip() for x in deletes):
+        raise RuntimeError('repositoryDeleteIntent must be an array of non-empty strings')
+    if len(deletes)!=len(set(deletes)):
+        raise RuntimeError('repositoryDeleteIntent must not contain duplicates')
+    for rel in deletes:
+        p=Path(rel)
+        if p.is_absolute() or '..' in p.parts or rel.startswith('.git/'):
+            raise RuntimeError(f'invalid repositoryDeleteIntent path: {rel!r}')
+
+    return {
+        'schemaVersion':schema,
+        'version':version,
+        'releaseProfile':profile,
+        'publishedUtc':published,
+        'protectedFragmentIntent':sorted(protected),
+        'repositoryDeleteIntent':sorted(deletes),
+    }
 
 
 def load_version(root: Path) -> str:

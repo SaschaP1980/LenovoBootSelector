@@ -1,5 +1,18 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.5.0 – LBS-15 Release-Einstieg technisch gehärtet
+
+- Neuer vorgeschalteter **Candidate Preflight** über `candidate/v<version>`: Der exakte Candidate-SHA wird vollständig geprüft, bevor ein sichtbarer `release/v<version>`-Branch entstehen darf.
+- Der Candidate-Workflow schreibt den Commit-Status `preflight/candidate`, erzeugt erst nach GREEN den Releasebranch auf exakt demselben SHA und löscht anschließend den Candidate-Branch.
+- Der Release-Orchestrator verweigert Kandidaten ohne erfolgreichen `preflight/candidate`-Status und verwirft stale Kandidaten, wenn der aktuelle `main` nicht mehr Vorfahr des Release-SHA ist.
+- `tools/candidate_preflight.py` führt deterministische Release-Vorbereitung, zwei reproduzierbare Builds, Release/Core/Boundary/Regression sowie Repository-Delete-/ZIP-History-Prüfungen vor der Releasebranch-Erzeugung aus.
+- `protectedFragmentIntent` in `bin/version.json` ist nun ein versionsgebundener, exakter Change-Intent. Geschützte Fragmente werden gegen den unmittelbar vorherigen kanonischen Source-Tag verglichen; tatsächliche und deklarierte Änderungen müssen exakt übereinstimmen.
+- Die dauerhafte `INTENTIONALLY_CHANGED_FROZEN`-Bypass-Allowlist wurde entfernt. Spätere Änderungen an bereits früher bewusst geänderten Security-/Critical-Funktionen werden wieder erkannt.
+- `repositoryDeleteIntent` macht beabsichtigte Repository-Löschungen im Candidate explizit; undeklarierte oder stale Delete-Intents blockieren den Preflight.
+- `tools/build_runtime.py` besitzt keine zweite statische Include-Liste mehr. Reihenfolge und Modulmenge werden ausschließlich aus den `# @include ...`-Markern des Runtime-Templates abgeleitet und auf Duplikate, Pfadsicherheit und vorhandene Dateien geprüft.
+- GitHub bleibt autoritative zweite Schranke: Release-Orchestrator, Source-Tag-Semantik, historische ZIP-Integrität und die bestehenden acht Release-Status-Gates bleiben erhalten.
+- Keine Änderung an Produkt-Runtime-Funktionalität, BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
+
 ## v0.6.4.1 – Hotfix für LBS-6-Repair-ACL-Prüfung
 
 - Behebt den bestätigten Reparaturabbruch aus v0.6.4.0 im Installer-Schritt `protect-state`.
