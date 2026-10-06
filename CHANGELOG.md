@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.8.1 – Tray tooltip simplified
+
+- Removes the historical German suffix `– Startziel wählen` from the Windows tray icon tooltip.
+- The tray tooltip is now exactly `Lenovo Boot Selector`, which better represents both One-Shot Next Boot selection and the persistent default boot-target feature.
+- A permanent Regression gate requires the exact product-name-only tooltip and rejects reintroduction of the old suffix.
+- No BootService, TaskBroker, Storage, firmware/BCD, updater, or privilege-boundary behavior changes.
+
 ## v0.6.8.0 – LBS-18 repository documentation standardized on English
 
 - All tracked Markdown documentation is migrated to English, including `README.md`, `CHANGELOG.md`, `docs/**`, `tests/**`, `tests-history/**`, and `downloads/README.md`.
