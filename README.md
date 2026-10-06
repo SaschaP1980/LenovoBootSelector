@@ -155,6 +155,12 @@ The central native Windows PowerShell 5.1 test wrapper is:
 
 Build and packaging helpers live under `tools/`. Detailed version history is in [CHANGELOG.md](CHANGELOG.md).
 
+### Agentic software engineering
+
+Lenovo Boot Selector is developed as an **agentic software engineering** project. Substantial engineering work can be delegated to an AI coding agent that operates against the current GitHub repository state, executable tests, workflows, Issues, and release contracts rather than relying on conversation memory or stale local copies.
+
+The repository remains the source of truth. Agentic work is constrained by the same engineering controls as any other contribution: Issue-backed scope where required, test-first regression handling, explicit safety boundaries, atomic candidate commits, deterministic builds, Linux and Windows PowerShell 5.1 gates, reproducibility checks, post-release verification, and native acceptance where hardware-specific behavior must be proven. Human direction remains authoritative for product intent, safety-sensitive decisions, and final acceptance.
+
 Since v0.6.5.0, a release is first validated as `candidate/v<version>`. Only a completely green candidate may be promoted automatically to `release/v<version>` on the exact same commit. Protected runtime fragments use a release-specific `protectedFragmentIntent` instead of permanent exception lists; runtime modules are registered exclusively through template include markers.
 
 Since v0.6.6.0, there are only two active release profiles: `version-only` for unchanged product code under `src/**`, and `patch` for functional product-code changes. The historical `release-architecture` special profile has been removed.
