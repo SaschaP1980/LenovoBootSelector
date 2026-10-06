@@ -312,16 +312,30 @@ For connector-supervised releases, optimize the **number of orchestration roundt
 Use phase snapshots:
 
 1. **Preparation snapshot:** read current `main` SHA/tree, implementation Issue, version and all files required for the planned change in one batched/parallel read where technically possible. Reuse that snapshot while its base SHA remains current.
-2. **Atomic candidate preparation:** create all intended blobs, one tree and one candidate commit; inspect that commit once before exposing `candidate/v<version>`.
-3. **Candidate observation:** perform one initial run lookup. Do not tight-poll. When the run is terminal, read run/jobs/logs together where possible and consume `CANDIDATE_PREFLIGHT_SUMMARY=<json>`.
-4. **Release observation:** after dispatch, avoid re-reading unchanged candidate facts. On terminal success, consume the single `RELEASE_VERIFICATION_SUMMARY=<json>` emitted by the Release Orchestrator.
-5. **Issue completion:** use the verified summary for the release facts, add the final Issue comment and close the Issue. Do not repeat individual PR/tag/status/latest/ZIP/source-tree reads merely to reconstruct facts already verified in the summary.
+2. **Patch/Hotfix focused validation:** for the normal branchless path, run the bug-specific RED regression against the unfixed canonical basis, then require that same regression GREEN after the fix. Add only source-type smoke checks that protect distinct risks (for example Python syntax, PowerShell parser/encoding/BOM, deterministic generated-output checks). Do not run or reconstruct the full repository matrix before every intermediate Git object.
+3. **Atomic candidate preparation:** create all intended blobs, one tree and one candidate commit; inspect that commit once before exposing `candidate/v<version>`. For a normal Patch/Hotfix, avoid file-by-file visible implementation commits.
+4. **Candidate observation:** perform one initial run lookup. Do not tight-poll. When the run is terminal, read run/jobs/logs together where possible and consume `CANDIDATE_PREFLIGHT_SUMMARY=<json>`.
+5. **Release observation:** after dispatch, avoid re-reading unchanged candidate facts. On terminal success, consume the single `RELEASE_VERIFICATION_SUMMARY=<json>` emitted by the Release Orchestrator.
+6. **Issue completion:** use the verified summary for the release facts, add the final Issue comment and close the Issue. Do not repeat individual PR/tag/status/latest/ZIP/source-tree reads merely to reconstruct facts already verified in the summary.
 
 `tools/release_verification.py` performs the complete server-side post-release aggregation after the merge. It verifies the merged PR, exactly one publication PR, 8/8 release statuses, all 3/3 candidate statuses (`preflight/candidate`, `preflight/linux`, `preflight/windows-powershell51`), annotated source tag/commit, ZIP-/cache-free source tree, `downloads/latest.json`, published release ZIP size/hash, candidate/release branch cleanup and the prior reproducibility marker.
 
 The structured summary is an **aggregation of completed checks**, not a replacement for them. If the workflow is not terminal success, the summary is missing, `result != PASS`, or a requested fact is absent, fall back to the full direct post-release checklist below.
 
 The practical target for a small conflict-free patch, once code is ready and runners are available, is roughly **2–3 minutes of interactive orchestration**, while GitHub still executes all existing gates.
+
+### Avoid duplicate validation
+
+Once a behavior/invariant has a permanent executable owner, call that test or validator instead of rebuilding the same proof with connector-side string searches. An additional test is justified only when it covers a distinct layer or failure mode.
+
+In particular:
+
+- prefer an existing Functional Core/native/integration test over a new issue-specific validator that only mirrors it;
+- avoid exact prose/punctuation assertions for human documentation unless tooling genuinely consumes that exact text;
+- do not manually repeat catalog parity, runtime closure, protected-fragment or other checks already owned by permanent validators;
+- do not re-verify fields individually after a successful aggregate Candidate/Release summary unless investigating an inconsistency.
+
+LBS-23/v0.8.0.1 demonstrated the cost of violating this rule: duplicated structural checks and an issue-specific validator created extra quote/prose-literal corrections without adding equivalent product protection.
 
 ## The eight release status gates
 

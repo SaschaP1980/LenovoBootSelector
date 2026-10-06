@@ -54,6 +54,14 @@ Before implementing the fix:
 
 Then implement the smallest fix, rerun the same regression test and require GREEN. Complete applicable broader prechecks before Candidate creation.
 
+For a normal branchless Patch/Hotfix, RED evidence does **not** require a durable RED commit. Run the focused regression against the unfixed canonical basis, record the failure durably, then prepare the complete fix as one atomic candidate state. Avoid a chain of intermediate commits unless the work has been deliberately escalated to the work-branch model.
+
+Do not run the entire repository/native test matrix before every intermediate commit. Before Candidate exposure, require:
+- the defect-specific RED→GREEN regression;
+- directly relevant syntax/parser/encoding checks for changed source types;
+- relevant deterministic-generation checks when generated artifacts are affected;
+- any additional focused test that protects a distinct risk introduced by the change.
+
 The Candidate branch is **release-ready**, not a RED-test vehicle. Do not intentionally publish a known-failing Candidate or run Candidate Preflight merely to prove the pre-fix failure. Candidate Preflight is the mandatory integration/release-entry gate for a state that is already expected to pass. Unexpected Candidate failures continue to use the existing same-branch fast-forward correction path.
 
 ## Local release preparation
@@ -64,13 +72,14 @@ The Candidate branch is **release-ready**, not a RED-test vehicle. Do not intent
 4. Set `protectedFragmentIntent` to exactly the protected fragments intentionally changed by this version; normally `[]`.
 5. Set `repositoryDeleteIntent` to exactly the repository paths intentionally deleted by this version; normally `[]`.
 6. For a bug/regression, complete the focused RED→GREEN proof described above and run applicable broader prechecks.
-7. Prepare one exact **release-ready** candidate commit based on current `main`.
-8. The candidate-only commit range must contain exactly one unique `Work-Branch:` trailer:
+7. For a normal Patch/Hotfix without a work branch, assemble the complete intended change as one atomic candidate tree/commit rather than persisting file-by-file implementation commits.
+8. Prepare one exact **release-ready** candidate commit based on current `main`.
+9. The candidate-only commit range must contain exactly one unique `Work-Branch:` trailer:
    - Major/Minor: `Work-Branch: work/LBS-<issue>` is mandatory;
    - Patch/Hotfix normal path: `Work-Branch: none`;
    - Patch/Hotfix exception: `Work-Branch: work/LBS-<issue>` plus exactly one `Work-Branch-Reason: <reason>` from the pre-implementation effort/risk analysis.
    Same-candidate correction commits may omit these trailers, but must not introduce conflicting values. When a work branch is declared, its current tree must exactly match the Candidate tree.
-9. Push that commit only as `candidate/v<version>`. Do **not** manually create `release/v<version>`.
+10. Push that commit only as `candidate/v<version>`. Do **not** manually create `release/v<version>`.
 
 ### Version-only minimum diff
 

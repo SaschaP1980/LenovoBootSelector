@@ -41,6 +41,22 @@ For Patch/Hotfix analysis, indicators for escalation include multiple independen
 
 When a Patch/Hotfix is escalated, record the concise reason in the Issue when Issue-backed (or equivalent durable release history for an Issue-less Hotfix) and later include the same decision as `Work-Branch-Reason: <reason>` in the Candidate history.
 
+### Patch/Hotfix atomic fast path
+
+For a Patch/Hotfix that is **not** escalated to a work branch, prefer one short atomic development cycle:
+
+1. pin current `main`;
+2. reproduce the bug and establish the focused RED regression against the unfixed canonical basis;
+3. prepare the complete source/test/documentation/release-metadata change in memory/Git objects without creating a chain of visible intermediate commits;
+4. run the focused GREEN regression plus the smallest relevant syntax/encoding/determinism checks;
+5. create **one unreferenced candidate commit** from the pinned `main`;
+6. inspect the complete candidate diff/scope once;
+7. re-read `main` and expose `candidate/v<version>` only if the base lease still holds.
+
+Do not create a durable RED commit merely to prove test-first work for a normal branchless Patch/Hotfix. Durable RED evidence belongs in the Issue/release audit trail; the Candidate itself remains release-ready only.
+
+If the work can no longer fit safely in this atomic path because scope or duration grows materially, stop before accumulating many intermediate commits and explicitly reconsider whether the Patch/Hotfix should be escalated to the work-branch model.
+
 Create the selected work branch from a freshly verified current `main`:
 
 `work/LBS-<issue-number>`
@@ -79,6 +95,8 @@ LBS-17 demonstrated why this matters: the implementation deliberately migrated p
 
 A checkpoint is a coherent, recoverable development state.
 
+A checkpoint is **not required to have the complete repository test matrix GREEN**. Its purpose is durable recovery, not release qualification. A checkpoint may intentionally contain a known RED focused regression, an intermediate migration state, or a phase for which some broader/native tests have not yet run, as long as the commit body states the validation status honestly.
+
 **Checkpoint != stop point.**
 
 After a successful checkpoint is persisted, continue the same user-authorized task automatically unless:
@@ -106,6 +124,8 @@ For a normal checkpoint, target no more than about **1–2 minutes of agent/conn
 
 A checkpoint must not become a separate mini-build project. In particular:
 
+- do not run the complete Release/Core/Boundary/Regression/native matrix before every checkpoint commit;
+- run only the focused checks needed to prove that the checkpoint is coherent enough for its stated phase;
 - do not manually reconstruct the generated single-file runtime through large connector string transformations;
 - do not repeat permanent validator logic with ad-hoc remote reads once the repository already owns the corresponding executable check;
 - do not create a second metadata-only commit with the same tree merely to label an implementation commit as a checkpoint;
@@ -259,6 +279,33 @@ LBS-17 created many temporary/unreferenced staging commits while incrementally r
 
 The Candidate is expected GREEN.
 
+### Commit validation versus Candidate validation
+
+Do **not** use the rule "every commit requires every test suite to be GREEN."
+
+Use validation proportional to the Git object's role:
+
+- **RED-evidence state:** the focused regression is expected to fail for the defect-specific reason.
+- **Work-branch checkpoint:** run the focused checks needed to establish a coherent recoverable phase; broader/native suites may remain pending and must be recorded honestly.
+- **Branchless Patch/Hotfix candidate preparation:** require the same focused test that proved RED to be GREEN, plus directly relevant syntax/encoding/determinism smoke checks before exposing the Candidate.
+- **Release-ready Candidate:** all available prechecks should indicate expected GREEN; GitHub Candidate Preflight then runs the authoritative Linux and Windows PowerShell 5.1 gates on the exact exposed SHA.
+- **Release:** the Release Orchestrator reruns the publication/reproducibility/status gates as defense in depth.
+
+The full repository matrix belongs at the Candidate/Release boundary, not mechanically before every persistence commit.
+
+### Test ownership and redundancy
+
+Prefer the **lowest existing permanent test layer that directly proves the behavior**. Add a second test layer only when it protects a meaningfully different risk.
+
+Once a repository invariant is owned by a permanent executable test or validator:
+
+- execute that test/validator instead of reconstructing the same assertion with multiple connector reads;
+- do not add an issue-specific validator that merely duplicates existing Functional Core/native/integration coverage;
+- do not assert exact documentation wording, capitalization, punctuation, or implementation-detail strings unless the text is itself a machine-consumed compatibility contract;
+- do not keep both ad-hoc structural checks and a permanent regression when they prove the same fact.
+
+A new permanent regression should normally encode behavior or a stable architectural invariant, not incidental source spelling.
+
 Hand-written structural checks are useful focused prechecks, but they must not be mistaken for the actual repository validators.
 
 Before Candidate creation, the final development-completion gate should execute the closest available equivalent of the real Candidate checks:
@@ -272,6 +319,10 @@ Before Candidate creation, the final development-completion gate should execute 
 If the current environment cannot execute the real full-worktree checks, record that limitation explicitly. Do not manufacture dozens of approximate checks as a substitute.
 
 LBS-17's first Candidate failed because a regression assertion was too broad. The product behavior was correct; the exact permanent validator had not been executed against the work branch before Candidate exposure. A hosted work-branch preflight would have caught this earlier.
+
+LBS-23/v0.8.0.1 reinforced the opposite efficiency lesson for small fixes: the work branch accumulated **24 commits** for an 18-file Hotfix, while several manual structural checks and an issue-specific Python validator duplicated behavior already covered by Functional Core and the native localization suite. The extra validator also created avoidable quote/prose-literal corrections. Future small Patch/Hotfix work should therefore favor the atomic branchless path, one behavioral regression at the lowest useful layer, and only distinct integration coverage.
+
+The LBS-23 Candidate also found a displaced UTF-8 BOM on a PowerShell file. For changed PowerShell sources containing non-ASCII text, a cheap encoding/BOM/parser smoke check is appropriate before Candidate exposure; that is a targeted precheck, not justification for running the full repository suite before every commit.
 
 ## 11. Candidate and release supervision
 

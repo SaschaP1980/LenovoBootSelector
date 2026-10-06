@@ -90,6 +90,8 @@ For **MAJOR and MINOR** work, follow the persistent work-branch/checkpoint model
 
 For **PATCH and HOTFIX**, default to the shortest safe branchless atomic path. Before implementation, perform a brief effort/risk analysis. Escalate to the work-branch/checkpoint model only when that analysis shows the work is likely to be substantial, cross-cutting, migration-heavy, interruption-prone, or otherwise likely to require several recoverable checkpoints. Record the exception reason durably and carry it into the Candidate as `Work-Branch-Reason:`.
 
+For a normal branchless Patch/Hotfix, do not create a chain of intermediate commits: establish focused RED evidence against the unfixed basis, prepare the complete fix atomically, require focused GREEN plus directly relevant syntax/encoding/determinism checks, then expose one release-ready Candidate. Do not run the full test matrix before every commit; full authoritative validation belongs at the Candidate/Release gates. Reuse permanent validators instead of duplicating their assertions with ad-hoc connector checks.
+
 - **MAJOR:** a relevant GitHub Issue is mandatory.
 - **MINOR:** a relevant GitHub Issue is mandatory.
 - **PATCH:** a relevant GitHub Issue is mandatory.
