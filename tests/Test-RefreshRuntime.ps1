@@ -2,6 +2,7 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 . (Join-Path $root 'src\Application\RefreshRuntime.ps1')
+. (Join-Path $root 'src\Infrastructure\RuntimeDiagnostics.ps1')
 
 $checks = 0
 function Assert-RefreshTest {
@@ -51,5 +52,77 @@ Assert-RefreshTest 'Last timing stored in runtime state' ($state.LastTiming.Tota
 $parsed = ConvertFrom-BackgroundRefreshResultText -Text '{"Success":true,"Stage":"complete"}'
 Assert-RefreshTest 'Result JSON parses through application contract' ([bool]$parsed.Success -and [string]$parsed.Stage -eq 'complete')
 
-Write-Host "REFRESH TOTAL $checks/18"
-if ($checks -ne 18) { throw "Expected 18 refresh checks, got $checks" }
+# LBS-22: child workers must inherit the tray diagnostics session instead of
+# silently creating a separate session that is absent from the exported ZIP.
+$templatePath = Join-Path $root 'src\App\LenovoBootMenuTray.template.ps1'
+$templateText = [System.IO.File]::ReadAllText($templatePath, [System.Text.Encoding]::UTF8)
+$captureMarker = '$script:InheritedRuntimeSessionId = [string]$RuntimeSessionId'
+$resetMarker = '$script:RuntimeSessionId = $null'
+$captureIndex = $templateText.IndexOf($captureMarker, [System.StringComparison]::Ordinal)
+$resetIndex = $templateText.IndexOf($resetMarker, [System.StringComparison]::Ordinal)
+Assert-RefreshTest 'Runtime session input captured before active state reset' ($captureIndex -ge 0 -and $resetIndex -gt $captureIndex)
+
+$diagnosticRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('LenovoBootSelector-DiagnosticTest-' + [guid]::NewGuid().ToString('N'))
+$parentSession = '11111111-2222-3333-4444-555555555555'
+try {
+    $script:RuntimeDiagnosticsRoot = $diagnosticRoot
+    $script:RuntimeDiagnosticsErrorCount = 0
+    $script:InheritedRuntimeSessionId = $parentSession
+
+    $script:BackgroundRefresh = $true
+    $script:UpdateCheck = $false
+    $script:UpdatePrepare = $false
+    $script:RuntimeSessionId = $null
+    $script:RuntimeDiagnosticsAvailable = $false
+    Initialize-RuntimeDiagnostics
+    $parentLogPath = $script:RuntimeEventsPath
+    $backgroundRecord = ([System.IO.File]::ReadAllLines($parentLogPath, [System.Text.Encoding]::UTF8) | Select-Object -Last 1) | ConvertFrom-Json
+    Assert-RefreshTest 'Background worker reuses inherited diagnostics session' ($script:RuntimeSessionId -eq $parentSession)
+    Assert-RefreshTest 'Background worker start is correlated to parent log' ($backgroundRecord.event -eq 'BACKGROUND_WORKER_STARTED' -and [bool]$backgroundRecord.data.parentSession -and $backgroundRecord.sessionId -eq $parentSession)
+
+    $script:BackgroundRefresh = $false
+    $script:UpdateCheck = $true
+    $script:UpdatePrepare = $false
+    $script:RuntimeSessionId = $null
+    $script:RuntimeDiagnosticsAvailable = $false
+    Initialize-RuntimeDiagnostics
+    $updateCheckRecord = ([System.IO.File]::ReadAllLines($parentLogPath, [System.Text.Encoding]::UTF8) | Select-Object -Last 1) | ConvertFrom-Json
+    Assert-RefreshTest 'Update-check worker reuses inherited diagnostics session' ($script:RuntimeSessionId -eq $parentSession)
+    Assert-RefreshTest 'Update-check worker start is correlated to parent log' ($updateCheckRecord.event -eq 'UPDATE_CHECK_WORKER_STARTED' -and [bool]$updateCheckRecord.data.parentSession -and $updateCheckRecord.sessionId -eq $parentSession)
+
+    $script:BackgroundRefresh = $false
+    $script:UpdateCheck = $false
+    $script:UpdatePrepare = $true
+    $script:RuntimeSessionId = $null
+    $script:RuntimeDiagnosticsAvailable = $false
+    Initialize-RuntimeDiagnostics
+    $updatePrepareRecord = ([System.IO.File]::ReadAllLines($parentLogPath, [System.Text.Encoding]::UTF8) | Select-Object -Last 1) | ConvertFrom-Json
+    Assert-RefreshTest 'Update-prepare worker reuses inherited diagnostics session' ($script:RuntimeSessionId -eq $parentSession)
+    Assert-RefreshTest 'Update-prepare worker start is correlated to parent log' ($updatePrepareRecord.event -eq 'UPDATE_PREPARE_WORKER_STARTED' -and [bool]$updatePrepareRecord.data.parentSession -and $updatePrepareRecord.sessionId -eq $parentSession)
+
+    $parentRecords = @([System.IO.File]::ReadAllLines($parentLogPath, [System.Text.Encoding]::UTF8) | ForEach-Object { $_ | ConvertFrom-Json })
+    Assert-RefreshTest 'All three child roles share one parent diagnostics log' ($parentRecords.Count -eq 3 -and @($parentRecords | Where-Object { $_.sessionId -eq $parentSession }).Count -eq 3)
+
+    $script:InheritedRuntimeSessionId = ''
+    $script:BackgroundRefresh = $true
+    $script:UpdateCheck = $false
+    $script:UpdatePrepare = $false
+    $script:RuntimeSessionId = $null
+    $script:RuntimeDiagnosticsAvailable = $false
+    Initialize-RuntimeDiagnostics
+    $freshSession = [string]$script:RuntimeSessionId
+    $freshRecord = ([System.IO.File]::ReadAllLines($script:RuntimeEventsPath, [System.Text.Encoding]::UTF8) | Select-Object -Last 1) | ConvertFrom-Json
+    $parsedFreshGuid = [guid]::Empty
+    $freshIsGuid = [guid]::TryParse($freshSession, [ref]$parsedFreshGuid)
+    Assert-RefreshTest 'Worker without inherited session creates fresh session' ($freshIsGuid -and $freshSession -ne $parentSession)
+    Assert-RefreshTest 'Fresh worker session is not marked as parent session' ($freshRecord.event -eq 'BACKGROUND_WORKER_STARTED' -and -not [bool]$freshRecord.data.parentSession -and $freshRecord.sessionId -eq $freshSession)
+}
+finally {
+    $script:BackgroundRefresh = $false
+    $script:UpdateCheck = $false
+    $script:UpdatePrepare = $false
+    try { if (Test-Path -LiteralPath $diagnosticRoot) { Remove-Item -LiteralPath $diagnosticRoot -Recurse -Force } } catch { }
+}
+
+Write-Host "REFRESH TOTAL $checks/28"
+if ($checks -ne 28) { throw "Expected 28 refresh checks, got $checks" }

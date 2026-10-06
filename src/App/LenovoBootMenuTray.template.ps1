@@ -763,6 +763,9 @@ $script:ScriptPath = $PSCommandPath
 if (-not $script:ScriptPath) { $script:ScriptPath = $MyInvocation.MyCommand.Path }
 
 $script:RuntimeDiagnosticsRoot = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray\Diagnostics\Runtime'
+# Preserve the command-line parent-session input before active diagnostics state
+# reuses the RuntimeSessionId name in script scope.
+$script:InheritedRuntimeSessionId = [string]$RuntimeSessionId
 $script:RuntimeSessionId = $null
 $script:RuntimeSessionDir = $null
 $script:RuntimeEventsPath = $null
