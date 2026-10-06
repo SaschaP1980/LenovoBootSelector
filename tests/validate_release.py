@@ -83,6 +83,9 @@ def main():
         s.no('Release workflow has no Base64 patch transport',w,'base64')
         s.no('Release workflow has no source helper branch',w,'source-v')
         s.no('Release workflow has no post-merge finalizer',w,'finalize')
+        s.has('Release workflow allows only exact one-time LBS-2 root migration deletes',w,'EXPECTED_LBS2_DELETIONS')
+        s.has('LBS-2 delete compatibility is gated by legacy root version',w,'origin/main:version.json')
+        s.has('LBS-2 delete compatibility requires missing migrated version on main',w,'origin/main:bin/version.json')
     for rel in ['tests/validate_release.py','tests/validate_core.py','tests/validate_boundary.py','tests/validate_regression.py']:
         s.c(f'Permanent validator exists: {rel}',(root/rel).is_file())
     ui=txt(root/'src/UI/UpdatePresentation.ps1'); infra=txt(root/'src/Infrastructure/UpdateClient.ps1')
