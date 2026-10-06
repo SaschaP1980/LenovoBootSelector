@@ -233,16 +233,18 @@
         -ForeColor $script:ColorSecondary -X 352 -Y 7 -Width 22 -Height 23
     $defaultArrow.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $defaultArrow.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $defaultArrow.Name = 'DefaultTargetArrowLabel'
     $defaultPanel.Controls.Add($defaultArrow)
+    $script:DefaultArrowLabel = $defaultArrow
 
     $defaultRowEnter = {
-        if ($script:DefaultButton -and $script:DefaultButton.Enabled) { $script:DefaultButton.BackColor = [Drawing.Color]::FromArgb(38,38,38) }
+        if ($script:DefaultInteractionEnabled -and $script:DefaultButton) { $script:DefaultButton.BackColor = [Drawing.Color]::FromArgb(38,38,38) }
     }
     $defaultRowLeave = {
         if ($script:DefaultButton) { $script:DefaultButton.BackColor = $script:ColorSurface }
     }
     $defaultRowClick = {
-        if ($script:DefaultButton -and $script:DefaultButton.Enabled) { Show-DefaultTargetMenu -Owner $script:DefaultButton }
+        if ($script:DefaultInteractionEnabled -and $script:DefaultButton) { Show-DefaultTargetMenu -Owner $script:DefaultButton }
     }
     foreach ($control in @($defaultPanel,$defaultName,$defaultValue,$defaultArrow)) {
         $control.Add_MouseEnter($defaultRowEnter)

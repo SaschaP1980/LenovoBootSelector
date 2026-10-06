@@ -1,5 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.6.2.1 – Standard-Startziel während Erstprüfung klar darstellen
+
+- Während der initialen asynchronen Systemfunktionsprüfung bleibt die Zeile „Standard-Startziel“ vollständig lesbar.
+- Der rechte Wert zeigt in diesem Zustand „Wird geprüft …“ statt eines ausgegrauten, bereits bekannten Zielnamens.
+- Der Chevron wird während der Prüfung verborgen und die Zeile bleibt nicht interaktiv.
+- Nach Abschluss der Prüfung werden tatsächlicher Standardzielwert, Chevron und Interaktion automatisch wiederhergestellt.
+- Andere deaktivierte Zustände behalten ihre bisherige ausgegraute Semantik.
+- Keine Änderung an BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
+
 ## v0.6.2.0 – LBS-1 Architektur-/Audit-Artefakte strukturieren
 
 - Kanonische und historische `ARCHITECTURE_BASELINE*.json` liegen unter `docs/architecture/`.
