@@ -16,8 +16,8 @@ def render_integrity(root:Path,version:str)->bytes:
     return ('\n'.join(lines)+'\n').encode('utf-8')
 def update_readme(root:Path,version:str,check:bool):
     p=root/'README.md'; s=p.read_text(encoding='utf-8-sig'); import re
-    expected=f'**Aktueller Entwicklungsstand:** v{version}  '
-    new,n=re.subn(r'\*\*Aktueller Entwicklungsstand:\*\* v[^\s]+  ',expected,s,count=1)
+    expected=f'**Current development version:** v{version}  '
+    new,n=re.subn(r'\*\*Current development version:\*\* v[^\s]+  ',expected,s,count=1)
     if n!=1: raise RuntimeError('README current-development marker missing or ambiguous')
     if check:
         if s!=new: raise RuntimeError('README current version is not canonical')

@@ -1,57 +1,51 @@
 # GitHub How-To
 
-## Bootstrap für einen neuen Chat
+## Bootstrap for a new chat
 
-Der kanonische Ein-Zeilen-Einstieg für einen komplett neuen Chat ist `docs/INITIAL_PROMPT.md`. Wenn der Nutzer lediglich auf diese Datei verweist, führt der neue Chat den dort beschriebenen vollständigen Bootstrap aus und liest anschließend diese How-To-Datei sowie die übrigen aktuellen Verträge.
+The canonical one-line entry point for a completely new chat is `docs/INITIAL_PROMPT.md`. If the user only points to that file, the new chat must execute the complete bootstrap described there and then read this guide and the other current contracts.
 
-Wenn ein neuer Chat die Entwicklung, einen Build, einen Hotfix oder ein GitHub-Release für Lenovo Boot Selector übernimmt, darf er **nicht** aus Gesprächserinnerung oder einem alten Handover heraus direkt handeln. Zuerst muss der aktuelle kanonische Repository-Zustand rekonstruiert werden.
+When a new chat takes over development, a build, a Hotfix, or a GitHub release for Lenovo Boot Selector, it must **not** act directly from conversation memory or an old handover. It must first reconstruct the current canonical repository state.
 
-Verbindliche Reihenfolge:
+Mandatory order:
 
-1. **Aktuellen `main`-Stand lesen und SHA/Tree festhalten.**
-2. **Diese `docs/GITHUB_HOWTO.md` vollständig aus dem aktuellen `main` lesen.**
-3. **`docs/RELEASE_PROCESS.md` vollständig lesen.**
-4. Bei Issue-getriebener Arbeit das **aktuelle GitHub Issue** inklusive Status, Labels, Kommentare und Akzeptanzkriterien lesen.
-5. **`bin/version.json`** lesen und aktuelle Version, `releaseProfile`, `protectedFragmentIntent` und `repositoryDeleteIntent` prüfen.
-6. Die relevanten ausführbaren Verträge gegenlesen:
+1. **Read current `main` and record its SHA/tree.**
+2. **Read this `docs/GITHUB_HOWTO.md` in full from current `main`.**
+3. **Read `docs/RELEASE_PROCESS.md` in full.**
+4. For Issue-backed work, read the **current GitHub Issue** including state, labels, comments, and acceptance criteria.
+5. Read **`bin/version.json`** and verify current version, `releaseProfile`, `protectedFragmentIntent`, and `repositoryDeleteIntent`.
+6. Read the relevant executable contracts:
    - `.github/workflows/candidate-preflight.yml`
    - `.github/workflows/release.yml`
    - `tools/candidate_preflight.py`
    - `tools/release_verification.py`
-   - die vier permanenten Validatoren unter `tests/`
-7. Erst danach Scope, Zielversion und Implementierungs-/Releaseplan festlegen und Änderungen vorbereiten.
+   - the four permanent validators under `tests/`
+7. Only then determine scope, target version, and implementation/release plan and prepare changes.
 
-### Autoritätsreihenfolge
+### Authority order
 
-Bei Widersprüchen gilt:
+When information conflicts:
 
-1. aktueller GitHub-`main` einschließlich ausführbarer Workflows/Tools;
-2. normative aktuelle Dokumente `docs/GITHUB_HOWTO.md` und `docs/RELEASE_PROCESS.md`;
-3. aktuelle GitHub Issues und deren Kommentare;
-4. Handover-Dokumente und Chat-Historie.
+1. current GitHub `main`, including executable workflows/tools;
+2. current normative documents `docs/GITHUB_HOWTO.md` and `docs/RELEASE_PROCESS.md`;
+3. current GitHub Issues and their comments;
+4. handover documents and chat history.
 
-Ein Handover ist damit **Einstiegshilfe, nicht Source of Truth**. Vor jeder tatsächlichen Änderung muss der neue Chat den aktuellen GitHub-Zustand erneut prüfen.
+A handover is an **onboarding aid, not the source of truth**. Before any actual change, the new chat must verify the current GitHub state again.
 
-### Minimaler Startcheck vor jeder Umsetzung
+### Minimum start check before any implementation
 
-Bevor Code oder Release-Refs erzeugt werden, muss der neue Chat mindestens beantworten können:
+Before creating code or release refs, the new chat must be able to answer at least:
 
-- Welcher SHA ist aktuelles `main`?
-- Welche Produktversion ist aktuell?
-- Welches Issue bzw. welcher Hotfix-Scope autorisiert die Änderung?
-- Ist dafür Major, Minor, Patch oder Hotfix vorgesehen?
-- Welches Releaseprofil ist korrekt: `version-only` oder `patch`?
-- Welche Dateien dürfen sich fachlich ändern?
-- Welche Candidate-/Release-Gates müssen anschließend GREEN sein?
-- Welche nativen Windows-Tests wurden tatsächlich ausgeführt und welche nur statisch/CI-seitig geprüft?
+- What SHA is current `main`?
+- What is the current product version?
+- Which Issue or Hotfix scope authorizes the change?
+- Is the intended version level Major, Minor, Patch, or Hotfix?
+- Which release profile is correct: `version-only` or `patch`?
+- Which files are allowed to change functionally?
+- Which Candidate/Release gates must end GREEN?
+- Which native Windows tests were actually executed and which were only covered statically/in CI?
 
-Wenn eine dieser Grundlagen unklar ist, zuerst Repository/Issue nachlesen statt zu raten.
-
- for Lenovo Boot Selector
-
-This document is the operational playbook for ChatGPT when maintaining and publishing **Lenovo Boot Selector** with the user.
-
-It combines the durable project rules from the project handover with lessons verified during real GitHub releases, especially v0.6.3.0.
+If any of these fundamentals is unclear, read the repository/Issue first instead of guessing.
 
 ## Authority and conflict resolution
 
@@ -129,7 +123,7 @@ Before a release:
 2. Add the corresponding `CHANGELOG.md` section **for every released version**, including a version-only Hotfix or a pure release-performance measurement.
 3. Choose the release profile intentionally.
 4. If product code under `src/**` is unchanged, use `version-only`. This profile requires strict product-source byte identity to the previous canonical source basis, apart from the injected runtime version.
-5. If product code under `src/**` changes fachlich, use `patch`.
+5. If product code under `src/**` changes functionally, use `patch`.
 6. These are the only active profiles. The former `release-architecture` profile was removed in v0.6.6.0 because it encoded a completed one-time AppVersion-template migration and caused misleading profile selection/false positives.
 
 ### Mandatory changelog contract
@@ -459,6 +453,19 @@ A documentation-only change that does not alter product/runtime/release inputs d
 Prefer an atomic docs commit on current `main` when creating a temporary branch would leave an undeletable stale ref through the connector.
 
 Do not describe such a documentation update as a product release.
+
+## Repository and GitHub documentation language
+
+English is the canonical language for repository and durable GitHub documentation.
+
+- Every tracked `*.md` file must use English prose, including files under `docs/**`, `tests/**`, `tests-history/**`, `README.md`, `CHANGELOG.md`, and `downloads/README.md`.
+- New Markdown files must be written in English.
+- GitHub Issue bodies/comments, Pull Request descriptions, release notes, workflow-facing explanations, and other durable project documentation must use English.
+- Exact technical literals may remain unchanged where required: identifiers, function/type names, paths, commands, JSON/schema names, status contexts, task names, GUIDs, hashes, version numbers, event/error codes, and exact UI strings intentionally quoted as literals.
+- When a German UI label must be referenced for compatibility/history, keep it as a clearly delimited literal while the surrounding prose remains English.
+- Interactive chat with the user is separate from repository language policy and may remain in German with established English technical terminology.
+
+The permanent Markdown-language validation is a practical guard against accidental reintroduction of German prose. It deliberately ignores fenced code, inline code, and clearly delimited literal UI text so that compatibility examples remain possible.
 
 ## Handover artifact policy
 

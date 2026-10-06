@@ -1,20 +1,21 @@
-﻿# Build-Revisionshistorie
+﻿# Build revision history
 
-Dieser Ordner enthält die **historisch erhaltenen gebauten Releases** des Lenovo Boot Selector.
+This directory contains the **historically retained built releases** of Lenovo Boot Selector.
 
-## Regel
+## Policy
 
-- Jede produktive Source-Revision, die einen neuen Build erfordert, erhält eine neue Version.
-- Das zugehörige versionierte Release-ZIP wird zusätzlich in diesem Ordner abgelegt.
-- Bereits vorhandene Builds werden nicht gelöscht oder durch neuere Versionen ersetzt.
-- Reine Dokumentations-/Repository-Änderungen ohne produktive Source-Änderung erzeugen kein neues Build.
-- Jede gebaute Version erhält einen unveränderlichen Git-Tag `vMAJOR.MINOR.PATCH.HOTFIX`.
-- `latest.json` ist das maschinenlesbare Manifest für die manuelle Update-Funktion; `releases.json` führt die Build-Historie.
+- Every product source revision that requires a new build receives a new version.
+- The matching versioned release ZIP is retained in this directory.
+- Existing builds are never deleted or replaced by newer versions.
+- Documentation/repository-only changes with no product source change do not create a new build.
+- Every built version receives an immutable Git tag `vMAJOR.MINOR.PATCH.HOTFIX`.
+- `latest.json` is the machine-readable manifest used by the manual update function; `releases.json` records build history.
 
 ## Builds
 
-| Version | Release | Größe | SHA-256 | Git-Tag |
+| Version | Release | Size | SHA-256 | Git tag |
 | --- | --- | ---: | --- | --- |
+| v0.6.8.0 | [LenovoBootMenuTray-v0.6.8.0.zip](LenovoBootMenuTray-v0.6.8.0.zip) | 94.737 Bytes | `eeb2d4e314da354b9e889ae83beefac343b40444a8f5083b39e744afb5af38b3` | `v0.6.8.0` |
 | v0.6.7.3 | [LenovoBootMenuTray-v0.6.7.3.zip](LenovoBootMenuTray-v0.6.7.3.zip) | 94.172 Bytes | `a465600bcebb35520298027dac5536e0956325f9e2c04b5ec4217e4d59566350` | `v0.6.7.3` |
 | v0.6.7.2 | [LenovoBootMenuTray-v0.6.7.2.zip](LenovoBootMenuTray-v0.6.7.2.zip) | 94.169 Bytes | `faf32661a00e71608a85aaa0307215417594c3e95f154ab2388bc5f3edb15060` | `v0.6.7.2` |
 | v0.6.7.1 | [LenovoBootMenuTray-v0.6.7.1.zip](LenovoBootMenuTray-v0.6.7.1.zip) | 94.169 Bytes | `5cbce46a972f24ddcf27a88ceb8414dd862932578ba407c1335529301697f6e9` | `v0.6.7.1` |

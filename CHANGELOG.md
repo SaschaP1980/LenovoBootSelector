@@ -1,1221 +1,1189 @@
 ﻿# Lenovo Boot Selector – Changelog
 
-## v0.6.7.3 – Native Test-Harness Count-Drift gehärtet
-
-- `Test-UpdateCore.ps1` korrigiert den historisch veralteten Abschlusszähler von 61 auf 62; die 62 vorhandenen fachlichen Assertions waren bereits erfolgreich.
-- Der Update-Test führt zusätzlich einen PowerShell-AST-Self-Audit aus: die im Source definierten `Assert-True`-/`Assert-Equal`-Command-Aufrufe müssen exakt den tatsächlich ausgeführten `$checks` entsprechen.
-- Als bewusster zusätzlicher Change-Control-Guard bleiben `Write-Host "UPDATE TOTAL $checks/62"` und `if ($checks -ne 62) { throw "Unexpected update test count $checks" }` fest erhalten; auch die AST-Source-Anzahl muss explizit 62 sein.
-- Das permanente Release-Gate prüft strukturell 62 Update-Assertion-Call-Sites sowie AST-Self-Audit und beide 62er-Guards, damit Count-Drift bereits im Candidate Preflight auffällt.
-- `Test-SingleInstanceMutex.ps1` erhält zusätzlich zu `MUTEX TOTAL $checks/4` einen echten Fail-Guard auf exakt vier Checks.
-- `tests/README.md` dokumentiert die unterschiedlichen Count-Strategien der nativen Suites; Loop-/Soak-/dynamische Suites werden nicht fälschlich mit einem pauschalen Call-Site-Count behandelt.
-- Produktcode unter `src/**` bleibt unverändert; der Hotfix verwendet deshalb `version-only`.
-- Native Windows-/PowerShell-5.1-Ausführung bleibt nach Veröffentlichung separat zu bestätigen.
-
-## v0.6.7.2 – Version-only Release-Zyklus-Messung
-
-- Reiner Hotfix-/Releaseprozess-Test ohne fachliche Produktänderung.
-- Kanonische Version von `0.6.7.1` auf `0.6.7.2` erhöht.
-- `releaseProfile` bleibt `version-only`; Produktcode unter `src/**` bleibt unverändert.
-- Dieser Build dient ausschließlich der erneuten Messung des optimierten Candidate-/Release-Ablaufs.
-
-## v0.6.7.1 – Version-only Release-Zyklus-Messung
-
-- Reiner Hotfix-/Releaseprozess-Test ohne fachliche Produktänderung.
-- Kanonische Version von `0.6.7.0` auf `0.6.7.1` erhöht.
-- `releaseProfile` bleibt `version-only`; Produktcode unter `src/**` bleibt unverändert.
-- Dieser Build dient ausschließlich der Messung des LBS-16 Candidate-/Release-Ablaufs.
-
-## v0.6.7.0 – LBS-16 Release-Orchestrierung gebündelt
-
-- Neuer integrierter `tools/release_verification.py`-Abschlusscheck bündelt nach dem Merge die bisher interaktiv einzeln kontrollierten GitHub-/Repository-Fakten.
-- Der Verifier prüft: gemergten PR und genau einen Publication-PR, 8/8 Release-Statuskontexte, Candidate-Preflight-Status, Source-Tag/-Commit, ZIP-/cache-freien Source-Tree, `downloads/latest.json`, veröffentlichte Release-ZIP Größe/SHA-256, Candidate-/Release-Branch-Cleanup sowie den zuvor bestandenen Reproduzierbarkeitsvergleich.
-- Erfolgreiche Releases emittieren genau einen maschinenlesbaren `RELEASE_VERIFICATION_SUMMARY=<json>`-Block und zusätzlich eine kompakte GitHub Job Summary.
-- Candidate Preflight emittiert ergänzend `CANDIDATE_PREFLIGHT_SUMMARY=<json>`, behält aber den bestehenden Marker `CANDIDATE PREFLIGHT PASS` für Kompatibilität bei.
-- Die interaktive Orchestrierung verwendet künftig gebündelte Ausgangsreads, einen atomaren Candidate-Commit, zurückhaltendes Workflow-Polling und den verifizierten End-Summary statt redundanter Einzelabfragen.
-- Der neue Verification-Helper besitzt einen permanent ausgeführten Self-Test; Release- und Regression-Gates sichern die Summary-/Workflow-Verträge ab.
-- Candidate Preflight, zwei deterministische Builds, Release/Core/Boundary/Regression, 8/8 Status-Gates, Source-Integrity und historische ZIP-Integrität bleiben vollständig erhalten.
-- v0.6.7.0 verwendet `version-only`; Produktcode unter `src/**`, Installer, Boot-/Firmware-/Storage-/Privilege-Logik bleiben unverändert.
-
-## v0.6.6.0 – LBS-10 historisches Releaseprofil entfernt
-
-- Das aktive Profil `release-architecture` wurde vollständig entfernt. Seine Sonderlogik bezog sich ausschließlich auf die längst abgeschlossene Migration von einer fest eingebauten AppVersion zum `@APP_VERSION@`-Template-Token.
-- Aktive Releaseprofile sind nur noch `version-only` und `patch`.
-- `version-only` ist die strikte Wahl, wenn Produktcode unter `src/**` unverändert bleibt: alle Produktmodule müssen byteidentisch zur unmittelbar vorherigen kanonischen Source-Basis sein; nur die injizierte Runtime-Version darf sich unterscheiden.
-- `patch` bleibt für fachliche Produktcodeänderungen vorgesehen.
-- Der Release-Config-Parser lehnt das historische Profil nun ab; Release- und Regression-Gates sichern die neue Zweiprofil-Semantik dauerhaft ab.
-- Historische Validatoren und frühere Releases bleiben unverändert in `tests-history/` bzw. `downloads/` erhalten.
-- v0.6.6.0 selbst verwendet korrekt `version-only`, da LBS-10 ausschließlich Release-Tooling, Tests und Dokumentation bereinigt und keinen Produktcode unter `src/**` verändert.
-- Keine Änderung an Produkt-Runtime, BootService, TaskBroker, Storage, Updater, Firmware-/BCD- oder Privilege-Logik.
-
-## v0.6.5.0 – LBS-15 Release-Einstieg technisch gehärtet
-
-- Neuer vorgeschalteter **Candidate Preflight** über `candidate/v<version>`: Der exakte Candidate-SHA wird vollständig geprüft, bevor ein sichtbarer `release/v<version>`-Branch entstehen darf.
-- Der Candidate-Workflow schreibt den Commit-Status `preflight/candidate`, erzeugt erst nach GREEN den Releasebranch auf exakt demselben SHA und löscht anschließend den Candidate-Branch.
-- Der Release-Orchestrator verweigert Kandidaten ohne erfolgreichen `preflight/candidate`-Status und verwirft stale Kandidaten, wenn der aktuelle `main` nicht mehr Vorfahr des Release-SHA ist.
-- `tools/candidate_preflight.py` führt deterministische Release-Vorbereitung, zwei reproduzierbare Builds, Release/Core/Boundary/Regression sowie Repository-Delete-/ZIP-History-Prüfungen vor der Releasebranch-Erzeugung aus.
-- `protectedFragmentIntent` in `bin/version.json` ist nun ein versionsgebundener, exakter Change-Intent. Geschützte Fragmente werden gegen den unmittelbar vorherigen kanonischen Source-Tag verglichen; tatsächliche und deklarierte Änderungen müssen exakt übereinstimmen.
-- Die dauerhafte `INTENTIONALLY_CHANGED_FROZEN`-Bypass-Allowlist wurde entfernt. Spätere Änderungen an bereits früher bewusst geänderten Security-/Critical-Funktionen werden wieder erkannt.
-- `repositoryDeleteIntent` macht beabsichtigte Repository-Löschungen im Candidate explizit; undeklarierte oder stale Delete-Intents blockieren den Preflight.
-- `tools/build_runtime.py` besitzt keine zweite statische Include-Liste mehr. Reihenfolge und Modulmenge werden ausschließlich aus den `# @include ...`-Markern des Runtime-Templates abgeleitet und auf Duplikate, Pfadsicherheit und vorhandene Dateien geprüft.
-- GitHub bleibt autoritative zweite Schranke: Release-Orchestrator, Source-Tag-Semantik, historische ZIP-Integrität und die bestehenden acht Release-Status-Gates bleiben erhalten.
-- Keine Änderung an Produkt-Runtime-Funktionalität, BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
-
-## v0.6.4.1 – Hotfix für LBS-6-Repair-ACL-Prüfung
-
-- Behebt den bestätigten Reparaturabbruch aus v0.6.4.0 im Installer-Schritt `protect-state`.
-- Ursache: `FileSystemRights::Modify` wurde als zusammengesetzte Verbotsmaske verwendet und überlappt mit dem ausdrücklich erlaubten `ReadAndExecute`. Dadurch wurde die gerade gesetzte Users-ReadAndExecute-ACL fälschlich als schreibbar abgelehnt.
-- Die Prüfung verwendet jetzt ausschließlich konkrete Mutationsrechte wie WriteData, AppendData, WriteExtendedAttributes, WriteAttributes, DeleteSubdirectoriesAndFiles, Delete, ChangePermissions und TakeOwnership.
-- `ReadAndExecute` gilt damit korrekt als nicht mutierend; `Modify` und `FullControl` bleiben verboten.
-- Der native TaskBroker-Boundary-Test extrahiert die tatsächlich im Installer enthaltene Rechtefunktion und prüft explizit ReadAndExecute = PASS, Modify = FAIL und FullControl = FAIL.
-- Runtime-Diagnosen trennen künftig `present`, `metadataReadable` und `compatible`. Eine vorhandene, aber inkompatible 0.2.12-Metadatendatei wird nicht mehr fälschlich als „nicht vorhanden“ dargestellt.
-- TaskBroker-Schema 0.2.13, `boundaryContract = fixed-task-v1`, operation-gated Runtime, One-Shot-`bootsequence` und alle übrigen LBS-6-Sicherheitsgrenzen bleiben unverändert.
-- Nach einem in v0.6.4.0 fehlgeschlagenen Repair kann **Wartung → Systemfunktionen reparieren…** mit v0.6.4.1 erneut ausgeführt werden.
-
-## v0.6.4.0 – LBS-6 Boot-/Privilege-Boundary fail-closed gehärtet
-
-- Der Runtime-TaskBroker akzeptiert keine frei übergebenen Scheduled-Task-Namen mehr. `Invoke-AuthorizedTask` nimmt nur noch die festen Operationsarten `ManagerRefresh`, `FirmwareRefresh`, `BootNext`, `DefaultSet` und `DefaultClear` an.
-- Statische Tasknamen sind fest im Runtime-Vertrag verankert; zielbezogene BootNext-/DefaultSet-Tasknamen werden ausschließlich aus streng validierten, bereits installierten Firmware-GUIDs abgeleitet.
-- TaskBroker-Schema **0.2.13** führt `boundaryContract = fixed-task-v1` ein. Metadaten werden fail-closed auf Schema, Benutzer-SID, feste Tasknamen, feste State-Pfade, kanonische GUIDs, abgeleitete Tasknamen und Duplikate geprüft.
-- Das erhöhte Setup schützt das komplette TaskBroker-State-Verzeichnis unter ProgramData sowie `task-broker.json` mit SYSTEM/Admin FullControl und Users ReadAndExecute. Normale Benutzer können vertrauenswürdige TaskBroker-Metadaten damit nicht mehr umschreiben.
-- Die Task-DACL-Verifikation akzeptiert `GENERIC_ALL` nicht mehr als Erfolg. Überbreite Benutzer-Allow-ACEs werden durch genau eine Read+Execute-ACE ersetzt und anschließend per Read-back verifiziert.
-- `LenovoBootMenu-Default-Restore` bleibt ein ausschließlich triggergesteuerter fester SYSTEM-Task und ist nicht als unelevierte Runtime-Operation exponiert.
-- One-Shot-`bootsequence` bleibt unverändert; permanente `BootOrder`-/`{fwbootmgr} displayorder`-Mutation bleibt verboten.
-- Neuer kanonischer Threat-/Boundary-Vertrag: `docs/SECURITY_BOUNDARY.md`.
-- Bestehende Schema-0.2.12-Systemfunktionen werden nach dem App-Update absichtlich als reparaturbedürftig erkannt. Ein einmaliger expliziter UAC-Repair installiert Schema 0.2.13 und die neuen ACL-Grenzen.
-- Updater, Storage und USB-Erkennung erhalten keine neue privilegierte Schnittstelle.
-
-## v0.6.3.1 – LBS-14 Update-Hinweis interaktiv und Dialogtitel vereinheitlicht
-
-- Der Header-Hinweis lautet jetzt konsistent **„Neue App-Version verfügbar“**.
-- Der Hinweis ist bei verfügbarem Update interaktiv: Hover und Tastaturfokus färben die Schrift Lenovo-rot, der Mauszeiger signalisiert Klickbarkeit.
-- Der Status verwendet einen flach gestalteten WinForms-Button und unterstützt dadurch die native Aktivierung per Enter und Leertaste.
-- Erst ein Klick bzw. eine Tastaturaktivierung öffnet den vorhandenen Update-Dialog; Hover allein öffnet nichts.
-- Der Dialogtitel lautet ebenfalls **„Neue App-Version verfügbar“** und verwendet weiterhin das bereits validierte, im Prozesszustand gespeicherte Manifest.
-- Der Header-Klick startet keinen zusätzlichen Netzwerk-/Versionscheck und führt keinen Download oder keine Installation automatisch aus.
-- Die bestehende Priorität bleibt unverändert: aktiver Bootziel-Refresh vor Update-Hinweis vor normaler Headeranzeige; während Refresh oder Maintenance ist der Update-Hinweis nicht interaktiv.
-- LBS-11-Startup-Check, LBS-5-Updatergrenzen sowie BootService, TaskBroker, Storage und Firmware-/BCD-Pfade bleiben unverändert.
-
-## v0.6.3.0 – LBS-5 Updater-Netzwerklogik gekapselt und diagnostisch gehärtet
-
-- Neue Infrastrukturgrenze `src/Infrastructure/UpdateTransport.ps1`: feste GitHub-Quelle, TLS-1.2-Aktivierung, WebClient-Erzeugung sowie Manifest-/Pakettransport liegen nicht mehr im UpdateClient.
-- Netzwerkfehler werden strukturiert als `network` mit Stufen `manifest-download` bzw. `package-download` erfasst; der zugrunde liegende `WebExceptionStatus` bleibt in der Runtime-Diagnose erhalten.
-- Manifest-, Paket-, Größen- und SHA-256-Fehler besitzen getrennte Kategorien/Stufen. Insbesondere Hashfehler werden als `hash / package-hash` ausgewiesen.
-- Update-Check- und Prepare-Worker geben `ErrorCategory`, `FailureStage`, `ErrorClass` und `NetworkStatus` an die UI weiter; die Runtime-Diagnose protokolliert dieselben strukturierten Felder.
-- Persistente Installer-/Restart-Ergebnisse führen zusätzlich `failureCategory`, `failureStage` und `errorClass`, sodass Installations- und Restartfehler voneinander unterscheidbar bleiben.
-- Gezielte native Update-Tests decken DNS-, Timeout- und ConnectFailure-Klassifikation sowie die separate Hash-Kategorie ab.
-- Der einmalige read-only Startup-Versionscheck aus LBS-11 bleibt erhalten; Popup-Öffnen startet keinen weiteren Check und periodisches Polling bleibt ausgeschlossen.
-- Keine Änderung an BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
+## v0.6.8.0 – LBS-18 repository documentation standardized on English
+
+- All tracked Markdown documentation is migrated to English, including `README.md`, `CHANGELOG.md`, `docs/**`, `tests/**`, `tests-history/**`, and `downloads/README.md`.
+- English is now the canonical language for repository documentation, development/process documentation, GitHub Issues/PRs/release notes, and other durable GitHub project communication.
+- `docs/INITIAL_PROMPT.md` remains the one-line bootstrap entry point and now explicitly distinguishes repository language from interactive chat language: repository/GitHub documentation stays English, while user chat may remain German with established English technical terminology.
+- `docs/GITHUB_HOWTO.md` and `docs/RELEASE_PROCESS.md` document the permanent language policy and keep the existing authority, Candidate Preflight, release, security, and handover contracts intact.
+- A new permanent `tools/validate_markdown_language.py` gate scans every tracked Markdown file and pragmatically rejects German-looking prose while excluding fenced code, inline code, and clearly delimited literal UI/technical text.
+- `tests/validate_release.py` runs the Markdown-language gate during Candidate Preflight/Release validation; `tests/validate_regression.py` protects the permanent wiring.
+- Exact identifiers, paths, commands, schemas, status contexts, event/error codes, hashes, version numbers, and intentionally quoted UI strings remain unchanged where required.
+- Product code under `src/**` is unchanged; v0.6.8.0 therefore uses `version-only`. BootService, TaskBroker, Storage, updater, firmware/BCD behavior, and the privilege boundary are unchanged.
+
+## v0.6.7.3 – Native test-harness count drift hardened
+
+- `Test-UpdateCore.ps1` corrects the historically stale final count from 61 to 62; all 62 existing functional assertions were already passing.
+- The update test additionally performs a PowerShell-AST self-audit: the `Assert-True` / `Assert-Equal` command calls defined in source must exactly match the actually executed `$checks`.
+- As a deliberate additional change-control guard, `Write-Host "UPDATE TOTAL $checks/62"` and `if ($checks -ne 62) { throw "Unexpected update test count $checks" }` remain fixed; the AST source count must also explicitly equal 62.
+- The permanent release gate structurally checks 62 update assertion call sites plus the AST self-audit and both 62-count guards, so count drift is detected during Candidate Preflight.
+- `Test-SingleInstanceMutex.ps1` now has a real fail guard for exactly four checks in addition to `MUTEX TOTAL $checks/4`.
+- `tests/README.md` documents the different count strategies used by native suites; loop-, soak-, and dynamically counted suites are not incorrectly treated with a generic call-site count.
+- Product code under `src/**` is unchanged; the Hotfix therefore uses `version-only`.
+- Native Windows/PowerShell-5.1 execution remains a separate post-publication confirmation.
+
+## v0.6.7.2 – Version-only release-cycle measurement
+
+- Pure Hotfix/release-process test with no functional product change.
+- Canonical version raised from `0.6.7.1` to `0.6.7.2`.
+- `releaseProfile` remains `version-only`; product code under `src/**` is unchanged.
+- This build exists only to remeasure the optimized Candidate/Release flow.
+
+## v0.6.7.1 – Version-only release-cycle measurement
+
+- Pure Hotfix/release-process test with no functional product change.
+- Canonical version raised from `0.6.7.0` to `0.6.7.1`.
+- `releaseProfile` remains `version-only`; product code under `src/**` is unchanged.
+- This build exists only to measure the LBS-16 Candidate/Release flow.
+
+## v0.6.7.0 – LBS-16 release orchestration aggregated
+
+- New integrated `tools/release_verification.py` final verifier aggregates GitHub/repository facts that had previously been checked through many interactive requests after merge.
+- The verifier checks: merged PR and exactly one publication PR, 8/8 release status contexts, Candidate Preflight status, source tag/commit, ZIP/cache-free source tree, `downloads/latest.json`, published release ZIP size/SHA-256, candidate/release branch cleanup, and the previously completed reproducibility comparison.
+- Successful releases emit exactly one machine-readable `RELEASE_VERIFICATION_SUMMARY=<json>` plus a compact GitHub Job Summary.
+- Candidate Preflight additionally emits `CANDIDATE_PREFLIGHT_SUMMARY=<json>` while retaining `CANDIDATE PREFLIGHT PASS` for compatibility.
+- Interactive orchestration now prefers batched initial reads, one atomic candidate commit, conservative workflow polling, and the verified final summary instead of redundant individual lookups.
+- The new verification helper has a permanently executed self-test; Release and Regression gates protect the summary/workflow contracts.
+- Candidate Preflight, two deterministic builds, Release/Core/Boundary/Regression, 8/8 status gates, source integrity, and historical ZIP integrity remain fully intact.
+- v0.6.7.0 uses `version-only`; product code under `src/**`, installer, boot/firmware/storage logic, and privilege behavior are unchanged.
+
+## v0.6.6.0 – LBS-10 historical release profile removed
+
+- Active `release-architecture` was removed completely. Its special behavior covered only the long-completed migration from a hard-coded AppVersion to the `@APP_VERSION@` template token.
+- Active release profiles are now only `version-only` and `patch`.
+- `version-only` is the strict choice when product code under `src/**` is unchanged: all product modules must be byte-identical to the immediately previous canonical source basis; only the injected runtime version may differ.
+- `patch` remains the profile for functional product-code changes.
+- The release-config parser now rejects the historical profile; Release and Regression gates permanently protect the two-profile semantics.
+- Historical validators and prior releases remain unchanged under `tests-history/` and `downloads/`.
+- v0.6.6.0 correctly uses `version-only` because LBS-10 changes only release tooling, tests, and documentation and does not change product code under `src/**`.
+- No change to product runtime, BootService, TaskBroker, Storage, updater, firmware/BCD, or privilege logic.
+
+## v0.6.5.0 – LBS-15 release entry hardened
+
+- A new upstream **Candidate Preflight** uses `candidate/v<version>` so the exact candidate SHA is fully validated before a visible `release/v<version>` branch may exist.
+- The Candidate workflow writes `preflight/candidate`, creates the release branch only after GREEN on the exact same SHA, then deletes the candidate branch.
+- The Release Orchestrator rejects candidates without successful `preflight/candidate` and rejects stale candidates when current `main` is no longer an ancestor of the release SHA.
+- `tools/candidate_preflight.py` performs deterministic release preparation, two reproducible builds, Release/Core/Boundary/Regression, repository-delete intent checks, and ZIP-history checks before release-branch creation.
+- `protectedFragmentIntent` in `bin/version.json` is now an exact release-specific change intent. Protected fragments are compared with the immediately previous canonical source tag; actual and declared changes must match exactly.
+- The permanent `INTENTIONALLY_CHANGED_FROZEN` bypass allowlist was removed. Future changes to security/critical functions that were intentionally changed in a prior release are protected again.
+- `repositoryDeleteIntent` makes intended repository deletions explicit; undeclared or stale deletion intent blocks preflight.
+- `tools/build_runtime.py` no longer has a second static include registry. Module set/order is derived only from `# @include ...` markers in the runtime template and validated for duplicates, safe paths, and existence.
+- GitHub remains the authoritative second barrier: Release Orchestrator, source-tag semantics, historical ZIP integrity, and the existing eight release status gates remain.
+- No change to product-runtime functionality, BootService, TaskBroker, Storage, firmware/BCD paths, or the privilege boundary.
+
+## v0.6.4.1 – Hotfix for LBS-6 repair ACL validation
+
+- Fixes the confirmed v0.6.4.0 repair failure at installer step `protect-state`.
+- Root cause: `FileSystemRights::Modify` was used as a composite forbidden mask and overlaps the explicitly allowed `ReadAndExecute` rights. The newly written Users=ReadAndExecute ACL was therefore falsely classified as writable.
+- Validation now checks only concrete mutation rights such as WriteData, AppendData, WriteExtendedAttributes, WriteAttributes, DeleteSubdirectoriesAndFiles, Delete, ChangePermissions, and TakeOwnership.
+- `ReadAndExecute` is correctly treated as non-mutating; `Modify` and `FullControl` remain forbidden.
+- The native TaskBroker boundary test extracts the actual rights predicate from the installer and explicitly verifies ReadAndExecute = PASS, Modify = FAIL, and FullControl = FAIL.
+- Runtime diagnostics now distinguish `present`, `metadataReadable`, and `compatible`. An existing but incompatible 0.2.12 metadata file is no longer falsely reported as absent.
+- TaskBroker schema 0.2.13, `boundaryContract = fixed-task-v1`, operation-gated runtime, One-Shot `bootsequence`, and all other LBS-6 security boundaries are unchanged.
+- After a repair failed under v0.6.4.0, the existing German maintenance action `Wartung → Systemfunktionen reparieren…` can safely be run again with v0.6.4.1.
+
+## v0.6.4.0 – LBS-6 boot/privilege boundary hardened fail-closed
+
+- Runtime TaskBroker no longer accepts freely supplied Scheduled Task names. `Invoke-AuthorizedTask` accepts only fixed operations `ManagerRefresh`, `FirmwareRefresh`, `BootNext`, `DefaultSet`, and `DefaultClear`.
+- Static task names are fixed by the runtime contract; target-specific BootNext/DefaultSet task names are derived only from strictly validated installed firmware GUIDs.
+- TaskBroker schema **0.2.13** introduces `boundaryContract = fixed-task-v1`. Metadata is validated fail-closed for schema, user SID, fixed task names, fixed state paths, canonical GUIDs, derived task names, and duplicates.
+- Elevated setup protects the complete TaskBroker state directory under ProgramData plus `task-broker.json` with SYSTEM/Admin FullControl and Users ReadAndExecute. Normal users can no longer rewrite trusted TaskBroker metadata.
+- Task-DACL verification no longer accepts `GENERIC_ALL` as success. Over-broad user allow ACEs are replaced by exactly one Read+Execute ACE and verified by read-back.
+- `LenovoBootMenu-Default-Restore` remains a trigger-only fixed SYSTEM task and is not exposed as an unelevated runtime operation.
+- One-Shot `bootsequence` semantics remain unchanged; permanent `BootOrder` / `{fwbootmgr} displayorder` mutation remains forbidden.
+- New canonical threat/boundary contract: `docs/SECURITY_BOUNDARY.md`.
+- Existing schema-0.2.12 system functions are intentionally treated as requiring repair after the app update. One explicit UAC repair installs schema 0.2.13 and the new ACL boundaries.
+- Updater, Storage, and USB detection receive no new privileged interface.
+
+## v0.6.3.1 – LBS-14 update indicator made interactive and dialog title aligned
+
+- The header indicator now consistently uses the exact German UI text `Neue App-Version verfügbar`.
+- When an update is available, the indicator is interactive: hover and keyboard focus turn the text Lenovo red and the pointer indicates clickability.
+- The status uses a flat WinForms button and therefore supports native activation with Enter and Space.
+- Only click/keyboard activation opens the existing update dialog; hover alone does nothing.
+- The dialog title also uses `Neue App-Version verfügbar` and continues to use the already validated manifest stored in process state.
+- Header activation starts no additional network/version check and does not automatically download or install anything.
+- Existing priority remains unchanged: active boot-target refresh before update indicator before normal header; the update indicator is not interactive during refresh or maintenance.
+- LBS-11 startup check, LBS-5 updater boundaries, BootService, TaskBroker, Storage, and firmware/BCD paths remain unchanged.
+
+## v0.6.3.0 – LBS-5 updater networking isolated and diagnostics hardened
+
+- New infrastructure boundary `src/Infrastructure/UpdateTransport.ps1` owns the fixed GitHub source, TLS 1.2 activation, WebClient creation, and manifest/package transport instead of UpdateClient.
+- Network failures are recorded structurally as `network` with stages `manifest-download` or `package-download`; underlying `WebExceptionStatus` remains in runtime diagnostics.
+- Manifest, package, size, and SHA-256 failures have separate categories/stages. Hash failures are specifically classified as `hash / package-hash`.
+- Update-check and prepare workers return `ErrorCategory`, `FailureStage`, `ErrorClass`, and `NetworkStatus` to the UI; runtime diagnostics record the same structured fields.
+- Persistent installer/restart results also carry `failureCategory`, `failureStage`, and `errorClass` so installation and restart failures remain distinguishable.
+- Targeted native update tests cover DNS, timeout, ConnectFailure classification, and the separate hash category.
+- LBS-11's one-time read-only startup version check remains; opening/reopening the popup starts no additional check and periodic polling remains excluded.
+- No change to BootService, TaskBroker, Storage, firmware/BCD paths, or the privilege boundary.
 
-## v0.6.2.2 – Teststruktur aufgeräumt und einmaliger Start-Versionscheck
+## v0.6.2.2 – Test structure cleaned up and one-time startup version check
+
+### LBS-13 – Test structure
+
+- `tests/` now contains only active canonical validators, native PowerShell tests, and required baseline data.
+- 74 historical `validate_v*.py` files were moved byte-for-byte to `tests-history/`.
+- Historical filenames now explicitly contain test category `release`, `core`, `boundary`, or `regression` plus a readable version.
+- `tests/README.md` documents the active test matrix; `tests-history/README.md` documents historical snapshots and naming.
+- The four permanent GitHub gates remain `validate_release.py`, `validate_core.py`, `validate_boundary.py`, and `validate_regression.py`.
 
-### LBS-13 – Teststruktur
-
-- `tests/` enthält nur noch die aktiven kanonischen Validatoren, nativen PowerShell-Tests und benötigten Baseline-Daten.
-- 74 historische `validate_v*.py`-Dateien wurden byteidentisch nach `tests-history/` verschoben.
-- Historische Dateinamen enthalten jetzt explizit die Testkategorie `release`, `core`, `boundary` oder `regression` sowie eine lesbare Versionsnummer.
-- `tests/README.md` dokumentiert die aktive Testmatrix; `tests-history/README.md` dokumentiert die historischen Snapshots und das Namensschema.
-- Die vier permanenten GitHub-Gates bleiben `validate_release.py`, `validate_core.py`, `validate_boundary.py` und `validate_regression.py`.
+### LBS-11 – Version check per tray process
 
-### LBS-11 – Versionscheck pro Tray-Prozess
+- A new tray process automatically performs exactly one read-only check for a newer app version.
+- Opening/reopening the popup starts no additional automatic check; periodic polling remains excluded.
+- The automatic check shows no update dialogs, downloads nothing, and installs nothing.
+- When an update is available, the validated manifest remains in process state and the header shows the exact historical German UI text `Neue App Version verfügbar`.
+- An active boot-target refresh takes header precedence with `Aktualisiere Bootziele…`; the update message returns after completion.
+- The existing manual update path with dialog and explicit installation is unchanged.
+- No change to BootService, TaskBroker, Storage, firmware/BCD paths, or the privilege boundary.
+
+## v0.6.2.1 – Default boot target remains clear during initial check
+
+- During the initial asynchronous system-functions check, the `Standard-Startziel` row remains fully readable.
+- The right-hand value shows `Wird geprüft …` instead of a disabled already-known target name.
+- The chevron is hidden during the check and the row is non-interactive.
+- After completion, actual default-target value, chevron, and interaction are restored automatically.
+- Other disabled states keep their previous dimmed semantics.
+- No change to BootService, TaskBroker, Storage, firmware/BCD paths, or the privilege boundary.
 
-- Beim Start eines neuen Tray-Prozesses wird genau einmal automatisch und read-only auf eine neuere App-Version geprüft.
-- Popup-Öffnen oder erneutes Popup-Öffnen startet keinen weiteren automatischen Check; periodisches Polling bleibt ausgeschlossen.
-- Der automatische Check zeigt keine Update-Dialoge, lädt nichts herunter und installiert nichts.
-- Bei verfügbarem Update bleibt das validierte Manifest im Prozesszustand erhalten und der Header zeigt `Neue App Version verfügbar`.
-- Ein aktiver Bootziel-Refresh hat im Header Vorrang mit `Aktualisiere Bootziele…`; nach Abschluss erscheint die Update-Meldung wieder.
-- Der bestehende manuelle Updatepfad mit Dialog und expliziter Installation bleibt unverändert.
-- Keine Änderung an BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
-
-## v0.6.2.1 – Standard-Startziel während Erstprüfung klar darstellen
+## v0.6.2.0 – LBS-1 architecture/audit artifacts structured
 
-- Während der initialen asynchronen Systemfunktionsprüfung bleibt die Zeile „Standard-Startziel“ vollständig lesbar.
-- Der rechte Wert zeigt in diesem Zustand „Wird geprüft …“ statt eines ausgegrauten, bereits bekannten Zielnamens.
-- Der Chevron wird während der Prüfung verborgen und die Zeile bleibt nicht interaktiv.
-- Nach Abschluss der Prüfung werden tatsächlicher Standardzielwert, Chevron und Interaktion automatisch wiederhergestellt.
-- Andere deaktivierte Zustände behalten ihre bisherige ausgegraute Semantik.
-- Keine Änderung an BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
+- Canonical and historical `ARCHITECTURE_BASELINE*.json` files now live under `docs/architecture/`.
+- Canonical and historical `CATCH_AUDIT*.json` files now live under `audits/`.
+- Generators, permanent and historical regression tests, documentation, and the release-migration gate use the new paths.
+- Source/transition packaging includes the new directories automatically; the flat release ZIP structure is unchanged.
+- Boot, TaskBroker, privilege, Storage, and UI logic remain unchanged.
+- LBS-1 is fully integrated into the release cycle with v0.6.2.0.
 
-## v0.6.2.0 – LBS-1 Architektur-/Audit-Artefakte strukturieren
+## v0.6.1.0 – LBS-2 repository-root cleanup
 
-- Kanonische und historische `ARCHITECTURE_BASELINE*.json` liegen unter `docs/architecture/`.
-- Kanonische und historische `CATCH_AUDIT*.json` liegen unter `audits/`.
-- Generatoren, permanente und historische Regressionstests, Dokumentation und das Release-Migrationsgate verwenden die neuen Pfade.
-- Source-/Transition-Packaging nimmt die neuen Verzeichnisse automatisch auf; die flache Release-ZIP-Struktur bleibt unverändert.
-- Boot-, TaskBroker-, Privilege-, Storage- und UI-Logik bleiben unverändert.
-- LBS-1 ist mit v0.6.2.0 vollständig in den Release-Zyklus übernommen.
+v0.6.1.0 implements LBS-2 and cleanly separates repository structure from shipped release structure.
 
-## v0.6.1.0 – LBS-2 Repository-Root-Bereinigung
+- Runtime/project files previously loose in the repository root now live under `bin/`.
+- This includes the generated runtime, installer/uninstaller, launcher, icon/preview, `BUILD_INTEGRITY.txt`, and canonical `version.json`.
+- `README.md` and `CHANGELOG.md` remain in the root; `.gitignore` remains as the Git control file.
+- JSON architecture/audit artifacts remain explicitly unchanged within LBS-1 scope and are not moved by LBS-2.
+- Build, test, packaging, release-workflow, and documentation paths were updated to the new `bin/` source.
+- The shipped release ZIP intentionally remains unchanged and flat with the same 10 files; `bin/` is repository/source structure only.
+- Updater, boot, Storage, TaskBroker, and privilege-boundary semantics remain unchanged.
 
-v0.6.1.0 setzt [LBS-2] um und trennt Repository-Struktur und ausgelieferte Release-Struktur sauber.
+## v0.6.0.0 – GitHub-owned publication timestamp and release-cycle hardening
 
-- Die lose im Repository-Root liegenden Runtime-/Projektdateien liegen nun unter `bin/`.
-- Dazu gehören die generierte Runtime, Installer/Uninstaller, Launcher, Icon/Preview, `BUILD_INTEGRITY.txt` und die kanonische `version.json`.
-- `README.md` und `CHANGELOG.md` bleiben im Root; `.gitignore` bleibt als Git-Steuerdatei im Root.
-- Die JSON-Architektur-/Audit-Artefakte bleiben ausdrücklich unverändert im Scope von LBS-1 und werden durch LBS-2 nicht verschoben.
-- Build-, Test-, Packaging-, Release-Workflow- und Dokumentationspfade wurden auf die neue `bin/`-Quelle umgestellt.
-- Die ausgelieferte Release-ZIP bleibt bewusst unverändert flach mit denselben 10 Dateien; `bin/` ist ausschließlich Repository-/Source-Struktur.
-- Updater-, Boot-, Storage-, TaskBroker- und Privilege-Boundary-Semantik bleiben unverändert.
+v0.6.0.0 is a minor release of the release system. Product runtime remains unchanged except for the version number.
 
-## v0.6.0.0 – GitHub-eigener Veröffentlichungszeitpunkt und Release-Zyklus-Härtung
+- `version.json` moves to schema 2 and no longer contains a pre-set `publishedUtc`.
+- Release profile remains `version-only` because all product modules stay byte-identical to the v0.5.10.4 basis and only release tooling changes.
+- GitHub Release Orchestrator creates canonical `publishedUtc` only once the hosted runner is executing the publication job.
+- Both deterministic GitHub rebuilds receive the exact same GitHub-generated timestamp.
+- `tools/prepare_release.py` requires explicit `--published-utc` for schema 2; local values are provisional build metadata only.
+- Legacy schema 1 remains readable for older source states.
+- Python calls in the release workflow use `-B` so interpreter caches are not written to the working tree.
+- Runner queue policy is documented: wait interactively at most 60 seconds, then no cancel/retry/duplicate trigger; check later with the `Github Status` user command.
+- LBS-9 is implemented.
 
-v0.6.0.0 ist eine Minor-Version des Release-Systems. Die Produkt-Runtime bleibt bis auf die Versionsnummer unverändert.
+## v0.5.10.4 – Version-only performance optimization test 3
 
-- `version.json` wechselt auf Schema 2 und enthält keinen vorab gesetzten `publishedUtc` mehr.
-- Das Releaseprofil bleibt `version-only`, weil alle Produktmodule byteidentisch zur v0.5.10.4-Basis bleiben und nur Release-Tooling geändert wird.
-- Der GitHub Release Orchestrator erzeugt den kanonischen `publishedUtc` erst, wenn der Hosted Runner den Veröffentlichungsjob tatsächlich ausführt.
-- Beide deterministischen GitHub-Rebuilds erhalten exakt denselben GitHub-seitig erzeugten Zeitstempel.
-- `tools/prepare_release.py` verlangt für Schema 2 einen expliziten `--published-utc`; lokale Werte sind ausschließlich provisorische Build-Metadaten.
-- Legacy-Schema 1 bleibt für ältere Source-Stände lesbar.
-- Python-Aufrufe im Release-Workflow verwenden `-B`, damit keine Interpreter-Caches in den Arbeitsbaum geschrieben werden.
-- Die vereinbarte Runner-Queue-Policy ist dokumentiert: maximal 60 Sekunden interaktiv warten, danach kein Cancel/Retry/Doppeltrigger; spätere Kontrolle per `Github Status`.
-- LBS-9 ist damit umgesetzt.
+v0.5.10.4 is a pure Hotfix for measuring the further optimized end-to-end release path. There is no functional product change from v0.5.10.3.
 
-## v0.5.10.4 – Version-only Performance-Optimierungstest 3
+- Version raised from `0.5.10.3` to `0.5.10.4`.
+- `releaseProfile` remains `version-only`.
+- LBS-8 / Squash Merge is explicitly not part of this build.
+- No persistent extracted worktree cache: the canonical v0.5.10.3 source ZIP is the only basis.
+- No intermediate workflow polling; after trigger there is one wait block followed by aggregated final verification.
+- No change to product runtime, update behavior, BootService, TaskBroker, Storage, firmware/BCD paths, or privilege boundary.
 
-v0.5.10.4 ist ein reiner Hotfix zur Messung des weiter optimierten End-to-End-Releasepfads. Gegenüber v0.5.10.3 gibt es keine funktionale Produktänderung.
+## v0.5.10.3 – Version-only performance optimization test 2
 
-- Version von `0.5.10.3` auf `0.5.10.4` erhöht.
-- `releaseProfile` bleibt `version-only`.
-- LBS-8 / Squash Merge ist ausdrücklich nicht Bestandteil dieses Builds.
-- Kein persistenter entpackter Arbeitsbaum-Cache: Grundlage ist ausschließlich das kanonische v0.5.10.3-Source-ZIP.
-- Kein Zwischenpolling des GitHub-Workflows; nach dem Trigger erfolgt ein einmaliger Warteblock und danach eine gebündelte Endkontrolle.
-- Keine Änderung an Produkt-Runtime, Update-Verhalten, BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
+v0.5.10.3 is a pure Hotfix for measuring the further optimized end-to-end release path. There is no functional product change from v0.5.10.2.
 
-## v0.5.10.3 – Version-only Performance-Optimierungstest 2
+- Version raised from `0.5.10.2` to `0.5.10.3`.
+- `releaseProfile` remains `version-only`.
+- LBS-8 / Squash Merge is explicitly not part of this build.
+- No change to product runtime, update behavior, BootService, TaskBroker, Storage, firmware/BCD paths, or privilege boundary.
+- The run measures all steps, records errors/retries, and uses the verified v0.5.10.2 source cache.
 
-v0.5.10.3 ist ein reiner Hotfix zur Messung des weiter optimierten End-to-End-Releasepfads. Gegenüber v0.5.10.2 gibt es keine funktionale Produktänderung.
+## v0.5.10.2 – Version-only performance optimization test
 
-- Version von `0.5.10.2` auf `0.5.10.3` erhöht.
-- `releaseProfile` bleibt `version-only`.
-- LBS-8 / Squash Merge ist ausdrücklich nicht Bestandteil dieses Builds.
-- Keine Änderung an Produkt-Runtime, Update-Verhalten, BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
-- Der Lauf misst alle Schritte, protokolliert Fehler und Retries und nutzt den verifizierten v0.5.10.2-Source-Cache.
+v0.5.10.2 is a pure Hotfix for another end-to-end performance measurement of the permanent release path. There is no functional product change from v0.5.10.1.
 
-## v0.5.10.2 – Version-only Performance-Optimierungstest
+- Version raised from `0.5.10.1` to `0.5.10.2`.
+- `releaseProfile` remains `version-only`.
+- LBS-8 / Squash Merge is explicitly not part of this build.
+- No change to product runtime, update behavior, BootService, TaskBroker, Storage, firmware/BCD paths, or privilege boundary.
+- The run measures all steps, records retries/errors, and uses safe caches where possible.
 
-v0.5.10.2 ist ein reiner Hotfix zur erneuten End-to-End-Performance-Messung des permanenten Releasepfads. Gegenüber v0.5.10.1 gibt es keine funktionale Produktänderung.
+## v0.5.10.1 – Version-only pipeline performance test
 
-- Version von `0.5.10.1` auf `0.5.10.2` erhöht.
-- `releaseProfile` bleibt `version-only`.
-- LBS-8 / Squash Merge ist ausdrücklich nicht Bestandteil dieses Builds.
-- Keine Änderung an Produkt-Runtime, Update-Verhalten, BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
-- Der Lauf misst alle Schritte, protokolliert Retries/Fehler und nutzt sichere Caches, wo möglich.
+v0.5.10.1 is a pure Hotfix for measuring the permanent build/GitHub release path. There is no functional product change from v0.5.10.0. Changes are limited to canonical version/release configuration and deterministically generated release metadata/packages.
 
-## v0.5.10.1 – Version-only Pipeline-Performance-Test
+- Version raised from `0.5.10.0` to `0.5.10.1`.
+- `releaseProfile` is `version-only`.
+- No change to product runtime, update behavior, BootService, TaskBroker, Storage, firmware/BCD paths, or privilege boundary.
+- This release explicitly measures end-to-end performance of the permanent Release Orchestrator.
 
-v0.5.10.1 ist ein reiner Hotfix zur Messung des permanenten Build- und GitHub-Releasepfads. Gegenüber v0.5.10.0 gibt es keine funktionale Produktänderung. Die Änderung beschränkt sich auf die kanonische Versions-/Release-Konfiguration und die daraus deterministisch erzeugten Release-Metadaten und Pakete.
+## v0.5.10.0 – Permanent release pipeline and centralized versioning
 
-- Version von `0.5.10.0` auf `0.5.10.1` erhöht.
-- `releaseProfile` ist `version-only`.
-- Keine Änderung an Produkt-Runtime, Update-Verhalten, BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
-- Dieser Release dient ausdrücklich der End-to-End-Performance-Messung des permanenten Release-Orchestrators.
+v0.5.10.0 is a build/release architecture patch with no new product feature. From this version, app version is derived only from `version.json`; runtime, package, audit, and transition builds use the same canonical source.
 
-## v0.5.10.0 – Permanente Release-Pipeline und zentrale Versionierung
+Changes:
 
-v0.5.10.0 ist ein Build-/Release-Architekturpatch ohne neue Produktfunktion. Die App-Version wird ab dieser Version ausschließlich aus `version.json` abgeleitet; Runtime-, Paket-, Audit- und Transition-Builds verwenden dieselbe kanonische Quelle.
+- New canonical `version.json` with version, release profile, and deterministic publication timestamp.
+- `LenovoBootMenuTray.template.ps1` contains only build token `@APP_VERSION@`; `tools/build_runtime.py` injects the canonical version deterministically.
+- `build_packages.py`, `build_transition.py`, and `build_catch_audit.py` no longer contain a hard-coded release version.
+- New permanent tools `release_common.py`, `prepare_release.py`, and `build_architecture_baseline.py`.
+- Catch Audit and Architecture Baseline continue under canonical names `CATCH_AUDIT.json` and `ARCHITECTURE_BASELINE.json`; historical versioned snapshots remain unchanged.
+- Permanent validators `validate_release.py`, `validate_core.py`, `validate_boundary.py`, and `validate_regression.py` replace future version-specific copies. Historical validators remain as evidence of earlier releases.
+- Permanent GitHub release path: exactly one `release/v<version>` branch, one PR, and one merge. No Base64 patch transport, separate source branch, or required post-merge finalizer.
+- The single permanent GitHub orchestrator reproduces the release and runs Release/Core/Boundary/Regression itself. Green gate statuses are written to the final PR head; a separate `pull_request` workflow is intentionally absent because PR events created with `GITHUB_TOKEN` do not recursively start another workflow. The ZIP-free annotated source tag is created only after successful gates and PR creation, before merge.
+- Existing historical `downloads/*.zip` remain immutable; each release may add exactly one new ZIP.
+- Product runtime, update behavior, BootService, TaskBroker, Storage, firmware/BCD paths, and privilege boundary remain functionally unchanged from v0.5.9.1.
 
-Änderungen:
+**Performance target for the following version-only test:** target <= 5 minutes, hard expected limit 10 minutes from start to merged PR, assuming no external GitHub incident.
 
-- Neue kanonische `version.json` mit Version, Release-Profil und deterministischem Veröffentlichungszeitpunkt.
-- `LenovoBootMenuTray.template.ps1` enthält nur noch den Build-Token `@APP_VERSION@`; `tools/build_runtime.py` injiziert die kanonische Version deterministisch.
-- `build_packages.py`, `build_transition.py` und `build_catch_audit.py` enthalten keine hart codierte Releaseversion mehr.
-- Neue permanente Werkzeuge `release_common.py`, `prepare_release.py` und `build_architecture_baseline.py`.
-- Catch-Audit und Architektur-Baseline werden ab dieser Version unter den kanonischen Dateinamen `CATCH_AUDIT.json` und `ARCHITECTURE_BASELINE.json` fortgeführt; historische versionierte Snapshots bleiben unverändert erhalten.
-- Permanente Validatoren `validate_release.py`, `validate_core.py`, `validate_boundary.py` und `validate_regression.py` ersetzen künftige versionsspezifische Testkopien. Historische Validatoren bleiben als frühere Releasebelege bestehen.
-- Permanenter GitHub-Releasepfad: genau ein `release/v<version>`-Branch, genau ein PR und genau ein Merge. Kein Base64-Patchtransport, kein separater Source-Branch und kein notwendiger Post-Merge-Finalizer.
-- Der einzige permanente GitHub-Orchestrator reproduziert das Release und führt Release-/Core-/Boundary-/Regression-Gates selbst aus. Die grünen Gate-Status werden auf den finalen PR-Head geschrieben; ein separater `pull_request`-Workflow entfällt bewusst, weil durch `GITHUB_TOKEN` erzeugte PR-Ereignisse keinen rekursiven Workflow starten. Der ZIP-freie annotierte Source-Tag wird erst nach erfolgreichen Gates und erfolgreicher PR-Erstellung, aber vor dem Merge gesetzt.
-- Bestehende historische `downloads/*.zip` bleiben unveränderlich; pro Release darf genau ein neues ZIP ergänzt werden.
-- Produkt-Runtime, Update-Verhalten, BootService, TaskBroker, Storage, Firmware-/BCD-Pfade und Privilege Boundary bleiben gegenüber v0.5.9.1 funktional unverändert.
+## v0.5.9.1 – Version Hotfix without functional change
 
-**Performance-Ziel für den anschließenden Version-only-Test:** Ziel <= 5 Minuten, harte Erwartungsgrenze 10 Minuten vom Start bis zum gemergten PR, sofern keine externe GitHub-Störung vorliegt.
+v0.5.9.1 exists solely to verify the simplified build/GitHub release process. There is no functional product change from v0.5.9.0; runtime logic is byte-identical apart from the app-version line.
 
-## v0.5.9.1 – Versions-Hotfix ohne Funktionsänderung
+Changes:
 
-v0.5.9.1 dient ausschließlich der Verifikation des vereinfachten Build-/GitHub-Release-Prozesses. Gegenüber v0.5.9.0 gibt es keine funktionale Produktänderung; die Laufzeitlogik bleibt byteidentisch, abgesehen von der App-Versionszeile.
+- App version raised from `0.5.9.0` to `0.5.9.1`.
+- Version-related build, audit, download, and revision metadata advanced to v0.5.9.1.
+- No change to update dialog, update networking, BootService, TaskBroker, Storage, firmware/BCD paths, or privilege boundary.
+- Release process is verified as **1 build = 1 release branch = 1 PR**; source tag and reproducible package check must complete before merge.
 
-Änderungen:
+**Native verification:** no new functional test required; starting the app and confirming displayed version v0.5.9.1 is sufficient as a smoke test.
 
-- App-Version von `0.5.9.0` auf `0.5.9.1` angehoben.
-- Versionsbezogene Build-, Audit-, Download- und Revisionsmetadaten auf v0.5.9.1 fortgeschrieben.
-- Keine Änderung an Update-Dialog, Update-Netzwerklogik, BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
-- Releaseprozess wird als **1 Build = 1 Release-Branch = 1 PR** geprüft; Source-Tag und reproduzierbare Paketprüfung müssen vor dem Merge abgeschlossen sein.
+## v0.5.9.0 – Start update directly from availability dialog
 
-**Native Prüfung:** keine neue Funktionsprüfung erforderlich; ein Start der App mit angezeigter Version v0.5.9.1 genügt als Smoke-Test.
+v0.5.9.0 changes only the manual update entry after a successful newer-version check. Existing update path, network/hash validation, and privilege boundary remain unchanged.
 
-## v0.5.9.0 – Update direkt aus dem Verfügbarkeitsdialog starten
+Changes:
 
-v0.5.9.0 verbessert ausschließlich den manuellen Update-Einstieg nach einer erfolgreichen Prüfung auf eine neue Version. Der vorhandene Updatepfad, die Netzwerk-/Hashprüfung und die Privilege Boundary bleiben unverändert.
+- Dialog `Neue Version verfügbar` additionally offers button `Jetzt aktualisieren`.
+- The button calls the existing `Start-ManualAppUpdate` path directly; no second installation/download path is introduced.
+- Historical German helper text is exactly: `Du kannst die neue Version jetzt direkt installieren. Später findest du die Aktualisierung im Tray-Menü unter ‚Wartung‘ → ‚App aktualisieren…‘.`
+- **OK** remains a non-installing action; existing maintenance item `Wartung → App aktualisieren…` remains available.
+- No change to download source, update networking, SHA-256/package validation, backup/rollback, restart-result logic, BootService, TaskBroker, Storage, firmware/BCD paths, or privilege boundary.
 
-Änderungen:
+**Native verification required:** after a real update check, visually verify the dialog, trigger `Jetzt aktualisieren` and confirm the same existing update process starts; regressively verify **OK** only closes the dialog.
 
-- Der Dialog **„Neue Version verfügbar“** besitzt zusätzlich den Button **„Jetzt aktualisieren“**.
-- Der Button ruft direkt den bereits bestehenden `Start-ManualAppUpdate`-Pfad auf; es entsteht kein zweiter Installations- oder Downloadpfad.
-- Der Hinweistext lautet: **„Du kannst die neue Version jetzt direkt installieren. Später findest du die Aktualisierung im Tray-Menü unter ‚Wartung‘ → ‚App aktualisieren…‘.“**
-- **OK** bleibt als nicht installierende Aktion erhalten; der bestehende Menüeintrag **Wartung → App aktualisieren…** bleibt unverändert verfügbar.
-- Keine Änderung an Downloadquelle, Update-Netzwerklogik, SHA-256-/Paketvalidierung, Backup/Rollback, Restart-Ergebnislogik, BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
+## v0.5.8.1 – Legacy updater restart result compatibility
 
-**Native Prüfung erforderlich:** Dialog nach einer realen Updateprüfung visuell prüfen, **„Jetzt aktualisieren“** auslösen und bestätigen, dass derselbe bestehende Updateprozess startet; anschließend **OK** regressiv als reines Schließen prüfen.
+v0.5.8.1 is a narrow Hotfix based on canonical v0.5.8.0 source. The real v0.5.7.2 → v0.5.8.0 web-update test installed v0.5.8.0 successfully, but after restart falsely showed `Update fehlgeschlagen – Unbekannter Update-Ergebnisstatus: <leer>`. Root cause was the persisted restart-result format transition: the helper still running from v0.5.7.2 wrote `{ utc, success, message }` while v0.5.8.0 already expected the new `status/sourceVersion/targetVersion/rollback...` format.
 
-## v0.5.8.1 – Legacy-Updater-Ergebnis beim Neustart kompatibel auswerten
+Changes:
 
-v0.5.8.1 ist ein enger Hotfix auf Basis der kanonischen v0.5.8.0-Source. Der reale Web-Update-Test v0.5.7.2 → v0.5.8.0 installierte v0.5.8.0 erfolgreich, zeigte nach dem Neustart jedoch fälschlich **„Update fehlgeschlagen – Unbekannter Update-Ergebnisstatus: <leer>“**. Ursache war der Formatwechsel des persistenten Restart-Ergebnisses: Der noch aus v0.5.7.2 laufende Helper schrieb `{ utc, success, message }`, während v0.5.8.0 bereits das neue Statusformat mit `status/sourceVersion/targetVersion/rollback...` erwartete.
+- Restart evaluation now normalizes through `Resolve-LenovoUpdateRestartResultCore`.
+- Legacy format is detected only when `status` is absent and `success` is a real Boolean. This correctly handles `success=false` without accepting malformed string/pseudo-Boolean values.
+- Legacy `success=true` produces `Update erfolgreich` once. Because old format stores no reliable `targetVersion`, diagnostics do not invent one; only the actually running app version is shown.
+- Legacy `success=false` produces `Update fehlgeschlagen` once and uses the stored legacy error message or a neutral fallback.
+- When `status` is present, v0.5.8.x status format takes precedence; `pending-verification`, exact target-version verification, `failed`, and rollback presentation remain unchanged.
+- `UPDATE_RESTART_RESULT` additionally contains `resultFormat` and, for legacy results, `legacySuccess` so compatibility handling is diagnostically explicit.
+- Unknown/malformed result shapes remain fail-closed and continue to produce `Unbekannter Update-Ergebnisstatus`.
+- The result is still consumed before the modal dialog, so the message appears at most once.
+- No change to download source, network logic, SHA-256/package validation, backup/rollback, BootService, TaskBroker, Storage, firmware/BCD paths, or privilege boundary.
 
-Änderungen:
+**Native verification required:** fully test the new resolver under Windows PowerShell 5.1 and confirm either a real transition from a helper using the legacy result format to v0.5.8.1 or a controlled legacy fixture. The new status format must remain regressively unchanged.
 
-- Die Restart-Auswertung normalisiert das Ergebnis jetzt über `Resolve-LenovoUpdateRestartResultCore`.
-- Das Legacy-Format wird ausschließlich erkannt, wenn `status` fehlt und `success` als echter Boolean vorliegt. Dadurch wird insbesondere `success=false` korrekt erkannt, ohne dass beschädigte String-/Pseudo-Boolean-Werte akzeptiert werden.
-- Legacy `success=true` führt einmalig zu **„Update erfolgreich“**. Da das alte Format keine belastbare `targetVersion` speichert, wird diagnostisch keine Zielversion erfunden; angezeigt wird ausschließlich die tatsächlich laufende App-Version.
-- Legacy `success=false` führt einmalig zu **„Update fehlgeschlagen“** und übernimmt die gespeicherte Legacy-Fehlermeldung bzw. einen neutralen Fallback.
-- Sobald `status` vorhanden ist, hat das v0.5.8.x-Statusformat Vorrang; `pending-verification`, exakte Zielversionsprüfung, `failed` und Rollbackdarstellung bleiben unverändert.
-- `UPDATE_RESTART_RESULT` enthält zusätzlich `resultFormat` und bei Legacy-Ergebnissen `legacySuccess`, damit die Kompatibilitätsauswertung diagnostisch eindeutig erkennbar ist.
-- Unbekannte bzw. beschädigte Ergebnisformen bleiben fail-closed und erzeugen weiterhin **„Unbekannter Update-Ergebnisstatus“**.
-- Das Ergebnis wird weiterhin vor dem modalen Dialog konsumiert und deshalb höchstens einmal angezeigt.
-- Keine Änderung an Downloadquelle, Netzwerklogik, SHA-256-/Paketprüfung, Backup/Rollback, BootService, TaskBroker, Storage, Firmware-/BCD-Pfaden oder Privilege Boundary.
+## v0.5.8.0 – Confirm update result after restart
 
-**Native Prüfung erforderlich:** den neuen Resolver unter Windows PowerShell 5.1 vollständig prüfen und einen realen Übergang von einem Helper mit Legacy-Ergebnisformat auf v0.5.8.1 bzw. einen kontrollierten Legacy-Fixture-Fall bestätigen. Das neue Statusformat muss regressiv unverändert funktionieren.
+v0.5.8.0 extends the manual self-updater with persistent completion confirmation across process restart. The successful real v0.5.7.1 → v0.5.7.2 update proved the update path works, but previous runtime diagnostics ended with the old session and the user saw no explicit final message after restart.
 
-## v0.5.8.0 – Update-Ergebnis nach Neustart bestätigen
+Changes:
 
-v0.5.8.0 erweitert den manuellen Self-Updater um eine persistente Abschlussbestätigung über den Prozessneustart hinweg. Der erfolgreiche reale Web-Update-Test v0.5.7.1 → v0.5.7.2 hat gezeigt, dass der Updatepfad selbst funktioniert; die vorherige Runtime-Diagnose endete jedoch mit der alten Sitzung und zeigte dem Nutzer nach dem Neustart keine explizite Abschlussmeldung.
+- The unelevated installer helper writes a persistent update result before restart under `%LOCALAPPDATA%\Lenovo Boot Menu Tray\Updates\last-update-result.json`.
+- An update is initially marked `pending-verification`. **Success is confirmed only by the restarted tray app** when its running version exactly equals the expected target version.
+- After successful verification, `Update erfolgreich` appears once with the installed target version.
+- Installation/restart failures continue to use the existing backup/rollback path. The helper stores `failed` plus rollback state and then attempts to start the installed/restored app again.
+- After a failed update, `Update fehlgeschlagen` appears once on the next app start; successful rollback is stated explicitly.
+- The consumed result is copied as `UPDATE_RESTART_RESULT` into the new session's runtime diagnostics with source version, target version, running version, and rollback status.
+- The result is consumed before the modal dialog so the same completion message appears at most once.
+- Version schema remains **MAJOR.MINOR.PATCH.HOTFIX**; v0.5.8.0 is the next PATCH after v0.5.7.2.
+- No change to firmware/BCD/TaskBroker/Storage paths and no new privileged update channel.
 
-Änderungen:
+**Native verification required:** update an older installed version to v0.5.8.0 and confirm exactly one `Update erfolgreich` after automatic restart. Also run a controlled error/rollback test in a disposable copy.
 
-- Der unelevierte Installer-Helper schreibt vor dem Neustart ein persistentes Update-Ergebnis unter `%LOCALAPPDATA%\Lenovo Boot Menu Tray\Updates\last-update-result.json`.
-- Ein Update wird zunächst als `pending-verification` markiert. **Erfolg wird erst von der neu gestarteten Tray-App bestätigt**, wenn ihre laufende Version exakt der erwarteten Zielversion entspricht.
-- Nach erfolgreicher Verifikation erscheint einmalig **„Update erfolgreich“** mit der installierten Zielversion.
-- Bei Installations-/Restartfehlern wird weiterhin der bestehende Backup-/Rollback-Pfad verwendet. Der Helper speichert `failed` samt Rollbackstatus und versucht anschließend, die installierte bzw. wiederhergestellte App erneut zu starten.
-- Nach einem fehlgeschlagenen Update erscheint beim nächsten App-Start einmalig **„Update fehlgeschlagen“**; bei erfolgreichem Rollback wird dies ausdrücklich genannt.
-- Das konsumierte Ergebnis wird als `UPDATE_RESTART_RESULT` mit Quellversion, Zielversion, laufender Version und Rollbackstatus in die Runtime-Diagnose der neuen Sitzung übernommen.
-- Das Ergebnis wird vor Anzeige des modalen Dialogs konsumiert, damit dieselbe Abschlussmeldung höchstens einmal erscheint.
-- Versionsschema bleibt **MAJOR.MINOR.PATCH.HOTFIX**; v0.5.8.0 ist der nächste PATCH nach v0.5.7.2.
-- Keine Änderung an Firmware-/BCD-/TaskBroker-/Storage-Pfaden und kein neuer privilegierter Updatekanal.
+## v0.5.7.2 – Web-update test release
 
-**Native Prüfung erforderlich:** Update von einer älteren installierten Version auf v0.5.8.0 durchführen und bestätigen, dass nach dem automatischen Neustart genau einmal **„Update erfolgreich“** erscheint. Zusätzlich ist ein kontrollierter Fehler-/Rollbacktest in einer disposable Kopie vorgesehen.
+v0.5.7.2 is an intentionally minimal test release for the first real web-update path from v0.5.7.1 to v0.5.7.2. Only the version number changes; there is no other functional product change. By explicit request, no tests or handover were generated for this release.
 
-## v0.5.7.2 – Web-Update-Testrelease
+## v0.5.7.1 – Four-component version schema for web updates
 
-v0.5.7.2 ist ein bewusst minimaler Test-Release für den ersten echten Web-Update-Pfad von v0.5.7.1 auf v0.5.7.2. Gegenüber v0.5.7.1 wurde ausschließlich die Versionsnummer erhöht; es gibt keine weitere funktionale Produktänderung. Auf ausdrücklichen Wunsch wurden für dieses Release keine Tests und kein Handover erzeugt.
+v0.5.7.1 is an intentionally minimal test release for **MAJOR.MINOR.PATCH.HOTFIX**. The update parser now accepts three- and four-component versions; historical three-component versions are internally compared with `HOTFIX = 0`. There are no other functional product changes. By explicit request, no tests or handover were generated for this release.
 
-## v0.5.7.1 – Vierstufiges Versionsschema für Web-Updates
+## v0.5.7 – Update-manifest roundtrip fixed
 
-v0.5.7.1 ist ein bewusst minimaler Test-Release für das Versionsschema **MAJOR.MINOR.PATCH.HOTFIX**. Der Update-Parser akzeptiert jetzt drei- und vierteilige Versionen; historische dreiteilige Versionen werden intern mit `HOTFIX = 0` verglichen. Darüber hinaus enthält dieser Test-Release keine funktionalen Produktänderungen. Auf ausdrücklichen Wunsch wurden für dieses Release keine Tests und kein Handover erzeugt.
+v0.5.7 is a narrow updater bugfix based on v0.5.6. During manual update check, the remote manifest was validated correctly in the check worker, but normalized output lost `schemaVersion`. The tray app validated that worker result a second time and rejected it with `Update-Manifest-Schema wird nicht unterstützt.`
 
-## v0.5.7 – Update-Manifest-Roundtrip korrigiert
+Changes:
 
-v0.5.7 ist ein enger Updater-Bugfix auf Basis von v0.5.6. Der Fehler trat beim manuellen Update-Check auf: Das Remote-Manifest wurde im Check-Worker zunächst korrekt validiert, das normalisierte Ergebnis verlor jedoch `schemaVersion`. Die Tray-App validierte dieses Worker-Ergebnis ein zweites Mal und lehnte es deshalb mit **„Update-Manifest-Schema wird nicht unterstützt.“** ab.
+- `Test-LenovoUpdateManifestCore` includes `SchemaVersion = 1` in normalized manifest output.
+- Worker→JSON→Tray roundtrip is complete and second validation accepts an already valid manifest.
+- `Test-UpdateCore.ps1` explicitly checks normalized schema version and a complete JSON roundtrip.
+- Download source, SHA-256 gate, package validation, backup/rollback, unelevated installer helper, and all boot/TaskBroker/Storage/privilege paths remain unchanged.
 
-Änderungen:
+**Native verification required:** install v0.5.7 manually, run `Auf neue Version prüfen…`, and confirm current-state message `Lenovo Boot Selector v0.5.7 ist aktuell.`. A later version is required for the first real successful self-update.
 
-- `Test-LenovoUpdateManifestCore` erhält `SchemaVersion = 1` im normalisierten Manifest-Ergebnis.
-- Der Worker→JSON→Tray-Roundtrip bleibt damit vollständig und die zweite Validierung akzeptiert ein zuvor bereits valides Manifest.
-- `Test-UpdateCore.ps1` prüft nun explizit die normalisierte Schema-Version und einen vollständigen JSON-Roundtrip.
-- Downloadquelle, SHA-256-Gate, Paketvalidierung, Backup/Rollback, unelevierter Installer-Helper und alle Boot-/TaskBroker-/Storage-/Privilege-Pfade bleiben unverändert.
+## v0.5.6 – Maintenance menu grouped by topic
 
-**Native Prüfung erforderlich:** v0.5.7 manuell installieren, **„Auf neue Version prüfen…“** ausführen und bestätigen, dass bei aktuellem Stand **„Lenovo Boot Selector v0.5.7 ist aktuell.“** erscheint. Für den ersten echten Self-Update-Erfolg ist anschließend eine spätere Version erforderlich.
+v0.5.6 is a narrow UI/menu-structure patch based on v0.5.5. Update, boot, Storage, TaskBroker, and privilege logic are unchanged.
 
-## v0.5.6 – Wartungsmenü thematisch geordnet
+Changes:
 
-v0.5.6 ist ein enger UI-/Menüstruktur-Patch auf Basis von v0.5.5. Die Update-, Boot-, Storage-, TaskBroker- und Privilege-Logik bleibt unverändert.
+- Maintenance submenu keeps thematic groups and now clearly orders them as **system functions → updates → diagnostics**.
+- `Diagnose speichern…` is the final item at the bottom of the maintenance submenu.
+- Exactly one separator appears between system functions/updates and updates/diagnostics.
+- `Auf neue Version prüfen…` and `App aktualisieren…` retain their v0.5.5 behavior and semantics.
+- No change to self-updater download/hash/backup/rollback, firmware/BCD paths, Scheduled Tasks, Storage detection, or boot-target logic.
 
-Änderungen:
+**Native verification required:** open the maintenance submenu and visually confirm group order and both separators. Briefly regress v0.5.5 updater behavior.
 
-- Im Untermenü **Wartung** bleiben die thematischen Blöcke erhalten und werden jetzt klar in der Reihenfolge **Systemfunktionen → Updates → Diagnose** dargestellt.
-- **„Diagnose speichern…“** steht als letzter Eintrag ganz unten im Wartungs-Untermenü.
-- Zwischen Systemfunktionen und Updates sowie zwischen Updates und Diagnose steht jeweils genau ein Separator.
-- **„Auf neue Version prüfen…“** und **„App aktualisieren…“** behalten ihre v0.5.5-Funktion und -Semantik unverändert bei.
-- Keine Änderung an Self-Updater-Download/Hash/Backup/Rollback, Firmware-/BCD-Pfaden, Scheduled Tasks, Storage-Erkennung oder Bootziel-Logik.
+## v0.5.5 – Manual self-updater
 
-**Native Prüfung erforderlich:** Wartungs-Untermenü öffnen und die Reihenfolge Systemfunktionen → Updates → Diagnose sowie die beiden Separatoren visuell bestätigen. Die v0.5.5-Updater-Funktion kurz regressiv prüfen.
+v0.5.5 introduces an explicitly user-started self-updater. There is still no periodic or automatic update check.
 
-## v0.5.5 – Manueller Self-Updater
+Changes:
 
-v0.5.5 führt einen explizit vom Benutzer gestarteten Self-Updater ein. Es gibt weiterhin keinerlei periodische oder automatische Update-Prüfung.
+- Tray maintenance menu exposes exactly `Auf neue Version prüfen…` and `App aktualisieren…`.
+- `App aktualisieren…` is initially disabled and becomes enabled only after a successful check finds a genuinely newer valid version.
+- Update metadata is read only from fixed public repository `SaschaP1980/LenovoBootSelector`.
+- `downloads/latest.json` is the machine-readable manifest. Version format, filename, Git tag, file size, SHA-256, and expected flat package file list are strictly validated.
+- Release ZIP is validated for size and SHA-256 before extraction. Any mismatch fails closed.
+- ZIP must be flat; directories, `..` path components, and unexpected files are rejected.
+- Download/package preparation run in hidden unelevated worker processes so network I/O does not block the tray UI.
+- After successful preparation, a temporary unelevated update helper waits for the tray app to exit, backs up all managed release files, replaces them atomically best-effort, restarts the app through the existing VBS launcher, and rolls back to backups on installation failure.
+- Settings, diagnostics, and TaskBroker state under `%LOCALAPPDATA%` / `%ProgramData%` are not changed by the updater.
+- The updater has no `RunAs`/SYSTEM path and executes neither `bcdedit` nor Scheduled Task operations. If a future version needs different system functions, existing TaskBroker compatibility/repair logic remains responsible after restart.
+- Update check, preparation, and helper start are logged through existing runtime diagnostics.
+- Build revision history under `downloads/` remains. Every built product-source revision receives a versioned ZIP; older ZIPs remain.
+- Every built version receives an immutable Git tag `vX.Y.Z` on its source commit.
 
-Änderungen:
+### Native Windows acceptance required
 
-- Im Tray-Kontextmenü unter **Wartung** stehen jetzt exakt **„Auf neue Version prüfen…“** und **„App aktualisieren…“** zur Verfügung.
-- **„App aktualisieren…“** ist zunächst deaktiviert und wird erst nach einer erfolgreichen Prüfung auf eine tatsächlich neuere, valide Version aktiv.
-- Die Update-Metadaten werden ausschließlich aus dem fest eingebauten öffentlichen Repository `SaschaP1980/LenovoBootSelector` gelesen.
-- `downloads/latest.json` ist das maschinenlesbare Manifest. Versionsformat, Dateiname, Git-Tag, Dateigröße, SHA-256 und die erwartete flache Paketdateiliste werden strikt validiert.
-- Das Release-ZIP wird vor dem Entpacken gegen Größe und SHA-256 geprüft. Abweichungen brechen das Update fail-closed ab.
-- Das ZIP muss flach sein; Verzeichnisse, `..`-Pfadbestandteile und unerwartete Dateien werden abgelehnt.
-- Download und Paketvorbereitung laufen in versteckten, unelevierten Worker-Prozessen, damit die Tray-UI nicht durch Netzwerkzugriffe blockiert wird.
-- Nach erfolgreicher Vorbereitung startet ein temporärer unelevierter Update-Helper. Er wartet auf das Ende der Tray-App, sichert alle verwalteten Release-Dateien, ersetzt sie atomar best-effort, startet die App über den vorhandenen VBS-Launcher neu und führt bei Installationsfehlern einen Rollback auf die gesicherten Dateien aus.
-- Einstellungen, Diagnosen und TaskBroker-Zustand unter `%LOCALAPPDATA%` bzw. `%ProgramData%` werden vom Updater nicht verändert.
-- Der Updater besitzt keinen `RunAs`-/SYSTEM-Pfad und führt weder `bcdedit` noch Scheduled-Task-Operationen aus. Falls eine zukünftige Version andere Systemfunktionen benötigt, greift nach dem Neustart weiterhin die bestehende TaskBroker-Kompatibilitäts-/Repair-Logik.
-- Update-Prüfung, Vorbereitung und Helper-Start werden in der bestehenden Runtime-Diagnose protokolliert.
-- Die Build-Revisionshistorie in `downloads/` bleibt erhalten. Jede gebaute produktive Source-Revision bekommt ein versioniertes ZIP; ältere ZIPs bleiben bestehen.
-- Jede gebaute Version erhält einen unveränderlichen Git-Tag `vX.Y.Z` auf den zugehörigen Source-Commit.
+In addition to existing Parser/Core/Refresh/Mutex/Soak/Maintenance/Drift tests, `Test-UpdateCore.ps1` must be fully green. Manual checks include at least “no new version”, “new version found”, bad hash/download, and one successful self-update with restart.
 
-### Native Windows-Abnahme erforderlich
+## Repository maintenance after v0.5.4
 
-Zusätzlich zu den bisherigen Parser/Core/Refresh/Mutex/Soak/Maintenance/Drift-Tests muss `Test-UpdateCore.ps1` vollständig grün sein. Manuell sind mindestens „keine neue Version“, „neue Version gefunden“, fehlerhafter Hash/Download sowie ein erfolgreicher Self-Update-Pfad mit Neustart zu prüfen.
+- `README.md` is a conventional GitHub project overview; continuous version history lives in `CHANGELOG.md`.
+- `downloads/` is permanent build revision history, not only a folder for the latest ZIP.
+- Architecture baselines and Catch Audits are planned for a controlled cleanup from repository root into `docs/architecture/` and `audits/` with test/build paths migrated together.
 
-## Repository-Pflege nach v0.5.4
+## v0.5.4 – USB boot medium named explicitly
 
-- `README.md` ist eine klassische GitHub-Projektübersicht; die fortlaufende Versionshistorie liegt in dieser `CHANGELOG.md`.
-- `downloads/` ist eine dauerhafte Build-Revisionshistorie, nicht nur ein Ordner für das jeweils neueste ZIP.
-- Architektur-Baselines und Catch-Audits sollen in einem späteren kontrollierten Cleanup aus dem Repository-Root nach `docs/architecture/` bzw. `audits/` verschoben werden; Tests/Buildpfade werden dabei gemeinsam migriert.
+v0.5.4 is based only on canonical v0.5.3 source. The patch changes only the user-facing label for the already read-only detected single USB boot candidate. Instead of probability wording, UI now describes the evidenced Storage finding directly. Boot, firmware, TaskBroker, Storage-refresh, and privilege architecture remain unchanged.
 
-## Neu in v0.5.4 – USB-Startmedium klar benennen
+Change:
 
-v0.5.4 baut ausschließlich auf der kanonischen v0.5.3-Source auf. Der Patch ändert nur die endanwenderseitige Bezeichnung für den bereits read-only erkannten einzelnen USB-Bootkandidaten. Statt einer Wahrscheinlichkeitsformulierung beschreibt die UI nun direkt den belegten Storage-Befund. Boot-, Firmware-, TaskBroker-, Storage-Refresh- und Privilege-Architektur bleiben unverändert.
+- **Exactly one USB boot candidate:** subtext beneath generic firmware target `USB HDD` or an alias such as `Windows: Gaming` is now `USB-Startmedium: <Modell>`. On the target system, `USB-Startmedium: SanDisk Extreme Pro USB4` is expected.
+- **No new firmware binding:** wording states only which physical USB medium has detected boot structure. It still does not claim direct 1:1 addressability of the generic `USB HDD` firmware target.
+- **All other USB states unchanged:** pending, real Storage failure, media not detected as boot media, multiple possible USB boot media, and no USB drive remain unchanged.
 
-Änderung:
+**Native verification required:** with SanDisk as the only detected USB boot candidate, full Storage refresh must show `USB-Startmedium: SanDisk Extreme Pro USB4`. v0.5.3 NVMe presentation and header/tray red must remain unchanged.
 
-- **Genau ein USB-Bootkandidat:** Der Subtext unter dem generischen Firmwareziel `USB HDD` bzw. einem Alias wie `Windows: Gaming` lautet nun **`USB-Startmedium: <Modell>`**. Auf dem Zielsystem wird damit **`USB-Startmedium: SanDisk Extreme Pro USB4`** erwartet.
-- **Keine neue Firmwarebindung:** Die Formulierung sagt nur aus, welches physische USB-Medium eine erkannte Bootstruktur besitzt. Sie behauptet weiterhin keine direkte 1:1-Adressierbarkeit des generischen Firmwareziels `USB HDD`.
-- **Alle anderen USB-Zustände unverändert:** Pending, echter Storagefehler, nicht als Startmedium erkannte Medien, mehrere mögliche USB-Startmedien und kein USB-Laufwerk bleiben unverändert.
+## v0.5.3 – NVMe slot presentation
 
-**Native Prüfung erforderlich:** Mit SanDisk als einzigem erkannten USB-Bootkandidaten muss nach dem Storage-Refresh `USB-Startmedium: SanDisk Extreme Pro USB4` erscheinen. Die v0.5.3-NVMe-Darstellung sowie Header-/Tray-Rot müssen unverändert bleiben.
+v0.5.3 is based only on canonical v0.5.2 source. It changes only the read-only presentation of internal NVMe slots on the confirmed target ThinkPad. With exactly one internal NVMe detected by Windows, `NVMe-SSD 1` shows its model as `Interne SSD: <Modell>` and `NVMe-SSD 2` shows `Kein Laufwerk erkannt`. With multiple NVMe drives, no unsupported physical NVMe0/NVMe1 mapping is guessed and prior generic subtexts remain. Boot, firmware, TaskBroker, Storage-refresh, and privilege architecture are unchanged.
 
+## v0.5.2 – USB pending state and Lenovo-red experiment
 
-## Neu in v0.5.3 – NVMe-Slotdarstellung
+v0.5.2 is based only on canonical v0.5.1 source. It corrects USB presentation observed during native startup and includes two deliberately small UI experiments. Boot, Storage, and privilege architecture remain unchanged.
 
-v0.5.3 baut ausschließlich auf der kanonischen v0.5.2-Source auf. Der Patch verbessert nur die read-only Darstellung der internen NVMe-Slots auf dem bestätigten Ziel-ThinkPad. Bei genau einer von Windows erkannten internen NVMe zeigt `NVMe-SSD 1` deren Modell als `Interne SSD: <Modell>`; `NVMe-SSD 2` zeigt in diesem bestätigten Ein-Slot-Zustand `Kein Laufwerk erkannt`. Bei mehreren NVMe-Laufwerken wird bewusst keine physische NVMe0/NVMe1-Zuordnung geraten; die bisherigen generischen Subtexte bleiben dann erhalten. Boot-, Firmware-, TaskBroker-, Storage-Refresh- und Privilege-Architektur bleiben unverändert.
+Changes:
 
-## Neu in v0.5.2 – USB-Pending-State und Lenovo-Rot-Experiment
+- **USB check pending instead of error:** while first popup build has no `StorageContext` yet, `USB HDD` now shows `USB-Laufwerke werden geprüft …`. `USB-Laufwerke konnten nicht geprüft werden` remains only for completed failure state `UsbResolution = 'Unavailable'`.
+- **Header experimentally Lenovo red:** `Lenovo Boot Selector` at upper left uses the existing Lenovo-red accent.
+- **Tray menu clarified:** `Boot Selector öffnen` becomes `Lenovo Boot Selector öffnen` and is experimentally shown in Lenovo red. Other tray items are unchanged.
+- **No refresh-architecture change:** no polling, no PnP/device-arrival handlers, no `Storage.ps1` change. Existing popup-first background refresh remains.
+- **No new privileged mutation:** TaskBroker, BootService, installer/uninstaller, and firmware/BCD write boundaries are unchanged.
 
-v0.5.2 baut ausschließlich auf der kanonischen v0.5.1-Source auf. Der Patch korrigiert den beim nativen Start beobachteten Präsentationszustand der USB-Erkennung und enthält zwei bewusst kleine UI-Experimente. Boot-, Storage- und Privilege-Architektur bleiben unverändert.
+**Native verification required:** observe cold/app startup: first `USB-Laufwerke werden geprüft …`, then real USB state. Also verify header/tray menu text/color. A real Storage read failure must still show `USB-Laufwerke konnten nicht geprüft werden`.
 
-Änderungen:
+## v0.5.1 – USB HDD semantics after read-only capability discovery
 
-- **USB-Prüfung laufend statt Fehler:** Solange beim ersten Popup-Aufbau noch kein `StorageContext` vorliegt, zeigt `USB HDD` nun **`USB-Laufwerke werden geprüft …`**. **`USB-Laufwerke konnten nicht geprüft werden`** bleibt ausschließlich dem tatsächlich abgeschlossenen Fehlerzustand `UsbResolution = 'Unavailable'` vorbehalten.
-- **Header testweise in Lenovo-Rot:** Der Schriftzug **`Lenovo Boot Selector`** oben links im Popup verwendet testweise den bestehenden Lenovo-Rot-Akzent.
-- **Tray-Kontextmenü präzisiert:** **`Boot Selector öffnen`** heißt nun **`Lenovo Boot Selector öffnen`** und wird testweise in Lenovo-Rot dargestellt. Die übrigen Kontextmenüeinträge bleiben unverändert.
-- **Keine Refresh-Architekturänderung:** Kein Polling, keine PnP-/Device-Arrival-Handler und keine Änderung an `Storage.ps1`. Der bestehende Popup-first-Hintergrundrefresh bleibt erhalten.
-- **Keine neue privilegierte Mutation:** TaskBroker, BootService, Installer/Uninstaller und Firmware-/BCD-Schreibgrenzen bleiben unverändert.
+v0.5.1 is based only on canonical v0.5.0 source. Read-only USB direct-boot discovery showed that although the ThinkPad F12 menu can distinguish physical USB devices by name, BCD, standard UEFI, and documented Lenovo WMI surfaces expose only generic firmware target `USB HDD` as software-addressable. v0.5.1 therefore changes only presentation/terminology; privilege boundary and all mutating boot paths remain unchanged.
 
-**Native Prüfung erforderlich:** Kaltstart/Appstart beobachten: zuerst `USB-Laufwerke werden geprüft …`, danach den realen USB-Zustand. Zusätzlich Headerfarbe und Tray-Menütext/-farbe unter Windows prüfen. Ein echter Storage-Lesefehler muss weiterhin `USB-Laufwerke konnten nicht geprüft werden` anzeigen.
+Changes:
 
-## Neu in v0.5.1 – USB-HDD-Semantik nach read-only Capability-Discovery
+- **Firmware target remains visible:** selectable entry is always `USB HDD`. A physical USB drive no longer replaces firmware title.
+- **Physical medium is status only:** with exactly one detected USB boot candidate, subtext is `Wahrscheinlich: <Modell>`. With exactly one USB drive without detected boot structure, it is `<Modell> erkannt · nicht als Startmedium erkannt`.
+- **Additional USB states:** no USB drive → `Kein USB-Laufwerk angeschlossen`; multiple drives without candidate → `USB-Laufwerke erkannt · kein Startmedium gefunden`; multiple candidates → `Mehrere mögliche USB-Startmedien erkannt`; failed Storage detection → `USB-Laufwerke konnten nicht geprüft werden`.
+- **Drift wording clarified:** firmware-only drift is `Neues Startziel erkannt` instead of `Neues Gerät erkannt`; neutral change states refer to boot targets rather than physical boot devices.
+- **No new USB addressing:** no SanDisk/Micron-specific Next Boot path, no new firmware variable, no Lenovo WMI setter, and no permanent `BootOrder` / `displayorder` mutation.
+- **Refresh policy unchanged:** no PnP/device-arrival event handlers and no periodic polling. App start, existing refresh, and manual reload remain refresh triggers.
 
-v0.5.1 baut ausschließlich auf der kanonischen v0.5.0-Source auf. Die read-only USB-Direct-Boot-Discovery hat gezeigt, dass das ThinkPad die physischen USB-Geräte im F12-Menü zwar namentlich unterscheiden kann, BCD, Standard-UEFI und die dokumentierten Lenovo-WMI-Oberflächen aber nur das generische Firmwareziel `USB HDD` als softwareseitig adressierbares Bootobjekt exponieren. v0.5.1 korrigiert deshalb ausschließlich Darstellung und Terminologie; die Privilege-Boundary und alle mutierenden Bootpfade bleiben unverändert.
+**Native verification required:** on target ThinkPad test at least `SanDisk + Micron`, `nur Micron`, and `kein USB` with full refresh. Title must remain `USB HDD` and subtext must switch between `Wahrscheinlich: SanDisk Extreme Pro USB4`, `Micron CT2000X9PROSSD9 erkannt · nicht als Startmedium erkannt`, and `Kein USB-Laufwerk angeschlossen`. Also verify firmware-drift simulation shows `Neues Startziel erkannt`.
 
-Änderungen:
+## v0.5.0 – Read-only drift detection and reinitialization for new boot targets
 
-- **Firmwareziel bleibt sichtbar:** Der auswählbare Eintrag heißt immer **`USB HDD`**. Ein physisches USB-Laufwerk ersetzt den Firmwaretitel nicht mehr.
-- **Physisches Medium nur als Status:** Bei genau einem erkannten USB-Bootkandidaten lautet der Subtext **`Wahrscheinlich: <Modell>`**. Bei genau einem USB-Laufwerk ohne erkannte Bootstruktur lautet er **`<Modell> erkannt · nicht als Startmedium erkannt`**.
-- **Weitere USB-Zustände:** Ohne USB-Laufwerk wird **`Kein USB-Laufwerk angeschlossen`** angezeigt; mehrere Laufwerke ohne Bootkandidaten ergeben **`USB-Laufwerke erkannt · kein Startmedium gefunden`**; mehrere Bootkandidaten **`Mehrere mögliche USB-Startmedien erkannt`**; bei fehlgeschlagener Storage-Erkennung **`USB-Laufwerke konnten nicht geprüft werden`**.
-- **Drift-Begriff präzisiert:** Firmware-only-Drift heißt **`Neues Startziel erkannt`** statt `Neues Gerät erkannt`; neutrale Änderungszustände sprechen von `Startzielen` statt physischen `Startgeräten`.
-- **Keine neue USB-Adressierung:** Es gibt keinen neuen SanDisk-/Micron-spezifischen Next-Boot-Pfad, keine neue Firmwarevariable, keinen Lenovo-WMI-Setter und keine permanente `BootOrder`-/`displayorder`-Mutation.
-- **Refresh-Policy unverändert:** Keine PnP-/Device-Arrival-Eventhandler und kein periodisches Polling. Appstart, bestehender Refresh und manueller Reload bleiben die Aktualisierungspfade.
+v0.5.0 builds on natively fully approved v0.4.7. The app detects firmware/boot-target inventory changes strictly read-only and compares the current firmware target set with the TaskBroker target set authorized during setup. It never performs automatic repair or reinitialization.
 
-**Native Prüfung erforderlich:** Auf dem Ziel-ThinkPad mindestens die Zustände `SanDisk + Micron`, `nur Micron` und `kein USB` per vollständigem Refresh prüfen. Der Titel muss jeweils `USB HDD` bleiben; der Subtext muss zwischen `Wahrscheinlich: SanDisk Extreme Pro USB4`, `Micron CT2000X9PROSSD9 erkannt · nicht als Startmedium erkannt` und `Kein USB-Laufwerk angeschlossen` wechseln. Zusätzlich den Firmware-Drift-Simulationspfad auf `Neues Startziel erkannt` prüfen.
+Changes:
 
+- **Read-only drift detection:** after fresh firmware/manager refresh, Boot Menu + `{fwbootmgr} displayorder` are compared with installed `task-broker.json` targets. Added and removed GUIDs are diagnosed separately.
+- **New-target UX:** added firmware targets make the central popup show `Neues Gerät erkannt`. Removal-only drift shows `Startgeräte wurden geändert`. Primary action in both cases is `Systemfunktionen neu initialisieren`.
+- **No auto-repair:** detection starts neither UAC nor setup automatically. Only explicit user confirmation invokes the existing safe installer path. Privilege boundary remains unchanged; no free GUID, task name, or argument is passed.
+- **Drift blocks normal mutation:** while reinitialization is pending, BootNext, default target, Manage, Restart, and manual refresh are disabled/covered in normal UI. Read-only diagnostics remain available.
+- **Reinitialize as a maintenance mode:** busy view and success dialog use user terminology `neu initialisieren` / `neu initialisiert`, not Repair. Existing `Reparieren` UX remains only for truly incomplete/old installations.
+- **Diagnostics:** `BOOT_TARGET_DRIFT_CHECK` logs drift plus added/removed firmware GUIDs as Warning, not Runtime Error.
+- **Native tests:** `Test-BootTargetDrift.ps1` checks equal set, added/removed targets, and drift runtime state. The Windows PowerShell 5.1 wrapper runs it too.
 
-## Neu in v0.5.0 – read-only Drift-Erkennung und Neu-Initialisierung bei neuen Startgeräten
+**Native verification required:** create/simulate a firmware/boot-target change on target PC, verify `Neues Gerät erkannt` and CTA `Systemfunktionen neu initialisieren`, confirm no UAC/mutation before user confirmation, complete reinitialization with UAC, then confirm drift disappears and normal boot functions are restored.
 
-v0.5.0 baut auf der nativ vollständig freigegebenen v0.4.7-Basis auf. Die App erkennt Änderungen am Firmware-/Bootzielbestand ausschließlich read-only und vergleicht den aktuell gelesenen Firmware-Zielsatz mit dem bei der Einrichtung fest autorisierten TaskBroker-Zielsatz. Es findet niemals eine automatische Reparatur oder Neu-Initialisierung statt.
+## v0.4.7 – Maintenance UX, first-run setup, and maintenance diagnostics
 
-Änderungen:
+v0.4.7 is a required corrective/UX build after the first fully native maintenance-cycle test. Setup/Repair/Remove remain unchanged behind fixed SYSTEM Scheduled Tasks; only lifecycle locks, main-popup presentation, completion feedback, and maintenance-aware diagnostics change.
 
-- **Read-only Drift-Erkennung:** Nach einem frischen Firmware-/Manager-Refresh werden Boot Menu + `{fwbootmgr}`-`displayorder` mit den installierten `task-broker.json`-Targets verglichen. Hinzugekommene und entfernte GUIDs werden getrennt diagnostiziert.
-- **Neue Geräte-UX:** Bei neu hinzugekommenen Firmware-Zielen zeigt das zentrale Popup **`Neues Gerät erkannt`**. Bei einer reinen Entfernung wird neutral **`Startgeräte wurden geändert`** angezeigt. Die primäre Aktion heißt in beiden Fällen **`Systemfunktionen neu initialisieren`**.
-- **Kein Auto-Repair:** Die Erkennung startet weder UAC noch Setup automatisch. Erst die explizite Nutzerbestätigung startet den bestehenden sicheren Installer-Pfad. Intern bleibt die Privilege-Boundary unverändert; keine freie GUID, kein freier Taskname und kein freies Argument werden übergeben.
-- **Drift blockiert normale Mutation:** Solange die Neu-Initialisierung aussteht, sind BootNext, Standardziel, Manage, Restart und manueller Refresh in der normalen UI gesperrt/überdeckt. Die App kann weiterhin read-only diagnostizieren.
-- **Neu-Initialisieren als eigener Maintenance-Modus:** Busy-Ansicht und Erfolgsdialog verwenden bewusst die Nutzerbegriffe `neu initialisieren` / `neu initialisiert`, nicht `Repair`. Die bestehende `Reparieren`-UX bleibt nur für wirklich unvollständige/alte Installationen bestehen.
-- **Diagnose:** `BOOT_TARGET_DRIFT_CHECK` protokolliert Driftstatus sowie hinzugekommene/entfernte Firmware-GUIDs als Warning, nicht als Runtime-Error.
-- **Native Tests:** `Test-BootTargetDrift.ps1` prüft Gleichstand, hinzugefügte und entfernte Ziele sowie den Drift-Runtime-State. Der Windows-PowerShell-5.1-Wrapper führt ihn zusätzlich aus.
+Changes:
 
-**Native Prüfung erforderlich:** Firmware-/Bootzieländerung auf dem Ziel-PC erzeugen bzw. kontrolliert simulieren, `Neues Gerät erkannt` und die CTA `Systemfunktionen neu initialisieren` prüfen, sicherstellen dass vor Nutzerbestätigung keine UAC/Mutation erfolgt, anschließend Neu-Initialisierung mit UAC abschließen und verifizieren, dass der Drift verschwindet und die normalen Bootfunktionen wieder freigegeben werden.
+- **Central maintenance state:** Setup, Repair, Migrate, and Remove use explicit busy state. Normal boot-target, default, Manage, Refresh, and Restart paths are blocked while active; running/pending background refresh work is stopped in a controlled way.
+- **Prominent first-run/repair state:** when system functions are missing, main popup centrally offers `Systemfunktionen einrichten` as primary CTA. For an incomplete existing installation, it offers `Systemfunktionen reparieren`. On true first run the popup opens automatically; UAC starts only after explicit user confirmation.
+- **Clear maintenance presentation:** during installation/repair/removal, a central app-native maintenance view covers normal UI. Popup stays visible and shows current state instead of still-interactive boot functions.
+- **App-native completion:** successful Setup/Repair confirms `Systemfunktionen sind bereit.`; successful Remove confirms `Systemfunktionen wurden entfernt.`. UI is then deterministically rebuilt or moved to setup state.
+- **Maintenance-aware diagnostics:** new refreshes are suppressed during maintenance; running refreshes are cancelled in a controlled way and logged as expected maintenance state. After successful Remove, intentionally missing TaskBroker is no longer emitted as a runtime error by normal ready check.
+- **Soak harness corrected:** `Test-ArchitectureSoak.ps1` now correctly uses `-Source $raw` instead of `-Settings $raw` for Settings normalization.
+- **No privilege change:** tray remains unelevated; no free commands/arguments/task names/GUIDs, no permanent `displayorder`, no custom SYSTEM EXE.
 
+**Native verification required:** Windows PowerShell 5.1 wrapper including Maintenance test, first run without registered tasks, Setup/Repair/Remove/Re-Setup with busy UI and success dialogs, and final diagnostics with no expected maintenance conditions recorded as Error.
 
-## Neu in v0.4.7 – Maintenance UX, First-Run Setup und Wartungsdiagnostik
+## v0.4.6 – Cleanup / soak and architecture completion
 
-v0.4.7 ist ein verpflichtender Korrektur-/UX-Build nach dem erstmalig vollständig nativ getesteten Maintenance-Zyklus. Setup/Repair/Remove bleiben sicherheitstechnisch unverändert hinter den festen SYSTEM-Scheduled-Tasks; geändert werden ausschließlich Lifecycle-Sperren, Haupt-Popup-Präsentation, Abschlussfeedback und maintenance-aware Diagnose.
+v0.4.6 completes the planned 0.4.x refactoring series behavior-preservingly. There is no new user-facing feature. The natively green v0.4.5 state remains behavior basis; cleanup occurs only where static call analysis and regression tests unambiguously protect removal/movement.
 
-Änderungen:
+Changes:
 
-- **Zentraler Maintenance-State:** Setup, Repair, Migrate und Remove verwenden einen expliziten Busy-State. Währenddessen werden normale Bootziel-, Default-, Manage-, Refresh- und Restart-Pfade gesperrt; laufende/pending Background-Refresh-Arbeit wird kontrolliert beendet.
-- **Prominenter First-Run-/Repair-State:** Fehlen die Systemfunktionen, zeigt das Haupt-Popup zentral `Systemfunktionen einrichten` mit primärer CTA. Bei vorhandener, unvollständiger Installation wird zentral `Systemfunktionen reparieren` angeboten. Auf einem echten Erststart öffnet sich das Popup automatisch; UAC startet erst nach ausdrücklicher Nutzerbestätigung.
-- **Klare Wartungsanzeige:** Während Installation/Reparatur/Entfernung liegt eine zentrale app-eigene Wartungsansicht über der normalen UI. Das Popup bleibt sichtbar und zeigt den aktuellen Zustand statt weiter bedienbarer Bootfunktionen.
-- **App-eigener Abschluss:** Erfolgreiches Setup/Repair bestätigt `Systemfunktionen sind bereit.`; erfolgreiches Remove bestätigt `Systemfunktionen wurden entfernt.`. Danach wird die UI deterministisch neu aufgebaut bzw. in den Setup-State gewechselt.
-- **Maintenance-aware Diagnostics:** Neue Refreshs werden während Wartung unterdrückt, laufende Refreshs kontrolliert abgebrochen und als erwarteter Maintenance-Zustand protokolliert. Nach erfolgreichem Remove wird der absichtlich fehlende TaskBroker nicht mehr über einen normalen Ready-Check als Runtime-Fehler erzeugt.
-- **Soak-Test-Harness korrigiert:** `Test-ArchitectureSoak.ps1` verwendet für die Settings-Normalisierung korrekt `-Source $raw` statt des falschen `-Settings $raw`.
-- **Keine Privilege-Änderung:** Tray bleibt uneleviert; keine freien Commands/Argumente/Tasknamen/GUIDs, keine permanente `displayorder`, keine Custom-SYSTEM-EXE.
+- **Four dead runtime functions removed:** `Test-IsAdministrator`, `Get-PresentDiskPnpInfo`, `Find-MatchingPnpDisk`, and unused wrapper `Show-ManageEntriesMode` had no callers in modular source graph. They are not replaced.
+- **Three dead globals removed:** `$script:AutostartTaskName`, `$script:ColorBorder`, and `$script:ColorFrame` were declarations with no readers.
+- **Storage infrastructure explicit:** active still-heuristic Storage/USB path (`Test-PartitionBootStructure`, `Get-StorageContextCore`, `Get-StorageContext`) now lives in `src/Infrastructure/Storage.ps1`. Function bodies remain unchanged from v0.4.5.
+- **Catch audit instead of silent ambiguity:** `CATCH_AUDIT_v0.4.6.json` classifies every remaining inline empty/best-effort `catch { }` in modular runtime source. `tools/build_catch_audit.py --check` ensures audit exactly matches source. Product-relevant failure paths remain explicitly diagnosed.
+- **Native architecture soak:** `tests/Test-ArchitectureSoak.ps1` repeats refresh lifecycle, Settings normalization, firmware-manager parsing, and 30-second firmware freshness 500 times each. Windows PowerShell 5.1 wrapper runs this test in addition to Core, Refresh, and Mutex.
+- **No security/UX change:** TaskBroker, BootService, RefreshRuntime, Settings service, Autostart, Diagnostics, and closed UI paths are unchanged. Popup-first, full-width hover/selected, red separators, eye/pencil tooltips, and taskbar-silent recovery dialog remain regression contracts.
 
-**Native Prüfung erforderlich:** Windows-PowerShell-5.1-Wrapper inklusive Maintenance-Test, First-Run ohne registrierte Tasks, Setup/Repair/Remove/Re-Setup mit Busy-UI und Erfolgsdialogen sowie abschließende Diagnose ohne erwartbare Maintenance-Fehler als Error.
+**Native verification required:** `tests\Test-WindowsPowerShell51.ps1` must run Parser/Core/Refresh/Mutex/Soak fully green. Then run a longer tray/refresh/close-restart soak plus known boot/settings/autostart/diagnostics/UI regression paths.
 
+## v0.4.5 – Settings/Autostart/Diagnostics infrastructure adapters
 
-## Neu in v0.4.6 – Cleanup / Soak und Architekturabschluss
+v0.4.5 is the next behavior-preserving architecture step based on natively confirmed v0.4.4 runtime/UI paths. Persistence, Registry/Task-Scheduler, and diagnostics filesystem access move out of App/UI layers behind named Infrastructure operations. There is no new user-facing feature.
 
-v0.4.6 schließt die geplante 0.4.x-Refactoring-Serie behavior-preserving ab. Es gibt keine neue Endanwenderfunktion. Der nativ grüne v0.4.5-Stand bleibt die Verhaltensbasis; Cleanup wird nur dort vorgenommen, wo statische Aufrufanalyse und Regressionstests die Entfernung oder Verschiebung eindeutig absichern.
+Changes:
 
-Änderungen:
+- **SettingsRepository:** file/JSON I/O and legacy Registry cleanup live in `src/Infrastructure/SettingsRepository.ps1`; normalization remains in Functional Core. `src/Application/SettingsService.ps1` continues to build the same Settings contract (`schemaVersion = 4`) and uses only named repository operations.
+- **Autostart separated:** HKCU Run key, hidden VBS launcher, and read-only legacy-task detection live in `src/Infrastructure/Autostart.ps1`. WinForms state and user feedback live separately in `src/UI/AutostartPresentation.ps1`.
+- **Runtime diagnostics separated:** session logging, retention, export ZIP, and Explorer reveal live in `src/Infrastructure/RuntimeDiagnostics.ps1`; manual UI action lives in `src/UI/DiagnosticsPresentation.ps1`.
+- **No runtime module dependency:** release remains a deterministically generated single-file `LenovoBootMenuTray.ps1`; loose source modules are not loaded at runtime.
+- **Abandoned-mutex test fixed:** parent opens its handle to named mutex before child owner process is terminated. An explicit file signal synchronizes exit so the test actually validates `AbandonedMutexException`. Product singleton implementation remains unchanged.
+- **Security/UX unchanged:** TaskBroker, BootService, RefreshRuntime, BackgroundRefreshWorker, Functional Core, and existing UI modules remain unchanged. Popup-first, fixed SYSTEM tasks, full-width hover/selected, red separators, eye/pencil tooltips, and recovery dialog remain regression contracts.
 
-- **Vier tote Runtime-Funktionen entfernt:** `Test-IsAdministrator`, `Get-PresentDiskPnpInfo`, `Find-MatchingPnpDisk` und der unbenutzte Wrapper `Show-ManageEntriesMode` hatten im modularen Source-Graph keine Aufrufer mehr. Sie werden nicht durch neue Implementierungen ersetzt.
-- **Drei tote Globals entfernt:** `$script:AutostartTaskName`, `$script:ColorBorder` und `$script:ColorFrame` waren nur noch Deklarationen ohne Leser.
-- **Storage-Infrastructure explizit:** Der tatsächlich aktive, weiterhin heuristische Storage-/USB-Pfad (`Test-PartitionBootStructure`, `Get-StorageContextCore`, `Get-StorageContext`) liegt jetzt in `src/Infrastructure/Storage.ps1`. Die Funktionskörper bleiben gegenüber v0.4.5 unverändert.
-- **Catch-Audit statt stiller Unklarheit:** `CATCH_AUDIT_v0.4.6.json` klassifiziert jeden verbleibenden inline leeren/best-effort `catch { }` im modularen Runtime-Source. `tools/build_catch_audit.py --check` stellt sicher, dass der Audit exakt zum Source passt. Produktrelevante Fehlerpfade bleiben weiterhin explizit diagnostiziert.
-- **Nativer Architektur-Soak:** `tests/Test-ArchitectureSoak.ps1` wiederholt Refresh-Lifecycle, Settings-Normalisierung, Firmware-Manager-Parsing und die 30-Sekunden-Firmware-Freshness jeweils 500-mal. Der Windows-PowerShell-5.1-Wrapper führt diesen Test zusätzlich zu Core, Refresh und Mutex aus.
-- **Keine Sicherheits-/UX-Änderung:** TaskBroker, BootService, RefreshRuntime, Settings-Service, Autostart, Diagnostics und die geschlossenen UI-Pfade bleiben unverändert. Popup-first, Vollbreiten-Hover/Selected, rote Separatoren, Auge-/Stift-Tooltips und der taskbar-silente Recovery-Dialog bleiben Regression-Verträge.
+**Native verification required:** `tests\Test-WindowsPowerShell51.ps1` must run Parser/Core/Refresh/Mutex fully green. Then perform short Settings/Autostart/Diagnostics smoke plus existing boot/UI regressions.
 
-**Native Prüfung erforderlich:** `tests\Test-WindowsPowerShell51.ps1` muss Parser/Core/Refresh/Mutex/Soak vollständig grün durchlaufen. Anschließend folgt ein längerer Tray-/Refresh-/Close-Restart-Soak plus die bekannten Boot-/Settings-/Autostart-/Diagnose-/UI-Regressionspfade.
+## v0.4.4 – UI source split without runtime behavior change
 
+v0.4.4 is the next behavior-preserving architecture step based on natively fully confirmed v0.4.3 runtime/UI paths. WinForms presentation moves from App template into clearly named `src/UI/` modules; release remains a deterministically generated single-file `LenovoBootMenuTray.ps1`. There is no new user-facing feature.
 
-## Neu in v0.4.5 – Settings-/Autostart-/Diagnostics-Infrastructure-Adapter
+Changes:
 
-v0.4.5 ist der nächste behavior-preserving Architektur-Schritt auf Basis der nativ bestätigten v0.4.4-Runtime/UI-Pfade. Persistenz-, Registry-/Task-Scheduler- und Diagnose-Dateisystemzugriffe werden aus der App-/UI-Schicht hinter klar benannte Infrastructure-Operationen verschoben. Es gibt keine neue Endanwenderfunktion.
+- **UI source modularized:** startup error dialog, menu rendering/tooltips, refresh presentation, Manage mode, default-target presentation/menu, app dialogs, boot-target list, and popup live in ten `src/UI/*.ps1` modules.
+- **No runtime module dependency:** `tools/build_runtime.py` still bundles Core, Application, Infrastructure, and UI deterministically into one runtime file. No loose modules are imported at runtime.
+- **UI behavior frozen:** 34 moved UI functions are characterized against function SHA-256 from native v0.4.3 basis. Full-width hover/selected, red separators, eye/pencil tooltips, and taskbar-silent recovery dialog remain unchanged.
+- **Layer boundary:** `src/UI/` may not call privileged Scheduled Task/TaskBroker mechanisms directly. Privileged operations remain only behind Infrastructure/Application.
+- **App template substantially smaller:** generated runtime may remain large; editable App shell contains much less Presentation code.
+- **Mutex test harness fixed:** temporary Named Mutex paths in `Test-SingleInstanceMutex.ps1` correctly use exactly one backslash (`Local\...`), allowing Windows PowerShell 5.1 test to create real namespace.
+- **No functional change:** RefreshRuntime, BackgroundRefreshWorker, TaskBroker, BootService, Functional Core, installer/uninstaller, and launcher remain semantically unchanged.
 
-Änderungen:
+**Native verification required:** `tests\Test-WindowsPowerShell51.ps1` must run Parser/Core/Refresh/Mutex fully green. Then perform short UI smoke for popup, boot-target list, Manage mode, default-target menu, dialogs, full-width hover/separators/tooltips, and recovery dialog.
 
-- **SettingsRepository:** Datei-/JSON-IO und der Legacy-Registry-Cleanup liegen in `src/Infrastructure/SettingsRepository.ps1`; Normalisierung bleibt im Functional Core. `src/Application/SettingsService.ps1` baut weiterhin denselben Settings-Vertrag (`schemaVersion = 4`) und verwendet nur benannte Repository-Operationen.
-- **Autostart getrennt:** HKCU-Run-Key, versteckter VBS-Launcher und read-only Legacy-Task-Erkennung liegen in `src/Infrastructure/Autostart.ps1`. WinForms-Zustand und Benutzerfeedback liegen separat in `src/UI/AutostartPresentation.ps1`.
-- **Runtime-Diagnose getrennt:** Session-Logging, Retention, Export-ZIP und Explorer-Reveal liegen in `src/Infrastructure/RuntimeDiagnostics.ps1`; die manuelle UI-Aktion liegt in `src/UI/DiagnosticsPresentation.ps1`.
-- **Keine Runtime-Modulabhängigkeit:** Der Release bleibt eine deterministisch erzeugte Single-File-`LenovoBootMenuTray.ps1`; lose Source-Module werden zur Laufzeit nicht geladen.
-- **Abandoned-Mutex-Test korrigiert:** Der Parent öffnet jetzt seinen Handle auf den benannten Mutex, bevor der Child-Prozess als Eigentümer beendet wird. Ein explizites Dateisignal synchronisiert den Exit, sodass der Test tatsächlich `AbandonedMutexException` prüfen kann. Die Produkt-Singleton-Implementierung bleibt unverändert.
-- **Security/UX unverändert:** TaskBroker, BootService, RefreshRuntime, BackgroundRefreshWorker, Functional Core und die bestehenden UI-Module bleiben unverändert. Popup-first, feste SYSTEM-Tasks, Vollbreiten-Hover/Selected, rote Separatoren, Auge-/Stift-Tooltips und Recovery-Dialog bleiben Regression-Verträge.
+## v0.4.3 – Explicit Refresh Runtime state
 
-**Native Prüfung erforderlich:** `tests\Test-WindowsPowerShell51.ps1` muss Parser/Core/Refresh/Mutex vollständig grün durchlaufen. Danach kurzer Settings-/Autostart-/Diagnose-Smoke plus die bestehenden Boot-/UI-Regressionspfade.
+v0.4.3 is the next behavior-preserving architecture step based on natively fully confirmed v0.4.2.2. There is no new user-facing feature. Goal: move background refresh, request coalescing, result processing, and refresh lifecycle from scattered global `$script:` state into clearly bounded contracts without changing popup-first or privileged TaskBroker boundary.
 
+Changes:
 
-## Neu in v0.4.4 – UI-Source-Split ohne Runtime-Verhaltensänderung
+- **One refresh state instead of nine globals:** process, timer, result file, active request, pending request, and last timing live in explicit `BackgroundRefreshState`. Old globals `BackgroundRefreshProcess`, `BackgroundRefreshTimer`, `BackgroundRefreshResultPath`, `BackgroundRefreshRequested*`, `BackgroundRefreshPending*`, and `LastBackgroundRefreshTiming` are removed.
+- **Request/transition logic extracted:** `src/Application/RefreshRuntime.ps1` contains stateless refresh contract for request creation, firmware freshness, escalation/coalescing, lifecycle adoption, pending request, and result parsing. Module uses no `$script:` state, WinForms, or process/filesystem API.
+- **Process/result I/O isolated:** `src/Infrastructure/BackgroundRefreshWorker.ps1` launches only the existing hidden unelevated Windows PowerShell worker and encapsulates result read/cleanup. UI/Application no longer creates `ProcessStartInfo` directly.
+- **Completion split:** lifecycle completion, result read/parse, and UI/cache application are separate responsibilities (`Complete-BackgroundBootRefresh`, `Get-BackgroundRefreshResult`, `Apply-BackgroundRefreshResult`).
+- **Coalescing unchanged:** active refresh gets no redundant follow-up job. Only newly required Storage/firmware work is merged into pending request.
+- **Popup-first unchanged:** firmware/Storage work remains in unelevated background worker. Popup still does not wait for fresh Scheduled Task/Storage run.
+- **Security boundary unchanged:** `src/Infrastructure/TaskBroker.ps1`, `src/Application/BootService.ps1`, Functional Core, installer/uninstaller, and launcher are byte-identical to v0.4.2.2. No free command/argument/GUID interface, no permanent `displayorder` mutation, and no custom SYSTEM EXE.
+- **New native characterization:** `tests/Test-RefreshRuntime.ps1` validates refresh-state/request contract with 18 checks under Windows PowerShell 5.1 and is run by existing `Test-WindowsPowerShell51.ps1`.
 
-v0.4.4 ist der nächste behavior-preserving Architektur-Schritt auf Basis der nativ vollständig bestätigten v0.4.3-Runtime/UI-Pfade. Die WinForms-Präsentation wird aus dem App-Template in klar benannte `src/UI/`-Module extrahiert; der Release bleibt weiterhin ein deterministisch erzeugtes Single-File-`LenovoBootMenuTray.ps1`. Es gibt keine neue Endanwenderfunktion.
+**Native verification required:** app start/popup-first, multiple refreshes, fast popup open during running refresh, Storage escalation, BootNext/default regression, UI regressions, and diagnostics export. Wrapper must additionally report `REFRESH TOTAL 18/18`.
 
-Änderungen:
+## v0.4.2.2 – Robust singleton mutex
 
-- **UI-Source modularisiert:** Startfehlerdialog, Menüdarstellung/Tooltips, Refresh-Präsentation, Manage-Mode, Standardziel-Präsentation/-Menü, App-Dialoge, Bootziel-Liste und Popup liegen in zehn `src/UI/*.ps1`-Modulen.
-- **Keine Runtime-Modulabhängigkeit:** `tools/build_runtime.py` bündelt Core, Application, Infrastructure und UI weiterhin deterministisch in die eine Runtime-Datei. Zur Laufzeit werden keine losen Module importiert.
-- **UI-Verhalten eingefroren:** Die 34 verschobenen UI-Funktionen werden gegen Funktions-SHA-256 der nativen v0.4.3-Basis charakterisiert. Vollbreiten-Hover/Selected, rote Separatoren, Auge-/Stift-Tooltips und der taskbar-silente Recovery-Dialog bleiben unverändert.
-- **Schichtgrenze:** `src/UI/` darf keine privilegierten Scheduled-Task-/TaskBroker-Mechanismen direkt aufrufen. Privilegierte Operationen bleiben ausschließlich hinter Infrastructure/Application.
-- **App-Template deutlich kleiner:** Die generierte Runtime darf weiterhin groß sein; die editierbare App-Shell enthält jedoch wesentlich weniger Presentation-Code.
-- **Mutex-Test-Harness korrigiert:** Die temporären Named-Mutex-Pfade in `Test-SingleInstanceMutex.ps1` verwenden jetzt korrekt genau einen Backslash (`Local\...`). Damit kann der Windows-PowerShell-5.1-Test den realen Namespace erzeugen.
-- **Keine fachliche Änderung:** RefreshRuntime, BackgroundRefreshWorker, TaskBroker, BootService, Functional Core, Installer/Uninstaller und Launcher bleiben semantisch unverändert.
+v0.4.2.2 is a targeted stability patch based on v0.4.2.1. Trigger was a native startup finding: app reported `läuft bereits` even though afterward neither a matching process nor named mutex existed. Boot, firmware, TaskBroker, and main UI logic remain unchanged.
 
-**Native Prüfung erforderlich:** `tests\Test-WindowsPowerShell51.ps1` muss Parser/Core/Refresh/Mutex vollständig grün durchlaufen. Danach kurzer UI-Smoke für Popup, Bootzielliste, Manage-Mode, Standardziel-Menü, Dialoge, Vollbreiten-Hover/Separatoren/Tooltips und Recovery-Dialog.
+Changes:
 
+- **Actual ownership instead of `createdNew`:** tray singleton still uses named mutex `Local\LenovoBootMenuTray` but now decides via `WaitOne(...)` whether current process actually owns it. An existing but free kernel object is no longer treated as a running app.
+- **Fast first start unchanged:** normal first start tries `WaitOne(0, $false)` and acquires without extra wait. Only a competing start gets one 500-ms grace retry so an exiting process can release cleanly.
+- **Abandoned recovery:** `AbandonedMutexException` is explicitly treated as acquired ownership. A crashed/early-exited old instance no longer blocks next start.
+- **Clean ownership cleanup:** `ReleaseMutex()` runs only if this process owns the mutex; Dispose remains best-effort.
+- **Diagnostics:** successful ownership logs `SINGLE_INSTANCE_MUTEX_ACQUIRED`; takeover after abandonment logs `SINGLE_INSTANCE_MUTEX_ABANDONED_RECOVERED`.
+- **Native mutex test:** `tests/Test-SingleInstanceMutex.ps1` checks active foreign owner, release/takeover, and abandoned recovery under Windows PowerShell 5.1 with unique temporary mutex name. `Test-WindowsPowerShell51.ps1` runs it after Parser/Functional-Core gate.
+- **v0.4.2.1 patches retained:** custom startup error dialog without taskbar entry and UTF-8 BOM rule for non-ASCII PowerShell sources remain unchanged.
 
-## Neu in v0.4.3 – expliziter Refresh-Runtime-State
+**Native verification required:** run `tests\Test-WindowsPowerShell51.ps1`, verify normal first start, real double start (only second rejected with `läuft bereits`), then exit tray and immediately restart; no false positive is allowed.
 
-v0.4.3 ist der nächste behavior-preserving Architektur-Schritt auf Basis der nativ vollständig bestätigten v0.4.2.2. Es gibt keine neue Endanwenderfunktion. Ziel ist, Background-Refresh, Request-Coalescing, Ergebnisverarbeitung und Refresh-Lifecycle aus verstreutem globalem `$script:`-State in klar abgegrenzte Verträge zu überführen, ohne Popup-first oder die privilegierte TaskBroker-Grenze zu verändern.
+## v0.4.2.1 – Custom startup error dialog and PS5.1 encoding fix
 
-Änderungen:
+v0.4.2.1 is a targeted UX/compatibility patch based on v0.4.2. TaskBroker/BootService architecture, boot logic, and privilege boundaries remain unchanged.
 
-- **Ein Refresh-State statt neun Einzelglobals:** Prozess, Timer, Ergebnisdatei, aktiver Request, Pending-Request und letztes Timing liegen in einem expliziten `BackgroundRefreshState`. Die bisherigen Globals `BackgroundRefreshProcess`, `BackgroundRefreshTimer`, `BackgroundRefreshResultPath`, `BackgroundRefreshRequested*`, `BackgroundRefreshPending*` und `LastBackgroundRefreshTiming` entfallen.
-- **Request-/Transition-Logik ausgelagert:** `src/Application/RefreshRuntime.ps1` enthält den zustandsfreien Refresh-Vertrag für Request-Erzeugung, Firmware-Freshness, Eskalation/Coalescing, Lifecycle-Übernahme, Pending-Request und Result-Parsing. Das Modul verwendet keinen `$script:`-State, kein WinForms und keine Prozess-/Dateisystem-API.
-- **Prozess-/Result-IO isoliert:** `src/Infrastructure/BackgroundRefreshWorker.ps1` startet ausschließlich den bereits vorhandenen versteckten unelevierten Windows-PowerShell-Worker und kapselt Result-Read/Cleanup. Die UI/Application-Schicht erzeugt keinen `ProcessStartInfo` mehr direkt.
-- **Completion aufgeteilt:** Lifecycle-Abschluss, Ergebnislesen/-parsen und UI-/Cache-Anwendung sind getrennte Verantwortlichkeiten (`Complete-BackgroundBootRefresh`, `Get-BackgroundRefreshResult`, `Apply-BackgroundRefreshResult`).
-- **Coalescing unverändert:** Ein laufender Refresh bekommt keinen redundanten Folgejob. Nur neu hinzukommende Storage-/Firmware-Arbeit wird als Pending-Request zusammengeführt.
-- **Popup-first unverändert:** Firmware-/Storage-Arbeit bleibt im unelevierten Background-Worker. Das Popup wartet weiterhin nicht auf einen frischen Scheduled-Task-/Storage-Lauf.
-- **Security Boundary unverändert:** `src/Infrastructure/TaskBroker.ps1`, `src/Application/BootService.ps1`, Functional Core, Installer/Uninstaller und Launcher bleiben byteidentisch zu v0.4.2.2. Keine freie Command-/Argument-/GUID-Schnittstelle, keine permanente `displayorder`-Mutation und keine Custom-SYSTEM-EXE.
-- **Neue native Characterization:** `tests/Test-RefreshRuntime.ps1` prüft unter Windows PowerShell 5.1 den Refresh-State-/Request-Vertrag mit 18 Checks und wird vom bestehenden `Test-WindowsPowerShell51.ps1` mit ausgeführt.
+Changes:
 
-**Native Prüfung erforderlich:** Appstart/Popup-first, mehrere Refreshs, schneller Popup-Open während laufendem Refresh, Storage-Eskalation, BootNext/Default-Regression, UI-Regressionen und Diagnoseexport. Der Testwrapper muss zusätzlich `REFRESH TOTAL 18/18` melden.
+- **Custom startup error dialog:** unbound native `MessageBox` is replaced with compact WinForms recovery dialog in Lenovo Boot Selector style. It has no own taskbar entry (`ShowInTaskbar = $false`) and uses Lenovo red only as accent.
+- **Clear recovery actions:** on a real fatal startup error, `Erneut starten`, `Diagnose öffnen`, and `Schließen` are available. Restart occurs only after tray mutex release via existing hidden VBS launcher. `Erneut starten` is disabled if another instance is already running.
+- **Taskbar fallback hardened:** if custom dialog cannot be built, native MessageBox is bound only to invisible owner with `ShowInTaskbar = $false`.
+- **PS5.1 encoding fix:** modular PowerShell sources with non-ASCII content are shipped UTF-8 with BOM. This preserves `Lenovo Boot-Menü` when directly dot-sourced under Windows PowerShell 5.1.
+- **Windows gate extended:** `tests/Test-WindowsPowerShell51.ps1` additionally checks encoding rule for non-ASCII `.ps1` files and still runs Functional Core.
+- **No boot/security change:** no changes to fixed SYSTEM tasks, TaskBroker schema 0.2.12, GUID allowlist, `{fwbootmgr} bootsequence`, default logic, cleanup, or popup-first.
 
+**Native verification required:** provoke/use dedicated path for startup error on target PC: no PowerShell taskbar icon, app-style dialog, `Diagnose öffnen`, `Schließen`, and `Erneut starten` correct. Also run `tests\Test-WindowsPowerShell51.ps1` natively.
 
-## Neu in v0.4.2.2 – robuster Singleton-Mutex
+## v0.4.2 – Explicit TaskBroker / BootService boundary
 
-v0.4.2.2 ist ein gezielter Stabilitäts-Patch auf Basis von v0.4.2.1. Anlass war ein nativer Startbefund: Die App meldete „läuft bereits“, obwohl anschließend weder ein passender Prozess noch der benannte Mutex vorhanden war. Boot-, Firmware-, TaskBroker- und Haupt-UI-Logik bleiben unverändert.
+v0.4.2 is the second behavior-preserving refactoring build of the 0.4.x series. Natively fully confirmed v0.4.1 runtime is basis; parked v0.3.5/v0.3.6 features remain unimplemented.
 
-Änderungen:
+Changes:
 
-- **Tatsächlicher Besitz statt `createdNew`:** Der Tray-Singleton verwendet den benannten Mutex `Local\LenovoBootMenuTray` weiterhin, entscheidet aber jetzt über `WaitOne(...)`, ob der aktuelle Prozess den Mutex tatsächlich besitzt. Ein bereits existierendes, aber freies Kernelobjekt wird nicht mehr automatisch als laufende App gewertet.
-- **Schneller Erststart bleibt unverändert:** Der normale Erststart versucht `WaitOne(0, $false)` und erhält den Mutex ohne zusätzliche Wartezeit. Nur ein konkurrierender Start bekommt einen einmaligen 500-ms-Grace-Retry, damit ein gerade beendender Prozess sauber freigeben kann.
-- **Abandoned-Recovery:** `AbandonedMutexException` wird explizit als übernommener Mutex-Besitz behandelt. Eine abgestürzte/früh beendete Altinstanz blockiert damit keinen Folgestart.
-- **Sauberer Ownership-Cleanup:** `ReleaseMutex()` wird nur noch ausgeführt, wenn dieser Prozess den Mutex tatsächlich besitzt; Dispose bleibt best-effort.
-- **Diagnose:** Erfolgreicher Besitz wird als `SINGLE_INSTANCE_MUTEX_ACQUIRED` dokumentiert; eine Übernahme nach Abbruch als `SINGLE_INSTANCE_MUTEX_ABANDONED_RECOVERED`.
-- **Nativer Mutex-Test:** `tests/Test-SingleInstanceMutex.ps1` prüft unter Windows PowerShell 5.1 einen aktiven Fremdbesitzer, Freigabe/Übernahme und abandoned recovery mit eindeutigem temporärem Mutexnamen. `Test-WindowsPowerShell51.ps1` führt diesen Test nach Parser- und Functional-Core-Gate automatisch aus.
-- **v0.4.2.1-Patches bleiben erhalten:** eigener Startfehlerdialog ohne Taskleisten-Eintrag und die UTF-8-BOM-Regel für nicht-ASCII-PowerShell-Sources bleiben unverändert.
+- **Historical `Invoke-BcdEdit` pseudo-API removed:** tray runtime has no generic BCDEdit compatibility layer. Read-only firmware access, BootNext, and system-wide default target use clearly named operations.
+- **Infrastructure module introduced:** `src/Infrastructure/TaskBroker.ps1` encapsulates TaskBroker metadata, exact Scheduled Task start, cache/status files, and fixed broker operations. Generic internal task starter is no longer called directly outside module.
+- **Explicit broker operations:** `Get-TaskBrokerFirmwareManagerText`, `Get-TaskBrokerFirmwareEntriesText`, `Get-TaskBrokerDefaultTargetGuid`, `Set-TaskBrokerBootNextTarget`, `Set-TaskBrokerDefaultTarget`, and `Clear-TaskBrokerDefaultTarget` represent allowed domain-level broker access.
+- **Application Boot Service introduced:** `src/Application/BootService.ps1` reads firmware data through Infrastructure boundary, delegates text parsing to Functional Core, and verifies BootNext after write by reading back `bootsequence`.
+- **BootNext terminology clarified:** UI/shell path is now `Set-BootNextTarget`; historical `Set-BootSequence` is removed. Actual privileged behavior is unchanged: only preinstalled GUID-bound SYSTEM task may set `{fwbootmgr} bootsequence`.
+- **Default Set/Clear decoupled:** `Set-DefaultGuid` knows no task names and calls only explicit broker operations. Target GUIDs are still resolved only against installed TaskBroker metadata.
+- **Background refresh decoupled:** worker uses explicit read-only broker operations; main window syncs cache files through Infrastructure adapter. Popup-first unchanged.
+- **No privilege-surface growth:** no free command/argument/task-name/GUID interface introduced; `Invoke-AuthorizedTask` remains internal Infrastructure mechanism. Installer/uninstaller, task definitions, ACLs, and TaskBroker schema **0.2.12** are byte-identical.
+- **PS5.1 test finding fixed:** three ambiguous `$Name:` interpolations found on Windows in `tests/Test-FunctionalCore.ps1` are corrected to `${Name}:`. `tests/Test-WindowsPowerShell51.ps1` now natively parses all shipped `.ps1` sources with Windows PowerShell parser and then runs Functional Core.
+- **Closed UI paths unchanged:** full-width hover/selected, red separators, and eye/pencil tooltips are not functionally changed.
 
-**Native Prüfung erforderlich:** `tests\Test-WindowsPowerShell51.ps1` ausführen, normalen Erststart prüfen, anschließend echten Doppelstart prüfen und sicherstellen, dass nur der zweite Start mit „läuft bereits“ abgewiesen wird. Danach Tray beenden und unmittelbar neu starten; der Neustart muss ohne False Positive funktionieren.
+**Native verification:** v0.4.1 was fully native GREEN (S01 24/24, S02–S16 UI clean, S17 diagnostics without runtime errors). v0.4.2 changes internal broker/BootService calls and therefore requires targeted Windows smoke for firmware read/refresh, BootNext read-back, Default Set/Clear, and closed UI regressions.
 
+## v0.4.1 – Functional Core
 
-## Neu in v0.4.2.1 – eigener Startfehlerdialog und PS5.1-Encoding-Fix
+v0.4.1 is the first behavior-preserving refactoring build of the 0.4.x series. The prior single-file runtime remains for deployment/startup but is now **deterministically generated from modular source files**. There is no intended functional, UX, security, or privilege change.
 
-v0.4.2.1 ist ein gezielter UX-/Kompatibilitäts-Patch auf Basis von v0.4.2. Die TaskBroker-/Boot-Service-Architektur, Bootlogik und Privilege-Grenzen bleiben unverändert.
+Changes:
 
-Änderungen:
+- **Functional Core introduced:** `src/Core/EntryPreferences.ps1`, `src/Core/FirmwareParsing.ps1`, and `src/Core/BootTargetModel.ps1` contain deterministic logic with no global script state, WinForms, filesystem, Registry, Scheduled Tasks, process starts, or privileged broker access.
+- **Settings normalized:** `Get-AppSettings` remains I/O shell and delegates default/normalization logic to Core. Schema **4** unchanged.
+- **Entry Preferences extracted:** alias normalization, sequence/map comparison, GUID-list validation, and sort/visibility live in Core; `Get-OrderedEntriesForUi` is only a thin state adapter.
+- **Firmware text parser extracted:** GUID, firmware-entry, `displayorder`, and `bootsequence` parsing live in Core. `Get-FirmwareBootState` retains only cache/TaskBroker/Storage orchestration.
+- **Friendly boot-target model presentation-neutral:** classification emits `AccentRole` token; only UI shell maps token to existing `Drawing.Color` values. User text and USB heuristic unchanged.
+- **Deterministic single-file build:** `src/App/LenovoBootMenuTray.template.ps1` plus Core modules are bundled byte-exact by `tools/build_runtime.py` into `LenovoBootMenuTray.ps1`. Release remains flat and needs no additional runtime modules.
+- **Regression gates extended:** all v0.3.4/v0.4.0 critical fragments not intentionally refactored remain SHA-256-identical. New Core/Boundary gates cover three intentionally changed shell functions.
+- **Security architecture unchanged:** unelevated tray; fixed allowlisted SYSTEM Scheduled Tasks; no free commands/arguments/GUIDs; only `{fwbootmgr} bootsequence`; no permanent `displayorder`; no custom SYSTEM EXE; bounded cleanup.
+- **Popup-first and closed UI paths unchanged:** full-width hover/selected, red separators, eye/pencil tooltips, and background-worker ordering are unchanged.
+- **Parked features remain parked:** formerly planned v0.3.5/v0.3.6 features are not part of v0.4.1.
 
-- **Eigener Startfehlerdialog:** Die ungebundene Standard-`MessageBox` wurde durch einen kompakten WinForms-Recovery-Dialog im Lenovo-Boot-Selector-Stil ersetzt. Er zeigt keinen eigenen Taskleisten-Eintrag (`ShowInTaskbar = $false`) und verwendet Lenovo-Rot nur als Akzent.
-- **Klare Recovery-Aktionen:** Bei einem echten Fatal-Startfehler stehen `Erneut starten`, `Diagnose öffnen` und `Schließen` bereit. Der Neustart erfolgt erst nach Freigabe des Tray-Mutex über den bestehenden versteckten VBS-Launcher. Bei einer bereits laufenden Instanz ist `Erneut starten` deaktiviert.
-- **Taskleisten-Fallback abgesichert:** Falls der eigene Dialog nicht erstellt werden kann, wird die native MessageBox nur an einen unsichtbaren Owner mit `ShowInTaskbar = $false` gebunden.
-- **PS5.1-Encoding-Fix:** Modulare PowerShell-Sources mit Nicht-ASCII-Inhalt werden als UTF-8 mit BOM ausgeliefert. Dadurch bleibt `Lenovo Boot-Menü` beim direkten Dot-Sourcing unter Windows PowerShell 5.1 korrekt.
-- **Windows-Gate erweitert:** `tests/Test-WindowsPowerShell51.ps1` prüft zusätzlich die Encoding-Regel für `.ps1`-Dateien mit Nicht-ASCII-Inhalt und führt weiterhin den Functional-Core-Test aus.
-- **Keine Boot-/Security-Änderung:** Keine Änderung an festen SYSTEM-Tasks, TaskBroker-Schema 0.2.12, GUID-Allowlist, `{fwbootmgr}`-`bootsequence`, Default-Logik, Cleanup oder Popup-first.
+**Native verification:** Linux build environment cannot execute Windows PowerShell 5.1, WinForms, Task Scheduler, or UEFI. Because v0.4.1 first changes productive internal structure, a short Windows smoke is recommended before next refactor: app start, popup-first, boot-target list/names, alias/visibility/order, refresh, and already-closed hover/separator/tooltip paths. Task/ACL code is unchanged.
 
-**Native Prüfung erforderlich:** Startfehlerdialog auf dem Ziel-PC provozieren bzw. über den dedizierten Testpfad prüfen: kein PowerShell-Symbol in der Taskleiste, Dialog im App-Stil, `Diagnose öffnen`, `Schließen` und `Erneut starten` korrekt. Zusätzlich `tests\Test-WindowsPowerShell51.ps1` nativ ausführen.
+## v0.3.4 – Full-width hover over actual DropDown client area
 
+v0.3.4 is an isolated WinForms Hotfix based on v0.3.3. Native v0.3.3 testing confirmed hover and red separators were restored, but a narrow dark remainder still stayed on the right. Root cause: selection background was still painted in the per-item renderer. WinForms clips that Graphics context to item/content area, so the system-reserved right padding/grip area of the DropDown could not be reliably covered even with a mathematically larger rectangle.
 
-## Neu in v0.4.2 – explizite TaskBroker-/Boot-Service-Grenze
+Changes:
 
-v0.4.2 ist der zweite behavior-preserving Refactoring-Build der 0.4.x-Reihe. Die in v0.4.1 nativ vollständig bestätigte Runtime dient als Basis; es werden weiterhin keine geparkten v0.3.5-/v0.3.6-Funktionen umgesetzt.
+- **Selection paint moved to real DropDown surface:** hover/selected background is now drawn in `OnRenderToolStripBackground(...)`. This renderer operates on full `ToolStripDropDown.ClientRectangle` and can cover the previously excluded right remainder.
+- **Exact full width:** root menus use full `ClientRectangle` width. Submenus leave only their existing neutral 1-px edge.
+- **Deterministic hover detection retained:** `GetVisualHotItem(...)` still uses current mouse position plus row hit test; `Selected`/`Pressed` remains fallback for keyboard navigation/open submenu.
+- **Item renderer no longer paints selection background:** `OnRenderMenuItemBackground(...)` remains responsible only for checkmarks and submenu arrows, preventing item-local clip bounds from truncating full-width background.
+- **Separators unchanged:** local separator paint fixed in v0.3.3 (`Item.Height / 2`) remains.
+- **No new timing logic:** no `PaintSelectionTail`, timer, or delayed `BeginInvoke`; existing synchronous full invalidates remain.
+- **No security change:** TaskBroker schema stays **0.2.12**, Settings schema **4**. BootNext, Default, runtime diagnostics, allowlist, ACL, cleanup, and restart semantics unchanged.
 
-Änderungen:
+**Native verification required:** repeatedly open tray context menu, `Wartung`, and `Standard-Startziel` and hover every row slowly/quickly to right edge. Highlight must reach actual right client edge with no dark remainder; red separators, checkmarks, arrows remain correct.
 
-- **Historische `Invoke-BcdEdit`-Pseudo-API entfernt:** Die Tray-Runtime besitzt keine generische BCDEdit-Kompatibilitätsschicht mehr. Read-only Firmwarezugriffe, BootNext und systemweites Standardziel verwenden klar benannte Operationen.
-- **Infrastructure-Modul eingeführt:** `src/Infrastructure/TaskBroker.ps1` kapselt TaskBroker-Metadaten, exakten Scheduled-Task-Start, Cache-/Statusdateien und die festen Brokeroperationen. Der generische interne Task-Starter wird außerhalb dieses Moduls nicht mehr direkt aufgerufen.
-- **Explizite Brokeroperationen:** `Get-TaskBrokerFirmwareManagerText`, `Get-TaskBrokerFirmwareEntriesText`, `Get-TaskBrokerDefaultTargetGuid`, `Set-TaskBrokerBootNextTarget`, `Set-TaskBrokerDefaultTarget` und `Clear-TaskBrokerDefaultTarget` bilden die erlaubten fachlichen Brokerzugriffe ab.
-- **Application-Boot-Service eingeführt:** `src/Application/BootService.ps1` liest Firmwaredaten über die Infrastructure-Grenze, delegiert Textparsing an den Functional Core und verifiziert BootNext nach dem Schreiben durch Read-back der `bootsequence`.
-- **BootNext-Begriff präzisiert:** Der UI/Shell-Pfad heißt nun `Set-BootNextTarget`; die historische Funktion `Set-BootSequence` entfällt. Das tatsächliche privilegierte Verhalten bleibt unverändert: ausschließlich der vorinstallierte, GUID-gebundene SYSTEM-Task darf `{fwbootmgr}` `bootsequence` setzen.
-- **Default-Set/Clear entkoppelt:** `Set-DefaultGuid` kennt keine Tasknamen mehr und ruft nur noch die expliziten Brokeroperationen auf. Ziel-GUIDs werden weiterhin ausschließlich gegen die installierten TaskBroker-Metadaten aufgelöst.
-- **Background-Refresh entkoppelt:** Der Worker nutzt die expliziten read-only Brokeroperationen; das Hauptfenster synchronisiert Cache-Dateien über einen Infrastructure-Adapter. Popup-first bleibt unverändert.
-- **Kein Privilege-Surface-Wachstum:** Keine freie Command-, Argument-, Taskname- oder GUID-Schnittstelle wurde eingeführt; `Invoke-AuthorizedTask` bleibt ein interner Infrastructure-Mechanismus. Installer/Uninstaller, Taskdefinitionen, ACLs und TaskBroker-Schema **0.2.12** bleiben byteidentisch.
-- **PS5.1-Testfinding behoben:** Die drei unter Windows gefundenen mehrdeutigen `$Name:`-Interpolationen in `tests/Test-FunctionalCore.ps1` sind mit `${Name}:` korrigiert. `tests/Test-WindowsPowerShell51.ps1` parst künftig alle ausgelieferten `.ps1`-Quellen nativ mit dem Windows-PowerShell-Parser und führt anschließend den Functional-Core-Test aus.
-- **Geschlossene UI-Pfade unverändert:** Vollbreiten-Hover/Selected, rote Separatoren und Auge-/Stift-Tooltips werden nicht funktional verändert.
+## v0.3.3 – ToolStrip coordinate fix for hover and separators
 
-**Native Prüfung:** v0.4.1 wurde vollständig nativ GREEN bestätigt (S01 24/24, S02–S16 UI sauber, S17 Diagnose ohne Runtime-Fehler). v0.4.2 verändert interne Broker-/Boot-Service-Aufrufe und benötigt deshalb einen gezielten Windows-Smoke für Firmware-Read/Refresh, BootNext-Read-back, Default-Set/Clear sowie die geschlossenen UI-Regressionspfade.
+v0.3.3 is an isolated native WinForms renderer Hotfix based on v0.3.2. v0.3.2 made hover deterministic but incorrectly handled coordinate systems in per-item renderers: `item.Bounds.Top` was added again inside an already item-local Graphics context. Hover was effectively visible only in first row, and red separators were painted vertically outside their items.
 
+Changes:
 
-## Neu in v0.4.1 – Functional Core
+- **Item-local hover paint:** `FullRowBounds(...)` always starts vertically at `Y = 0`. DropDown client edges are translated only horizontally into local item coordinates.
+- **Full width retained:** selection background still reaches real DropDown client edge; no separate tail paint, timer, or delayed `BeginInvoke` is reintroduced.
+- **Red separators visible again:** `OnRenderSeparator(...)` draws at `Item.Height / 2` in local separator coordinates. Again, only horizontal client edges are translated.
+- **Checkmarks and submenu arrows fixed:** both use same local full-row rectangle as hover background.
+- **Hover detection still deterministic:** current mouse position plus row hit test remains authoritative; `Selected`/`Pressed` only fallback for keyboard/open submenu.
+- **No security change:** TaskBroker schema **0.2.12**, Settings schema **4**. BootNext, Default, runtime diagnostics, allowlist, ACL, cleanup, and restart semantics unchanged.
 
-v0.4.1 ist der erste behavior-preserving Refactoring-Build der 0.4.x-Reihe. Die bisherige Single-File-Runtime bleibt für Deployment und Startup erhalten, wird aber nun **deterministisch aus modularen Source-Dateien erzeugt**. Es gibt keine beabsichtigte Funktions-, UX-, Sicherheits- oder Privilege-Änderung.
+**Native verification required:** in tray context menu, `Wartung` submenu, and `Standard-Startziel` DropDown, hover every row repeatedly slowly/quickly. Every row must highlight fully and red horizontal separators remain continuously visible.
 
-Änderungen:
+## v0.3.2 – Deterministic full-width hover in DropDown menus
 
-- **Functional Core eingeführt:** `src/Core/EntryPreferences.ps1`, `src/Core/FirmwareParsing.ps1` und `src/Core/BootTargetModel.ps1` enthalten deterministische Logik ohne globalen Script-State, WinForms, Dateisystem, Registry, Scheduled Tasks, Prozessstarts oder privilegierten Brokerzugriff.
-- **Settings normalisiert:** `Get-AppSettings` bleibt IO-Shell und delegiert Default-/Normalisierungslogik an den Core. Schema **4** bleibt unverändert.
-- **Entry-Preferences extrahiert:** Alias-Normalisierung, Sequenz-/Map-Vergleich, GUID-Listenprüfung und Sortierung/Sichtbarkeit laufen im Core; `Get-OrderedEntriesForUi` ist nur noch ein dünner State-Adapter.
-- **Firmware-Textparser extrahiert:** GUID-, Firmware-Entry-, `displayorder`- und `bootsequence`-Parsing liegen im Core. `Get-FirmwareBootState` behält ausschließlich Cache/TaskBroker/Storage-Orchestrierung.
-- **Friendly-Bootzielmodell presentation-neutral:** Die Klassifikation erzeugt ein `AccentRole`-Token; erst die UI-Shell ordnet dieses Token den bestehenden `Drawing.Color`-Werten zu. Nutzertexte und USB-Heuristik bleiben unverändert.
-- **Deterministischer Single-File-Build:** `src/App/LenovoBootMenuTray.template.ps1` plus die Core-Module werden durch `tools/build_runtime.py` bytegenau zu `LenovoBootMenuTray.ps1` gebündelt. Das Release bleibt flach und benötigt zur Laufzeit keine zusätzlichen Module.
-- **Regression-Gates erweitert:** Alle nicht absichtlich refaktorierten v0.3.4/v0.4.0-Critical-Fragments bleiben SHA-256-identisch. Für die drei bewusst geänderten Shell-Funktionen existieren neue Core-/Boundary-Gates.
-- **Sicherheitsarchitektur unverändert:** Tray uneleviert; feste allowgelistete SYSTEM-Scheduled-Tasks; keine freien Commands/Argumente/GUIDs; nur `{fwbootmgr}` `bootsequence`; keine permanente `displayorder`; keine Custom-SYSTEM-EXE; begrenzter Cleanup.
-- **Popup-first und geschlossene UI-Pfade unverändert:** Vollbreiten-Hover/Selected, rote Separatoren, Auge-/Stift-Tooltips sowie Background-Worker-Reihenfolge werden nicht verändert.
-- **Geparkte Funktionen bleiben geparkt:** Die ehemals geplanten v0.3.5-/v0.3.6-Funktionen sind nicht Bestandteil von v0.4.1.
+v0.3.2 is a targeted native WinForms Hotfix based on v0.3.1. Eye/pencil tooltips and diagnostics Explorer path fixed in v0.3.1 remain unchanged. BootNext, TaskBroker, Default, diagnostics, cleanup, privilege, and Settings architecture remain functionally unchanged.
 
-**Native Prüfung:** Die Linux-Buildumgebung kann Windows PowerShell 5.1, WinForms, Task Scheduler und UEFI nicht ausführen. Weil v0.4.1 erstmals produktive interne Struktur verändert, ist vor dem nächsten Refactoring ein kurzer Windows-Smoke sinnvoll: Appstart, Popup-first, Bootzielliste/Bezeichnungen, Alias/Sichtbarkeit/Reihenfolge, Refresh sowie die bereits geschlossenen Hover-/Separator-/Tooltip-Pfade. Task-/ACL-Code wurde nicht geändert.
+Changes:
 
+- **Hover race removed:** hover/selected area no longer depends on whether `ToolStripMenuItem.Selected` had already updated during a particular paint cycle.
+- **One controlled paint path:** `LenovoMenuRenderer.OnRenderMenuItemBackground` derives current row directly from mouse position and paints complete row in owner coordinates to actual DropDown client edge.
+- **Right remainder no longer separately repainted:** v0.3.1 workaround `PaintSelectionTail(...)` removed completely; delayed `BeginInvoke` / `QueueFullInvalidate` path also removed.
+- **Immediate full repaint:** both custom DropDown classes synchronously invalidate entire small menu surface on mouse movement, eliminating delayed second paint step.
+- **Checkmarks/submenu arrows in same item pass:** right-side state indicators are painted with full-width row and cannot be overwritten by later tail fill.
+- **Keyboard/submenu behavior retained:** when mouse is outside menu, native `Selected`/`Pressed` still used for keyboard navigation/open child submenu.
+- **No security change:** TaskBroker schema **0.2.12**, Settings schema **4**. No change to privileged tasks, allowlist, `{fwbootmgr} bootsequence`, `displayorder`, ACLs, cleanup, or restart semantics.
 
-## Neu in v0.3.4 – Vollbreiten-Hover über die tatsächliche DropDown-Clientfläche
+**Native verification required:** repeatedly open tray context menu, `Wartung`, and `Standard-Startziel` and move mouse slowly/quickly across all rows. Hover must reach intended client edge without dark right remainder in every cycle.
 
-v0.3.4 ist ein isolierter WinForms-Hotfix auf Basis von v0.3.3. Die native Prüfung von v0.3.3 bestätigte, dass Hover-Funktion und rote Separatoren wiederhergestellt waren, rechts aber weiterhin ein schmaler dunkler Restbereich stehen blieb. Ursache: Der Auswahlhintergrund wurde weiterhin im per-Item-Renderer gezeichnet. WinForms beschränkt diesen Graphics-Kontext auf den Item-/Contentbereich; der systemintern reservierte rechte Padding-/Grip-Bereich des DropDowns konnte damit trotz rechnerisch größerem Rechteck nicht zuverlässig übermalt werden.
+## v0.3.1 – Tooltip focus fix, complete DropDown hover, and reveal diagnostics file
 
-Änderungen:
+v0.3.1 is a targeted Hotfix/UX build based on v0.3.0. Runtime diagnostics from v0.3.0 remain; BootNext, TaskBroker, Default, cleanup, privilege, and Settings architecture remain functionally unchanged.
 
-- **Selection-Paint auf die echte DropDown-Fläche verlagert:** Der Hover-/Selected-Hintergrund wird jetzt in `OnRenderToolStripBackground(...)` gezeichnet. Dieser Renderer arbeitet auf der vollständigen `ToolStripDropDown.ClientRectangle`-Fläche und kann daher auch den zuvor ausgesparten rechten Restbereich abdecken.
-- **Exakte Vollbreite:** Root-Menüs nutzen die komplette `ClientRectangle`-Breite. Untermenüs lassen nur ihre bestehende neutrale 1-px-Kante frei.
-- **Deterministische Hover-Ermittlung bleibt erhalten:** `GetVisualHotItem(...)` verwendet weiterhin aktuelle Mausposition plus Zeilen-Hit-Test; bei Tastaturnavigation bzw. geöffnetem Untermenü bleibt `Selected`/`Pressed` der Fallback.
-- **Item-Renderer zeichnet keinen Auswahlhintergrund mehr:** `OnRenderMenuItemBackground(...)` bleibt ausschließlich für Häkchen und Untermenü-Pfeile zuständig. Dadurch kann keine item-lokale Clip-Grenze den Vollbreiten-Hintergrund erneut beschneiden.
-- **Separatoren unverändert:** Der in v0.3.3 korrigierte lokale Separator-Paint (`Item.Height / 2`) bleibt unverändert.
-- **Keine neue Timing-Logik:** Kein `PaintSelectionTail`, kein Timer, kein verzögertes `BeginInvoke`; die bestehenden synchronen Full-Invalidates bleiben bestehen.
-- **Keine Sicherheitsänderung:** TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **4**. BootNext-, Default-, Runtime-Diagnose-, Allowlist-, ACL-, Cleanup- und Neustartsemantik bleiben unverändert.
+Changes:
 
-**Native Prüfung erforderlich:** Tray-Kontextmenü, `Wartung` und `Standard-Startziel` mehrfach öffnen und jede Zeile langsam/schnell bis ganz an den rechten Rand hovern. Die Hervorhebung muss ohne dunklen Reststreifen bis zur tatsächlichen rechten Clientkante reichen; rote Separatoren, Häkchen und Pfeile müssen unverändert korrekt bleiben.
+- **Eye/pencil no longer close UI:** separate `LenovoDarkToolTipForm` introduced in v0.2.35 is removed from this path. Eye and pencil now use owner-drawn `System.Windows.Forms.ToolTip`, avoiding an app `Form` that could deactivate main window and trigger `Deactivate → Hide`.
+- **Dark tooltip style retained:** tooltips remain square, dark, compact and use exact UI literals `Sichtbar – klicken zum Ausblenden`, `Verborgen – klicken zum Einblenden`, and `Anzeigename ändern`. Position remains screen-aware right of icon or left when space is insufficient.
+- **DropDown hover to real right client edge:** in addition to existing full-row renderer, `LenovoContextMenuStrip` and `LenovoDropDownMenu` repaint any remaining right selection tail after normal WinForms painting. The neutral 1-px submenu edge remains excluded.
+- **Find diagnostics ZIP directly:** success dialog `Diagnose gespeichert` adds action `Im Ordner anzeigen` beside `OK`. It opens Windows Explorer with `/select,"<Diagnose-ZIP>"` so the generated package is selected; visible storage path remains.
+- **Diagnostics for new action:** success/failure of Explorer launch is logged best-effort as `DIAGNOSTIC_REVEAL`. Failure does not block app.
+- **No security change:** TaskBroker schema **0.2.12**, Settings schema **4**. No new privileged interface, free GUID/arguments, or change to `{fwbootmgr} bootsequence`, allowlist, task ACLs, cleanup, or restart semantics.
 
-## Neu in v0.3.3 – ToolStrip-Koordinatenfix für Hover und Separatoren
+**Native verification required:** hover eye/pencil repeatedly without main window disappearing. Verify gapless hover/selected surface to right edge in root, `Wartung`, and `Standard-Startziel` DropDowns. Diagnostics export `Im Ordner anzeigen` must open Explorer and select exact generated ZIP.
 
-v0.3.3 ist ein isolierter nativer WinForms-Renderer-Hotfix auf Basis von v0.3.2. v0.3.2 hatte die Hover-Erkennung zwar deterministisch gemacht, dabei aber die Koordinatensysteme der per-Item-Renderer falsch behandelt: `item.Bounds.Top` wurde in einem bereits item-lokalen Graphics-Kontext erneut addiert. Dadurch war der Hover praktisch nur in der ersten Zeile sichtbar; auch die roten Separatoren wurden vertikal außerhalb ihrer Items gezeichnet.
+## v0.3.0 – Complete runtime diagnostics
 
-Änderungen:
+v0.3.0 implements phase 1 of technical build plan after v0.2.35. Focus is continuous read-only runtime diagnostics so technical causes remain traceable while visible UI stays user-friendly. BootNext, TaskBroker, Default, cleanup, privilege, and Settings architecture remain functionally unchanged.
 
-- **Item-lokaler Hover-Paint:** `FullRowBounds(...)` beginnt vertikal immer bei `Y = 0`. Die DropDown-Clientkanten werden nur horizontal in das lokale Item-Koordinatensystem übersetzt.
-- **Vollbreite bleibt erhalten:** Der Auswahlhintergrund reicht weiterhin bis zum realen DropDown-Clientrand; ein separates Tail-Paint, Timer oder verzögertes `BeginInvoke` wird nicht wieder eingeführt.
-- **Rote Separatoren wieder sichtbar:** `OnRenderSeparator(...)` zeichnet die Linie bei `Item.Height / 2` im lokalen Separator-Koordinatensystem. Auch hier werden nur die horizontalen Clientkanten übersetzt.
-- **Häkchen und Untermenü-Pfeile korrigiert:** Beide verwenden dasselbe lokale Vollzeilen-Rechteck wie der Hover-Hintergrund.
-- **Hover-Erkennung unverändert deterministisch:** Aktuelle Mausposition plus Zeilen-Hit-Test bleiben maßgeblich; `Selected`/`Pressed` bleibt nur der Fallback für Tastatur bzw. geöffnetes Untermenü.
-- **Keine Sicherheitsänderung:** TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **4**. BootNext-, Default-, Runtime-Diagnose-, Allowlist-, ACL-, Cleanup- und Neustartsemantik bleiben unverändert.
+Changes:
 
-**Native Prüfung erforderlich:** Im Tray-Kontextmenü, im `Wartung`-Untermenü und im `Standard-Startziel`-DropDown jede Zeile mehrfach langsam und schnell hovern. Jede Zeile muss vollständig hervorgehoben werden; die roten horizontalen Separatoren müssen durchgehend sichtbar sein.
+- **One diagnostics session per app start:** every normal tray start gets random `sessionId`. Hidden background refresh carries same session ID so UI/worker events land in one chronological `runtime.jsonl` session.
+- **Structured append-only events:** events contain UTC time, session, app version, process role, event/stage, success, duration, and on errors class/text. Diagnostic write failures are swallowed and may never block app/boot action.
+- **Covered paths:** BootNext set, default-target set/clear, authorized Scheduled Tasks, TaskBroker ready check, manager/firmware refresh, background refresh including phase timings, Storage/USB resolution, Autostart, setup/repair, cleanup, restart, and UI/unhandled/fatal exceptions.
+- **Background timings persisted:** `ReadyMs`, `ManagerMs`, `FirmwareMs`, `StorageMs`, and `TotalMs` measured since v0.2.26 are now also written to runtime diagnostics.
+- **Maintenance → save diagnostics:** compact diagnostics ZIP for **current session** can be created any time from maintenance submenu.
+- **Diagnostics package deliberately small:** contains `runtime.jsonl`, `environment.json`, `task-broker-summary.json`, and `summary.txt`. Historical runtime sessions, `settings.json`, and user files are excluded.
+- **Data minimization:** broker `userSid`, username, and machine name are excluded from export. Technical error text is scrubbed best-effort of `%LOCALAPPDATA%`, `%USERPROFILE%`, username, and machine name.
+- **30-day retention:** old runtime-session directories are best-effort removed after 30 days. Cleanup cannot block app functionality.
+- **Error hooks:** WinForms thread exceptions, AppDomain unhandled exceptions, and outer fatal path write structured diagnostics when session is available.
+- **No privilege change:** TaskBroker schema **0.2.12**, Settings schema **4**. Installer/uninstaller, fixed task names, task ACLs, allowlist, `{fwbootmgr} bootsequence`, and `shutdown.exe /r /t 0` unchanged from v0.2.35.
 
-## Neu in v0.3.2 – deterministischer Vollbreiten-Hover in DropDown-Menüs
+**Native verification required:** Linux build environment cannot run Windows PowerShell 5.1, Task Scheduler, WinForms, or UEFI. On target PC verify successful/failed BootNext, background refresh, Autostart change, Setup/Repair failure, and export via `Wartung → Diagnose speichern…`. Exported ZIP must contain only current session and four documented files.
 
-v0.3.2 ist ein gezielter nativer WinForms-Hotfix auf Basis von v0.3.1. Die in v0.3.1 korrigierten Auge-/Stift-Tooltips und der Diagnose-Explorerpfad bleiben unverändert. BootNext-, TaskBroker-, Default-, Diagnose-, Cleanup-, Privilege- und Settings-Architektur bleiben funktional unverändert.
+## v0.2.35 – Consistent tooltips and full-width DropDown interaction
 
-Änderungen:
+v0.2.35 is a targeted UI/UX quality pass based on v0.2.34. BootNext, TaskBroker, Default, cleanup, display-name, and background-refresh architecture remain unchanged.
 
-- **Hover-Race entfernt:** Die Hover-/Selected-Fläche hängt nicht mehr davon ab, ob `ToolStripMenuItem.Selected` genau während eines bestimmten Paint-Zyklus bereits aktualisiert wurde.
-- **Ein kontrollierter Paint-Pfad:** `LenovoMenuRenderer.OnRenderMenuItemBackground` ermittelt die aktuell getroffene Zeile direkt aus der Mausposition und zeichnet die komplette Zeile in Owner-Koordinaten bis zum tatsächlichen DropDown-Clientrand.
-- **Rechte Restfläche nicht mehr separat nachgemalt:** Der v0.3.1-Workaround `PaintSelectionTail(...)` wurde vollständig entfernt. Ebenso entfällt der verzögerte `BeginInvoke`-/`QueueFullInvalidate`-Pfad.
-- **Sofortiges Full-Repaint:** Die beiden eigenen DropDown-Klassen invalidieren bei Mausbewegung die gesamte kleine Menüfläche synchron. Dadurch gibt es keinen zeitversetzten zweiten Paint-Schritt mehr.
-- **Häkchen und Untermenü-Pfeile im selben Item-Pass:** Rechte Statusindikatoren werden gemeinsam mit der Vollbreitenzeile gezeichnet und können nicht mehr von einem späteren Tail-Fill übermalt werden.
-- **Keyboard-/Submenu-Verhalten bleibt erhalten:** Befindet sich die Maus außerhalb des jeweiligen Menüs, wird für Tastaturnavigation bzw. ein geöffnetes Kind-Untermenü weiterhin auf den nativen `Selected`-/`Pressed`-Zustand zurückgefallen.
-- **Keine Sicherheitsänderung:** TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **4**. Keine Änderung an privilegierten Tasks, Allowlist, `{fwbootmgr}`-`bootsequence`, `displayorder`, ACLs, Cleanup oder Neustartsemantik.
+Changes:
 
-**Native Prüfung erforderlich:** Tray-Kontextmenü, `Wartung` und `Standard-Startziel` mehrfach öffnen und mit der Maus langsam sowie schnell über alle Zeilen bewegen. Die Hoverfläche muss in jedem Zyklus ohne dunklen rechten Reststreifen bis zum vorgesehenen Clientrand reichen.
+- **Custom dark visibility tooltips:** eyes in mode `STARTZIELE ANPASSEN` no longer use bright native Windows tooltips. A square dark app tooltip appears with subtle neutral edge and automatic left/right positioning within current working area.
+- **Shorter visibility text:** open eye `Sichtbar – klicken zum Ausblenden`; crossed-out eye `Verborgen – klicken zum Einblenden`.
+- **Pencil explains function:** same dark tooltip style shows `Anzeigename ändern`.
+- **Boot-menu subtext in edit mode:** unchanged entry `Lenovo Boot-Menü` now shows descriptive subtext `Auswahlmenü für das nächste Startziel`. Entries with display name still show `Originalname: …`.
+- **DropDown width contract strengthened:** root context menu, `Standard-Startziel`, and `Wartung` use custom ToolStripDropDown classes with real minimum width at preferred-size level. After each native layout phase, all items stretch to full usable client width so hit-test, hover, selected, check, and arrow zones share same real row width.
+- **Hover repaint after native selection:** asynchronous full-surface invalidation after mouse movement ensures owner-based hover/selected background is painted after internal WinForms selection updates, preventing dark right remainder.
+- **Maintenance submenu uses same contract:** explicitly uses same full-width DropDown layout as root/default target menu; existing neutral submenu edge remains.
+- **No functional change:** TaskBroker schema **0.2.12**, Settings schema **4**. Firmware GUIDs, BootNext targets, task names, allowlist, default target, cleanup boundaries, and unelevated app semantics unchanged.
 
+**Native verification required:** on target PC verify complete hover/selected width in root/maintenance/default-target menus, hit testing to right edge, and position/readability/non-focus behavior of new dark tooltips.
 
-## Neu in v0.3.1 – Tooltip-Fokusfix, vollständig durchgezogener DropDown-Hover und Diagnose-Datei anzeigen
+## v0.2.34 – Visibility tooltips and red settings separator
 
-v0.3.1 ist ein gezielter Hotfix-/UX-Build auf Basis von v0.3.0. Die Runtime-Diagnose aus v0.3.0 bleibt erhalten; BootNext-, TaskBroker-, Default-, Cleanup-, Privilege- und Settings-Architektur bleiben funktional unverändert.
+v0.2.34 is a small UI/UX quality pass based on v0.2.33. BootNext, TaskBroker, Default, cleanup, display-name, and background-refresh architecture remain unchanged.
 
-Änderungen:
+Changes:
 
-- **Auge/Stift schließen die UI nicht mehr:** Der in v0.2.35 eingeführte separate `LenovoDarkToolTipForm` wurde vollständig aus diesem Pfad entfernt. Auge und Stift verwenden jetzt einen owner-drawn `System.Windows.Forms.ToolTip`. Damit wird kein eigenes App-`Form` mehr geöffnet, das das Hauptfenster deaktivieren und dadurch dessen `Deactivate → Hide`-Logik auslösen könnte.
-- **Dunkler Tooltip-Stil bleibt erhalten:** Die Tooltips bleiben eckig, dunkel, kompakt und verwenden weiterhin `Sichtbar – klicken zum Ausblenden`, `Verborgen – klicken zum Einblenden` sowie `Anzeigename ändern`. Die Position wird weiterhin bildschirmbewusst rechts bzw. bei Platzmangel links des Symbols gewählt.
-- **DropDown-Hover bis zum echten rechten Clientrand:** Zusätzlich zum bestehenden Full-Row-Renderer zeichnen `LenovoContextMenuStrip` und `LenovoDropDownMenu` nach dem normalen WinForms-Painting einen eventuell verbleibenden rechten Selection-Tail nach. Dadurch wird auch der von WinForms trotz gestreckter Item-Bounds zurückbehaltene Restbereich gefüllt. Die neutrale 1-px-Untermenükante bleibt ausgespart.
-- **Diagnose-ZIP direkt finden:** Der Erfolgsdialog `Diagnose gespeichert` besitzt neben `OK` jetzt **`Im Ordner anzeigen`**. Die Aktion öffnet den Windows-Explorer mit `/select,"<Diagnose-ZIP>"`, sodass das gerade erzeugte Paket direkt markiert wird. Der sichtbare Speicherpfad bleibt bestehen.
-- **Diagnose der neuen Aktion:** Erfolg bzw. Fehlschlag des Explorer-Aufrufs wird als `DIAGNOSTIC_REVEAL` best-effort in der laufenden Runtime-Diagnose protokolliert. Ein Fehlschlag blockiert die App nicht.
-- **Keine Sicherheitsänderung:** TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **4**. Es gibt keine neue privilegierte Schnittstelle, keine freien GUIDs/Argumente und keine Änderung an `{fwbootmgr}`-`bootsequence`, Allowlist, Task-ACLs, Cleanup oder Neustartsemantik.
+- **Visibility eye explains state/action:** open eye tooltip is `In der Standardansicht sichtbar – klicken zum Ausblenden`; crossed-out eye tooltip is `In der Standardansicht verborgen – klicken zum Einblenden`.
+- **Robust tooltip fallback:** in addition to normal WinForms `ToolTip.SetToolTip(...)`, owner-drawn visibility icon has explicit `MouseHover` / `MouseLeave` path, matching proven marker-tooltip fallback.
+- **Red separator before restart area:** horizontal line between `Einstellungen` and `Windows neu starten` now uses Lenovo red instead of neutral gray.
+- **No functional change:** TaskBroker schema **0.2.12**, Settings schema **4**. Firmware GUIDs, BootNext targets, task names, allowlist, default target, cleanup boundaries, and unelevated app semantics unchanged.
 
-**Native Prüfung erforderlich:** Auf dem Ziel-PC müssen Auge/Stift mehrfach gehovert werden, ohne dass das Hauptfenster verschwindet. Root-, `Wartung`- und `Standard-Startziel`-DropDowns sind auf eine lückenlose Hover-/Selected-Fläche bis zur rechten Kante zu prüfen. Beim Diagnoseexport muss `Im Ordner anzeigen` den Explorer öffnen und genau das erzeugte ZIP markieren.
+**Native verification required:** visually check tooltips for open/crossed eye and red separator between settings/restart area.
 
+## v0.2.33 – Major end-user UI/UX quality pass
 
-## Neu in v0.3.0 – vollständige Runtime-Diagnose
+v0.2.33 is a comprehensive quality build based on v0.2.32. Goal: substantially more consistent and understandable end-user UI without unnecessary technical terminology. BootNext, TaskBroker, Default, cleanup, alias persistence, and background-refresh architecture remain unchanged.
 
-v0.3.0 setzt Phase 1 des technischen Build-Plans nach v0.2.35 um. Schwerpunkt ist eine durchgängige, rein beobachtende Runtime-Diagnose, damit technische Ursachen nachvollziehbar bleiben, während die sichtbare UI weiterhin endbenutzerfreundliche Meldungen zeigt. Die BootNext-, TaskBroker-, Default-, Cleanup-, Privilege- und Settings-Architektur bleibt funktional unverändert.
+Changes:
 
-Änderungen:
+- **End-user vocabulary standardized:** visible UI consistently uses exact historical German terms `Startziel`, `Standard-Startziel`, `Einstellungen`, `Anzeigename`, and `Systemfunktionen`. Implementation terms such as privileged tasks, TaskBroker, Default-Restore, Scheduled Tasks, HKCU, and ExitCodes are removed from normal dialogs/menus.
+- **Manage mode made clearer:** `VERWALTEN` becomes `ANPASSEN`; `EINTRÄGE VERWALTEN` becomes `STARTZIELE ANPASSEN`; section `KONFIGURATION` becomes `EINSTELLUNGEN`.
+- **Visibility uses icon instead of ON/OFF:** an eye is drawn at previous ON/OFF location. Open eye = visible in standard view; crossed eye = hidden. Hidden rows remain dimmed; tooltip explains state.
+- **Alias becomes display name:** visible UI uses `Anzeigename` / `Umbenennen` instead of Alias. `Originalname:` and `Leer lassen = Originalname` clarify semantics. Technical Settings structure `entryAliases` remains for compatibility.
+- **Default target clearer:** `Kein Standard` becomes `Kein Standardziel`. Restart row shows `Nächstes Ziel: …`; technical `Firmware-Standardreihenfolge` is simplified to `Standardreihenfolge`.
+- **Boot-target text simplified:** tooltips/subtitles avoid unnecessary terms such as NVMe/PCIe, PXE, firmware boot selection, or on-premise unless decision requires them. Examples include `Interne SSD`, `Netzwerkstart`, `Wiederherstellung über das Netzwerk`, `Start über das Firmennetzwerk`.
+- **Marker tooltips shortened:** compact meanings such as `Rot: Lenovo Boot-Menü`, `Gelb: USB-Laufwerk`, `Blau: interne SSD`, `Violett: Netzwerkstart`, `Grau: weiteres Startziel`.
+- **Maintenance clearer:** menu items become `Systemfunktionen einrichten/reparieren…` and `Systemfunktionen entfernen…`. Internal task/broker terms are removed from menu.
+- **Custom maintenance dialogs:** Setup, Repair/Migration, Remove use square dark app-style dialogs instead of bright Windows MessageBoxes, with red accent and clear primary/secondary action. Text explains consequences rather than implementation.
+- **User-friendly errors:** common interactive errors no longer expose raw exception/task/path/ExitCode text. UI names failed action and understandable next step; technical details stay in diagnostics.
+- **Tray menu text:** `Bootauswahl öffnen` becomes `Boot Selector öffnen`. Tray tooltip is `Lenovo Boot Selector – Startziel wählen`.
+- **Refresh help:** reload icon tooltip is `Startziele aktualisieren`.
+- **Restart dialog simplified:** target heading is `NÄCHSTES ZIEL`; redundant sentence `Dieses Ziel wird beim Neustart verwendet.` removed.
+- **No functional change:** TaskBroker schema **0.2.12**, Settings schema **4**. Firmware GUIDs, BootNext targets, task names, allowlist, default state, cleanup boundaries, and unelevated app semantics unchanged.
 
-- **Eine Diagnose-Session pro Appstart:** Jeder normale Tray-Start erhält eine zufällige `sessionId`. Der versteckte Hintergrund-Refresh übernimmt dieselbe Session-ID, sodass UI- und Worker-Ereignisse in einer gemeinsamen chronologischen `runtime.jsonl`-Sitzung landen.
-- **Strukturierte append-only Events:** Runtime-Ereignisse enthalten UTC-Zeit, Session, Appversion, Prozessrolle, Event/Stage, Erfolg, Laufzeit und bei Fehlern Fehlerklasse/-text. Diagnose-Schreibfehler werden vollständig geschluckt und dürfen keine App-/Bootaktion blockieren.
-- **Abgedeckte Pfade:** BootNext setzen, Standard-Startziel setzen/löschen, autorisierte Scheduled Tasks, TaskBroker-Ready-Prüfung, Manager-/Firmware-Refresh, Background-Refresh inklusive Phase-Timings, Storage-/USB-Auflösung, Autostart, Einrichtung/Reparatur, Cleanup, Neustart sowie UI-/Unhandled-/Fatal-Exceptions.
-- **Background-Timings persistiert:** Die bereits seit v0.2.26 gemessenen Zeiten `ReadyMs`, `ManagerMs`, `FirmwareMs`, `StorageMs` und `TotalMs` werden nun zusätzlich in der Runtime-Diagnose festgehalten.
-- **Wartung → Diagnose speichern…:** Im Wartungs-Untermenü kann jederzeit ein kompaktes Diagnose-ZIP der **aktuellen Session** erzeugt werden.
-- **Diagnosepaket bewusst klein:** Enthalten sind `runtime.jsonl`, `environment.json`, `task-broker-summary.json` und `summary.txt`. Historische Runtime-Sessions, `settings.json` und Benutzerdateien werden nicht mit exportiert.
-- **Datensparsamkeit:** Broker-`userSid`, Benutzername und Rechnername werden nicht in das Runtime-Diagnosepaket geschrieben. Technische Fehltexte werden best-effort um `%LOCALAPPDATA%`, `%USERPROFILE%`, Benutzer- und Rechnernamen bereinigt.
-- **30-Tage-Retention:** Alte Runtime-Session-Verzeichnisse werden best-effort nach 30 Tagen entfernt. Diese Bereinigung kann keine Appfunktion blockieren.
-- **Fehlerhaken:** WinForms-Thread-Exceptions, AppDomain-Unhandled-Exceptions und der äußere Fatal-Pfad schreiben strukturierte Diagnoseevents, sofern die Diagnose-Session bereits verfügbar ist.
-- **Keine Privilege-Änderung:** TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **4**. Installer/Uninstaller, feste Tasknamen, Task-ACLs, Allowlist, `{fwbootmgr}`-`bootsequence` und `shutdown.exe /r /t 0` sind gegenüber v0.2.35 unverändert.
+**Native verification required:** Linux build environment cannot run Windows PowerShell 5.1/WinForms. On target PC verify new dark system-function dialogs, eye icon, all revised text/tooltips, and existing menu/hover/alias/restart regressions.
 
-**Native Prüfung erforderlich:** In der Linux-Buildumgebung stehen Windows PowerShell 5.1, Task Scheduler, WinForms und UEFI nicht zur Verfügung. Auf dem Ziel-PC sind insbesondere ein erfolgreicher/fehlgeschlagener BootNext-Lauf, Background-Refresh, Autostartänderung, Setup/Repair-Fehler und der Export über `Wartung → Diagnose speichern…` zu prüfen. Das exportierte ZIP muss ausschließlich die aktuelle Session und die vier dokumentierten Dateien enthalten.
+## v0.2.32 – Robust full-width menus and cleaner management footer
 
+v0.2.32 is a UI/UX correction pass based on v0.2.31. BootNext, TaskBroker, Default, cleanup, alias, and background-refresh architecture remain unchanged.
 
-## Neu in v0.2.35 – konsistente Tooltips und vollbreite DropDown-Interaktion
+Changes:
 
-v0.2.35 ist ein gezielter UI-/UX-Qualitätspass auf Basis von v0.2.34. Die BootNext-, TaskBroker-, Default-, Cleanup-, Anzeigenamen- und Hintergrund-Refresh-Architektur bleibt unverändert.
+- **Menu hover/selection centrally rerendered:** shared `LenovoMenuRenderer` no longer paints hover/pressed inside native content-based `ToolStripItem` paint area. Complete row surfaces are drawn directly in `ToolStripDropDown` owner coordinates from `ClientSize`, independent of `MinimumSize`, text width, and WinForms item clipping.
+- **Right-side state instead of left checkbox gutter:** checked states such as `Mit Windows starten` and active `Standard-Startziel` render as red checkbox with white check at right edge. Text stays left; no overlapping checkmark column.
+- **Submenu arrows stabilized at right:** arrows for `Wartung` and future submenus are owner-drawn in fixed right zone.
+- **Separators remain full-width:** red horizontal group separators drawn over real DropDown inner width. Maintenance submenu keeps only subtle neutral 1-px edge, no red outer/top border.
+- **No fragile item stretching:** v0.2.31 workaround with `AutoSize = false` and post-layout `Item.Size` removed. WinForms may calculate normal text sizes; visible hover/selected surface is decoupled.
+- **Version no longer clipped:** normal view has dedicated 20-px footer. Version is vertically centered with guaranteed bottom spacing; Manage mode also has dedicated footer.
+- **Alias field with clear action:** small `×` appears at right when text exists; clears only current field, keeps focus, saves nothing. `✓ Übernehmen`, `Esc`/`Abbrechen`, and global save remain.
+- **Management footer restructured:** `Reihenfolge & Sichtbarkeit` becomes `ÄNDERUNGEN`. Compact hints: `Ziehen = Reihenfolge · Klick = Ein/Aus · Stift = Alias` and `Alias leer = Originalname · Ausgegraut = ausgeblendet`.
+- **Buttons horizontal:** `Abbrechen` left; `Änderungen speichern` right as larger primary action.
+- **Dirty state for Save:** `Änderungen speichern` enabled/Lenovo-red only if order, visibility, alias draft, or current alias text differs from initial state; otherwise dark/disabled.
+- **Tray menu stays reduced:** `Aktualisieren` and `Standard-Startziel` remain only in main UI; tray contains only `Bootauswahl öffnen`, `Mit Windows starten`, `Wartung`, `Windows neu starten`, and `Beenden`.
+- **No functional change:** TaskBroker schema **0.2.12**, Settings schema **4**.
 
-Änderungen:
+**Native verification required:** verify full hover/selected width in root/maintenance/default-target menus, right-side checks/arrows, alias clear button, Save dirty-state, and unclipped version.
 
-- **Eigene dunkle Tooltips für Sichtbarkeit:** Die Augen im Modus `STARTZIELE ANPASSEN` verwenden keine hellen nativen Windows-Tooltips mehr. Stattdessen erscheint ein eckiger dunkler App-Tooltip mit dezenter Neutral-Kante und automatischer Links-/Rechts-Positionierung innerhalb des aktuellen Arbeitsbereichs.
-- **Kürzere Sichtbarkeits-Texte:** Offenes Auge: `Sichtbar – klicken zum Ausblenden`; durchgestrichenes Auge: `Verborgen – klicken zum Einblenden`.
-- **Stift erklärt seine Funktion:** Der Stift besitzt nun im selben dunklen Tooltip-Stil den Hinweis `Anzeigename ändern`.
-- **Boot-Menü-Subtext im Anpassungsmodus:** Beim unveränderten Eintrag `Lenovo Boot-Menü` lautet der beschreibende Subtext jetzt `Auswahlmenü für das nächste Startziel`. Einträge mit gesetztem Anzeigenamen zeigen weiterhin `Originalname: …`.
-- **DropDown-Breitenvertrag verstärkt:** Root-Kontextmenü, `Standard-Startziel` und `Wartung` verwenden nun eigene ToolStripDropDown-Klassen mit einer echten Mindestbreite auf Preferred-Size-Ebene. Nach jeder nativen Layoutphase werden alle Items auf die komplette nutzbare Clientbreite gestreckt, sodass Hit-Test-, Hover-, Selected-, Check- und Pfeilzone dieselbe reale Zeilenbreite besitzen.
-- **Hover-Repaint nach nativer Selection:** Eine asynchrone Vollflächen-Invalidierung nach Mausbewegungen stellt sicher, dass der owner-basierte Hover/Selected-Hintergrund erst nach der internen WinForms-Selection aktualisiert wird. Dadurch soll kein dunkler Reststreifen rechts mehr verbleiben.
-- **Wartungs-Untermenü nutzt denselben Vertrag:** Das Wartungsmenü erhält explizit das gleiche vollbreite DropDown-Layout wie Root- und Standardziel-Menü; die bestehende neutrale Submenu-Kante bleibt erhalten.
-- **Keine fachliche Änderung:** TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **4**. Firmware-GUIDs, BootNext-Ziele, Tasknamen, Allowlist, Standard-Startziel, Cleanup-Grenzen und unelevierte App-Semantik bleiben unverändert.
+## v0.2.31 – Consistent menus and simplified lower third
 
-**Native Prüfung erforderlich:** Auf dem Ziel-PC sind besonders die vollständige Hover-/Selected-Breite in Root-/Wartungs-/Standardziel-Menüs, Hit-Testing bis an den rechten Rand sowie Position, Lesbarkeit und Nicht-Fokussierung der neuen dunklen Tooltips zu prüfen.
+v0.2.31 combines menu/layout issues confirmed by native v0.2.30 smoke with requested UX revision of lower third. BootNext, TaskBroker, Default, cleanup, alias, and background-refresh architecture remain unchanged.
 
+Changes:
 
-## Neu in v0.2.34 – Sichtbarkeits-Tooltips und roter Einstellungs-Separator
+- **Tray context menu reduced:** `Aktualisieren` and `Standard-Startziel` removed from tray context menu. Refresh remains in main popup; default target remains in popup configuration area.
+- **Shared menu-width fix:** layout forces all `ToolStripItem` elements after native DropDown layout to actual usable client width and repeats once via `BeginInvoke` after WinForms layout. Hover/selected surfaces should therefore reach full usable width in root, maintenance submenu, and default-target popup.
+- **No separate native check margin:** `ShowCheckMargin` and `ShowImageMargin` disabled. Checked states are drawn by shared renderer within actual menu row, not separate left gutter.
+- **Continuous red separators:** group dividers span complete usable width. Root menu retains only meaningful separations before `Windows neu starten` and `Beenden`.
+- **Maintenance submenu cleaned:** submenus stay visually second-level via slightly lighter background + subtle neutral 1-px edge; red top/outer border removed.
+- **Lower third restructured:** `Mit Windows starten` and `Standard-Startziel` are equivalent configuration rows: label left, state/value right.
+- **Autostart state right-aligned:** checkbox for `Mit Windows starten` sits compactly on right; label separately clickable.
+- **Default target clearer:** row explicitly named `Standard-Startziel`; current target name right, followed by arrow.
+- **Restart contextual:** under `Windows neu starten`, actual next target shown, e.g. `mit Lenovo Boot-Menü`.
+- **Duplicate status removed:** prior footer pair `Nächster Start: …` + `Die Auswahl gilt nur für den nächsten Start.` removed. Version remains subtle at lower right.
+- **No functional change:** TaskBroker schema **0.2.12**, Settings schema **4**. BootNext, system-wide default, alias persistence, custom restart dialog, popup-first background refresh, and privileged Scheduled Task boundaries unchanged.
 
-v0.2.34 ist ein kleiner UI-/UX-Qualitätspass auf Basis von v0.2.33. Die BootNext-, TaskBroker-, Default-, Cleanup-, Anzeigenamen- und Hintergrund-Refresh-Architektur bleibt unverändert.
+**Native verification required:** verify full hover/selected width root/maintenance menu, integrated checked state, full separator width, no red submenu border, and new lower third.
 
-Änderungen:
+## v0.2.30 – Reliable menu hover and flat alias focus
 
-- **Sichtbarkeits-Auge erklärt Zustand und Aktion:** Das offene Auge zeigt nun den Tooltip **`In der Standardansicht sichtbar – klicken zum Ausblenden`**. Das durchgestrichene Auge zeigt **`In der Standardansicht verborgen – klicken zum Einblenden`**.
-- **Robuster Tooltip-Fallback:** Zusätzlich zum normalen WinForms-`ToolTip.SetToolTip(...)` besitzt das owner-drawn Sichtbarkeitssymbol einen expliziten `MouseHover`-/`MouseLeave`-Pfad. Damit entspricht die Zuverlässigkeit dem bereits bewährten Fallback der farbigen Bootziel-Marker.
-- **Rote Trennlinie vor dem Neustartbereich:** Die horizontale Linie zwischen **Einstellungen** und **Windows neu starten** verwendet jetzt Lenovo-Rot statt Neutralgrau.
-- **Keine fachliche Änderung:** TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **4**. Firmware-GUIDs, BootNext-Ziele, Tasknamen, Allowlist, Standard-Startziel, Cleanup-Grenzen und unelevierte App-Semantik bleiben unverändert.
+v0.2.30 is a targeted UI fix based on v0.2.29. BootNext, TaskBroker, Default, cleanup, alias persistence, and background-refresh architecture remain unchanged.
 
-**Native Prüfung erforderlich:** Auf dem Ziel-PC sind insbesondere die Tooltips des offenen/durchgestrichenen Auges sowie die rote Trennlinie zwischen Einstellungen und Neustartbereich visuell zu prüfen.
+Changes:
 
+- **Menu hover centrally corrected:** shared `LenovoMenuRenderer` now consistently treats render context as item-local coordinates. Previous heuristic using `VisibleClipBounds` and `item.Bounds.Top` removed because lower items could paint hover outside visible row.
+- **All DropDown levels benefit:** hover/pressed always starts local `Y = 0`; X is translated to actual owner client origin and area expanded to `ToolStripDropDown.ClientSize.Width`. Applies to root menu, `Standard-Startziel`, `Wartung`, checked items, and future submenus.
+- **Alias field without full red border:** expanded alias editor stays wide/dark but no surrounding red focus border; only a **1-px underline** indicates focus.
+- **Subtle focus state:** without focus bottom line neutral gray; on focus only line becomes Lenovo red. Textbox itself borderless dark.
+- **Alias semantics unchanged:** `Enter` accepts into edit draft, `Esc` discards current input, `✓ Übernehmen` / `× Abbrechen` remain, and only global `Speichern` persists alias/order/visibility.
+- **No functional change:** TaskBroker schema **0.2.12**, Settings schema **4**. Popup-first background refresh, boot-target tooltips, custom restart dialog, context-menu chrome, and GUID-bound alias persistence unchanged.
 
-## Neu in v0.2.33 – großer UI-/UX-Qualitätspass für Endanwender
+**Native verification required:** verify hover/selected at all positions in `Standard-Startziel` submenu and new alias-focus state.
 
-v0.2.33 ist ein umfassender Qualitäts-Build auf Basis von v0.2.32. Ziel ist eine deutlich konsistentere, verständlichere Endanwenderoberfläche ohne unnötige technische Begriffe. Die BootNext-, TaskBroker-, Default-, Cleanup-, Alias-Persistenz- und Hintergrund-Refresh-Architektur bleibt unverändert.
+## v0.2.29 – Clearer header, configuration block, and alias editor
 
-Änderungen:
+v0.2.29 is a pure UI/UX pass based on v0.2.28. BootNext, TaskBroker, Default, cleanup, alias persistence, and background-refresh architecture remain unchanged. Visible product name is now **Lenovo Boot Selector**; historical internal task/path names remain for compatibility.
 
-- **Endanwender-Vokabular vereinheitlicht:** Die sichtbare UI spricht konsequent von `Startziel`, `Standard-Startziel`, `Einstellungen`, `Anzeigename` und `Systemfunktionen`. Technische Implementierungsbegriffe wie privilegierte Aufgaben, TaskBroker, Default-Restore, Scheduled Tasks, HKCU und ExitCodes werden aus den normalen Dialogen und Menüs entfernt.
-- **Verwaltungsmodus verständlicher:** `VERWALTEN` heißt jetzt **`ANPASSEN`**, `EINTRÄGE VERWALTEN` wird zu **`STARTZIELE ANPASSEN`**. Der Abschnitt `KONFIGURATION` heißt **`EINSTELLUNGEN`**.
-- **Sichtbarkeit als Symbol statt AN/AUS:** An der bisherigen AN/AUS-Position wird jetzt ein Auge gezeichnet. Offenes Auge = in der Standardansicht sichtbar, durchgestrichenes Auge = verborgen. Verborgene Zeilen bleiben zusätzlich gedimmt. Ein Tooltip erklärt den Zustand.
-- **Alias wird zum Anzeigenamen:** Die sichtbare UI verwendet **`Anzeigename`** bzw. `Umbenennen` statt Alias. `Originalname:` und `Leer lassen = Originalname` erklären die Semantik klarer. Die technische Settings-Struktur `entryAliases` bleibt aus Kompatibilitätsgründen unverändert.
-- **Standardziel klarer:** `Kein Standard` heißt **`Kein Standardziel`**. In der Neustartzeile wird **`Nächstes Ziel: …`** angezeigt; der technische Begriff `Firmware-Standardreihenfolge` ist als **`Standardreihenfolge`** vereinfacht.
-- **Bootzieltexte vereinfacht:** Tooltips und Untertitel vermeiden unnötige Begriffe wie NVMe/PCIe, PXE, Firmware-Bootauswahl oder On-Premise, sofern sie für die Entscheidung nicht nötig sind. Beispiele: `Interne SSD`, `Netzwerkstart`, `Wiederherstellung über das Netzwerk`, `Start über das Firmennetzwerk`.
-- **Marker-Tooltips verkürzt:** Statt technischer Erklärsätze stehen kompakte Bedeutungen wie `Rot: Lenovo Boot-Menü`, `Gelb: USB-Laufwerk`, `Blau: interne SSD`, `Violett: Netzwerkstart` und `Grau: weiteres Startziel`.
-- **Wartung verständlicher:** Die Menüpunkte heißen jetzt **`Systemfunktionen einrichten/reparieren…`** und **`Systemfunktionen entfernen…`**. Interne Task-/Broker-Begriffe werden nicht mehr im Menü gezeigt.
-- **Eigene Wartungsdialoge im App-Stil:** Einrichtung, Reparatur/Migration und Entfernen verwenden keine hellen Windows-MessageBoxes mehr, sondern eckige dunkle Lenovo-Boot-Selector-Dialoge mit roter Akzentlinie und klarer Primär-/Sekundäraktion. Die Texte erklären Konsequenzen statt Implementierungsdetails.
-- **Fehlertexte endanwenderfreundlicher:** Häufige interaktive Fehler zeigen keine rohen Exception-, Task-, Pfad- oder ExitCode-Texte mehr. Stattdessen nennt die UI die fehlgeschlagene Aktion und einen verständlichen nächsten Schritt. Technische Details bleiben in bestehenden Diagnosepfaden.
-- **Tray-Menütext:** `Bootauswahl öffnen` heißt nun **`Boot Selector öffnen`**. Der Tray-Tooltip lautet kompakt **`Lenovo Boot Selector – Startziel wählen`**.
-- **Refresh-Hilfe:** Das Reload-Symbol besitzt den Tooltip **`Startziele aktualisieren`**.
-- **Neustartdialog gestrafft:** Die Zielüberschrift lautet `NÄCHSTES ZIEL`; der redundante Satz `Dieses Ziel wird beim Neustart verwendet.` entfällt.
-- **Keine fachliche Änderung:** TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **4**. Firmware-GUIDs, BootNext-Ziele, Tasknamen, Allowlist, Default-State, Cleanup-Grenzen und unelevierte App-Semantik bleiben unverändert.
+Changes:
 
-**Native Prüfung erforderlich:** Die Linux-Buildumgebung kann Windows PowerShell 5.1 und WinForms nicht ausführen. Auf dem Ziel-PC sind besonders die neuen dunklen Systemfunktionen-Dialoge, das Augen-Symbol für Sichtbarkeit, alle überarbeiteten Texte/Tooltips sowie die bestehenden Menü-/Hover-/Alias-/Restart-Regressionspfade zu prüfen.
+- **New visible app name:** header, tray tooltip, user-facing dialog/balloon titles use `Lenovo Boot Selector`. Internal task names, `%LOCALAPPDATA%` / ProgramData paths, and legacy identifiers unchanged.
+- **Header simplified:** decorative red dot removed. Permanent subtitle `Einmaliges Startziel · Geräte erkannt` removed. Idle header shows only app name and refresh button.
+- **Dynamic refresh status:** only while background refresh runs, `Aktualisiere Bootziele…` appears temporarily. Title moves slightly upward and recenters after completion. Existing Variant-B refresh-icon behavior retained: neutral idle, Lenovo red on hover/running refresh.
+- **Lower area grouped as configuration:** above `Mit Windows starten` and `Standardziel` is heading `KONFIGURATION`. Restart remains separate below without redundant second heading.
+- **Alias inline editing redesigned:** pencil click no longer replaces title with narrow textbox. Row temporarily expands to 92 px, shows original name above and wide dark alias field below.
+- **Clear editing mode:** while editing alias, `AN/AUS`, pencil, and drag handle hide; `✓ Übernehmen` and `× Abbrechen` plus hint `leer = Originalname` appear.
+- **Focus accent:** alias field has subtle neutral 1-px border; focus changes it Lenovo red. `Enter` accepts into draft, `Esc` discards; only global `Speichern` persists alias/order/visibility.
+- **No functional change:** TaskBroker schema **0.2.12**, Settings schema **4**. GUID binding, alias persistence, BootNext, system-wide default, cleanup, context menus, custom restart dialog, and popup-first background refresh unchanged.
 
+**Native verification required:** verify header idle/refresh status, configuration grouping, alias editor (pencil, focus, accept/cancel, Enter/Esc, global save), and existing boot/default/refresh regressions.
 
+## v0.2.28 – Flat rectangular main UI and regrouped context menu
 
-## Neu in v0.2.32 – robuste Vollbreiten-Menüs und aufgeräumter Verwaltungsfooter
+v0.2.28 moves visible tray UI to requested flat rectangular utility style. BootNext, TaskBroker, Default, cleanup, alias, and background-refresh architecture from v0.2.27 remain unchanged.
 
-v0.2.32 ist ein UI-/UX-Korrekturpass auf Basis von v0.2.31. Die BootNext-, TaskBroker-, Default-, Cleanup-, Alias- und Hintergrund-Refresh-Architektur bleibt unverändert.
+Changes:
 
-Änderungen:
+- **Main popup without outer frame:** Lenovo-red outer ring removed. Popup is simple rectangular 390×672 box without rounded window region.
+- **No rounded corners:** main popup and custom restart dialog use no rounded region. Red remains interaction/status accent instead of window frame.
+- **Boot rows full width:** rows start at left edge and span full list width. Current BootNext selection's red vertical bar sits at outer left wall; hover/selection color entire row.
+- **Reload action Variant B:** upper-right refresh icon neutral/light idle; Lenovo red on hover and during background refresh. Existing non-blocking refresh architecture from v0.2.26/v0.2.27 unchanged.
+- **Tray context menu square/borderless:** no red/neutral outer border or rounding. Group separators are 1-px Lenovo-red horizontal lines.
+- **Submenus deliberately separated:** `Standard-Startziel` and `Wartung` use slightly lighter dark-gray panel (`#202020`), subtle neutral 1-px edge, and red top accent line, separating submenu layer without red box.
+- **Menu hover stays full width:** central renderer from v0.2.27 retained; hover/pressed calculated against real DropDown client width. Root reaches full client edge; submenu reaches just inside neutral edge.
+- **Native popup edge remains suppressed:** `DropShadowEnabled=false`, relevant Win32 edge styles removed, DWM border suppression retained.
+- **Restart dialog adapted:** dark custom dialog remains, now rectangular with no red outer ring; confirm action stays Lenovo red, safety semantics unchanged.
+- **No functional change:** TaskBroker schema **0.2.12**, Settings schema **4**. Boot-target aliases, tooltips, background refresh, default target, cleanup, Autostart, and `shutdown.exe /r /t 0` unchanged.
 
-- **Menü-Hover/Selection zentral neu gerendert:** Der gemeinsame `LenovoMenuRenderer` zeichnet Hover-/Pressed-Flächen nicht mehr innerhalb der nativen, content-basierten `ToolStripItem`-Paintfläche. Stattdessen werden die vollständigen Zeilenflächen direkt im `ToolStripDropDown`-Ownerkoordinatensystem aus dessen `ClientSize` gezeichnet. Dadurch ist die Interaktionsfläche unabhängig von `MinimumSize`, Textbreite und WinForms-Item-Clipping.
-- **Rechter Zustand statt linker Checkbox-Gutter:** Checked-Zustände wie **„Mit Windows starten“** und das aktive **Standard-Startziel** werden als rote Checkbox mit weißem Häkchen am rechten Zeilenrand dargestellt. Text bleibt links; es gibt keine überlappende Checkmark-Spalte mehr.
-- **Untermenü-Pfeile rechts stabilisiert:** Pfeile für **„Wartung“** und künftige Untermenüs werden ebenfalls owner-basiert in einer festen rechten Zone gezeichnet.
-- **Separatoren weiterhin vollbreit:** Rote horizontale Gruppentrenner werden zentral über die reale DropDown-Innenbreite gezeichnet. Das Wartungs-Untermenü behält nur seine dezente neutrale 1-px-Kante, keinen roten Außen-/Top-Border.
-- **Keine fragile Item-Stretch-Logik mehr:** Der v0.2.31-Workaround mit `AutoSize = false` und nachträglichem `Item.Size` wurde entfernt. WinForms darf Textgrößen normal berechnen; die sichtbare Hover-/Selected-Fläche ist davon entkoppelt.
-- **Versionsnummer nicht mehr abgeschnitten:** Die normale Ansicht besitzt jetzt einen eigenen 20-px-Footer. Die Version wird darin vertikal zentriert und hat garantierten Abstand zur unteren Fensterkante. Im Verwaltungsmodus liegt die Version ebenfalls in einem eigenen Footerbereich.
-- **Alias-Feld mit Löschaktion:** Rechts im Alias-Eingabefeld erscheint bei vorhandenem Text ein kleines `×`. Es leert nur den aktuellen Feldinhalt, lässt den Fokus im Feld und speichert noch nichts. `✓ Übernehmen`, `Esc`/`Abbrechen` und das globale Speichern bleiben unverändert.
-- **Verwaltungsfooter neu strukturiert:** Die bisherige Überschrift **„Reihenfolge & Sichtbarkeit“** wird durch **„ÄNDERUNGEN“** ersetzt. Die Hinweise sind kompakter: `Ziehen = Reihenfolge · Klick = Ein/Aus · Stift = Alias` sowie `Alias leer = Originalname · Ausgegraut = ausgeblendet`.
-- **Buttons horizontal:** `Abbrechen` steht links, **„Änderungen speichern“** rechts als größere Primäraktion.
-- **Dirty-State für Speichern:** **„Änderungen speichern“** ist nur aktiv und Lenovo-rot, wenn Reihenfolge, Sichtbarkeit, Alias-Draft oder der aktuell offene Alias-Text tatsächlich vom Ausgangszustand abweichen. Ohne Änderungen bleibt der Button dunkel/deaktiviert.
-- **Tray-Menü bleibt gestrafft:** `Aktualisieren` und `Standard-Startziel` bleiben ausschließlich in der Haupt-UI; das Tray-Menü enthält weiterhin nur `Bootauswahl öffnen`, `Mit Windows starten`, `Wartung`, `Windows neu starten` und `Beenden`.
-- **Keine fachliche Änderung:** TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **4**.
+**Native verification required:** verify rectangular main UI, missing outer frame, full-width boot rows, reload hover/active state, red menu separators, and submenu visual separation.
 
-**Native Prüfung erforderlich:** Die Linux-Buildumgebung kann Windows PowerShell 5.1 und WinForms/ToolStripDropDown nicht ausführen. Auf dem Ziel-PC sind besonders die volle Hover-/Selected-Breite in Root-/Wartungs-/Standardziel-Menüs, die rechtsseitigen Häkchen/Pfeile, der Alias-Clear-Button, Dirty-State des Speichern-Buttons sowie die nicht mehr abgeschnittene Versionsnummer zu prüfen.
+## v0.2.27 – Complete menu highlighting, native outer edge removed, and boot-target aliases
 
+v0.2.27 centrally fixes both context-menu problems confirmed in native v0.2.26 smoke and adds requested alias feature in `Einträge verwalten` mode. BootNext, TaskBroker, Default, cleanup, Autostart, Restart, and background-refresh architecture remain unchanged.
 
-## Neu in v0.2.31 – konsistente Menüs und vereinfachtes unteres Drittel
+Changes:
 
-v0.2.31 bündelt die nach dem nativen v0.2.30-Smoke bestätigten Menü-/Layoutprobleme und die gewünschte UX-Überarbeitung des unteren Drittels. BootNext-, TaskBroker-, Default-, Cleanup-, Alias- und Hintergrund-Refresh-Architektur bleiben unverändert.
+- **Hover/Selected over full menu width:** shared `LenovoMenuRenderer` no longer paints selection only inside WinForms-calculated item width. Item clip region is controlled for background and area calculated against actual `ToolStripDropDown.ClientSize.Width`. Fix applies to main menu, `Standard-Startziel`, `Wartung`, and future submenus.
+- `LenovoMenuLayout` additionally uses actual client width instead of `DisplayRectangle.Width`; v0.2.26 alone did not capture target system's right remainder.
+- **2-px Lenovo frame retained:** rendered as filled red outer ring plus dark inner surface, eliminating dark pixel strip outside red contour at client edge.
+- **Native black outer edge:** besides `DropShadowEnabled = false`, `LenovoMenuChrome` removes relevant native border/edge window styles, disables DWM non-client rendering for DropDown, and sets Windows 11 `DWMWA_BORDER_COLOR` to `DWMWA_COLOR_NONE`. Red frame remains entirely client-rendered.
+- **Boot-target aliases:** each entry in `Einträge verwalten` gets small pencil action opening inline input field. `Enter` accepts alias into edit draft; `Esc` discards current input; empty alias means original name.
+- Aliases persist only together with `Speichern`. `Abbrechen` discards alias changes too.
+- Set alias becomes visible primary name in normal boot selection; Manage view shows original name in subtext when alias set.
+- Aliases are local UI metadata keyed stably by firmware GUID. They change **no** firmware GUID, BootNext value, task name, TaskBroker allowlist, or privileged identity.
+- Alias display is also used for user-facing target names in default-target menus, status display, and restart dialog; technical identity always remains GUID.
+- `settings.json` expands backward-compatibly to **schema 4** with `entryAliases` in addition to `defaultGuid`, `entryOrder`, `hiddenEntryGuids`. Schema 3 or older still loads; missing aliases mean empty alias set.
+- TaskBroker schema remains **0.2.12**. Installer, uninstaller, launcher, and privileged Scheduled Task contracts unchanged.
 
-Änderungen:
+**Native verification required:** Linux build environment cannot run WinForms/DWM. On target PC verify full-width hover/selected in all menus, complete absence of black outer edge, pencil/inline alias editing, and persistence after app restart.
 
-- **Tray-Kontextmenü gestrafft:** `Aktualisieren` und `Standard-Startziel` wurden aus dem Tray-Kontextmenü entfernt. Aktualisieren bleibt über den Refresh-Button im Haupt-Popup erreichbar; das Standard-Startziel bleibt im Konfigurationsbereich des Haupt-Popups erreichbar.
-- **Gemeinsamer Menübreiten-Fix:** Der Menü-Layoutpfad zwingt alle `ToolStripItem`s nach dem nativen DropDown-Layout auf die tatsächliche nutzbare Clientbreite und wiederholt dies einmal per `BeginInvoke` nach Abschluss der WinForms-Layoutphase. Dadurch sollen Hover-/Selected-Flächen im Hauptmenü, im Wartungs-Untermenü und im Standardziel-Popup bis zur vollständigen nutzbaren Breite reichen.
-- **Keine separierte native Check-Margin mehr:** `ShowCheckMargin` und `ShowImageMargin` werden für DropDown-Menüs deaktiviert. Checked-Zustände werden im gemeinsamen Renderer direkt innerhalb der eigentlichen Menüzeile gezeichnet. Die Checkbox ist damit Teil derselben Hover-/Selected-Fläche statt einer optisch separaten linken Gutter-Spalte.
-- **Durchgängige rote Separatoren:** Gruppentrenner werden vom Renderer über die komplette nutzbare Menübreite gezeichnet. Im Root-Menü bleiben nur die fachlich sinnvollen Trennungen vor `Windows neu starten` und `Beenden`.
-- **Wartungs-Untermenü bereinigt:** Untermenüs bleiben über den etwas helleren Hintergrund und eine dezente neutrale 1-px-Kante als zweite Ebene erkennbar. Der rote Top-/Außenborder wurde entfernt.
-- **Unteres Drittel neu strukturiert:** `Mit Windows starten` und `Standard-Startziel` sind nun zwei gleichartig aufgebaute Konfigurationszeilen. Die Beschriftung steht links, der Zustand bzw. aktuelle Wert rechts.
-- **Autostart-Status rechts:** Die Checkbox von `Mit Windows starten` sitzt als kompakter Zustand rechts in derselben Zeile; die Zeilenbeschriftung ist separat und ebenfalls klickbar.
-- **Standard-Startziel klarer:** Die Zeile heißt jetzt ausdrücklich `Standard-Startziel`; der aktuelle Zielname steht rechts, gefolgt vom Pfeil.
-- **Neustart kontextbezogen:** Unter `Windows neu starten` steht direkt das tatsächlich verwendete nächste Ziel, z. B. `mit Lenovo Boot-Menü`.
-- **Doppelte Statusinformation entfernt:** Die frühere Footer-Kombination `Nächster Start: …` plus `Die Auswahl gilt nur für den nächsten Start.` entfällt. Die Versionsnummer bleibt sehr dezent am unteren rechten Rand.
-- **Keine fachliche Änderung:** TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **4**. BootNext, systemweiter Default, Alias-Persistenz, eigener Restartdialog, Popup-first-Hintergrundrefresh und privilegierte Scheduled-Task-Grenzen bleiben unverändert.
+## v0.2.26 – Context-menu finishing, custom restart dialog, and immediately visible boot selection
 
-**Native Prüfung erforderlich:** Die Linux-Buildumgebung kann Windows PowerShell 5.1 und WinForms/ToolStripDropDown nicht ausführen. Auf dem Ziel-PC sind besonders volle Hover-/Selected-Breite in Root- und Wartungsmenü, integrierte Checked-Darstellung, volle Separatorbreite, fehlender roter Submenu-Border sowie das neue untere Drittel zu prüfen.
+v0.2.26 follows native UI smoke after v0.2.25. Privileged boot/TaskBroker/Default architecture remains unchanged; only presentation, tooltip reliability, and interactive refresh path change.
 
+Changes:
 
-## Neu in v0.2.30 – zuverlässiger Menü-Hover und flacher Alias-Fokus
+- Lenovo-red frame around tray context menu/submenus is again **2 px**. Native `ToolStripDropDown` shadow disabled in v0.2.25 stays disabled to avoid black shadow outside red frame.
+- Menu items are explicitly stretched to usable DropDown width on opening; hover/selected backgrounds should again reach full usable width even when `MinimumSize` exceeds automatic text width.
+- Hover background is more present (`#401F1D` instead of prior subtle tone) but remains dark/Lenovo-consistent.
+- `Windows neu starten` no longer uses native Windows Yes/No dialog. Custom confirmation dialog uses dark Lenovo surface, 2-px red outer frame, consistent typography, and `Abbrechen` / `Neu starten`. Safety unchanged: concrete next target shown, explicit confirmation required, restart remains `shutdown.exe /r /t 0` with no extra UAC.
+- Boot-target marker tooltips add explicit `MouseHover` fallback beside normal `ToolTip.SetToolTip(...)` so explanatory text appears on colored circle even when native tooltip on transparent label does not.
+- **Startup latency:** `Show-OrTogglePopup` no longer performs fresh task/firmware query before `Popup.Show()`. Existing cache files read immediately; UI shown first. Exact TaskBroker check, manager/firmware refresh, and optional Storage discovery run afterward in hidden unelevated Windows PowerShell background process; main UI only polls completion and applies result.
+- Explicit refresh via header/context menu also uses non-blocking background path. Firmware is refreshed only as needed/full Storage refresh; manager state read fresh.
+- Background worker measures TaskBroker check, manager refresh, firmware refresh, Storage discovery, and total durations, enabling native follow-up to isolate slow phase without blocking UI before display.
+- TaskBroker schema remains **0.2.12**, Settings schema **3**. Installer, uninstaller, launcher, and privileged Scheduled Task contracts unchanged.
 
-v0.2.30 ist ein gezielter UI-Fix auf Basis von v0.2.29. BootNext-, TaskBroker-, Default-, Cleanup-, Alias-Persistenz- und Hintergrund-Refresh-Architektur bleiben unverändert.
+**Native verification required:** target PC must confirm 2-px frame, full hover width, custom restart dialog, marker tooltips, and subjective/measured improvement to visible boot selection. Linux environment cannot execute Windows PowerShell 5.1, WinForms/DWM, or Task Scheduler.
 
-Änderungen:
+## v0.2.25 – Slim context-menu frame without black outer edge
 
-- **Menü-Hover zentral korrigiert:** Der gemeinsame `LenovoMenuRenderer` behandelt den Renderkontext jetzt konsequent als Item-lokale Koordinaten. Der bisherige Heuristikpfad über `VisibleClipBounds` und `item.Bounds.Top` wurde entfernt, weil er bei weiter unten liegenden Einträgen den Hover-Hintergrund außerhalb der sichtbaren Zeile zeichnen konnte.
-- **Alle DropDown-Ebenen profitieren gemeinsam:** Hover/Pressed beginnt jetzt immer bei lokalem `Y = 0`; die X-Koordinate wird weiterhin auf den tatsächlichen Owner-Clientursprung zurückgerechnet und die Fläche auf `ToolStripDropDown.ClientSize.Width` erweitert. Das gilt für Hauptmenü, **„Standard-Startziel“**, **„Wartung“**, Checked-Einträge und künftige Untermenüs.
-- **Alias-Feld ohne roten Vollrahmen:** Der aufgeklappte Alias-Editor bleibt breit und dunkel, besitzt aber keinen umlaufenden roten Fokusrahmen mehr. Stattdessen zeigt nur eine **1-px-Unterstreichung** den Fokus an.
-- **Zurückhaltender Fokuszustand:** Ohne Fokus ist die Bottom-Line neutralgrau; beim Fokus wird ausschließlich diese Linie Lenovo-rot. Die Textbox selbst bleibt borderless auf dunkler Fläche.
-- **Alias-Semantik unverändert:** `Enter` übernimmt in den Bearbeitungsentwurf, `Esc` verwirft die aktuelle Eingabe, **„✓ Übernehmen“** / **„× Abbrechen“** bleiben erhalten und erst das globale **„Speichern“** persistiert Alias, Reihenfolge und Sichtbarkeit.
-- **Keine fachliche Änderung:** TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **4**. Popup-first-Hintergrundrefresh, Bootziel-Tooltips, eigener Neustartdialog, Kontextmenü-Chrome und GUID-gebundene Alias-Persistenz bleiben unverändert.
+v0.2.25 changes only external appearance of tray context menu. BootNext, TaskBroker, Default, Autostart, cleanup, Restart, and tooltip architecture from v0.2.24 remain unchanged.
 
-**Native Prüfung erforderlich:** Die Linux-Buildumgebung kann Windows PowerShell 5.1 und WinForms nicht ausführen. Auf dem Ziel-PC sind besonders Hover/Selected bei allen Positionen im Untermenü **„Standard-Startziel“** sowie der neue Alias-Fokuszustand zu prüfen.
+Changes:
 
+- Lenovo-red outer frame of context menu/submenus reduced from **2 px to 1 px**.
+- Frame is painted directly at client edge so no extra dark client border remains outside red line.
+- Native WinForms `ToolStripDropDown` shadow disabled (`DropShadowEnabled = false`) so no extra black shadow contour should appear outside red frame.
+- Rounded corners, checked states, submenu arrows, menu structure, maintenance submenu, and marker-tooltip explanations remain unchanged.
+- TaskBroker schema **0.2.12**, Settings schema **3**; no repair/re-setup of privileged tasks required for this UI-only update.
+- Visual effect still requires native Windows verification because Linux build environment cannot run WinForms/DWM DropDown chrome.
 
-## Neu in v0.2.29 – klarerer Header, Konfigurationsblock und Alias-Editor
+## v0.2.24 – Explain colored boot-target markers via tooltip
 
-v0.2.29 ist ein reiner UI-/UX-Pass auf Basis von v0.2.28. Die BootNext-, TaskBroker-, Default-, Cleanup-, Alias-Persistenz- und Hintergrund-Refresh-Architektur bleibt unverändert. Sichtbare Produktbezeichnung ist nun **Lenovo Boot Selector**; historische interne Task-/Pfadnamen bleiben aus Kompatibilitätsgründen unverändert.
+v0.2.24 adds only UI explanation for colored circles in boot list. BootNext, TaskBroker, Default, Autostart, cleanup, Restart, and context-menu architecture from v0.2.23 remain unchanged.
 
-Änderungen:
+Changes:
 
-- **Neuer sichtbarer App-Name:** Der Header, Tray-Tooltip sowie nutzerseitige Dialog-/Balloon-Titel verwenden **„Lenovo Boot Selector“**. Interne Tasknamen, `%LOCALAPPDATA%`-/ProgramData-Pfade und Legacy-Bezeichner bleiben unverändert.
-- **Header vereinfacht:** Der rein dekorative rote Punkt wurde entfernt. Der permanente Untertitel **„Einmaliges Startziel · Geräte erkannt“** entfällt vollständig. Im Ruhezustand zeigt der Header nur den App-Namen und den Refresh-Button.
-- **Dynamischer Refresh-Status:** Nur während eines laufenden Hintergrund-Refreshs erscheint temporär **„Aktualisiere Bootziele…“**. Der Titel rückt dafür kurz nach oben und wird nach Abschluss wieder vertikal zentriert. Die vorhandene Variante-B-Logik des Refresh-Icons bleibt erhalten: neutral im Ruhezustand, Lenovo-rot bei Hover bzw. laufender Aktualisierung.
-- **Unterer Bereich als Konfiguration gegliedert:** Über **„Mit Windows starten“** und **„Standardziel“** steht nun die kleine Abschnittsüberschrift **„KONFIGURATION“**. Der Neustart bleibt als separate Aktion darunter, ohne redundante zweite Überschrift.
-- **Alias-Inline-Editing neu gestaltet:** Ein Klick auf den Stift öffnet nicht mehr eine schmale Textbox anstelle des Titels. Die betroffene Zeile klappt temporär auf 92 px auf, zeigt oben den Originalnamen als Referenz und darunter ein breites, dunkles Alias-Feld.
-- **Klarer Editiermodus:** Während der Aliasbearbeitung werden `AN/AUS`, Stift und Drag-Handle der betroffenen Zeile ausgeblendet. Stattdessen erscheinen **„✓ Übernehmen“** und **„× Abbrechen“** sowie der Hinweis **„leer = Originalname“**. Dadurch konkurrieren keine Zeilenaktionen mit der Texteingabe.
-- **Fokus-Akzent:** Das Alias-Feld besitzt eine zurückhaltende neutrale 1-px-Flächenkante; bei Fokus wird diese Lenovo-rot. `Enter` übernimmt weiterhin in den Bearbeitungsentwurf, `Esc` verwirft. Erst das globale **„Speichern“** persistiert Alias, Reihenfolge und Sichtbarkeit.
-- **Keine fachliche Änderung:** TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **4**. GUID-Bindung, Alias-Persistenz, BootNext, systemweiter Default, Cleanup, Kontextmenüs, eigener Neustartdialog und Popup-first-Hintergrundrefresh bleiben funktional unverändert.
+- Hovering **colored circle** of boot target shows tooltip explaining category/color meaning.
+- Red = Lenovo Boot Menu / firmware boot selection.
+- Yellow = USB boot target.
+- Blue = internal NVMe/PCIe boot drive.
+- Violet = PXE network boot.
+- Cyan = Lenovo/enterprise network/recovery boot target.
+- Gray = other/non-specifically classified firmware target.
+- Tooltip is intentionally bound only to colored circle; selection remains separately recognizable via left red bar, row background, and checkmark.
+- TaskBroker schema **0.2.12**, Settings schema **3**; no repair/re-setup of privileged tasks required.
 
-**Native Prüfung erforderlich:** Die Linux-Buildumgebung kann Windows PowerShell 5.1 und WinForms nicht ausführen. Auf dem Ziel-PC sind besonders Header-Ruhezustand/Refreshstatus, Konfigurationsgliederung, Alias-Editor (Stift, Fokus, Übernehmen, Abbrechen, Enter/Esc, globales Speichern) sowie die bestehenden Boot-/Default-/Refresh-Regressionspfade zu prüfen.
+## v0.2.23 – Context menu focused and visually aligned with main UI
 
+v0.2.23 is a pure UI/UX pass on tray context menu. BootNext, TaskBroker, Default, Autostart, and cleanup architecture from v0.2.22 remain unchanged.
 
-## Neu in v0.2.28 – flache eckige Haupt-UI und neu gegliedertes Kontextmenü
+Changes:
 
-v0.2.28 überführt die sichtbare Tray-Oberfläche in den gewünschten flachen, rechteckigen Utility-Stil. Die BootNext-, TaskBroker-, Default-, Cleanup-, Alias- und Hintergrund-Refresh-Architektur aus v0.2.27 bleibt unverändert.
+- `Einträge verwalten…` removed from tray context menu. Function remains via `VERWALTEN` in main UI.
+- Technical actions `Privilegierte Aufgaben einrichten/reparieren…` and `Privilegierte Aufgaben entfernen…` grouped under `Wartung ›` submenu.
+- Status hints for missing/repair-needed privileged tasks now point correctly to `Rechtsklick → Wartung → …`.
+- `Bootauswahl öffnen` is subtly bold as primary tray action.
+- Context menu has continuous 2-px Lenovo Red `#E1251B` frame matching main UI red outer ring, still rounded.
+- Checked states use red checkbox with white check instead of inconsistent native Windows look.
+- Submenu arrows gain contrast and vertical padding is slightly increased.
+- TaskBroker schema **0.2.12**, Settings schema **3**; no repair/re-setup required solely because of v0.2.23.
 
-Änderungen:
+## v0.2.22 – System-wide default restore, legacy migration, and complete task cleanup
 
-- **Haupt-Popup ohne Außenrahmen:** Der bisherige Lenovo-rote Außenring wurde vollständig entfernt. Das Popup ist jetzt ein einfacher rechteckiger 390×672-Kasten ohne abgerundete Window-Region.
-- **Keine abgerundeten Ecken:** Haupt-Popup und der bereits eigene Neustartdialog verwenden keine Rounded-Region mehr. Rot bleibt Interaktions-/Statusakzent statt Fensterumrandung.
-- **Bootzeilen über volle Breite:** Bootzeilen beginnen direkt an der linken Kante und reichen über die vollständige Listenbreite. Bei der aktuellen BootNext-Selektion liegt der rote vertikale Auswahlstreifen direkt an der äußeren linken Wand der Zeile. Hover und Selection färben die gesamte Zeilenfläche.
-- **Reload-Aktion Variante B:** Das Aktualisieren-Symbol rechts oben bleibt im Normalzustand neutral/hell. Bei Hover sowie während eines laufenden Hintergrund-Refreshs wird das Symbol Lenovo-rot. Die bestehende nicht blockierende Refresh-Architektur aus v0.2.26/v0.2.27 bleibt unverändert.
-- **Tray-Kontextmenü eckig und borderless:** Das Haupt-Kontextmenü besitzt keine rote oder neutrale Außenumrandung und keine Rundungen. Die vorhandenen Gruppen-Separatoren werden als 1-px-Lenovo-rote horizontale Linien gerendert.
-- **Untermenüs bewusst abgesetzt:** `Standard-Startziel` und `Wartung` verwenden einen etwas helleren dunkelgrauen Panel-Hintergrund (`#202020`) statt Schwarz-auf-Schwarz. Eine dezente 1-px-Neutralkante und eine rote obere Akzentlinie trennen die Untermenüebene visuell vom Hauptmenü, ohne wieder einen roten Kasten zu erzeugen.
-- **Menü-Hover bleibt vollbreit:** Die zentrale Renderer-Lösung aus v0.2.27 bleibt erhalten; Hover/Pressed wird gegen die tatsächliche DropDown-Clientbreite gezeichnet. Beim Hauptmenü reicht die Fläche bis an die vollständige Clientkante, bei Untermenüs bis unmittelbar innerhalb der dezenten 1-px-Kante.
-- **Native Popup-Kante bleibt unterdrückt:** `DropShadowEnabled=false`, Entfernung der relevanten Win32-Window-Edge-Stile sowie die DWM-Border-Unterdrückung bleiben erhalten.
-- **Neustartdialog an den neuen Stil angepasst:** Der eigene dunkle Dialog bleibt erhalten, ist jetzt ebenfalls rechteckig und ohne roten Außenring; die bestätigende Aktion bleibt Lenovo-rot und die Sicherheitssemantik bleibt unverändert.
-- **Keine fachliche Änderung:** TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **4**. Bootziel-Aliase, Tooltips, Hintergrund-Refresh, Standardziel, Cleanup, Autostart und `shutdown.exe /r /t 0` bleiben funktional unverändert.
+v0.2.22 resolves competing default mechanisms. User-specific login/session restore in tray app is removed. Installation instead has exactly one system-wide SYSTEM startup restore that sets configured default boot target 30 seconds after Windows system start. Unelevated tray changes this default only through fixed pre-authorized Scheduled Tasks.
 
-**Native Prüfung erforderlich:** Die Linux-Buildumgebung kann Windows PowerShell 5.1, WinForms/DWM und ToolStripDropDown nicht ausführen. Auf dem Ziel-PC sind besonders rechteckige Haupt-UI, fehlender Außenrahmen, vollbreite Bootzeilen, Reload-Hover/Aktivzustand, rote Menüseparatoren und die optische Trennung der Untermenüs zu prüfen.
+Changes and security boundaries:
 
+- new TaskBroker schema **0.2.12**; v0.2.21 and older intentionally detected as needing repair/migration;
+- new fixed SYSTEM task `LenovoBootMenu-Default-Restore` with `AtStartup` + **30-second delay**;
+- one additional fixed task `LenovoBootMenu-Default-Set-<GUID>` per allowlisted firmware target;
+- `LenovoBootMenu-Default-Clear` disables automatic default;
+- startup restore reads system-wide default from `C:\ProgramData\Lenovo Boot Menu\TaskBroker\Default\default-guid.txt` but accepts only known firmware GUIDs embedded at setup time;
+- Default state directory hardened to **SYSTEM/Administrators = Full Control**, **Users = Read/Execute**; unelevated app never writes file directly;
+- existing `LenovoBootMenu-Set-<GUID>` tasks remain only for immediate manual BootNext selection;
+- app no longer performs login/session restore and removes old HKCU volatile marker;
+- migration priority: existing system-wide default → prior `settings.json` default → historical `Lenovo Boot Menu Next` / Boot Menu → no default;
+- historical `Lenovo Boot Menu Next` is removed only after new task set is registered and ACL-validated; new startup restore disabled during migration, enabled afterward;
+- **manual BootNext after startup restore wins** for next boot. Manual selection within first 30 seconds after system start can still be overwritten by delayed restore;
+- `settings.json` is schema **3**: UI order/hidden entries remain user-specific; `defaultGuid` exists temporarily only as legacy migration source and is cleared after migration;
+- new cleanup action `Privilegierte Aufgaben entfernen…` (from v0.2.23 under `Wartung`) starts targeted removal after confirmation/UAC of all known project Scheduled Tasks, old service-broker prototype, and system-wide TaskBroker/default state;
+- cleanup deletes only exact known task names and explicit prefixes `LenovoBootMenu-Set-` / `LenovoBootMenu-Default-Set-`; there is **no broad Lenovo wildcard delete path**;
+- UEFI boot entries and permanent firmware `displayorder` are changed by neither migration nor cleanup;
+- HKCU app Autostart intentionally remains during task cleanup.
 
-## Neu in v0.2.27 – vollständige Menü-Hervorhebung, native Außenkante entfernt und Bootziel-Aliase
+**Important when upgrading from v0.2.21:** run `Wartung → Privilegierte Aufgaben reparieren…` once and confirm UAC. This installs new Default Restore and Default Set/Clear tasks and controlled migration of historical `Lenovo Boot Menu Next`.
 
-v0.2.27 setzt die beiden im nativen v0.2.26-Smoke bestätigten Kontextmenü-Probleme zentral um und ergänzt die gewünschte Alias-Funktion im Modus **„Einträge verwalten“**. Die BootNext-, TaskBroker-, Default-, Cleanup-, Autostart-, Restart- und Hintergrund-Refresh-Architektur bleibt unverändert.
+## v0.2.21 – Manage entries
 
-Änderungen:
+v0.2.21 adds requested local management of visible boot targets. Firmware order (`displayorder`) is explicitly **not** changed; only UI ordering and visibility are stored.
 
-- **Hover/Selected über die volle Menübreite:** Der gemeinsame `LenovoMenuRenderer` zeichnet die Auswahlfläche nicht mehr nur innerhalb der von WinForms berechneten Item-Breite. Die Item-Clipregion wird für die Hintergrundfläche kontrolliert aufgehoben und die Fläche gegen die tatsächliche `ToolStripDropDown.ClientSize.Width` berechnet. Damit gilt die Korrektur gemeinsam für Hauptmenü, **„Standard-Startziel“**, **„Wartung“** und künftige Untermenüs.
-- `LenovoMenuLayout` verwendet zusätzlich die tatsächliche Clientbreite statt `DisplayRectangle.Width`; die v0.2.26-Lösung allein hatte auf dem Zielsystem die rechte Restfläche nicht erfasst.
-- **2-px-Lenovo-Rahmen bleibt erhalten**, wird aber als gefüllter roter Außenring plus dunkle Innenfläche gerendert. Dadurch liegt an der äußersten Clientkante kein dunkler Pixelstreifen mehr außerhalb der roten Kontur.
-- **Native schwarze Außenkante:** Zusätzlich zu `DropShadowEnabled = false` entfernt `LenovoMenuChrome` relevante native Border-/Edge-Fensterstile, deaktiviert DWM-Non-Client-Rendering für das DropDown und setzt unter Windows 11 `DWMWA_BORDER_COLOR` auf `DWMWA_COLOR_NONE`. Der rote Rahmen bleibt vollständig clientseitig.
-- **Bootziel-Aliase:** Im Modus **„Einträge verwalten“** besitzt jeder Eintrag eine kleine Stift-Aktion. Sie öffnet direkt in der Zeile ein Inline-Eingabefeld. `Enter` übernimmt den Alias in den Bearbeitungsentwurf, `Esc` verwirft die aktuelle Eingabe; ein leerer Alias bedeutet wieder Originalname.
-- Aliase werden erst zusammen mit **„Speichern“** dauerhaft übernommen. **„Abbrechen“** verwirft auch Aliasänderungen.
-- Ein gesetzter Alias wird in der normalen Bootauswahl als sichtbarer Hauptname verwendet. Zur Orientierung zeigt die Verwaltungsansicht bei gesetztem Alias im Subtext den Originalnamen.
-- Aliase werden als reine lokale UI-Metadaten stabil an der Firmware-GUID gespeichert. Sie verändern **keine** Firmware-GUID, keinen BootNext-Wert, keine Tasknamen, keine TaskBroker-Allowlist und keine sonstige privilegierte Identität.
-- Die Alias-Anzeige wird auch für endnutzerseitige Zielnamen wie Standardziel-Menüs, Statusanzeige und Neustartdialog verwendet; die technische Identität bleibt immer die GUID.
-- `settings.json` wird abwärtskompatibel auf **Schema 4** erweitert: zusätzlich zu `defaultGuid`, `entryOrder` und `hiddenEntryGuids` gibt es `entryAliases`. Dateien aus Schema 3 oder älter werden weiterhin eingelesen; fehlende Aliase entsprechen einer leeren Alias-Menge.
-- TaskBroker-Schema bleibt **0.2.12**. Installer, Uninstaller, Launcher und privilegierte Scheduled-Task-Verträge sind unverändert.
+Changes:
 
-**Native Prüfung erforderlich:** Die Linux-Buildumgebung kann WinForms/DWM nicht ausführen. Auf dem Ziel-PC sind insbesondere die vollständig breite Hover-/Selected-Fläche in allen Menüs, das vollständige Fehlen der schwarzen Außenkante sowie Stift-/Inline-Aliasbearbeitung und Persistenz nach App-Neustart zu prüfen.
+- new `VERWALTEN` entry above boot list plus `Einträge verwalten…` in tray context menu;
+- edit mode shows **all detected firmware entries**, including previously hidden;
+- order can be changed by **Drag & Drop**;
+- clicking an entry toggles **AN** / **AUS**; hidden entries dim immediately;
+- click in edit mode sets **no BootNext**;
+- `Speichern` persists order/visibility and returns to normal read-only view;
+- `Abbrechen` discards unsaved changes;
+- normal view then shows only **active entries in saved order**;
+- `settings.json` expands backward-compatibly to schema 2: `defaultGuid`, `entryOrder`, `hiddenEntryGuids`;
+- new/previously unknown firmware entries append after saved order and default visible;
+- main UI and continuous rounded Lenovo frame remain at v0.2.20 state; improved rounded context menu remains;
+- privileged TaskBroker tasks, BootNext mechanism, Autostart, default target, and restart logic unchanged;
+- **no repair/re-setup of privileged Windows tasks required**.
 
+## v0.2.20 – Main UI reverted to v0.2.18, context menu retained, frame closed cleanly
 
-## Neu in v0.2.26 – Kontextmenü-Finishing, eigener Neustartdialog und sofort sichtbare Bootauswahl
+v0.2.20 intentionally returns main surface to v0.2.18. Newer rounded context-menu design remains. Outer frame is rebuilt so Lenovo red is continuous on all four sides and especially corners.
 
-v0.2.26 setzt den nativen UI-Smoke nach v0.2.25 um. Die privilegierte Boot-/TaskBroker-/Default-Architektur bleibt unverändert; geändert werden ausschließlich Darstellung, Tooltip-Zuverlässigkeit und der interaktive Refreshpfad.
+Changes:
 
-Änderungen:
+- main UI (boot list, rows, default-target row, restart button, footer, scroll area) matches v0.2.18 layout;
+- improved dark context menu from newer UI retained with rounded corners;
+- old frame composed of four straight edge panels removed;
+- complete v0.2.18 surface now sits in inner rounded surface within a **continuous 2-px Lenovo-red outer ring**;
+- outer/inner surfaces clipped with coordinated radii so red curves stay closed on all four corners;
+- boot logic, TaskBroker, Autostart, persistent default target, and restart function unchanged;
+- **no repair/re-setup of privileged Windows tasks required**.
 
-- Der Lenovo-rote Rahmen des Tray-Kontextmenüs und seiner Untermenüs ist wieder **2 px** breit. Der in v0.2.25 deaktivierte native `ToolStripDropDown`-Schatten bleibt deaktiviert, damit außerhalb des roten Rahmens keine zusätzliche schwarze Schattenkante gewollt ist.
-- Menüeinträge werden beim Öffnen explizit auf die nutzbare Dropdown-Breite gestreckt. Hover-/Selected-Hintergründe sollen dadurch wieder bis zur vollen nutzbaren Breite reichen – auch bei Menüs, deren `MinimumSize` breiter als der automatisch berechnete Textinhalt ist.
-- Der Hover-Hintergrund ist etwas präsenter (`#401F1D` statt des sehr zurückhaltenden bisherigen Tons), bleibt aber dunkel und Lenovo-konform.
-- **„Windows neu starten“** verwendet keinen nativen Windows-Standard-Yes/No-Dialog mehr. Der neue eigene Bestätigungsdialog nutzt die dunkle Lenovo-Oberfläche, einen 2-px-roten Außenrahmen, konsistente Typografie sowie `Abbrechen`/`Neu starten`. Sicherheitssemantik bleibt unverändert: das konkrete nächste Startziel wird angezeigt, es ist eine explizite Bestätigung erforderlich und der eigentliche Neustart bleibt `shutdown.exe /r /t 0` ohne zusätzliche UAC-Abfrage.
-- Die Bootziel-Marker-Tooltips verwenden zusätzlich zum normalen `ToolTip.SetToolTip(...)` einen expliziten `MouseHover`-Fallback. Damit wird der Erklärungstext direkt am farbigen Kreis angezeigt, auch wenn der native WinForms-Tooltip auf dem transparenten Symbol-Label nicht selbständig erscheint.
-- **Startlatenz:** `Show-OrTogglePopup` führt vor `Popup.Show()` keine frische Task-/Firmware-Abfrage mehr aus. Vorhandene Cache-Dateien werden sofort gelesen; die UI wird zuerst sichtbar. Die vollständige exakte TaskBroker-Prüfung sowie Manager-/Firmware-Refresh und optional Storage-Ermittlung laufen danach in einem versteckten, unelevierten Windows-PowerShell-Hintergrundprozess. Die Haupt-UI pollt nur dessen Abschluss und übernimmt das Ergebnis anschließend.
-- Auch der explizite Refresh über Kopfzeile bzw. Kontextmenü nutzt den nicht blockierenden Hintergrundpfad. Firmware wird dabei weiterhin nur bei Bedarf bzw. beim vollständigen Storage-Refresh erneuert; der Managerzustand wird frisch gelesen.
-- Der Hintergrundworker misst intern die Laufzeiten für TaskBroker-Prüfung, Manager-Refresh, Firmware-Refresh, Storage-Ermittlung und Gesamtzeit. Dadurch kann ein nativer Folgetest die tatsächlich langsame Phase eindeutig eingrenzen, ohne die UI vor dem Anzeigen zu blockieren.
-- TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **3**. Installer, Uninstaller, Launcher und privilegierte Scheduled-Task-Verträge werden durch v0.2.26 nicht geändert.
+## v0.2.18 – Visual-polish build startup failure fixed
 
-**Native Prüfung erforderlich:** Die Linux-Buildumgebung kann Windows PowerShell 5.1, WinForms/DWM und Task Scheduler nicht ausführen. Insbesondere müssen auf dem Ziel-PC der 2-px-Rahmen, die volle Hover-Breite, der eigene Neustartdialog, die Marker-Tooltips und die subjektive/zeitliche Verbesserung beim Öffnen der Boot-Auswahl bestätigt werden.
+v0.2.18 fixes PowerShell argument-binding error from v0.2.17. Three UI labels passed static `[Drawing.Color]::FromArgb(...)` call directly as `-ForeColor` argument. Windows PowerShell treated expression as text instead of evaluating it, so it could not convert to `System.Drawing.Color` and popup construction failed.
 
+Changes:
 
-## Neu in v0.2.25 – schlanker Kontextmenü-Rahmen ohne schwarze Außenkante
+- all three affected `-ForeColor` arguments are explicitly evaluated as `([Drawing.Color]::FromArgb(...))`;
+- displayed version raised to **v0.2.18**;
+- visual polish, scrollbar, context menu, boot logic, TaskBroker, Autostart, default target, and restart behavior remain unchanged from v0.2.17;
+- **no repair/re-setup of privileged Windows tasks required**.
 
-v0.2.25 verfeinert ausschließlich die äußere Darstellung des Tray-Kontextmenüs. BootNext-, TaskBroker-, Default-, Autostart-, Cleanup-, Restart- und Tooltip-Architektur aus v0.2.24 bleiben unverändert.
+## v0.2.17 – Complete visual-polish pass
 
-Änderungen:
+v0.2.17 changes only presentation and interaction hierarchy of tray UI; boot logic, TaskBroker, Autostart, default target, and restart behavior unchanged.
 
-- Der Lenovo-rote Außenrahmen des Kontextmenüs und seiner Untermenüs wurde von **2 px auf 1 px** reduziert.
-- Der Rahmen wird nun direkt an der Clientkante gezeichnet, sodass außerhalb der roten Linie kein zusätzlicher dunkler Client-Rand mehr verbleibt.
-- Der native WinForms-`ToolStripDropDown`-Schatten wird deaktiviert (`DropShadowEnabled = false`), damit außerhalb des roten Rahmens keine zusätzliche schwarze Schattenkontur erscheinen soll.
-- Abgerundete Ecken, Checked-Zustände, Untermenü-Pfeile, Menüstruktur, Wartungs-Untermenü und die Tooltip-Erklärungen der Bootziel-Marker bleiben unverändert.
-- TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **3**; für dieses reine UI-Update ist keine Reparatur/Neueinrichtung der privilegierten Aufgaben erforderlich.
-- Die visuelle Wirkung muss weiterhin nativ unter Windows geprüft werden, da WinForms-/DWM-Dropdown-Chrome in der Linux-Buildumgebung nicht ausgeführt werden kann.
+Changes:
 
+- popup widened to **390 px** for more space for device names/detail text;
+- calmer header with more internal spacing, compact subtitle, subtle separator;
+- active boot row now uses subtle dark-red fill, 3-px Lenovo-red accent left, and red checkmark;
+- consistent horizontal text axes and larger padding in all boot rows;
+- SanDisk detail text shortened to `USB HDD · wahrscheinlicher Bootkandidat` without detection-logic change;
+- scrollbar reduced to narrow **8-px dark track** with slim Lenovo-red thumb;
+- native blue Windows checkbox replaced with custom black/Lenovo-red checkbox;
+- default target presented as compact navigation row with `›`;
+- restart action no longer permanently red-framed; becomes Lenovo red only on hover/interaction;
+- footer made calmer and version right-aligned cleanly;
+- previously dominant red outer frame retained by design only as subtle **1-px dark-red line**;
+- popup gets slightly rounded corners;
+- context menu: no bright red outer frame, instead dark-gray contour, dark hover with Lenovo-red accent, more padding, cleaner grouping;
+- separator after `Aktualisieren` separates navigation actions from settings.
 
-## Neu in v0.2.24 – Bedeutung der farbigen Bootziel-Marker per Tooltip
+**No repair/re-setup of privileged Windows tasks required.**
 
-v0.2.24 ergänzt ausschließlich eine UI-Erklärung für die farbigen Kreise in der Bootliste. BootNext-, TaskBroker-, Default-, Autostart-, Cleanup-, Restart- und Kontextmenü-Architektur aus v0.2.23 bleiben unverändert.
+## v0.2.16 – Scroll crash fixed
 
-Änderungen:
+v0.2.16 fixes reproducible mouse-wheel/scrollbar crash from v0.2.15. `ValueChanged` handler of new Lenovo scrollbar used local variable `$host`. PowerShell variable names are case-insensitive, so it collided with built-in read-only automatic variable `$Host` and WinForms showed unhandled .NET exception.
 
-- Beim Überfahren des **farbigen Kreises** eines Bootziels erscheint jetzt ein Tooltip, der Kategorie und Farbbedeutung erklärt.
-- Rot = Lenovo Boot-Menü / Firmware-Bootauswahl.
-- Gelb = USB-Startziel.
-- Blau = internes NVMe-/PCIe-Startlaufwerk.
-- Violett = PXE-Netzwerkstart.
-- Cyan = Lenovo-/Unternehmens-Netzwerk-/Recovery-Startziel.
-- Grau = sonstiges bzw. nicht speziell klassifiziertes Firmware-Startziel.
-- Der Tooltip ist bewusst nur am farbigen Kreis gebunden; Auswahlzustand bleibt weiterhin separat durch linken roten Balken, Zeilenhintergrund und Häkchen erkennbar.
-- TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **3**; keine Reparatur/Neueinrichtung der privilegierten Aufgaben erforderlich.
+Changes:
 
+- local scroll-container variable renamed `$scrollContainer`;
+- `ValueChanged` callback additionally guarded so UI scroll event cannot produce WinForms JIT dialog;
+- Lenovo frame, red custom scrollbar, context-menu theme, boot logic, TaskBroker, Autostart, default target, and restart logic remain unchanged from v0.2.15;
+- **no repair/re-setup of privileged tasks required**.
 
-## Neu in v0.2.23 – Kontextmenü fokussiert und optisch an die Haupt-UI angeglichen
+## v0.2.15 – Lenovo frame, version display, and fully themed navigation
 
-v0.2.23 ist ein reiner UI-/UX-Pass am Tray-Kontextmenü. BootNext-, TaskBroker-, Default-, Autostart- und Cleanup-Architektur aus v0.2.22 bleiben unverändert.
+v0.2.15 completes black/Lenovo-red tray look:
 
-Änderungen:
+- complete popup UI now has **2-px Lenovo-red outer frame**;
+- running **version number is visible bottom-right in footer**;
+- native bright Windows scrollbar replaced by custom dark scroll track with Lenovo-red thumb;
+- horizontal standard scrollbar removed because boot rows fit available width;
+- mouse-wheel scrolling and dragging/clicking red scroll thumb remain possible;
+- tray context menu and `Standard-Startziel` menu use same dark background, Lenovo red for frame/selection/checked states, and light text;
+- boot, TaskBroker, Autostart, default-target, and restart logic remain unchanged from v0.2.14; no privileged-task re-setup required.
 
-- **„Einträge verwalten…“ wurde aus dem Tray-Kontextmenü entfernt.** Die Funktion bleibt vollständig erhalten und ist weiterhin über **„VERWALTEN“** direkt in der Haupt-UI erreichbar.
-- Die beiden technischen Aktionen **„Privilegierte Aufgaben einrichten/reparieren…“** und **„Privilegierte Aufgaben entfernen…“** sind jetzt im Untermenü **„Wartung ›“** gebündelt.
-- Statushinweise für fehlende bzw. reparaturbedürftige privilegierte Aufgaben verweisen jetzt korrekt auf **„Rechtsklick → Wartung → …“**.
-- **„Bootauswahl öffnen“** ist als primäre Tray-Aktion dezent durch Fettschrift hervorgehoben.
-- Das Kontextmenü besitzt jetzt einen **durchgängigen 2-px-Rahmen in Lenovo Red `#E1251B`**, passend zum roten Außenring der Haupt-UI, weiterhin mit abgerundeten Ecken.
-- Checked-Zustände im Kontextmenü verwenden eine **rote Checkbox mit weißem Häkchen** statt des uneinheitlichen nativen Windows-Looks.
-- Untermenü-Pfeile wurden kontrastreicher gestaltet und die vertikalen Innenabstände der Menüeinträge leicht vergrößert.
-- TaskBroker-Schema bleibt **0.2.12**, Settings-Schema bleibt **3**; es ist **keine Reparatur/Neueinrichtung der privilegierten Aufgaben allein wegen des Updates auf v0.2.23 erforderlich**.
+## v0.2.14 – More readable subtexts
 
+Two-line boot-target detail text is no longer clipped inside too-short single-line area. Entry rows are slightly taller, subtexts get enough height for two lines and slightly larger font. Secondary text changed from dark to lighter gray so short/long descriptions are much easier to read on dark background.
 
-## Neu in v0.2.22 – systemweiter Default-Restore, Legacy-Migration und vollständige Task-Bereinigung
+Boot logic, privileged Windows tasks, Autostart, default-target, and restart functions remain unchanged from v0.2.13. No privileged-task re-setup required.
 
-v0.2.22 löst die bisher konkurrierenden Default-Mechanismen auf. Der benutzerspezifische Login-/Session-Restore der Tray-App entfällt. Stattdessen besitzt die Installation genau einen systemweiten SYSTEM-Startup-Restore, der 30 Sekunden nach Windows-Systemstart das konfigurierte Standard-Bootziel setzt. Die unelevierte Tray-App ändert diesen Standard ausschließlich über fest definierte, vorautorisierte Scheduled Tasks.
+## v0.2.13 – Restart dialog names concrete boot target
 
-Änderungen und Sicherheitsgrenzen:
+Confirmation dialog for `Windows neu starten` now shows currently set next boot target using end-user-friendly name, e.g. `SanDisk Extreme Pro USB4` or `Lenovo Boot-Menü`. If no one-shot `bootsequence` target is set, `Firmware-Standardreihenfolge` is shown. Restart logic itself is unchanged.
 
-- neuer TaskBroker-Schema-Stand **0.2.12**; Installationen aus v0.2.21 und älter werden absichtlich als **reparatur-/migrationsbedürftig** erkannt;
-- neuer fixer SYSTEM-Task **`LenovoBootMenu-Default-Restore`** mit `AtStartup` + **30 Sekunden Delay**;
-- pro allowgelistetem Firmwareziel zusätzlicher fixer Task **`LenovoBootMenu-Default-Set-<GUID>`**;
-- **`LenovoBootMenu-Default-Clear`** deaktiviert den automatischen Standard;
-- der eigentliche Startup-Restore liest den systemweiten Default aus `C:\ProgramData\Lenovo Boot Menu\TaskBroker\Default\default-guid.txt`, akzeptiert aber ausschließlich beim Setup fest in den Restore-Task eingebettete, bekannte Firmware-GUIDs;
-- der Default-State-Ordner wird auf **SYSTEM/Administratoren = Full Control** und **Benutzer = Read/Execute** gehärtet; die unelevierte App schreibt die Datei niemals direkt;
-- bestehende **`LenovoBootMenu-Set-<GUID>`**-Tasks bleiben ausschließlich für die unmittelbare manuelle BootNext-Auswahl zuständig;
-- die App führt **keinen Login-/Session-Restore mehr aus** und entfernt den alten HKCU-Volatile-Marker;
-- Migration priorisiert: vorhandener systemweiter Default → bisheriger `settings.json`-Default → historischer Task `Lenovo Boot Menu Next`/Boot Menu → kein Standard;
-- der historische Task **`Lenovo Boot Menu Next`** wird erst entfernt, nachdem die neue Taskmenge erfolgreich registriert und ACL-validiert wurde; der neue Startup-Restore ist während dieser Migrationsphase deaktiviert und wird erst danach aktiviert;
-- **manuelle BootNext-Auswahl nach Ausführung des Startup-Restore gewinnt** für den nächsten Start. Eine manuelle Auswahl innerhalb der ersten 30 Sekunden nach Systemstart kann dagegen noch vom verzögerten Restore überschrieben werden;
-- `settings.json` ist Schema **3**: UI-Reihenfolge und ausgeblendete Einträge bleiben benutzerspezifisch; `defaultGuid` existiert nur noch temporär als Legacy-Migrationsquelle und wird nach erfolgreicher Migration geleert;
-- neue Cleanup-Aktion **„Privilegierte Aufgaben entfernen…“** (ab v0.2.23 unter **„Wartung“**) startet nach Bestätigung und UAC eine gezielte Bereinigung aller bekannten projektbezogenen Scheduled Tasks, des alten Service-Broker-Prototyps sowie des systemweiten TaskBroker-/Default-Zustands;
-- die Bereinigung löscht nur exakte bekannte Tasknamen und die expliziten Projektpräfixe `LenovoBootMenu-Set-` und `LenovoBootMenu-Default-Set-`; es gibt **keinen pauschalen Lenovo-Wildcard-Löschpfad**;
-- UEFI-Boot-Einträge und die permanente Firmware-`displayorder` werden weder bei Migration noch bei Bereinigung verändert;
-- HKCU-App-Autostart bleibt bei der Task-Bereinigung bewusst bestehen.
+## v0.2.12 – Hidden Autostart, persistent default target, and restart
 
-**Wichtig beim Upgrade von v0.2.21:** Einmal **„Wartung → Privilegierte Aufgaben reparieren…“** ausführen und die UAC-Abfrage bestätigen. Erst dadurch werden der neue Default-Restore und die Default-Set/Clear-Tasks installiert und der historische `Lenovo Boot Menu Next` kontrolliert migriert.
+v0.2.12 extends normal unelevated tray operation with three functions:
 
-## Neu in v0.2.21 – Einträge verwalten
+- **Autostart without visible PowerShell window:** HKCU Autostart no longer starts `powershell.exe` directly; it uses existing `wscript.exe` / VBS launcher. Existing active Autostart from older versions migrates automatically to hidden launcher of currently running version.
+- **Persistent default boot target:** popup contains `Standard: …` and tray context menu `Standard-Startziel`. Selection stored under `%LOCALAPPDATA%\Lenovo Boot Menu Tray\settings.json`. At first app start in a Windows logon session—including Autostart—target is restored once as `bootsequence`. Session marker is in `HKCU\Volatile Environment` and disappears at next Windows logon.
+- **Restart Windows:** action available in popup and tray context menu. Confirmation required; Windows then restarts through `shutdown.exe /r /t 0` without extra UAC. Current `bootsequence` target is used.
 
-v0.2.21 ergänzt die gewünschte lokale Verwaltung der sichtbaren Bootziele. Die Firmware-Reihenfolge (`displayorder`) wird dabei ausdrücklich **nicht** verändert; gespeichert werden ausschließlich UI-Reihenfolge und Sichtbarkeit des Lenovo Boot Menu Tray.
+Privileged TaskBroker tasks from v0.2.11 remain unchanged/compatible; v0.2.12 requires **no repair/re-setup**.
 
-Änderungen:
+### Using the default boot target
 
-- neuer Einstieg **„VERWALTEN“** direkt über der Bootliste sowie **„Einträge verwalten…“** im Tray-Kontextmenü;
-- im Bearbeitungsmodus werden **alle erkannten Firmware-Einträge** angezeigt – auch zuvor ausgeblendete;
-- Reihenfolge lässt sich per **Drag & Drop** verändern;
-- Klick auf einen Eintrag schaltet ihn zwischen **AN** und **AUS** um; ausgeblendete Einträge werden unmittelbar ausgegraut;
-- ein Klick im Bearbeitungsmodus setzt **kein BootNext**;
-- **Speichern** übernimmt Reihenfolge und Sichtbarkeit persistent und kehrt in die normale Read-only-Ansicht zurück;
-- **Abbrechen** verwirft die noch nicht gespeicherten Änderungen;
-- normale Ansicht zeigt anschließend ausschließlich **aktive Einträge in der gespeicherten Reihenfolge**;
-- `settings.json` wurde abwärtskompatibel auf Schema 2 erweitert: `defaultGuid`, `entryOrder`, `hiddenEntryGuids`;
-- neue bzw. bislang unbekannte Firmware-Einträge werden automatisch hinter der gespeicherten Reihenfolge ergänzt und sind standardmäßig sichtbar;
-- Haupt-UI und durchgängiger abgerundeter Lenovo-Rahmen bleiben auf dem Stand von v0.2.20; das verbesserte abgerundete Kontextmenü bleibt erhalten;
-- privilegierte TaskBroker-Aufgaben, BootNext-Mechanik, Autostart, Standardziel und Neustartlogik bleiben unverändert;
-- **keine erneute Einrichtung oder Reparatur der privilegierten Windows-Aufgaben erforderlich.**
+1. Open popup.
+2. Click `Standard: …` and choose a firmware/boot target—or use tray context menu `Standard-Startziel`.
+3. Selection is persisted.
+4. At first tool start of next Windows logon session, target is automatically set as one-time next boot. Further app restarts in same session do not overwrite a later manual choice.
 
+**Note on historical `Lenovo Boot Menu Next` task:** separately configured old task remains untouched and can set Lenovo Boot Menu again about 30 seconds after Windows start. If another persistent default is desired, this historical task can later overwrite it.
 
-## Neu in v0.2.20 – Haupt-UI zurück auf v0.2.18, Kontextmenü beibehalten, Rahmen sauber geschlossen
+## v0.2.11 – Handle Task Scheduler status 0x00041301 correctly
 
-v0.2.20 nimmt die Hauptoberfläche bewusst wieder auf den Stand von v0.2.18 zurück. Die neuere Kontextmenü-Gestaltung mit abgerundeten Ecken bleibt erhalten. Zusätzlich wurde der Außenrahmen technisch neu aufgebaut, damit Lenovo-Rot an allen vier Seiten und insbesondere an den Ecken durchgängig sichtbar ist.
+v0.2.11 fixes runtime error when selecting boot target. Windows Task Scheduler uses `0x00041301` (`267009`, `SCHED_S_TASK_RUNNING`) as **success/status code for “task currently running”**. v0.2.10 could falsely display transient state as error due to race between `LastTaskResult` and COM task state.
 
-Änderungen:
+Changes:
 
-- Haupt-UI (Bootliste, Zeilen, Standardziel-Zeile, Neustartbutton, Footer, Scrollbereich) entspricht wieder dem v0.2.18-Layout;
-- das verbesserte dunkle Kontextmenü aus der neueren UI bleibt erhalten und besitzt abgerundete Ecken;
-- der bisher aus vier geraden Rand-Panels zusammengesetzte Rahmen wurde entfernt;
-- stattdessen liegt die komplette v0.2.18-Oberfläche in einer inneren, abgerundeten Fläche innerhalb eines **durchgängigen 2-px-Lenovo-roten Außenrings**;
-- Außen- und Innenfläche werden mit aufeinander abgestimmten Radien geclippt, sodass die roten Rundungen an allen vier Ecken geschlossen bleiben;
-- Bootlogik, TaskBroker, Autostart, persistentes Standardziel und Neustartfunktion bleiben unverändert;
-- **keine erneute Einrichtung oder Reparatur der privilegierten Windows-Aufgaben erforderlich.**
+- `0x00041301` (`SCHED_S_TASK_RUNNING`) and `0x00041325` (`SCHED_S_TASK_QUEUED`) are transient, not errors;
+- concrete COM task is reopened on every poll so stale `State` not used;
+- success accepted only when current run ended and `LastTaskResult = 0`;
+- existing v0.2.10 TaskBroker/ACL install remains compatible; no repair required.
 
+## v0.2.10 – Task ACL verification fixed
 
-## Neu in v0.2.18 – Startfehler des Visual-Polish-Builds behoben
+v0.2.10 fixes concrete repair defect from v0.2.9. Windows Task Scheduler typically normalizes written `(A;;GRGX;;;SID)` ACE to object-specific access-mask `0x1200A9` when persisted. v0.2.9 checked only original GENERIC_READ/GENERIC_EXECUTE bits and falsely reported ACL was not set.
 
-v0.2.18 korrigiert einen PowerShell-Argumentbindungsfehler aus v0.2.17. Drei UI-Labels übergaben einen statischen `[Drawing.Color]::FromArgb(...)`-Aufruf direkt als Argument an `-ForeColor`. In Windows PowerShell wurde dieser Ausdruck dabei nicht ausgewertet, sondern als Text behandelt; dadurch konnte der Wert nicht in `System.Drawing.Color` konvertiert werden und das Popup brach beim Aufbau ab.
+Changes:
 
-Änderungen:
+- DACL verification accepts both `GR+GX` and persisted Task Scheduler mask `0x1200A9`;
+- task reopened after `SetSecurityDescriptor()` before ACL verification;
+- real verification failure logs read-back SDDL;
+- existing v0.2.6–v0.2.9 tasks reused and only repaired;
+- security boundary unchanged: user gets Read+Execute only, not Modify/Delete;
+- no `displayorder` change; boot mutations still only through fixed SYSTEM tasks.
 
-- alle drei betroffenen `-ForeColor`-Argumente werden jetzt explizit als ausgewerteter Ausdruck `([Drawing.Color]::FromArgb(...))` übergeben;
-- Versionsanzeige auf **v0.2.18** angehoben;
-- Visual-Polish, Scrollbar, Kontextmenü, Bootlogik, TaskBroker, Autostart, Standardziel und Neustartverhalten bleiben gegenüber v0.2.17 unverändert;
-- **keine erneute Einrichtung oder Reparatur der privilegierten Windows-Aufgaben erforderlich.**
+## v0.2.9 – Repair state detected correctly
 
+v0.2.9 cleanly distinguishes **not installed** from **present but not operational**. If `task-broker.json` exists but unelevated readiness fails due bad task DACL, tray shows `Privilegierte Aufgaben reparieren…` instead of `… einrichten…`.
 
+Changes:
 
-## Neu in v0.2.17 – kompletter Visual-Polish-Pass
+- context menu offers `Privilegierte Aufgaben reparieren…` when TaskBroker install exists but broken;
+- popup shows `Reparatur erforderlich` instead of `Einrichtung erforderlich`;
+- repair dialog explains existing installation is incomplete/inaccessible;
+- installer v0.2.9 retains v0.2.8 DACL repair/verification and writes metadata version 0.2.9;
+- older TaskBroker metadata 0.2.6–0.2.8 remain readable/repairable.
 
-v0.2.17 überarbeitet ausschließlich Darstellung und Bedienhierarchie der Tray-Oberfläche; Bootlogik, TaskBroker, Autostart, Standardziel und Neustartverhalten bleiben unverändert.
+## v0.2.8 – Task ACL / readiness fix
 
-Änderungen:
+v0.2.8 fixes error in unelevated verification of successfully installed SYSTEM tasks. On target system, tasks exposed through task DACL could be started and read using `Get-ScheduledTaskInfo` while `Get-ScheduledTask` failed during root-folder enumeration in unelevated process. v0.2.6 therefore falsely reported “not configured” although installer ended with `SUCCESS` / ExitCode 0.
 
-- Popup auf **390 px Breite** erweitert, damit Gerätenamen und Detailtexte mehr Luft erhalten;
-- Header ruhiger aufgebaut: mehr Innenabstand, kompakter Untertitel und dezente Trennlinie;
-- aktive Bootzeile verwendet nur noch eine **subtile dunkelrote Fläche**, einen 3-px-Lenovo-Rot-Akzent links und das rote Häkchen;
-- gleichmäßige horizontale Textachsen und größere Innenabstände in allen Bootzeilen;
-- SanDisk-Detailtext kompakter formuliert (`USB HDD · wahrscheinlicher Bootkandidat`), ohne die Erkennungslogik zu ändern;
-- Scrollbar auf einen schmalen **8-px dunklen Track** mit schlankem Lenovo-rotem Thumb reduziert;
-- native blaue Windows-Checkbox durch eine eigene schwarz/Lenovo-rote Checkbox ersetzt;
-- Standardziel als kompakte Navigationszeile mit `›` gestaltet;
-- Neustart-Aktion ist nicht mehr permanent rot umrandet, sondern erhält Lenovo-Rot erst bei Hover/Interaktion;
-- Footer beruhigt und Versionsanzeige sauber rechts ausgerichtet;
-- der zuvor dominante rote Außenrahmen bleibt gemäß Designvorgabe erhalten, aber nur noch als **subtile 1-px dunkelrote Linie**;
-- Popup erhält leicht gerundete Ecken;
-- Kontextmenü: kein leuchtend roter Außenrahmen mehr, stattdessen dunkelgraue Kontur, dunkler Hover mit Lenovo-Rot-Akzent, mehr Innenabstand und sauberere Gruppierung;
-- nach „Aktualisieren“ trennt jetzt ein Separator die Navigationsaktionen von den Einstellungen.
+Changes:
 
-**Keine erneute Einrichtung oder Reparatur der privilegierten Windows-Aufgaben erforderlich.**
+- no `Get-ScheduledTask` root enumeration in unelevated tray;
+- exact read through Task Scheduler COM `GetTask()` plus `Get-ScheduledTaskInfo`;
+- task execution waits through exact COM task state for completion;
+- existing v0.2.6 TaskBroker installation accepted—**no repeated UAC setup** if already successful;
+- ExitCode 0 + failed client verification no longer falsely labeled installer failure;
+- installer v0.2.8 uses reused Task Scheduler COM connection for ACL work to reduce setup overhead.
 
+## v0.2.8 – Bootstrap/tray hardening
 
-## Neu in v0.2.16 – Scroll-Crash behoben
+v0.2.8 fixes startup and interaction problems observed in v0.2.5:
 
-v0.2.16 behebt den reproduzierten Absturz beim Mausrad-/Scrollbar-Scrollen aus v0.2.15. Der `ValueChanged`-Handler des neuen Lenovo-Scrollbalkens verwendete lokal den Variablennamen `$host`. PowerShell behandelt Variablennamen ohne Beachtung der Groß-/Kleinschreibung; dadurch kollidierte `$host` mit der eingebauten schreibgeschützten automatischen Variable `$Host` und WinForms zeigte eine unbehandelte .NET-Ausnahme.
+- **no permanently open CMD window:** CMD starter immediately delegates to hidden detached `wscript` launcher and exits;
+- **tray remains operable:** one-time privileged-task setup no longer blocks UI startup;
+- **Exit remains available** even when privileged tasks are missing or setup fails;
+- left-click with missing setup opens normal popup with status hint instead of repeated error MessageBox;
+- new context-menu action `Privilegierte Aufgaben einrichten…` or, after successful setup, `… reparieren…`;
+- UAC installation runs asynchronously; tray UI remains responsive;
+- installation failures still reference diagnostics ZIP.
 
-Änderungen:
+## Privilege separation
 
-- die lokale Scroll-Container-Variable heißt nun konfliktfrei `$scrollContainer`;
-- der `ValueChanged`-Callback ist zusätzlich defensiv abgefangen, damit ein UI-Scrollereignis keinen WinForms-JIT-Dialog mehr auslösen kann;
-- Lenovo-Rahmen, roter Custom-Scrollbar, Kontextmenü-Theme, Bootlogik, TaskBroker, Autostart, Standardziel und Neustartlogik bleiben gegenüber v0.2.15 unverändert;
-- **keine erneute Einrichtung/Reparatur der privilegierten Aufgaben erforderlich**.
+The tray app runs as a normal user. Privileged firmware operations use fixed Windows Scheduled Tasks created once:
 
-
-## Neu in v0.2.15 – Lenovo-Rahmen, Versionsanzeige und vollständig thematisierte Navigation
-
-v0.2.15 vervollständigt den Schwarz/Lenovo-Rot-Look der Tray-Oberfläche:
-
-- die komplette Popup-UI besitzt jetzt einen **2-px-Lenovo-roten Außenrahmen**;
-- die laufende **Versionsnummer ist unten rechts im Footer sichtbar**;
-- der bisherige native helle Windows-Scrollbar wurde durch einen **eigenen dunklen Scroll-Track mit Lenovo-rotem Schieber** ersetzt;
-- der horizontale Standard-Scrollbar entfällt, da die Bootzeilen nun innerhalb der verfügbaren Breite gerendert werden;
-- Scrollen per Mausrad sowie Ziehen/Klicken des roten Scroll-Schiebers bleiben möglich;
-- das Tray-Kontextmenü und das Menü **„Standard-Startziel“** verwenden nun denselben dunklen Hintergrund, Lenovo-Rot für Rahmen/Selection/Checked-Zustände und helle Schrift;
-- die Boot-, TaskBroker-, Autostart-, Standardziel- und Neustartlogik bleibt gegenüber v0.2.14 unverändert; eine erneute Einrichtung der privilegierten Aufgaben ist **nicht erforderlich**.
-
-
-
-## Neu in v0.2.14 – besser lesbare Subtexte
-
-Die zweizeiligen Detailtexte der Bootziele werden nicht mehr in einer zu niedrigen Ein-Zeilen-Fläche abgeschnitten. Die Eintragszeilen sind etwas höher, die Subtexte erhalten ausreichend Höhe für zwei Zeilen und eine leicht größere Schrift. Zusätzlich wurde der Sekundärtext von dunklem Grau auf ein helleres Grau angehoben, damit kurze und längere Beschreibungen auf dem dunklen Hintergrund deutlich besser lesbar sind.
-
-Die Bootlogik, privilegierten Windows-Aufgaben, Autostart-, Standardziel- und Neustartfunktionen bleiben gegenüber v0.2.13 unverändert. Eine erneute Einrichtung der privilegierten Aufgaben ist nicht erforderlich.
-
-
-## Neu in v0.2.13 – Neustartdialog nennt das konkrete Bootziel
-
-Der Bestätigungsdialog für **„Windows neu starten“** zeigt jetzt das aktuell gesetzte nächste Startziel mit seinem endanwenderfreundlichen Namen an, zum Beispiel **„SanDisk Extreme Pro USB4“** oder **„Lenovo Boot-Menü“**. Ist kein einmaliges `bootsequence`-Ziel gesetzt, wird **„Firmware-Standardreihenfolge“** angezeigt. Die Neustartlogik selbst bleibt unverändert.
-
-## Neu in v0.2.12 – versteckter Autostart, persistentes Standardziel und Neustart
-
-v0.2.12 erweitert den normalen, unelevierten Tray-Betrieb um drei Funktionen:
-
-- **Autostart ohne sichtbares PowerShell-Fenster:** Der HKCU-Autostart startet nicht mehr direkt `powershell.exe`, sondern den vorhandenen `wscript.exe`/VBS-Launcher. Ein bereits aktiver Autostart-Eintrag aus älteren Versionen wird beim Start automatisch auf den versteckten Launcher der aktuell ausgeführten Version migriert.
-- **Persistentes Standard-Startziel:** Im Popup gibt es **„Standard: …“**, zusätzlich im Tray-Kontextmenü **„Standard-Startziel“**. Die Auswahl wird unter `%LOCALAPPDATA%\Lenovo Boot Menu Tray\settings.json` gespeichert. Beim ersten Start der App in einer Windows-Anmeldesitzung – also auch beim Autostart – wird dieses Ziel einmalig als `bootsequence` wiederhergestellt. Der Sitzungsmarker liegt in `HKCU\Volatile Environment` und verschwindet bei der nächsten Windows-Anmeldung.
-- **Windows neu starten:** Die Aktion ist sowohl direkt im Popup als auch im Tray-Kontextmenü vorhanden. Vor dem Neustart wird bestätigt; anschließend wird Windows über `shutdown.exe /r /t 0` ohne zusätzliche UAC-Abfrage neu gestartet. Das aktuell gesetzte `bootsequence`-Ziel wird dabei verwendet.
-
-Die privilegierten TaskBroker-Aufgaben aus v0.2.11 bleiben unverändert und kompatibel; für v0.2.12 ist **keine erneute Reparatur/Einrichtung** erforderlich.
-
-### Standard-Startziel verwenden
-
-1. Popup öffnen.
-2. Auf **„Standard: …“** klicken und ein Firmware-/Bootziel auswählen – oder im Tray-Kontextmenü **„Standard-Startziel“** verwenden.
-3. Die Auswahl wird persistent gespeichert.
-4. Beim ersten Toolstart der nächsten Windows-Anmeldesitzung wird dieses Ziel automatisch als einmaliges nächstes Startziel gesetzt. Weitere App-Neustarts in derselben Sitzung überschreiben eine danach manuell getroffene Auswahl nicht erneut.
-
-**Hinweis zum historischen Task `Lenovo Boot Menu Next`:** Dieser separat früher eingerichtete Task bleibt weiterhin unangetastet und kann ca. 30 Sekunden nach Windows-Start erneut das Lenovo Boot-Menü setzen. Wenn ein anderes persistentes Standardziel verwendet werden soll, kann dieser historische Task das Standardziel später wieder überschreiben.
-
-
-
-## Neu in v0.2.11 – Task-Status 0x00041301 korrekt behandeln
-
-v0.2.11 behebt einen Laufzeitfehler beim Auswählen eines Bootziels. Der Windows Task Scheduler verwendet `0x00041301` (`267009`, `SCHED_S_TASK_RUNNING`) als **Erfolgs-/Statuscode für „Aufgabe wird gerade ausgeführt“**. v0.2.10 konnte diesen transienten Zustand aufgrund eines Rennens zwischen `LastTaskResult` und dem COM-Taskzustand fälschlich als Fehler anzeigen.
-
-Änderungen:
-
-- `0x00041301` (`SCHED_S_TASK_RUNNING`) und `0x00041325` (`SCHED_S_TASK_QUEUED`) werden als transiente Zustände behandelt und nicht als Fehler;
-- der konkrete COM-Task wird bei jedem Poll neu geöffnet, damit kein veralteter `State`-Wert verwendet wird;
-- Erfolg wird erst akzeptiert, wenn der aktuelle Lauf beendet ist und `LastTaskResult = 0` zurückliefert;
-- die bestehende TaskBroker-/ACL-Installation aus v0.2.10 bleibt kompatibel; eine erneute Reparatur ist nicht erforderlich.
-
-## Neu in v0.2.10 – Task-ACL-Verifikation korrigiert
-
-v0.2.10 behebt den konkreten Reparaturfehler aus v0.2.9. Windows Task Scheduler normalisiert eine gesetzte `(A;;GRGX;;;SID)`-ACE beim Persistieren typischerweise auf den objektspezifischen Zugriffsmaskenwert `0x1200A9`. v0.2.9 prüfte nach dem Schreiben ausschließlich die ursprünglichen GENERIC_READ-/GENERIC_EXECUTE-Bits und meldete deshalb fälschlich, die ACL sei nicht gesetzt worden.
-
-Änderungen:
-
-- akzeptiert bei der DACL-Verifikation sowohl `GR+GX` als auch die persistierte Task-Scheduler-Maske `0x1200A9`;
-- öffnet den Task nach `SetSecurityDescriptor()` erneut, bevor die ACL verifiziert wird;
-- protokolliert bei einem echten Verifikationsfehler den zurückgelesenen SDDL;
-- vorhandene v0.2.6–v0.2.9-Tasks werden weiterverwendet und nur repariert;
-- die Sicherheitsgrenze bleibt unverändert: der Benutzer erhält nur Lesen + Ausführen, nicht Ändern/Löschen;
-- keine Änderung an `displayorder`; Bootänderungen erfolgen weiterhin ausschließlich über die festen SYSTEM-Tasks.
-
-
-## Neu in v0.2.9 – Reparaturzustand korrekt erkennen
-
-v0.2.9 trennt jetzt sauber zwischen **nicht installiert** und **vorhanden, aber nicht funktionsbereit**. Wenn `task-broker.json` bereits existiert, die unelevierte Readiness-Prüfung aber wegen einer fehlerhaften Task-DACL scheitert, zeigt das Tray nun **„Privilegierte Aufgaben reparieren…“** statt erneut **„… einrichten…“** an.
-
-Änderungen:
-
-- Kontextmenü bietet bei vorhandener, aber defekter TaskBroker-Installation **„Privilegierte Aufgaben reparieren…“** an;
-- Popup zeigt **„Reparatur erforderlich“** statt „Einrichtung erforderlich“;
-- der Reparaturdialog erklärt, dass die vorhandene Installation unvollständig oder nicht zugreifbar ist;
-- der Installer v0.2.9 behält die v0.2.8-DACL-Reparatur/Verifikation bei und schreibt Metadaten mit Version 0.2.9;
-- ältere TaskBroker-Metadaten 0.2.6–0.2.8 bleiben lesbar und reparierbar.
-
-
-## Neu in v0.2.8 – Task-ACL/Readiness-Fix
-
-v0.2.8 korrigiert einen Fehler in der unelevierten Verifikation der bereits erfolgreich eingerichteten SYSTEM-Aufgaben. Auf dem Zielsystem konnten die per Task-DACL freigegebenen Aufgaben gestartet und mit `Get-ScheduledTaskInfo` gelesen werden, während `Get-ScheduledTask` beim Root-Folder-Enumerieren im unelevierten Prozess fehlschlug. Dadurch meldete v0.2.6 fälschlich „nicht eingerichtet“, obwohl der Installer mit `SUCCESS` und ExitCode 0 beendet war.
-
-Änderungen:
-
-- keine `Get-ScheduledTask`-Root-Enumeration mehr im unelevierten Tray;
-- exaktes Lesen über Task-Scheduler-COM `GetTask()` plus `Get-ScheduledTaskInfo`;
-- Task-Ausführung wartet über den exakten COM-Taskzustand auf Abschluss;
-- vorhandene v0.2.6-TaskBroker-Installation wird akzeptiert – **keine erneute UAC-Einrichtung nötig**, wenn sie bereits erfolgreich war;
-- ExitCode 0 + fehlgeschlagene Client-Verifikation wird nicht mehr fälschlich als Installerfehler bezeichnet;
-- der Installer v0.2.8 verwendet eine wiederverwendete Task-Scheduler-COM-Verbindung für ACL-Arbeit, um unnötigen Setup-Overhead zu reduzieren.
-
-## Neu in v0.2.8 – Bootstrap-/Tray-Härtung
-
-v0.2.8 behebt die in v0.2.5 beobachteten Start- und Bedienprobleme:
-
-- **kein dauerhaft offenes CMD-Fenster mehr**: der CMD-Starter delegiert sofort an einen versteckten, entkoppelten `wscript`-Launcher und beendet sich;
-- **Tray bleibt immer bedienbar**: die einmalige Einrichtung der privilegierten Tasks blockiert nicht mehr den UI-Start;
-- **Beenden bleibt verfügbar**, auch wenn die privilegierten Tasks fehlen oder ihre Einrichtung fehlschlägt;
-- Linksklick öffnet bei fehlender Einrichtung jetzt das normale Popup mit einem Statushinweis statt einer wiederholten Fehler-MessageBox;
-- neue Kontextmenü-Aktion **„Privilegierte Aufgaben einrichten…“** bzw. nach erfolgreicher Einrichtung **„… reparieren…“**;
-- die UAC-Installation läuft asynchron; die Tray-UI bleibt währenddessen reaktionsfähig;
-- bei Installationsfehlern wird weiterhin auf das Diagnose-ZIP verwiesen.
-
-## Privilege-Separation
-
-Die Tray-App läuft als normaler Benutzer. Für privilegierte Firmwareoperationen werden einmalig fest definierte Windows-Scheduled-Tasks erstellt:
-
-```text
+~~~text
 Lenovo Boot Menu Tray
-normaler Benutzer
+normal user
         |
-        | Read + Execute auf fest definierte Tasks
+        | Read + Execute on fixed tasks
         v
 Windows Task Scheduler
-Task läuft als SYSTEM
+task runs as SYSTEM
         |
         v
 Microsoft bcdedit.exe
-fest vorgegebenes Bootziel
-```
+fixed boot target
+~~~
 
-Es läuft **keine Lenovo-eigene EXE als SYSTEM**.
+There is **no Lenovo-owned EXE running as SYSTEM**.
 
-Für jedes zulässige Firmware-Ziel wird ein eigener Task mit fest eingebauter GUID angelegt. Der Benutzer erhält auf diesen Taskobjekten nur Read + Execute (`GRGX`). Die Tray-App kann daher keine frei wählbaren Admin-Kommandos oder freie GUID-Parameter an einen privilegierten Prozess übergeben.
+A dedicated task with an embedded GUID is created for each allowed firmware target. The user receives only Read+Execute (`GRGX`) on these task objects. The tray app therefore cannot pass arbitrary admin commands or free GUID parameters to a privileged process.
 
-## Einmalige Einrichtung
+## One-time setup
 
-Nach dem ersten Start bleibt das Tray sofort benutzbar. Solange die privilegierten Aufgaben fehlen, steht im Popup:
+After first launch the tray is immediately usable. While privileged tasks are missing, popup shows exact historical UI text:
 
-```text
+~~~text
 Einrichtung erforderlich · Rechtsklick → Wartung
-```
+~~~
 
-Dann im Tray-Kontextmenü **„Wartung → Privilegierte Aufgaben einrichten…“** wählen und die einmalige UAC-Abfrage bestätigen.
+Then use tray context menu `Wartung → Privilegierte Aufgaben einrichten…` and confirm the one-time UAC prompt.
 
-Nach erfolgreicher Einrichtung wird der Firmwarezustand automatisch neu geladen. Im Normalbetrieb sind anschließend keine UAC-Abfragen mehr erforderlich.
+After successful setup, firmware state reloads automatically. Normal operation requires no further UAC prompts.
 
 ## Launcher
 
-`Start-LenovoBootMenuTray.cmd` startet `Start-LenovoBootMenuTray.vbs`. Zusätzlich verwendet auch der Windows-Autostart ab v0.2.12 direkt diesen WScript/VBS-Pfad. Dadurch bleibt weder beim manuellen Start noch bei der Windows-Anmeldung ein PowerShell-/CMD-Fenster sichtbar.
+`Start-LenovoBootMenuTray.cmd` starts `Start-LenovoBootMenuTray.vbs`. From v0.2.12 Windows Autostart also uses this WScript/VBS path directly. Therefore neither manual start nor Windows logon leaves visible PowerShell/CMD window.
 
-## Bestehende Funktionen
+## Existing functions
 
-- schwarzes Popup mit **Lenovo Red `#E1251B`** als Highlight-Farbe;
-- flaches, rechteckiges Haupt-Popup ohne äußeren roten Rahmen oder Rundungen;
-- schlanker 8-px-dunkelgrauer Scroll-Track mit Lenovo-rotem Scroll-Schieber;
-- eckiges, borderless Schwarz/Lenovo-Rot-Kontextmenü mit roten horizontalen Separatoren und dezent abgesetzten Untermenüs;
-- Lenovo-Rot im Tray-Icon;
-- aktuelles `bootsequence`-Ziel wird markiert;
-- dynamische Firmware-Einträge ohne GUIDs in der Endanwender-UI;
-- `USB HDD` wird anhand aktueller Storage-/Partitionsdaten einem plausiblen physischen USB-Bootkandidaten zugeordnet;
-- SanDisk Extreme Pro USB4 wird in der untersuchten Konstellation gegenüber der nicht bootfähigen Micron priorisiert;
-- Storage-Kontext wird gecacht;
-- **Einträge verwalten**: alle Einträge sichtbar, Drag & Drop, Ein/Aus per Klick, Speichern/Abbrechen, persistente lokale Reihenfolge/Sichtbarkeit;
-- **Mit Windows starten** über HKCU-Autostart via unsichtbarem WScript/VBS-Launcher ohne UAC;
-- **systemweites Standard-Startziel** über autorisierte Default-Set/Clear-Tasks;
-- einmaliger SYSTEM-Default-Restore 30 Sekunden nach jedem Windows-Systemstart;
-- **Windows neu starten** im Popup und im Tray-Kontextmenü.
+- black popup with **Lenovo Red `#E1251B`** as highlight color;
+- flat rectangular main popup with no outer red frame or rounding;
+- slim 8-px dark-gray scroll track with Lenovo-red thumb;
+- square borderless black/Lenovo-red context menu with red horizontal separators and subtly separated submenus;
+- Lenovo red in tray icon;
+- current `bootsequence` target marked;
+- dynamic firmware entries without GUIDs in end-user UI;
+- `USB HDD` associated from current Storage/partition data with a plausible physical USB boot candidate;
+- SanDisk Extreme Pro USB4 prioritized over non-bootable Micron in examined setup;
+- Storage context cached;
+- `Einträge verwalten`: all entries visible, Drag & Drop, on/off by click, Save/Cancel, persistent local order/visibility;
+- `Mit Windows starten` through HKCU Autostart via invisible WScript/VBS launcher without UAC;
+- **system-wide default boot target** via authorized Default Set/Clear tasks;
+- one SYSTEM Default Restore 30 seconds after each Windows system start;
+- `Windows neu starten` available in popup and tray context menu.
 
-## Historischer Task „Lenovo Boot Menu Next“
+## Historical task `Lenovo Boot Menu Next`
 
-Ab v0.2.22 ist dieser Task kein paralleler Dauermechanismus mehr. Beim einmaligen Reparatur-/Migrationslauf wird sein bisheriges Verhalten als Fallback für den initialen Systemstandard berücksichtigt. Nach erfolgreicher Validierung der neuen Default-Aufgaben wird `Lenovo Boot Menu Next` entfernt und anschließend ausschließlich `LenovoBootMenu-Default-Restore` verwendet.
+From v0.2.22 this task is no longer a parallel permanent mechanism. During one-time repair/migration its previous behavior is considered as fallback for initial system default. After successful validation of new Default tasks, `Lenovo Boot Menu Next` is removed and only `LenovoBootMenu-Default-Restore` is used.
 
-## Noch offen
+## Still open at that historical point
 
-- vollständige Diagnose-ZIPs bei **jedem** relevanten Laufzeitfehler der Tray-App;
-- native Windows-Abnahme der v0.2.26-UI-/Performanceänderungen: Kontextmenü-Rahmen/Hover, eigener Neustartdialog, Marker-Tooltips sowie tatsächliche Zeit bis zur sichtbaren Boot-Auswahl und Hintergrund-Refreshdauer; außerdem weiterhin Legacy-Task-/Default-/Cleanup-Regressionsprüfung.
+- complete diagnostics ZIPs for **every** relevant runtime failure of the tray app;
+- native Windows acceptance of v0.2.26 UI/performance changes: context-menu frame/hover, custom restart dialog, marker tooltips, actual time to visible boot selection, and background-refresh duration; plus legacy task/default/cleanup regression.
 
-## Deinstallation/Bereinigung der privilegierten Aufgaben
+## Uninstall / cleanup of privileged tasks
 
-Im Tray-Kontextmenü steht unter **„Wartung“** die Aktion **„Privilegierte Aufgaben entfernen…“** zur Verfügung. Nach Bestätigung und UAC werden gezielt entfernt:
+Tray context menu under `Wartung` exposes `Privilegierte Aufgaben entfernen…`. After confirmation and UAC, the following are targeted for removal:
 
 - `Lenovo Boot Menu Next`;
-- `Lenovo Boot Menu Tray Autostart` als historischer Scheduled-Task-Autostart, falls noch vorhanden;
+- `Lenovo Boot Menu Tray Autostart` historical Scheduled Task Autostart if present;
 - `LenovoBootMenu-RefreshManager`;
 - `LenovoBootMenu-RefreshFirmware`;
-- alle `LenovoBootMenu-Set-<GUID>`;
-- alle `LenovoBootMenu-Default-Set-<GUID>`;
+- all `LenovoBootMenu-Set-<GUID>`;
+- all `LenovoBootMenu-Default-Set-<GUID>`;
 - `LenovoBootMenu-Default-Clear`;
 - `LenovoBootMenu-Default-Restore`;
-- bekannte Probe-/Test-Tasks (`AclProbe`, `ElevationProbe`, `SystemReadProbe`, `SystemExecProbe`, `SystemBaseline`, `LenovoBootMenuBroker-SystemProbe`);
-- der historische `LenovoBootMenuBroker`-Service/Program-Files-Prototyp, falls noch vorhanden;
-- `C:\ProgramData\Lenovo Boot Menu\TaskBroker` einschließlich Default-State und Metadaten.
+- known probe/test tasks (`AclProbe`, `ElevationProbe`, `SystemReadProbe`, `SystemExecProbe`, `SystemBaseline`, `LenovoBootMenuBroker-SystemProbe`);
+- historical `LenovoBootMenuBroker` service/Program-Files prototype if present;
+- `C:\ProgramData\Lenovo Boot Menu\TaskBroker` including Default state and metadata.
 
-Die aktuelle HKCU-Run-Autostart-Einstellung der Tray-App wird **nicht** entfernt. Firmware-Boot-Einträge und `displayorder` bleiben unangetastet.
+Current HKCU Run Autostart setting of tray app is **not** removed. Firmware boot entries and `displayorder` remain untouched.
 
 ## Build
 
 - Tray: Windows PowerShell 5.1 / WinForms
-- privilegierter Pfad: Windows Task Scheduler + Microsoft `bcdedit.exe`
-- keine eigene SYSTEM-EXE im Paket
+- privileged path: Windows Task Scheduler + Microsoft `bcdedit.exe`
+- no custom SYSTEM EXE in package
 
+## v0.2.8 – Task ACL correction
 
-## v0.2.8 – Task-ACL-Korrektur
-
-- Behebt einen konkreten ACL-Erkennungsfehler aus v0.2.5–v0.2.7: Die Benutzer-SID kann bereits im Group-Feld (`G:<SID>`) des Task-Security-Descriptors stehen. Die alte Prüfung suchte nur nach der SID als Text und hielt dies fälschlich für eine vorhandene Benutzer-ACE.
-- v0.2.8 prüft ausschließlich die DACL und verlangt eine echte `AccessAllowed`-ACE mit `GENERIC_READ + GENERIC_EXECUTE` für die Benutzer-SID.
-- Das Setzen der Berechtigung erfolgt strukturiert über `RawSecurityDescriptor`/`CommonAce` und wird per Read-back verifiziert.
-- Der Installer meldet nur noch SUCCESS, wenn jede privilegierte Aufgabe die echte Read+Execute-ACE besitzt. Andernfalls wird ein Diagnose-ZIP erzeugt.
-- Vorhandene v0.2.7-Tasks werden bei der Reparatur wiederverwendet; ihre ACL wird repariert, statt alle Tasks neu anzulegen.
+- Fixes concrete ACL-detection defect from v0.2.5–v0.2.7: user SID can already appear in Group field (`G:<SID>`) of task security descriptor. Old check searched only for SID text and falsely interpreted this as existing user ACE.
+- v0.2.8 checks only DACL and requires a real `AccessAllowed` ACE with `GENERIC_READ + GENERIC_EXECUTE` for user SID.
+- Permission is set structurally through `RawSecurityDescriptor` / `CommonAce` and verified by read-back.
+- Installer reports SUCCESS only when every privileged task has real Read+Execute ACE; otherwise diagnostics ZIP is generated.
+- Existing v0.2.7 tasks are reused during repair; ACL is repaired instead of deleting/recreating all tasks.
