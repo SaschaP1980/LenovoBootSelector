@@ -20,8 +20,8 @@ Assert-True 'Four-part version parses' ($null -ne (ConvertTo-LenovoVersionCore -
 Assert-True 'Invalid version returns null' ($null -eq (ConvertTo-LenovoVersionCore -Version '0.5'))
 
 $runtime=New-UpdateRuntimeState
-Assert-True 'Startup update check starts unattempted' (-not $runtime.StartupCheckStarted)
-Assert-True 'Startup update check starts incomplete' (-not $runtime.StartupCheckCompleted)
+Assert-True 'Update runtime has no process-once startup gate' ($null -eq $runtime.PSObject.Properties['StartupCheckStarted'])
+Assert-True 'Update runtime has no process-once startup completion flag' ($null -eq $runtime.PSObject.Properties['StartupCheckCompleted'])
 Assert-Equal 'Update check mode starts empty' '' $runtime.CheckMode
 $threw=$false; try { [void](Compare-LenovoAppVersionCore -Current '0.5.7' -Candidate 'dev') } catch { $threw=$true }; Assert-True 'Invalid compare throws' $threw
 

@@ -34,7 +34,7 @@
 }
 
 function Update-UpdateMenuState {
-    # One automatic read-only check is allowed per tray process. There is no periodic polling.
+    # Automatic read-only checks are triggered by popup-open transitions. There is no periodic polling.
     if (-not $script:UpdateState) { return }
     $busy = Test-UpdateRuntimeBusy -State $script:UpdateState
     if ($script:UpdateCheckMenuItem) { $script:UpdateCheckMenuItem.Enabled = -not $busy }
@@ -60,10 +60,10 @@ function Stop-UpdateCheckUiWorker {
 
 
 function Complete-UpdateCheck {
-    param([Parameter(Mandatory=$true)][ValidateSet('Manual','Startup')][string]$Mode)
+    param([Parameter(Mandatory=$true)][ValidateSet('Manual','Popup')][string]$Mode)
     Stop-UpdateCheckUiWorker
     $path=[string]$script:UpdateState.CheckResultPath
-    $isStartup = ($Mode -eq 'Startup')
+    $isPopup = ($Mode -eq 'Popup')
     $failureCategory=''; $failureStage=''; $errorClass=''; $networkStatus=''
     try {
         if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { $failureCategory='runtime'; $failureStage='check-result'; throw 'Die Update-Prüfung hat kein Ergebnis geliefert.' }
@@ -80,34 +80,33 @@ function Complete-UpdateCheck {
             if (-not $validated.IsValid) { $failureCategory='manifest'; $failureStage='result-manifest-validation'; throw $validated.Error }
             [void](Set-UpdateRuntimeAvailable -State $script:UpdateState -Manifest $validated)
             $script:LastStatusText = ('Neue App-Version verfügbar: v{0}' -f $validated.Version)
-            if (-not $isStartup) {
+            if (-not $isPopup) {
                 [void](Show-AvailableUpdateDialog)
             }
-            Write-RuntimeDiagnosticEvent -Event $(if ($isStartup) { 'STARTUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$true; availableVersion=$validated.Version; mode=$Mode })
+            Write-RuntimeDiagnosticEvent -Event $(if ($isPopup) { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$true; availableVersion=$validated.Version; mode=$Mode })
         }
         else {
             $script:UpdateState.AvailableManifest=$null
             [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
-            if (-not $isStartup) {
+            if (-not $isPopup) {
                 $script:LastStatusText = ('Lenovo Boot Selector ist aktuell · v{0}' -f $script:AppVersion)
                 Show-LenovoNoticeDialog -Title 'Keine neue Version' -Heading ('Lenovo Boot Selector v{0} ist aktuell.' -f $script:AppVersion) -Message 'Es ist derzeit keine neuere Version verfügbar.' -Kind Info
             }
-            Write-RuntimeDiagnosticEvent -Event $(if ($isStartup) { 'STARTUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$false; mode=$Mode })
+            Write-RuntimeDiagnosticEvent -Event $(if ($isPopup) { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$false; mode=$Mode })
         }
     }
     catch {
         [void](Set-UpdateRuntimeFailed -State $script:UpdateState -Message $_.Exception.Message)
-        if (-not $isStartup) {
+        if (-not $isPopup) {
             $script:LastStatusText='Update-Prüfung fehlgeschlagen.'
             Show-LenovoNoticeDialog -Title 'Update fehlgeschlagen' -Heading 'Die Prüfung auf eine neue Version ist fehlgeschlagen.' -Message $_.Exception.Message -Kind Error
         }
-        Write-RuntimeDiagnosticEvent -Event $(if ($isStartup) { 'STARTUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage $(if ($failureStage) { $failureStage } else { 'update-check' }) -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode=$Mode; errorCategory=$failureCategory; failureStage=$failureStage; errorClass=$errorClass; networkStatus=$networkStatus }) -Level warning
+        Write-RuntimeDiagnosticEvent -Event $(if ($isPopup) { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage $(if ($failureStage) { $failureStage } else { 'update-check' }) -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode=$Mode; errorCategory=$failureCategory; failureStage=$failureStage; errorClass=$errorClass; networkStatus=$networkStatus }) -Level warning
     }
     finally {
         try { if ($path -and (Test-Path -LiteralPath $path)) { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue } } catch { }
         $script:UpdateState.CheckResultPath=$null
         $script:UpdateState.CheckMode=''
-        if ($isStartup) { $script:UpdateState.StartupCheckCompleted=$true }
         if ($script:UpdateState.Status -eq 'Failed') { [void](Set-UpdateRuntimeIdle -State $script:UpdateState) }
         Update-UpdateMenuState
         Update-HeaderRefreshStatus
@@ -118,12 +117,12 @@ function Complete-ManualUpdateCheck {
     Complete-UpdateCheck -Mode 'Manual'
 }
 
-function Complete-StartupUpdateCheck {
-    Complete-UpdateCheck -Mode 'Startup'
+function Complete-PopupUpdateCheck {
+    Complete-UpdateCheck -Mode 'Popup'
 }
 
 function Start-UpdateCheckUiWorker {
-    param([Parameter(Mandatory=$true)][ValidateSet('Manual','Startup')][string]$Mode)
+    param([Parameter(Mandatory=$true)][ValidateSet('Manual','Popup')][string]$Mode)
 
     if (Test-UpdateRuntimeBusy -State $script:UpdateState) { return $false }
     [void](Set-UpdateRuntimeChecking -State $script:UpdateState)
@@ -140,12 +139,12 @@ function Start-UpdateCheckUiWorker {
                 if (-not $script:UpdateState.CheckProcess) { return }
                 $script:UpdateState.CheckProcess.Refresh()
                 if ($script:UpdateState.CheckProcess.HasExited) {
-                    if ([string]$script:UpdateState.CheckMode -eq 'Startup') { Complete-StartupUpdateCheck }
+                    if ([string]$script:UpdateState.CheckMode -eq 'Popup') { Complete-PopupUpdateCheck }
                     else { Complete-ManualUpdateCheck }
                 }
             }
             catch {
-                if ([string]$script:UpdateState.CheckMode -eq 'Startup') { Complete-StartupUpdateCheck }
+                if ([string]$script:UpdateState.CheckMode -eq 'Popup') { Complete-PopupUpdateCheck }
                 else { Complete-ManualUpdateCheck }
             }
         })
@@ -176,21 +175,19 @@ function Start-ManualUpdateCheck {
     Update-UpdateMenuState
 }
 
-function Start-StartupUpdateCheck {
-    if (-not $script:UpdateState -or $script:UpdateState.StartupCheckStarted) { return }
-    $script:UpdateState.StartupCheckStarted=$true
+function Start-PopupUpdateCheck {
+    if (-not $script:UpdateState -or (Test-UpdateRuntimeBusy -State $script:UpdateState)) { return $false }
     try {
-        if (-not (Start-UpdateCheckUiWorker -Mode 'Startup')) {
-            $script:UpdateState.StartupCheckCompleted=$true
-            return
-        }
-        Write-RuntimeDiagnosticEvent -Event 'STARTUP_UPDATE_CHECK_STARTED' -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ mode='Startup' })
+        if (-not (Start-UpdateCheckUiWorker -Mode 'Popup')) { return $false }
+        Write-RuntimeDiagnosticEvent -Event 'POPUP_UPDATE_CHECK_STARTED' -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ mode='Popup' })
+        Update-UpdateMenuState
+        return $true
     }
     catch {
-        $script:UpdateState.StartupCheckCompleted=$true
-        Write-RuntimeDiagnosticEvent -Event 'STARTUP_UPDATE_CHECK_STARTED' -Stage 'update-check' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode='Startup' }) -Level warning
+        Write-RuntimeDiagnosticEvent -Event 'POPUP_UPDATE_CHECK_STARTED' -Stage 'update-check' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode='Popup' }) -Level warning
+        Update-UpdateMenuState
+        return $false
     }
-    Update-UpdateMenuState
 }
 
 function Stop-UpdatePrepareUiWorker {

@@ -1,5 +1,16 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.7.0.0 – LBS-21 popup-open automatic update checks
+
+- Automatic read-only app-version discovery moves from tray-process startup to each actual popup-open transition.
+- Opening the popup now starts the existing validated update-check worker alongside the existing fresh boot-target refresh; the two read-only workers remain independent and may overlap.
+- Closing and later reopening the popup starts a fresh version check again, while opening cannot start a competing second update operation when the updater is already busy.
+- The historical process-once `StartupCheckStarted` / `StartupCheckCompleted` state and dedicated startup-check trigger are removed instead of keeping a second automatic path.
+- Boot-target refresh status keeps priority over the update-available hint; the existing `Neue App-Version verfügbar` indication returns after refresh when applicable.
+- Manual update checking and installation remain explicit user-controlled paths. There is still no periodic polling, automatic package download, or automatic installation.
+- BootService, TaskBroker, Storage, firmware/BCD behavior, BootNext semantics, and the privilege boundary are unchanged.
+- The release uses the `patch` regression profile because product code under `src/**` changes. The intentional protected-fragment delta is exactly `ps:Show-OrTogglePopup`.
+
 ## v0.6.9.1 – LBS-20 release-cycle performance measurement
 
 - Pure version-only Hotfix used to measure the now-parallel Candidate Preflight with the mandatory GitHub-hosted Windows PowerShell 5.1 gate.
