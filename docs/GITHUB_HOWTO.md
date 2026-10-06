@@ -77,11 +77,23 @@ Historical three-component versions compare as `HOTFIX = 0`.
 Before a release:
 
 1. Update `bin/version.json`.
-2. Add the corresponding `CHANGELOG.md` section.
+2. Add the corresponding `CHANGELOG.md` section **for every released version**, including a version-only Hotfix or a pure release-performance measurement.
 3. Choose the release profile intentionally.
 4. If product code under `src/**` is unchanged, use `version-only`. This profile requires strict product-source byte identity to the previous canonical source basis, apart from the injected runtime version.
 5. If product code under `src/**` changes fachlich, use `patch`.
 6. These are the only active profiles. The former `release-architecture` profile was removed in v0.6.6.0 because it encoded a completed one-time AppVersion-template migration and caused misleading profile selection/false positives.
+
+### Mandatory changelog contract
+
+Every version that is actually published must have a matching `CHANGELOG.md` section **before** the candidate branch is created.
+
+This also applies when the requested product change is only “raise the version number”, a version-only Hotfix, or a release-pipeline/performance measurement. In those cases the minimum release diff is:
+
+`bin/version.json + matching minimal CHANGELOG.md section`
+
+Do not interpret “only bump the version” as permission to omit the changelog. `tools/prepare_release.py` enforces this contract and Candidate Preflight will fail before the release branch if the section is missing.
+
+The v0.6.7.1 measurement confirmed this behavior: the first candidate was rejected because only `bin/version.json` had changed; after adding the minimal v0.6.7.1 changelog section, the same candidate branch passed.
 
 ## Fresh-worktree rule
 

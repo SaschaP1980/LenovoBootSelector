@@ -28,11 +28,23 @@ For Issue-backed releases, the Issue is part of the audit trail: important imple
 ## Local release preparation
 
 1. Verify the version-level Issue prerequisite above.
-2. Change `bin/version.json` and add the corresponding `CHANGELOG.md` section.
-3. Set `protectedFragmentIntent` to exactly the protected fragments intentionally changed by this version; normally `[]`.
-4. Set `repositoryDeleteIntent` to exactly the repository paths intentionally deleted by this version; normally `[]`.
-5. Prepare one exact candidate commit based on current `main`.
-6. Push that commit only as `candidate/v<version>`. Do **not** manually create `release/v<version>`.
+2. Change `bin/version.json`.
+3. Add the corresponding `CHANGELOG.md` section for **every** published version. This is mandatory even for a version-only Hotfix, a pure version bump, or a release-performance measurement.
+4. Set `protectedFragmentIntent` to exactly the protected fragments intentionally changed by this version; normally `[]`.
+5. Set `repositoryDeleteIntent` to exactly the repository paths intentionally deleted by this version; normally `[]`.
+6. Prepare one exact candidate commit based on current `main`.
+7. Push that commit only as `candidate/v<version>`. Do **not** manually create `release/v<version>`.
+
+### Version-only minimum diff
+
+For a release whose only intended product change is the version number, the minimum valid release diff is still:
+
+- `bin/version.json`
+- the matching minimal `CHANGELOG.md` section
+
+`tools/prepare_release.py` validates the changelog/version pairing. A candidate without the matching changelog entry must fail before promotion to `release/v<version>`.
+
+This rule was empirically confirmed by the v0.6.7.1 release-cycle measurement.
 
 ## Mandatory candidate preflight
 
