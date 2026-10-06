@@ -7,10 +7,13 @@ Operational companion for ChatGPT/release supervision: [`GITHUB_HOWTO.md`](GITHU
 ## Canonical inputs
 
 - `bin/version.json` is the only authoritative release-version source. Schema v2 intentionally contains no `publishedUtc`.
-- `releaseProfile` selects regression strictness (`version-only`, `release-architecture`, `patch`).
+- `releaseProfile` selects regression strictness. Active values are only `version-only` and `patch`.
 - Product runtime receives the version only through the `@APP_VERSION@` token during deterministic runtime generation.
 - `tools/prepare_release.py` owns generated release metadata and packages. For schema v2, publication time must be supplied explicitly with `--published-utc`.
 - Canonical `publishedUtc` is owned by GitHub: the Release Orchestrator captures one UTC timestamp only after the hosted runner is executing the publication job and reuses that exact value for both deterministic rebuilds. Local preparation timestamps are provisional and are never committed as canonical publication metadata.
+- `version-only`: use when product code under `src/**` is unchanged. Regression requires product-source byte identity to the previous canonical source basis, apart from the injected runtime version.
+- `patch`: use when product code under `src/**` changes fachlich.
+- The former `release-architecture` profile was removed in v0.6.6.0. Its only special behavior covered the already completed migration from a hard-coded AppVersion to the `@APP_VERSION@` template token. Historical validators remain in `tests-history/`; there is no active selectable migration profile.
 
 ## Issue prerequisite by version level
 

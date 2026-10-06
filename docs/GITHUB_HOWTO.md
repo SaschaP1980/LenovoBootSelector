@@ -79,9 +79,9 @@ Before a release:
 1. Update `bin/version.json`.
 2. Add the corresponding `CHANGELOG.md` section.
 3. Choose the release profile intentionally.
-4. Product/source changes normally use `patch`.
-5. `version-only` is for a release whose product source is otherwise unchanged.
-6. Do not use the historical `release-architecture` profile by default.
+4. If product code under `src/**` is unchanged, use `version-only`. This profile requires strict product-source byte identity to the previous canonical source basis, apart from the injected runtime version.
+5. If product code under `src/**` changes fachlich, use `patch`.
+6. These are the only active profiles. The former `release-architecture` profile was removed in v0.6.6.0 because it encoded a completed one-time AppVersion-template migration and caused misleading profile selection/false positives.
 
 ## Fresh-worktree rule
 
