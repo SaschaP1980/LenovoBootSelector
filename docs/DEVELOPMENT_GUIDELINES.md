@@ -83,6 +83,22 @@ Also checkpoint before a long/high-risk tool sequence when the immediately compl
 
 Do not create checkpoints mechanically every few minutes. Merge adjacent tiny phases; split phases that are likely to exceed the resilience window.
 
+### Checkpoint cost and frequency
+
+Checkpoint frequency is a **resilience requirement**. Do not reduce the number of useful checkpoints merely because remote persistence or validation is expensive. The correct optimization target is the technical cost of producing a checkpoint.
+
+For a normal checkpoint, target no more than about **1–2 minutes of agent/connector orchestration overhead after the substantive implementation is complete**, excluding the actual runtime of tests and external GitHub-runner queue time.
+
+A checkpoint must not become a separate mini-build project. In particular:
+
+- do not manually reconstruct the generated single-file runtime through large connector string transformations;
+- do not repeat permanent validator logic with ad-hoc remote reads once the repository already owns the corresponding executable check;
+- do not create a second metadata-only commit with the same tree merely to label an implementation commit as a checkpoint;
+- do not trade away checkpoint frequency to hide expensive tooling;
+- prefer moving build and standardized validation to a full-worktree GitHub-hosted workflow.
+
+The resilience objective is that an unexpected chat termination, stream disconnect, connector interruption, or agent-runtime stop loses at most the coherent work completed since the latest durable checkpoint.
+
 ### One checkpoint commit per gate
 
 Prefer **one commit that contains both the implementation state and the checkpoint body**.
@@ -185,7 +201,9 @@ If the connector has no repository-archive action and direct clone/network acces
 4. continue connector-first for canonical file/ref/Git-object work;
 5. prefer repository-hosted GitHub Actions for operations that genuinely require a complete worktree.
 
-A future dedicated **work-branch integration/preflight workflow** would remove most of this friction by running the real repository build/validators on GitHub before Candidate creation. Until such a workflow exists, lack of a local full worktree must be treated as a known precheck limitation, not compensated for with increasingly elaborate archive workarounds.
+A dedicated **Work Checkpoint Gate** is the intended permanent solution for this friction. It should run the repository build and standardized validators on GitHub against the exact work-branch checkpoint instead of forcing the agent to emulate a full worktree through connector reads. The target contract is defined in section 14 below.
+
+Until that workflow exists, lack of a local full worktree must be treated as a known precheck limitation, not compensated for with increasingly elaborate archive workarounds. If necessary, persist a coherent modular-source checkpoint and record runtime synchronization or full-worktree validation as pending rather than performing unsafe manual runtime reconstruction. Such a checkpoint is recoverable development state, not a GREEN development-completion gate and not a release-ready Candidate.
 
 ## 8. Generated runtime handling
 
@@ -201,6 +219,10 @@ Preferred order:
 4. persist the coherent result.
 
 If a full local worktree is unavailable, prefer a GitHub-hosted full-worktree validation/build path over manual reconstruction.
+
+For routine work-branch checkpoints, the agent should edit the canonical modular source and let the future Work Checkpoint Gate own deterministic runtime synchronization. If the tracked runtime must change, the preferred hosted model is at most **one deterministic canonicalization follow-up commit** on the same work branch, containing only the generated runtime/audit outputs that the workflow is explicitly authorized to update. The workflow must never create a chain of incremental staging commits. The exact generated follow-up SHA, when one is needed, becomes the validated checkpoint head.
+
+Until that hosted path is implemented, do not claim a source-only checkpoint is fully synchronized or validator-GREEN when `bin/LenovoBootMenuTray.ps1` still needs deterministic regeneration. Before Candidate creation, the tracked runtime must be regenerated from canonical source and the real development-completion checks must pass.
 
 When text composition is unavoidable in JavaScript tooling, treat PowerShell `$` characters as data. Do not use the replacement-string form of JavaScript `String.replace()` for generated PowerShell content because `$` sequences have replacement semantics. Use a literal-safe method such as `split/join` or a replacement callback.
 
@@ -303,9 +325,128 @@ For a comparable feature, aim for:
 6. bounded connector operations;
 7. no clone/ZIP detours after the environment limitation is known;
 8. no manual incremental generated-runtime reconstruction;
-9. one development-completion validation gate using the real validators as closely as the environment permits;
-10. one release-ready Candidate;
-11. normal Candidate/Release automation;
-12. work-branch cleanup.
+9. use the Work Checkpoint Gate for deterministic runtime synchronization and standardized checkpoint validation as soon as that hosted path exists;
+10. one development-completion validation gate using the real validators as closely as the environment permits;
+11. one release-ready Candidate;
+12. normal Candidate/Release automation;
+13. work-branch cleanup.
 
 Never optimize by weakening validation, safety boundaries, reproducibility, or release verification.
+
+## 14. Work Checkpoint Gate — target architecture
+
+### Purpose
+
+The Work Checkpoint Gate exists to make **frequent durable checkpoints cheap enough to use as the primary defense against unavoidable interactive-session failure**.
+
+The project must assume that a chat, response stream, agent runtime, connector call, or local execution environment can stop without warning. That condition cannot be eliminated by asking one interactive prompt to run until an entire feature and release are complete. The durable engineering response is therefore:
+
+```text
+agent work
+  -> durable work-branch checkpoint
+  -> GitHub-hosted checkpoint build/validation
+  -> continue automatically
+```
+
+A fresh session must be able to recover from the latest work-branch head and its GitHub validation evidence without needing the interrupted conversation.
+
+### Non-goals and release separation
+
+The Work Checkpoint Gate is **not** Candidate Preflight and is **not** a publication path.
+
+It must not:
+
+- create `candidate/**`, `release/**`, version tags, publication PRs, or release ZIPs;
+- weaken or replace Linux Candidate Preflight;
+- weaken or replace the mandatory Windows PowerShell 5.1 Candidate gate;
+- weaken or replace the Release Orchestrator or its eight final release contexts;
+- convert an intermediate development checkpoint into a release-ready Candidate merely because a subset of checks is GREEN.
+
+Candidate Preflight remains the release-entry authority. The Work Checkpoint Gate exists only to make development state recoverable and to catch integration defects earlier.
+
+### Trigger and exact-SHA discipline
+
+The intended hosted workflow should operate on `work/LBS-*` checkpoints and validate an exact commit SHA.
+
+At minimum it should:
+
+1. check out the exact work-branch checkpoint on a full GitHub-hosted worktree;
+2. verify that the work branch still points to the expected source checkpoint before applying any generated follow-up;
+3. regenerate the single-file runtime through the repository's authoritative deterministic build tooling;
+4. verify runtime closure/determinism;
+5. run the relevant focused and permanent validators that are appropriate for that checkpoint;
+6. publish a clear exact-SHA PASS/FAIL result and machine-readable summary;
+7. leave the work branch in a recoverable state even when validation fails.
+
+A failed checkpoint gate is development evidence, not a reason to create a Candidate or release branch. Correct the smallest problem on the same work branch and continue.
+
+### Generated runtime canonicalization
+
+The agent should normally modify **canonical modular source**, not manually splice the 350–450 KB generated single-file runtime through connector string operations.
+
+If deterministic regeneration changes tracked generated files, the preferred hosted behavior is:
+
+1. preserve the original source checkpoint as a durable recoverable commit;
+2. generate the tracked runtime/audit outputs in the full GitHub worktree;
+3. if generated files differ, create **at most one** deterministic follow-up canonicalization commit on the same work branch;
+4. allow only the explicitly expected generated paths in that follow-up;
+5. validate the resulting exact follow-up SHA;
+6. make that validated SHA the effective checkpoint head.
+
+If no generated file changes, no follow-up commit is created.
+
+The workflow must prevent self-trigger loops and must not create unreferenced or repeated staging-commit chains. Automated canonicalization is acceptable because it removes expensive and error-prone connector reconstruction; manual incremental runtime staging is not.
+
+### Checkpoint validation levels
+
+Not every development checkpoint needs the full publication matrix. The gate should support validation proportional to the checkpoint while keeping the final development-completion gate strong.
+
+A normal checkpoint should prioritize:
+
+- deterministic runtime generation/check;
+- runtime closure;
+- relevant focused regression tests;
+- permanent static Release/Core/Boundary/Regression checks that are valid for the current intermediate state;
+- protected-fragment and repository-delete intent checks when those contracts are already meaningful.
+
+A checkpoint that touches Windows-specific runtime behavior, PowerShell parsing/encoding, localization runtime, TaskBroker boundaries, or other Windows-only contracts should run the relevant hosted Windows PowerShell 5.1 coverage when practical.
+
+Before Candidate creation, the **development-completion checkpoint** should run the closest available equivalent of the real Candidate validation, including hosted Windows PowerShell 5.1 coverage when the work-branch workflow provides it. Candidate Preflight still reruns its mandatory authoritative gates afterward.
+
+### Validator ownership and remote-read budget
+
+Once an invariant has a permanent executable validator, the Work Checkpoint Gate should execute that validator instead of having the agent reconstruct the same assertion through multiple GitHub fetches.
+
+Examples include:
+
+- localization catalog parity;
+- runtime include/closure checks;
+- uncontrolled visible-literal checks;
+- architecture/boundary invariants;
+- protected-fragment intent;
+- repository deletion intent;
+- deterministic generated-runtime checks.
+
+Connector reads remain appropriate for understanding code, reviewing exact diffs, diagnosing a failed gate, and making implementation decisions. They should not become a second hand-built validation framework beside the repository's validators.
+
+### Continuation behavior
+
+After a checkpoint is durably persisted and its required checkpoint gate is GREEN, continue the already authorized task automatically. Do not stop merely to announce that a checkpoint exists.
+
+If the checkpoint gate is still running when the interactive session ends, the work branch remains the recovery anchor. A later session must read the branch head and GitHub gate result before continuing.
+
+If the gate is RED, resume from that exact checkpoint, read the failure evidence, make the smallest correction, and rerun the gate. Do not discard the branch and do not start an unrelated parallel implementation path.
+
+### Performance objective
+
+The performance target is not fewer checkpoints. It is **cheap checkpoints**.
+
+For a normal checkpoint, aim for roughly:
+
+- no more than **1–2 minutes of agent/connector orchestration overhead** after substantive implementation, excluding test execution and external runner queues;
+- one durable source/checkpoint commit;
+- zero manual large-runtime reconstruction;
+- zero duplicated ad-hoc checks for invariants already owned by permanent validators;
+- at most one automated deterministic generated-output follow-up commit when required.
+
+The LBS-17 pilot showed that the final persistence overhead itself was usually acceptable; the dominant avoidable cost was manual generated-runtime synchronization and repeated connector-side revalidation. The Work Checkpoint Gate is specifically intended to remove that cost while preserving or increasing checkpoint frequency.
