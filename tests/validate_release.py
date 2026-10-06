@@ -58,6 +58,19 @@ def main():
         s.c(f'LBS-2 obsolete root path removed: {name}',not (root/name).exists())
     s.c('README remains repository-root file',(root/'README.md').is_file())
     s.c('CHANGELOG remains repository-root file',(root/'CHANGELOG.md').is_file())
+    readme=txt(root/'README.md') if (root/'README.md').is_file() else ''
+    changelog=txt(root/'CHANGELOG.md') if (root/'CHANGELOG.md').is_file() else ''
+    localization_doc=txt(root/'docs/LOCALIZATION.md') if (root/'docs/LOCALIZATION.md').is_file() else ''
+    s.has('README current development version matches canonical version',readme,f'**Current development version:** v{version}')
+    s.has('CHANGELOG contains canonical version section',changelog,f'## v{version} ')
+    s.c('LBS-17 localization architecture document exists',(root/'docs/LOCALIZATION.md').is_file())
+    s.has('LBS-17 README documents English default locale',readme,'English (`en-US`) UI by default')
+    s.has('LBS-17 README documents selectable German locale',readme,'German (`de-DE`)')
+    s.has('LBS-17 README links localization architecture',readme,'[docs/LOCALIZATION.md](docs/LOCALIZATION.md)')
+    s.has('LBS-17 localization docs declare English default and fallback',localization_doc,'`en-US` — canonical default and fallback')
+    s.has('LBS-17 localization docs define legacy German migration',localization_doc,'settings schema below 5 with no locale')
+    s.has('LBS-17 localization docs prohibit distributed language branches',localization_doc,'Do not add `if ($Language -eq ...)`')
+    s.has('LBS-17 localization docs retain safety boundary',localization_doc,'tray process unelevated')
     s.c('Git control file remains at repository root',(root/'.gitignore').is_file())
     s.c('LBS-1 canonical architecture baseline moved to docs/architecture',(root/'docs/architecture/ARCHITECTURE_BASELINE.json').is_file())
     s.c('LBS-1 canonical catch audit moved to audits',(root/'audits/CATCH_AUDIT.json').is_file())
