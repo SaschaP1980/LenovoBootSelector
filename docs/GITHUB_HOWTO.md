@@ -17,6 +17,20 @@ A handover is context, not an excuse to override newer repository facts.
 
 Never use a stale feature branch as a development basis merely because it still exists. The canonical development basis is GitHub `main`, unless the user explicitly names another verified branch.
 
+## Living-document maintenance — mandatory
+
+This operational GitHub guide is a **living project artifact** and must be kept current.
+
+Whenever work reveals a new durable fact about the GitHub integration, repository publishing behavior, release workflow, connector capabilities/limitations, recovery procedure, validation contract or another operational GitHub rule, update `docs/GITHUB_HOWTO.md` in the same workstream as soon as that fact is established.
+
+Likewise, whenever the GitHub integration or its release/operating process is intentionally changed, update this guide so that it describes the new behavior rather than preserving an obsolete procedure.
+
+Do not rely on chat memory or a handover alone for such knowledge. Durable GitHub-operating knowledge belongs here.
+
+Before finalizing any handover, first read the current `docs/GITHUB_HOWTO.md` from canonical `main`. **Every handover must include the complete latest contents of this guide**, not a summary, excerpt or stale copy. The handover may add release-specific context around it, but it must not omit or replace the current guide.
+
+If the guide changes after a handover draft was created, regenerate/update the handover so the embedded copy matches the current canonical guide before delivering it.
+
 ## Source of truth
 
 - `main` is the canonical development basis.
@@ -285,6 +299,10 @@ Do not describe such a documentation update as a product release.
 For ordinary hotfix/patch releases, successful GitHub publication is normally sufficient; do not manufacture extra chat artifacts unless requested.
 
 For a minor/major transition where a future conversation needs substantial context, additionally produce a **knowledge-only handover ZIP**. It must not duplicate Source ZIPs or release binaries.
+
+**Mandatory for every handover, regardless of release type or handover format:** include the complete current `docs/GITHUB_HOWTO.md` from canonical `main` in its latest version. Do not substitute a summary or an older embedded copy. Read the canonical guide immediately before final handover assembly and verify that the included copy is identical/current.
+
+If new GitHub integration knowledge or a GitHub-process change is discovered while preparing the handover, update `docs/GITHUB_HOWTO.md` first, then include that updated canonical version in the handover.
 
 A handover should record durable rules and current state, but the next session must still verify current GitHub facts before acting.
 
