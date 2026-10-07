@@ -4,7 +4,7 @@ Use this template as the default structure for the **single cumulative GitHub Is
 
 For new work, `LBS-<github-issue-number>` uses the GitHub Issue number directly. Example: Issue `#90` -> `LBS-90` -> `work/LBS-90`.
 
-Do not create a new comment for each heartbeat or phase. Update the same comment in place and retain previous evidence. Replace placeholders only with verified facts; do not invent unavailable values.
+Do not create a new comment for each heartbeat or phase. Update the same comment in place and retain previous evidence. Singleton lifecycle sections (`Candidate Entry`, `Release`, `Final Release Verification`, `Performance result`, `Plan-conformance assessment`) occur exactly once and are updated in place; numbered attempt sections occur once per actual attempt/revision. Replace placeholders only with verified facts; do not invent unavailable values.
 
 ~~~markdown
 ## LBS-<github-issue-number> — Rolling Build & Release Recovery State
@@ -13,7 +13,7 @@ Do not create a new comment for each heartbeat or phase. Update the same comment
 **Agent-State:** ACTIVE | WAITING_FOR_GITHUB | BLOCKED_EXTERNAL | IDLE | STOPPED | COMPLETED  
 **Issue:** LBS-<github-issue-number> / #<github-issue-number>  
 **Base main:** `<sha>`  
-**Work branch:** `work/LBS-<github-issue-number>`  
+**Work branch:** `work/LBS-<github-issue-number>` | deleted after successful release  
 **Current work head:** `<sha/status>`  
 **Last product checkpoint:** `<sha/status>`  
 **Target version:** v<version>  
@@ -24,7 +24,7 @@ Do not create a new comment for each heartbeat or phase. Update the same comment
 
 ### Explicit Work-Path decision / exception
 
-<Why Work-Path applies. For an escalated Patch/Hotfix, include the exact durable Work-Branch-Reason.>
+<Why Work-Path applies. For a Patch/Hotfix exception, identify whether this is effort/risk escalation or an explicit user-authorized process-validation/benchmark, and include the exact durable Work-Branch-Reason.>
 
 ### Allowed release-ready diff
 
@@ -46,7 +46,7 @@ State important forbidden scope explicitly, especially safety/privilege/firmware
 
 | Event | UTC | Evidence |
 | --- | --- | --- |
-| User-authorized performance/work start | <timestamp> | <evidence> |
+| User-authorized performance/work start | <timestamp | unavailable/approximate> | <evidence; never substitute Issue creation and call it user authorization> |
 | Issue created / Work-Path decision recorded | <timestamp> | #<issue> |
 | First product checkpoint | <timestamp> | `<sha>` |
 | First Development Completion request | <timestamp> | run <id> |
@@ -169,18 +169,19 @@ Completed: <UTC or pending>
 
 ### Performance result
 
-Authoritative user-authorized start: <UTC>  
+User-authorized start: <UTC if exactly observed | unavailable/approximate>  
 Issue creation: <UTC>  
 Final Release Verification summary: <UTC>
 
-- raw user-authorized start -> final verification: <duration>
-- Issue creation -> final verification: <duration>
+- raw durable GitHub end-to-end (Issue creation -> final verification): <duration>
+- raw user-authorized start -> final verification: <duration | N/A when exact start unavailable>
+- normalized repository-process time: <duration + listed excluded intervals | N/A if not reliably quantifiable>
 - first Development Completion request -> final verification: <duration>
 - final GREEN Development Completion -> final verification: <duration>
 - first Candidate creation -> final verification: <duration>
 - final GREEN Candidate creation -> final verification: <duration>
 - Release run creation -> final verification: <duration>
-- external infrastructure/user/chat timeout time: <duration; report separately>
+- external infrastructure/user/chat-runtime pause time: <duration(s); report separately and retain in raw chronology>
 - failed/corrected gate attempts: <summary>
 
 ### Plan-conformance assessment
@@ -200,5 +201,5 @@ At successful completion update this same comment to:
 - **Current phase:** Release Verification complete
 - **Next action:** close #<github-issue-number> as completed
 
-The terminal update of this same rolling comment is the final Work-Path implementation/release record. Do not add a second redundant completion comment unless it contains materially new information.
+Before Issue closure, perform one structural consistency pass: singleton headings occur once, numbered attempts are unique, no terminal section still says pending/in progress/not started, and the header/measurement/final-verification facts agree. The terminal update of this same rolling comment is the final Work-Path implementation/release record. Do not add a second redundant completion comment unless it contains materially new information.
 ~~~

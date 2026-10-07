@@ -24,9 +24,9 @@ The **subject of the documentation is not implementation complexity**. Editing W
 
 For this rule, **source/code** means any executable or machine-enforced repository implementation artifact: product source under `src/**`, tests, GitHub Actions workflows, validators, build/release tooling, scripts, or equivalent executable contracts. Markdown/documentation and GitHub Issue metadata do **not** count as source/code. If the complete intended change contains none of those executable/machine-enforced changes, `work/LBS-*` is forbidden regardless of topic, Issue priority, perceived importance, or the fact that the edited documentation governs the Work-Path itself.
 
-Patch and Hotfix work uses the shortest safe atomic path **without a work branch by default**. Before implementation begins, perform a brief effort/risk analysis. Escalate a Patch or Hotfix to the work-branch/checkpoint model only when that analysis indicates that the work is likely to be substantial, cross-cutting, migration-heavy, interruption-prone, or otherwise unlikely to fit safely into one short implementation cycle. Record the reason durably and carry it into the Candidate as exactly one `Work-Branch-Reason:` trailer.
+Patch and Hotfix work uses the shortest safe atomic path **without a work branch by default**. Before implementation begins, perform a brief development-path decision. Work-Path is permitted only when either (a) effort/risk makes the change substantial, cross-cutting, migration-heavy, interruption-prone, or otherwise unlikely to fit safely into one short implementation cycle, or (b) the user explicitly authorizes a process-validation/benchmark exercise whose purpose is to exercise the complete Work-Path itself. Record the exact exception reason durably and carry it into the Candidate as exactly one `Work-Branch-Reason:` trailer.
 
-Do not use a work branch for a small Patch/Hotfix merely for consistency with Major/Minor releases; the resilience machinery must not become routine overhead for short fixes.
+A process-validation/benchmark exception is evidence about the development process, not evidence that the underlying product change is complex. Outside these two exception classes, do not route a small Patch/Hotfix through Work-Path merely for consistency or convenience.
 
 The Work-Path rolling recovery comment defined below is the established resilience standard **only after a `work/LBS-*` path has already been selected**. It is not used for the normal branchless Patch/Hotfix fast path.
 
@@ -101,13 +101,14 @@ This gate applies only after the scope has been classified as executable/product
 Use a work branch when:
 
 - the release is **Major or Minor**; or
-- a **Patch or Hotfix** has been explicitly escalated by the pre-implementation effort/risk analysis.
+- a **Patch or Hotfix** has been explicitly escalated by the pre-implementation effort/risk analysis; or
+- a **Patch or Hotfix** is intentionally routed through Work-Path as an explicit user-authorized process-validation/benchmark exercise.
 
-For Patch/Hotfix analysis, indicators for escalation include multiple independently risky phases, settings/data migration, broad cross-module behavior changes, expected work substantially beyond a short atomic patch cycle, or a realistic need for several recoverable checkpoints. A narrow bug fix, text/UI correction, small validator change, or isolated behavior patch should normally remain branchless.
+For Patch/Hotfix effort/risk escalation, indicators include multiple independently risky phases, settings/data migration, broad cross-module behavior changes, expected work substantially beyond a short atomic patch cycle, or a realistic need for several recoverable checkpoints. A narrow bug fix, text/UI correction, small validator change, isolated behavior patch, or version-only Hotfix should normally remain branchless unless the user explicitly requests the separate process-validation/benchmark exception.
 
 For Issue-backed executable/product work, record the selected development model before implementation using exactly one mutually exclusive label from the canonical taxonomy in `docs/GITHUB_HOWTO.md`: `dev-path: work-branch` for this Work-Path model, or `dev-path: fast` for the branchless atomic Patch/Hotfix path. A backlog Issue may remain without a development-path label until this selection gate is actually performed. Documentation-only/process-guidance Issues remain outside this label dimension.
 
-When a Patch/Hotfix is escalated, record the concise reason in the Issue when Issue-backed (or equivalent durable release history for an Issue-less Hotfix) and later include the same decision as `Work-Branch-Reason: <reason>` in the Candidate history.
+When a Patch/Hotfix uses Work-Path by exception, record the concise reason in the Issue when Issue-backed (or equivalent durable release history for an Issue-less Hotfix) and later include the same decision as `Work-Branch-Reason: <reason>` in the Candidate history. The reason must distinguish an effort/risk escalation from an explicit process-validation/benchmark exercise.
 
 ### GitHub Issue identity and Work-Branch naming
 
@@ -134,17 +135,17 @@ Historical Issues that predate this convention may retain older independent LBS 
 
 ### Patch/Hotfix atomic fast path
 
-For a Patch/Hotfix that is **not** escalated to a work branch, prefer one short atomic development cycle:
+For a Patch/Hotfix that is **not** routed to a work branch, prefer one short atomic development cycle:
 
 1. pin current `main`;
-2. reproduce the bug and establish the focused RED regression against the unfixed canonical basis;
+2. for a confirmed bug/regression, reproduce it and establish the focused RED regression against the unfixed canonical basis; for a non-bug change, define the smallest focused positive acceptance/validation check instead;
 3. prepare the complete source/test/documentation/release-metadata change in memory/Git objects without creating a chain of visible intermediate commits;
-4. run the focused GREEN regression plus the smallest relevant syntax/encoding/determinism checks;
+4. run the defect-specific GREEN regression or the focused positive validation, plus the smallest relevant syntax/encoding/determinism checks;
 5. create **one unreferenced candidate commit** from the pinned `main`;
 6. inspect the complete candidate diff/scope once;
 7. re-read `main` and expose `candidate/v<version>` only if the base lease still holds.
 
-Do not create a durable RED commit merely to prove test-first work for a normal branchless Patch/Hotfix. Durable RED evidence belongs in the Issue/release audit trail; the Candidate itself remains release-ready only.
+Do not create a durable RED commit merely to prove test-first work for a normal branchless bug/regression Hotfix. Durable RED evidence belongs in the Issue/release audit trail; non-bug changes do not invent artificial RED evidence. The Candidate itself remains release-ready only.
 
 If the work can no longer fit safely in this atomic path because scope or duration grows materially, stop before accumulating many intermediate commits and explicitly reconsider whether the Patch/Hotfix should be escalated to the work-branch model.
 
@@ -169,7 +170,7 @@ Rules:
 
 ## 3. Product-decision gate before implementation
 
-A Major/Minor feature must not silently invent user-facing policy where the Issue leaves a material ambiguity.
+No release level may silently invent user-facing policy where the Issue leaves a material ambiguity. This decision gate applies to Major, Minor, Patch, and Hotfix work whenever the change can affect user state, defaults, migration, destructive behavior, compatibility/fallback semantics, persistence, security, or safety.
 
 Before implementation, resolve and record any decision that changes existing user state or defaults, including:
 
@@ -182,7 +183,7 @@ Before implementation, resolve and record any decision that changes existing use
 
 If the expected product behavior is genuinely ambiguous, ask the user before coding.
 
-LBS-17 demonstrated why this matters: the implementation deliberately migrated pre-localization installations to German even though the later native acceptance expectation was English-by-default. The tests faithfully protected the implemented rule, but the rule itself was wrong for the intended product behavior.
+Tests can faithfully protect an implemented policy while that policy is still wrong for the intended product behavior. Resolve material product-policy ambiguity before coding rather than relying on tests to discover the decision later.
 
 ## 4. Checkpoints are persistence gates, not stop points
 
@@ -266,7 +267,7 @@ This mechanism applies **only** to development that already uses a durable `work
 
 Maintain exactly **one rolling recovery comment** in the active GitHub Issue. Prefer the implementation-start comment and update that same comment in place. Do not create a new heartbeat comment every interval.
 
-Use [`docs/templates/WORK_PATH_ROLLING_COMMENT.md`](templates/WORK_PATH_ROLLING_COMMENT.md) as the canonical default layout. The format evolved from the successful LBS-41 / GitHub Issue #88 performance run and was formalized and exercised by later GitHub-number Work-Path runs such as #92 and #94: a compact recovery-state header, explicit intended diff and validation plan, one cumulative measurement ledger, counters, phase-specific evidence, final release verification, performance result, and plan-conformance assessment. GitHub Issue #92 is the cleaner reference for final section consolidation; #94 confirms that duplicated or stale lifecycle sections are a ledger-maintenance defect even when the underlying deployment is fully GREEN.
+Use [`docs/templates/WORK_PATH_ROLLING_COMMENT.md`](templates/WORK_PATH_ROLLING_COMMENT.md) as the canonical default layout: a compact recovery-state header, explicit intended diff and validation plan, one cumulative measurement ledger, counters, phase-specific evidence, final release verification, performance result, and plan-conformance assessment. Historical Issue comments are evidence, not normative templates; the tracked template and current process documents define the standard.
 
 The layout is part of the recovery standard, not merely presentation. Preserve the same major sections unless a task-specific section adds useful recovery information. At successful completion, update this **same** rolling comment to `Agent-State: COMPLETED`, record the authoritative release/PR/main/tag/artifact/cleanup facts, set the next action to Issue closure, and then close the Issue. Do not add a second redundant completion comment when the terminal rolling-comment update already contains the required final implementation/release record.
 
@@ -349,9 +350,15 @@ The rolling comment must preserve both raw wall-clock history and normalized pro
 - user/interactive pause time;
 - chat/runtime timeout and recovery time.
 
-Never subtract external/user/timeout delays from the raw total; retain them as part of the chronology.
+Never subtract external/user/timeout delays from the **raw** total; retain them as part of the chronology.
 
-Do not invent or normalize away a missing start timestamp. A user-authorized start may be recorded as authoritative only when the interaction/runtime provides an exact observed timestamp. If it is unavailable, mark it unavailable or approximate; **do not substitute `issue.created_at` and label that as the user-authorized start**. For cross-run comparisons that must rely only on durable GitHub evidence, use `Issue created_at → authoritative Release Verification summary` as the normalized end-to-end metric and identify it explicitly as such.
+Do not invent or normalize away a missing start timestamp. A user-authorized start may be recorded as authoritative only when the interaction/runtime provides an exact observed timestamp. If it is unavailable, mark it unavailable or approximate; **do not substitute `issue.created_at` and label that as the user-authorized start**.
+
+Use distinct timing classes:
+
+- **raw durable GitHub end-to-end** — for Issue-backed work, `Issue created_at → authoritative Release Verification summary`; do not subtract pauses or outages;
+- **raw user-authorized end-to-end** — only when an exact user-authorization timestamp is actually observed;
+- **normalized repository-process time** — raw chronology minus only independently verified external-infrastructure, user/interactive, or chat/runtime interruption intervals. List every excluded interval. If those intervals cannot be quantified reliably, report normalized time as unavailable rather than guessing.
 
 For process comparisons, also report at least:
 
@@ -365,36 +372,24 @@ For process comparisons, also report at least:
 
 This separation prevents external outages or session interruptions from being misreported as repository-development performance.
 
-Tracked `.chatgpt-work/LBS-<github-issue-number>.md` heartbeat files are now **legacy only**. Do not create them for new work. If an already-active branch contains one from the previous standard, keep it only until the rolling Issue comment has absorbed all recovery-relevant information, then remove it before Candidate creation. Timer-only Git commits are prohibited under the rolling-comment model.
-
-Historical measurements from LBS-29/LBS-27 remain useful evidence for why the three-minute recovery objective exists, but their journal-commit write overhead is not the target architecture anymore. The rolling-comment model preserves the recovery objective while removing heartbeat churn from Git history.
+Tracked `.chatgpt-work/LBS-<github-issue-number>.md` files are **legacy only**. Do not create them for new work. If an already-active branch contains one, first absorb all recovery-relevant state into the rolling Issue comment, then remove the legacy file **before the final release-ready Work tree is frozen for Development Completion**.
 
 #### Candidate cleanup and history isolation
 
-The journal is disposable Work-Path state and must never be published.
+The final exact Work tree qualified by Development Completion must already be free of legacy recovery files and contain only intended release content.
 
-Before Candidate creation:
+Before the final `Development-Completion: requested` commit:
 
-1. finish the intended product work and required development-completion checks;
-2. if a legacy `.chatgpt-work/LBS-<github-issue-number>.md` exists, first ensure its relevant state is already present in the rolling Issue comment, then remove it;
-3. verify the final cleaned work-branch tree contains only intended release content;
-4. re-read current `main` and reconcile it if necessary;
-5. create the release-ready Candidate as a **single clean commit whose parent is current `main` and whose tree exactly equals the final cleaned work-branch tree**;
-6. include the normal `Work-Branch: work/LBS-<github-issue-number>` provenance trailer and, for an escalated Patch/Hotfix, the required `Work-Branch-Reason:` trailer.
+1. absorb/remove any legacy `.chatgpt-work/LBS-<github-issue-number>.md`;
+2. verify the cleaned work-branch tree contains only intended release content;
+3. re-read and reconcile current `main`;
+4. recompute any evidence invalidated by that reconciliation;
+5. create the tree-identical qualification request commit and run Development Completion on that exact cleaned tree.
 
-The Work-Path journal commits therefore remain reachable only through the disposable work branch. They must not become ancestors of the Candidate, source tag, publication PR or `main`. Existing exact Candidate/work-branch tree equality remains the release safety contract, and the Release Orchestrator retains responsibility for deleting the work branch only after rechecking that equality.
+After `Candidate-Entry: PASS` is recorded for that frozen Work SHA, do **not** mutate the Work branch before Candidate creation. Any Work-tree change after qualification makes the exact-SHA Development Completion evidence stale and requires a new request/evaluation before Candidate exposure.
 
-Once the journal has been intentionally removed and the Candidate has been exposed, do **not** recreate the journal merely because the interactive stream stops. At that point the Candidate ref, exact Candidate SHA, GitHub Actions runs, release ref/PR, tag and current `main` are the durable recovery surface. A missing Candidate branch after interruption may be normal evidence that promotion already succeeded; verify the Actions run and downstream release state before treating the missing ref as a failure.
+Create the release-ready Candidate as a **single clean commit whose parent is current `main` and whose tree exactly equals the frozen, cleaned Work tree**. Work-branch checkpoint history must not become Candidate ancestry. After Candidate exposure, Candidate/Actions/Release state is the canonical recovery surface; continue updating the rolling Issue comment, but do not recreate legacy recovery files or mutate the Work branch.
 
-LBS-36 introduced this mechanism. LBS-31 validated the recovery model but showed that event-driven updates were too sparse, which led to the current time-based maximum-three-minute `ACTIVE` cadence. LBS-29 then validated the refined rule end to end: 15 journal commits covered a 21m48s active Work-Path window, the maximum heartbeat interval was 165 seconds, no `ACTIVE` heartbeat exceeded three minutes, and 14 measured journal writes accumulated 40.53 seconds of connector write latency without triggering product builds or test gates. The interactive stream later terminated after Candidate publication; recovery succeeded directly from the Candidate/Actions/Release state and the release completed normally.
-
-LBS-27 provided a second cost-focused measurement. Its heartbeat/journal phase lasted about 19m11s. Nine explicitly measured journal updates consumed 33.791 seconds of GitHub write latency; including the initial journal create, final removal, journal reads and concise status preparation, the practical end-to-end heartbeat overhead was estimated at roughly **50–70 seconds**, or about **4–6% (approximately 5%)** of the active Work-Path phase. Treat this as an empirical engineering range, not a fixed SLA: connector latency, task shape and finding density can change it.
-
-That approximately five-percent cost is an **accepted resilience budget for Work-Path development**. The comparison is not heartbeat versus zero cost; it is heartbeat versus the potentially much larger cost of reconstructing unpublished decisions, failed experiments, exact checkpoints and next actions after an unexpected stream/session/runtime interruption. In the current ChatGPT operating environment, long interactive work can also encounter session/runtime limits on the order of tens of minutes (roughly 30 minutes has been observed operationally); this is an environmental observation, not a guaranteed platform contract, and may change. Durable three-minute-scale recovery state materially limits the loss caused by such interruptions.
-
-Do not use this accepted overhead as justification to add heartbeat machinery to ordinary small Patch/Hotfix work. The branchless fast path intentionally remains journal-free. Conversely, do not weaken or remove the Work-Path heartbeat merely to save a few percent of runtime unless repeated measurements show materially disproportionate overhead or a better recovery mechanism provides equivalent or stronger guarantees.
-
-The heartbeat journal is therefore a **retained, established Work-Path standard**, not an experiment.
 
 ## 5. Stream/session resilience
 
@@ -408,8 +403,6 @@ Therefore:
 - after any unexpected interruption, re-read `main`, the work-branch head and the rolling Issue recovery comment before continuing;
 - use the rolling-comment heartbeat plus direct GitHub Actions state to distinguish a dead interactive stream from independently running GitHub automation;
 - never claim that background development continued when no automation/workflow was actually running.
-
-LBS-17 had two significant continuity gaps: work stopped after checkpoint 4 and again after checkpoint 7 until the user prompted continuation. The checkpoint model prevented source loss, but the idle wall-clock time was still avoidable.
 
 ## 6. Connector-call budget and atomic Git writes
 
@@ -436,27 +429,14 @@ If an orchestration call aborts:
 - do not blindly replay the whole write sequence;
 - unreferenced blobs/trees/commits are not authoritative project state.
 
-The first LBS-17 implementation attempt exceeded the code-mode tool-call limit because too many GitHub reads/writes were composed into one block. The visible branch remained safe, but the retry consumed avoidable time.
-
 ## 7. Repository archive / ZIP and clone limitations
 
 ### This is not work-branch-specific
 
 A work branch does **not** inherently prevent cloning, ZIP download, materialization, or normal Git operations.
 
-The LBS-17 message:
+A connector/runtime environment may lack repository archive materialization or direct GitHub network access even though normal GitHub ref/file/Git-object operations remain available. Treat that as an execution-environment limitation, not a Git or work-branch property.
 
-> “The connector ZIP path is not available in this environment…”
-
-described an **execution-environment/tooling limitation**, not a Git or work-branch property.
-
-During the pilot:
-
-- the available GitHub connector did not expose a general repository archive/zipball materialization operation;
-- the container runtime could not resolve/reach `github.com` for direct Git access;
-- attempting GitHub archive URLs through web/container access did not provide a reliable canonical full-worktree path.
-
-The work branch only made this limitation more visible because the newest intermediate source state existed only on GitHub and a full local worktree would have been convenient for runtime generation and repository-wide validators.
 
 ### Required behavior
 
@@ -468,7 +448,7 @@ If the connector has no repository-archive action and direct clone/network acces
 4. continue connector-first for canonical file/ref/Git-object work;
 5. prefer repository-hosted GitHub Actions for operations that genuinely require a complete worktree.
 
-LBS-40 / #85 tracks the dedicated hosted **Development Completion gate** for the exact final Work-Branch SHA. It is intentionally a final Candidate-entry qualification gate, not a mandatory full-matrix runner for every routine checkpoint.
+The repository's hosted **Development Completion gate** is the required full-worktree qualification path for the exact final Work-Branch SHA. It is a final Candidate-entry qualification gate, not a mandatory full-matrix runner for every routine checkpoint.
 
 If a local full worktree is unavailable during ordinary checkpoint work, persist a coherent recoverable source checkpoint and record full-worktree qualification as pending rather than emulating the repository through ad-hoc connector assertions. This is acceptable checkpoint state only. Before Candidate exposure, the final exact SHA must satisfy the mandatory Candidate-entry contract; if no truthful full-worktree execution path exists, Candidate Entry is `BLOCKED`.
 
@@ -497,7 +477,7 @@ Before creating the tree-identical `Development-Completion: requested` commit:
 
 Do **not** manually add Release-Orchestrator-owned publication outputs such as `README.md`, `bin/BUILD_INTEGRITY.txt`, `downloads/latest.json`, `downloads/releases.json`, `downloads/README.md`, or historical release ZIPs to the Work tree merely to complete a version-only Hotfix.
 
-This checklist is the persistent process lesson from comparing LBS-41 / Issue #88 with the later v0.10.7.2 benchmark: #88 synchronized the full five-file version-only Work tree before Development Completion #1, while the later run initially requested Development Completion before those deterministic artifacts were synchronized and was correctly stopped fail-closed.
+This five-file scope is the current version-only Work-Path invariant. Development Completion qualifies that already synchronized tree; it does not repair or canonicalize stale generated state.
 
 Do not manually patch `bin/LenovoBootMenuTray.ps1` through a long chain of ad-hoc incremental text replacements when the repository build tool can define the composition authoritatively.
 
@@ -512,13 +492,11 @@ If a full local worktree is unavailable, prefer a GitHub-hosted full-worktree va
 
 For routine work-branch checkpoints, edit the canonical modular source and persist only coherent recoverable states. A checkpoint may honestly record deterministic runtime regeneration or full-worktree validation as pending; it must not be labeled synchronized/GREEN when tracked generated output is stale.
 
-Do not assume a future workflow may mutate source or generated files unless that mutation contract is explicitly implemented and reviewed. LBS-40 is currently scoped as an exact-SHA qualification gate, not as automatic source canonicalization.
+Development Completion is an exact-SHA qualification gate and must not mutate or canonicalize source/generated files as part of qualifying the requested Work SHA.
 
 Before Candidate creation, tracked runtime state must match canonical source and the mandatory Development Completion/Candidate Entry checks must PASS on the exact frozen Work SHA.
 
 When text composition is unavoidable in JavaScript tooling, treat PowerShell `$` characters as data. Do not use the replacement-string form of JavaScript `String.replace()` for generated PowerShell content because `$` sequences have replacement semantics. Use a literal-safe method such as `split/join` or a replacement callback.
-
-LBS-17 hit this exact problem once and had to regenerate the staged runtime.
 
 ## 9. Avoid unreferenced staging-commit chains
 
@@ -530,7 +508,7 @@ Use:
 - at most one temporary tree/commit when it materially helps inspection;
 - one referenced checkpoint commit for the coherent phase.
 
-LBS-17 created many temporary/unreferenced staging commits while incrementally rebuilding the runtime. They protected the visible work branch but added connector roundtrips and debugging overhead. This is not the normal target process.
+Temporary Git objects may support atomic assembly, but chains of unreferenced staging commits are not the normal target process and must never become the durable recovery model.
 
 ## 10. Validation hierarchy before Candidate
 
@@ -549,7 +527,7 @@ Use validation proportional to the Git object's role:
 - **Release-ready Candidate:** after the path-specific preparation above, the Candidate is expected GREEN; GitHub Candidate Preflight then reruns the authoritative Linux and Windows PowerShell 5.1 gates on the exact exposed SHA.
 - **Release:** the Release Orchestrator reruns the publication/reproducibility/status gates as defense in depth.
 
-The full repository matrix does **not** run before every persistence commit. For Work-Path releases it runs once during final Development Completion immediately before Candidate and is rerun by Candidate/Release automation. For the branchless fast path, Candidate Preflight remains the first full integration matrix by design.
+The full repository matrix does **not** run before every persistence commit. For Work-Path releases, final Development Completion runs the mandatory Linux Candidate-entry validator set plus hosted Windows PowerShell 5.1 evidence on the exact Work SHA. Candidate Preflight reruns the authoritative Linux and hosted Windows release-entry gates on the exposed Candidate SHA. Release automation reruns the publication-side deterministic/permanent validators and release integrity/reproducibility gates as defense in depth; it is not described as rerunning the complete hosted Windows Candidate suite. For the branchless fast path, Candidate Preflight remains the first full integration matrix by design.
 
 ### Test ownership and redundancy
 
@@ -728,7 +706,7 @@ An empty intent list is a valid PASS only after the exact final diff proves that
 
 #### Executable Development Completion workflow
 
-LBS-40 implements the mandatory hosted/full-worktree path as `.github/workflows/development-completion.yml`.
+The mandatory hosted/full-worktree Development Completion path is `.github/workflows/development-completion.yml`.
 
 Operational contract:
 
@@ -789,11 +767,7 @@ Minimum fields:
 
 If any mandatory evidence cannot be produced, set `Candidate-Entry: BLOCKED`; do not use Candidate Preflight as the first runner for that missing evidence.
 
-LBS-17's first Candidate failed because a regression assertion was too broad. The product behavior was correct; the exact permanent validator had not been executed against the work branch before Candidate exposure. A hosted work-branch preflight would have caught this earlier.
-
-LBS-23/v0.8.0.1 reinforced the opposite efficiency lesson for small fixes: the work branch accumulated **24 commits** for an 18-file Hotfix, while several manual structural checks and an issue-specific Python validator duplicated behavior already covered by Functional Core and the native localization suite. The extra validator also created avoidable quote/prose-literal corrections. Future small Patch/Hotfix work should therefore favor the atomic branchless path, one behavioral regression at the lowest useful layer, and only distinct integration coverage.
-
-The LBS-23 Candidate also found a displaced UTF-8 BOM on a PowerShell file. For changed PowerShell sources containing non-ASCII text, a cheap encoding/BOM/parser smoke check is appropriate before Candidate exposure; that is a targeted precheck, not justification for running the full repository suite before every commit.
+For changed PowerShell sources containing non-ASCII text, a cheap encoding/BOM/parser smoke check is appropriate before Candidate exposure. This is a targeted precheck, not justification for running the full repository suite before every commit.
 
 ## 11. Candidate and release supervision
 
@@ -818,119 +792,49 @@ Include exactly one unique candidate-history trailer:
 
 Use `Work-Branch: none` for the normal Patch/Hotfix path and whenever no work branch exists. Major/Minor releases may not use `none`. If a Patch/Hotfix declares `work/LBS-*`, Candidate Preflight additionally requires exactly one non-empty `Work-Branch-Reason:` trailer documenting the pre-implementation effort/risk exception. Candidate Preflight requires an exact tree match between the declared work branch and the Candidate. After successful publication, the Release Orchestrator rechecks the tree and deletes that work branch automatically. If the branch changed after Candidate creation, cleanup fails closed and preserves the branch. The final `RELEASE_VERIFICATION_SUMMARY` must confirm candidate, release, and declared work-branch cleanup.
 
-LBS-17 included several unnecessary repeated job-status reads and redundant post-release API verification calls even though the repository already had aggregated summaries.
+## 12. Normal Work-Path target process
 
-## 12. LBS-17 pilot timing evidence
+For Work-Path development, use this target sequence:
 
-The LBS-17 work-branch pilot started at **2026-10-06 18:26:53Z** and the Release Orchestrator finished at **20:52:25Z**: about **2 h 25 min 32 s** wall-clock.
-
-Checkpoint timestamps:
-
-| Gate | UTC | Delta |
-| --- | --- | ---: |
-| Pilot start | 18:26:53 | — |
-| Checkpoint 1 | 18:32:31 | 5m 38s |
-| Checkpoint 2 | 18:36:06 | 3m 35s |
-| Checkpoint 3 | 18:52:32 | 16m 26s |
-| Checkpoint 4 | 19:02:10 | 9m 38s |
-| Checkpoint 5 | 19:48:53 | 46m 43s |
-| Checkpoint 6 | 20:04:48 | 15m 55s |
-| Checkpoint 7 | 20:13:04 | 8m 16s |
-| First Candidate run | 20:49:28 | 36m 24s after CP7 |
-| Release complete | 20:52:25 | 2m 57s after first Candidate start |
-
-The large elapsed time was therefore **not the publication pipeline**.
-
-The successful Candidate reported:
-
-- candidate gate elapsed: about **28.5 s**;
-- Linux execution: about **4 s**;
-- Windows critical path: about **22.3 s**;
-- Windows localization runtime: **14/14**;
-- aggregate Windows functional checks: **221/221**.
-
-The first Candidate start through final release completion took about **2m57s**, including one unexpected Candidate failure, its minimal validator correction, a second Candidate Preflight, and the Release Orchestrator.
-
-The two largest wall-clock gaps were:
-
-- checkpoint 4 → 5: **46m43s**, including an interrupted interactive workstream plus the most complex UI/runtime migration phase;
-- checkpoint 7 → Candidate: **36m24s**, dominated by an idle/terminated interactive session that required the user to prompt continuation.
-
-Optimization effort should therefore target development/session/connector orchestration, not remove Candidate/Release safety gates.
-
-## 13. Normal target process for the next Major/Minor feature
-
-For a comparable feature, aim for:
-
-1. Issue and explicit product-decision gate;
-2. verified `main`;
-3. one `work/LBS-<github-issue-number>` branch (Major/Minor, or an explicitly escalated Patch/Hotfix exception);
-4. roughly 3–5 coherent checkpoints rather than many tiny checkpoints;
-5. no more than about 10–15 minutes of completed unpersisted work;
-6. bounded connector operations;
-7. no clone/ZIP detours after the environment limitation is known;
+1. Issue and product-decision gate when applicable;
+2. freshly verified `main`;
+3. one `work/LBS-<github-issue-number>` branch;
+4. coherent product checkpoints at a cadence that prevents more than about **10–15 minutes of substantive completed work** from existing only in transient context;
+5. bounded connector operations and no heartbeat-only Git commits;
+6. focused validation owned by each implementation phase;
+7. no clone/ZIP detours after an environment limitation is established;
 8. no manual incremental generated-runtime reconstruction;
-9. perform Development Completion on the exact final Work-Branch SHA and produce all mandatory Candidate-entry evidence;
-10. if any mandatory Candidate-entry evidence is unavailable, stale, or failed, set Candidate Entry to `BLOCKED` and resolve the tooling/finding before proceeding;
-11. create one release-ready Candidate only after the rolling comment records `Candidate-Entry: PASS`, carrying the exact `Work-Branch:` provenance trailer;
-12. normal Candidate/Release automation;
-13. automatic, tree-verified work-branch cleanup after successful publication.
+9. remove/absorb any legacy recovery file before freezing the final Work tree;
+10. perform Development Completion on that exact cleaned Work SHA and produce all mandatory Candidate-entry evidence;
+11. if any mandatory evidence is unavailable, stale, or failed, keep Candidate Entry `BLOCKED` and resolve it before proceeding;
+12. expose one release-ready Candidate only after `Candidate-Entry: PASS`, carrying exact Work-Branch provenance;
+13. let Candidate/Release automation perform promotion/publication and tree-verified cleanup.
+
+Checkpoint count is not a quota. A rough count such as 3–5 may be convenient for some features, but the **10–15 minute resilience bound has priority** and may require more checkpoints.
 
 Never optimize by weakening validation, safety boundaries, reproducibility, or release verification.
 
-## 14. LBS-39 post-pilot Development Completion contract
-
-### LBS-28 empirical result
-
-LBS-28 / v0.10.5.0 was the first measured pilot of the LBS-38 guidance.
-
-Compared with LBS-26 / v0.10.4.0:
-
-- failed Candidate revisions before GREEN: **4 → 2** (**50% fewer**);
-- first Candidate → Release Verification: **22m51.862s → 8m49.446s** (about **61.4% lower**);
-- final GREEN Candidate → Release Verification: **1m33.862s → 1m22.446s** (about **12.2% lower**);
-- Release Orchestrator attempts remained **1 → 1**.
-
-The pilot proved that the Development Completion discipline moved several deterministic defects earlier:
-
-- malformed Windows-workflow text transformation;
-- stale UI test dependencies after ownership migration;
-- stale permanent-validator ownership assumptions.
-
-It also exposed two remaining failure classes:
-
-1. Candidate #1 failed on `protectedFragmentIntent` because the prescribed exact full-worktree check had no executable pre-Candidate path in the active environment. Classification: **Tooling gap**.
-2. Candidate #2 failed on a stale fixed UI test count (23 vs 25) that was visible in repository source and should have been caught by the propagation sweep. Classification: **Development Guideline miss**.
-
-These are now permanent process requirements above, not optional pilot observations.
-
-### Mandatory failure classification
+## 13. Unexpected Candidate failure classification
 
 Every unexpected Candidate failure must be classified in the rolling comment as exactly one primary category:
 
-- **Development Guideline miss** — the required check was applicable and executable/inspectable before Candidate, but the process failed to perform or propagate it correctly;
-- **Tooling gap** — the required pre-Candidate evidence had no executable path;
+- **Development Guideline miss** — an applicable, executable/inspectable pre-Candidate check was not performed or propagated correctly;
+- **Tooling gap** — mandatory pre-Candidate evidence had no executable path;
 - **Genuinely Candidate-only** — the condition could not reasonably exist or be evaluated before Candidate exposure;
 - **External infrastructure failure** — GitHub/runner/service failure unrelated to repository correctness.
 
-Each classification requires a follow-up action:
+Follow-up is mandatory:
 
-- Guideline miss → harden the guideline/checklist or permanent executable contract so the same class is not repeated;
-- Tooling gap → create or link an automation/tooling Issue;
+- Guideline miss → harden the guideline/checklist or permanent executable contract;
+- Tooling gap → add/fix the executable path before future equivalent Candidate entry;
 - Candidate-only → document why Candidate is the correct first evaluation point;
-- External infrastructure → preserve exact repository state, avoid retry storms, and keep outage time separate in benchmark metrics.
+- External infrastructure → preserve exact repository state, avoid retry storms, and keep outage time separate from normalized repository-process timing.
 
-### Executable gate
+## 14. Development Completion and release separation
 
-LBS-40 / #85 implements the hosted/full-worktree Development Completion workflow described above.
+The repository-supported Work-Path route through `.github/workflows/development-completion.yml` is the **required** execution path for mandatory hosted/full-worktree Candidate-entry evidence. If it cannot run or cannot produce exact-SHA PASS evidence, Work-Path remains `BLOCKED`; Candidate Preflight must not be used as a substitute first runner.
 
-The repository-supported Work-Path route is now the preferred execution path for mandatory Candidate-entry evidence. If that workflow cannot run or cannot produce exact-SHA PASS evidence, the Work-Path remains **BLOCKED**; Candidate Preflight must not be used as a substitute first runner.
-
-### Release separation
-
-Development Completion is never publication authorization.
-
-It must not:
+Development Completion is never publication authorization. It must not:
 
 - create or promote `candidate/**` or `release/**` branches;
 - create version tags, release ZIPs, or publication PRs;
