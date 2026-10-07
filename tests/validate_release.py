@@ -132,7 +132,7 @@ def main():
     taskbroker_migration_path=root/'tests/Test-TaskBrokerMigration.ps1'
     s.c('LBS-33 native TaskBroker migration test exists',taskbroker_migration_path.is_file())
     taskbroker_migration=txt(taskbroker_migration_path) if taskbroker_migration_path.is_file() else ''
-    s.has('LBS-34 migration suite keeps fixed total 36',taskbroker_migration,'Write-Host "TASKBROKER MIGRATION TOTAL $checks/36"')
+    s.has('LBS-35 migration suite keeps fixed total 42',taskbroker_migration,'Write-Host "TASKBROKER MIGRATION TOTAL $checks/42"')
     s.has('LBS-33 native aggregate runner invokes migration suite',windows_wrapper,'Test-TaskBrokerMigration.ps1')
     installer_trigger_source=txt(root/'bin/Install-LenovoBootMenuTasks.ps1')
     s.has('LBS-34 installer has authoritative XML trigger verifier',installer_trigger_source,'function Test-CanonicalTaskTriggerXml')

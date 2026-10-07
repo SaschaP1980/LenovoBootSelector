@@ -67,6 +67,22 @@ Invoke-Expression $triggerXmlFunction[0].Extent.Text
 Assert-True 'Installer trigger verification uses registered-task XML' ($installer.Contains('Test-CanonicalTaskTriggerXml -TaskXml ([string]$task.Xml)'))
 Assert-False 'Installer trigger verification no longer trusts CIM Triggers projection' ($installer.Contains('$definition.Triggers'))
 
+$canonicalDefinitionFunction = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-CanonicalTaskDefinitionMap' },$true))
+if ($canonicalDefinitionFunction.Count -ne 1) { throw 'Expected exactly one installer function: Get-CanonicalTaskDefinitionMap' }
+$canonicalAssertFunction = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Assert-CanonicalTaskSpec' },$true))
+if ($canonicalAssertFunction.Count -ne 1) { throw 'Expected exactly one installer function: Assert-CanonicalTaskSpec' }
+$legacyCleanupFunction = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Remove-LegacyTaskBrokerInstallation' },$true))
+if ($legacyCleanupFunction.Count -ne 1) { throw 'Expected exactly one installer function: Remove-LegacyTaskBrokerInstallation' }
+$probeCleanupFunction = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Remove-ProbeTasks' },$true))
+if ($probeCleanupFunction.Count -ne 1) { throw 'Expected exactly one installer function: Remove-ProbeTasks' }
+
+Assert-True 'Canonical definitions are loaded in one exact-name batch' ($canonicalDefinitionFunction[0].Extent.Text.Contains('Get-ScheduledTask -TaskName $names -ErrorAction Stop'))
+Assert-False 'Per-task canonical verifier no longer calls ScheduledTasks CIM' ($canonicalAssertFunction[0].Extent.Text.Contains('Get-ScheduledTask'))
+Assert-True 'Legacy cleanup unregisters the owned name set in one batch' ($legacyCleanupFunction[0].Extent.Text.Contains('Unregister-ScheduledTask -TaskName $removed -Confirm:$false -ErrorAction Stop'))
+Assert-False 'Legacy cleanup no longer unregisters one task per loop iteration' ($legacyCleanupFunction[0].Extent.Text.Contains('Unregister-ScheduledTask -TaskName $name'))
+Assert-True 'Probe cleanup unregisters the fixed probe list in one batch' ($probeCleanupFunction[0].Extent.Text.Contains('Unregister-ScheduledTask -TaskName $names -Confirm:$false -ErrorAction SilentlyContinue'))
+Assert-True 'Installer emits per-step duration diagnostics' ($installer.Contains('END durationMs={0}'))
+
 $taskNs = 'http://schemas.microsoft.com/windows/2004/02/mit/task'
 $noTriggerXml = "<Task xmlns='$taskNs'><Triggers /></Task>"
 $timeTriggerXml = "<Task xmlns='$taskNs'><Triggers><TimeTrigger><StartBoundary>2026-10-07T09:00:00</StartBoundary><Enabled>true</Enabled></TimeTrigger></Triggers></Task>"
@@ -107,5 +123,5 @@ Assert-True 'Uninstaller still recognizes legacy manager task' ($uninstaller.Con
 Assert-True 'Uninstaller removes canonical ProgramData root' ($uninstaller.Contains('Join-Path $env:ProgramData ''Lenovo Boot Selector\TaskBroker'''))
 Assert-True 'Uninstaller also removes exact legacy ProgramData root' ($uninstaller.Contains('Join-Path $env:ProgramData ''Lenovo Boot Menu\TaskBroker'''))
 
-Write-Host "TASKBROKER MIGRATION TOTAL $checks/36"
-if ($checks -ne 36) { throw "Unexpected TaskBroker migration test count $checks" }
+Write-Host "TASKBROKER MIGRATION TOTAL $checks/42"
+if ($checks -ne 42) { throw "Unexpected TaskBroker migration test count $checks" }
