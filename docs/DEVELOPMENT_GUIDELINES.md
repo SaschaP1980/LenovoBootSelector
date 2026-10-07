@@ -28,7 +28,7 @@ Patch and Hotfix work uses the shortest safe atomic path **without a work branch
 
 Do not use a work branch for a small Patch/Hotfix merely for consistency with Major/Minor releases; the resilience machinery must not become routine overhead for short fixes.
 
-The Work-Path heartbeat journal defined below is the established resilience standard **only after a `work/LBS-*` path has already been selected**. It is not used for the normal branchless Patch/Hotfix fast path.
+The Work-Path rolling recovery comment defined below is the established resilience standard **only after a `work/LBS-*` path has already been selected**. It is not used for the normal branchless Patch/Hotfix fast path.
 
 The release path remains defined by `docs/RELEASE_PROCESS.md`. Connector/GitHub operating details remain defined by `docs/GITHUB_HOWTO.md`.
 
@@ -233,72 +233,62 @@ A checkpoint commit should contain at least:
 
 A fresh agent should be able to read the Issue and latest work-branch checkpoint and continue without the previous chat.
 
-### Work-Path heartbeat journal
+### Work-Path rolling recovery comment
 
-This mechanism applies **only** to development that already uses a durable `work/LBS-<issue>` branch. It therefore applies to Major/Minor work and to the exceptional Patch/Hotfix that was explicitly escalated to the Work-Path model. It does **not** apply to the normal branchless Patch/Hotfix fast path.
+This mechanism applies **only** to development that already uses a durable `work/LBS-<issue>` branch. Major/Minor work and explicitly escalated Patch/Hotfix work use it; the normal branchless Patch/Hotfix fast path does not.
 
-During active interactive Work-Path development, maintain one temporary tracked continuation journal:
+Maintain exactly **one rolling recovery comment** in the active GitHub Issue. Prefer the implementation-start comment and update that same comment in place. Do not create a new heartbeat comment every interval.
 
-`.chatgpt-work/LBS-<issue>.md`
+The rolling comment and a product checkpoint have different responsibilities:
 
-The journal and a product checkpoint have different responsibilities:
+- a **product checkpoint** is a coherent recoverable source state on `work/LBS-<issue>` and may include focused validation;
+- the **rolling recovery comment** is the cumulative operational handover state for the complete Build & Release lifecycle.
 
-- a **product checkpoint** is a coherent recoverable source state and may include focused validation;
-- a **heartbeat journal commit** is a deliberately lightweight persistence event for recent engineering findings and liveness state.
+The rolling comment must remain sufficient for a fresh session to continue without reconstructing prior chat. It is not private chain-of-thought. Keep concise but complete durable facts such as:
 
-A heartbeat journal commit must not trigger a build, full test matrix, runtime regeneration, Candidate gate or checkpoint gate merely because the journal changed. When the connector supports a single-file contents update, prefer that lightweight write path rather than reconstructing a full product checkpoint.
-
-The journal records only durable engineering continuation information that could appropriately appear in a normal progress update. It is **not** a private chain-of-thought record. Useful entries include:
-
-- facts and constraints discovered;
-- experiments attempted and their concise result;
-- failed approaches and the technical reason they were rejected;
-- test/validator findings;
-- evidence-based decisions;
-- current phase and next intended action;
-- relevant GitHub workflow/run identifiers.
-
-Keep a compact status header with at least:
-
-```text
-Branch: work/LBS-XX
-Base-Main: <sha>
-Last-Heartbeat-UTC: <timestamp>
-Agent-State: ACTIVE | WAITING_FOR_GITHUB | IDLE | STOPPED
-GitHub-Run: none | <workflow/run identifier>
-Last-Product-Checkpoint: <sha>
-Current-Phase: <short phase>
-Next-Action: <short next action>
-```
-
-Exact formatting may evolve, but the semantics above must remain recoverable.
+- base `main`, current work head and last product checkpoint SHA;
+- target version, release profile and development-path reason;
+- current phase, `Agent-State`, exact next action and open risks;
+- architecture decisions and safety constraints;
+- every product checkpoint with purpose/result;
+- experiments attempted, failures and why approaches were rejected;
+- test/validator findings and corrections;
+- Development Completion evidence and unavailable-capability/tooling gaps;
+- exact GitHub Actions run IDs, tested SHA, totals and timings;
+- Candidate history, including every PASS/FAIL and correction cause;
+- Release/PR/tag/artifact verification;
+- wall-clock and gate timing measurements used for pilot comparisons.
 
 #### Heartbeat cadence and stale interpretation
 
-While the interactive agent is actively working on a Work-Path task, heartbeat cadence is **time-based, not event-based**.
+While the interactive agent is actively working on a Work-Path task, cadence is **time-based, not event-based**.
 
-- With `Agent-State: ACTIVE`, the latest journal commit must not become more than approximately **3 minutes old**, even when no new technical conclusion has been reached.
-- A finding, decision, failed experiment, checkpoint, or other substantive journal update may serve as the heartbeat for that interval.
-- If no new finding exists when the interval expires, write a minimal truthful heartbeat such as `still investigating <phase>; no new conclusion yet`. A timer-only heartbeat is valid and intentional because liveness is itself durable information.
-- Also write a heartbeat immediately before a potentially long/high-risk tool sequence when the intended next action matters for recovery.
-- Use concise commit subjects that distinguish liveness from findings, for example `worklog(LBS-XX): heartbeat`, `worklog(LBS-XX): record <finding>`, or `worklog(LBS-XX): record <failure>`.
+- With `Agent-State: ACTIVE`, the rolling comment's `Last heartbeat` must not become more than approximately **3 minutes old**.
+- Every update is cumulative: retain prior Build & Release evidence and add/refresh the newest recovery-relevant information.
+- A finding, decision, failed experiment, checkpoint or gate result is the preferred heartbeat payload.
+- If no new recovery-relevant information exists when the interval expires, update the same comment with a minimal truthful liveness statement; do not create a Git commit merely for the timer.
+- Update immediately before a potentially long/high-risk tool sequence when the next action matters for recovery.
+- Serialize mutative GitHub writes; do not parallelize heartbeat/comment mutations.
 
-The active-agent cadence may pause only in two cases:
+The active cadence may pause only when:
 
-1. the interactive agent is genuinely no longer working, represented as `IDLE` or `STOPPED`; or
-2. execution is intentionally waiting on independent GitHub Actions work. Before pausing, set `Agent-State: WAITING_FOR_GITHUB` and persist the exact workflow/run identifier in `GitHub-Run`.
+- `Agent-State: WAITING_FOR_GITHUB` names an exact independently running Actions run, or
+- `Agent-State: IDLE` / `STOPPED` truthfully states that interactive work is not continuing.
 
-When the referenced GitHub run completes or fails and interactive work resumes, set `Agent-State: ACTIVE` again and immediately resume the maximum-three-minute heartbeat cadence.
+When a referenced workflow completes and interactive work resumes, set `Agent-State: ACTIVE` and immediately resume the maximum-three-minute cadence.
 
-Operationally:
+Interpretation:
 
-- a recent `ACTIVE` heartbeat means only that the interactive agent was active at that recorded point;
-- an `ACTIVE` heartbeat older than roughly **3 minutes** is a missed heartbeat and should be treated as suspicious;
-- when the latest heartbeat is older than roughly **5 minutes** and no referenced GitHub Actions run is currently `queued` or `in_progress`, treat the interactive agent/stream as stopped and resume from durable GitHub state;
-- when `Agent-State: WAITING_FOR_GITHUB` references a workflow that is still `queued` or `in_progress`, GitHub continues independently even if the chat stream stopped;
-- never describe interactive-agent work as continuing in the background when no independent automation is actually running.
+- a recent `ACTIVE` timestamp means the interactive agent was active at that recorded point;
+- an `ACTIVE` heartbeat older than roughly **3 minutes** is a missed heartbeat;
+- when the latest heartbeat is older than roughly **5 minutes** and no referenced Actions run is `queued` or `in_progress`, treat the interactive stream as stopped and resume from durable GitHub state;
+- when `WAITING_FOR_GITHUB` references a live run, GitHub automation may continue independently even if the chat stream stops.
 
-On recovery from an interrupted Work-Path session, a fresh agent must read current `main`, the Issue, the `work/LBS-<issue>` head, the latest product checkpoint context and the journal when it exists before taking further action. Re-check any referenced GitHub run directly rather than trusting a stale journal status.
+On recovery, re-read current `main`, the Issue including the rolling recovery comment, the `work/LBS-<issue>` head and the latest product checkpoint before continuing. Re-check referenced Actions runs directly.
+
+Tracked `.chatgpt-work/LBS-<issue>.md` heartbeat files are now **legacy only**. Do not create them for new work. If an already-active branch contains one from the previous standard, keep it only until the rolling Issue comment has absorbed all recovery-relevant information, then remove it before Candidate creation. Timer-only Git commits are prohibited under the rolling-comment model.
+
+Historical measurements from LBS-29/LBS-27 remain useful evidence for why the three-minute recovery objective exists, but their journal-commit write overhead is not the target architecture anymore. The rolling-comment model preserves the recovery objective while removing heartbeat churn from Git history.
 
 #### Candidate cleanup and history isolation
 
@@ -307,7 +297,7 @@ The journal is disposable Work-Path state and must never be published.
 Before Candidate creation:
 
 1. finish the intended product work and required development-completion checks;
-2. remove `.chatgpt-work/LBS-<issue>.md` from the work branch;
+2. if a legacy `.chatgpt-work/LBS-<issue>.md` exists, first ensure its relevant state is already present in the rolling Issue comment, then remove it;
 3. verify the final cleaned work-branch tree contains only intended release content;
 4. re-read current `main` and reconcile it if necessary;
 5. create the release-ready Candidate as a **single clean commit whose parent is current `main` and whose tree exactly equals the final cleaned work-branch tree**;
@@ -336,8 +326,8 @@ Therefore:
 - do not hold a large finished change only in tool memory;
 - do not assume work continues between user turns;
 - when asked whether work is still running, verify GitHub refs/commit timestamps and relevant Actions runs instead of inferring activity from conversation text;
-- after any unexpected interruption, re-read `main`, the work-branch head and the Work-Path heartbeat journal when present before continuing;
-- use the journal heartbeat plus direct GitHub Actions state to distinguish a dead interactive stream from independently running GitHub automation;
+- after any unexpected interruption, re-read `main`, the work-branch head and the rolling Issue recovery comment before continuing;
+- use the rolling-comment heartbeat plus direct GitHub Actions state to distinguish a dead interactive stream from independently running GitHub automation;
 - never claim that background development continued when no automation/workflow was actually running.
 
 LBS-17 had two significant continuity gaps: work stopped after checkpoint 4 and again after checkpoint 7 until the user prompted continuation. The checkpoint model prevented source loss, but the idle wall-clock time was still avoidable.
@@ -484,7 +474,7 @@ The review is a development discipline, not a new publication gate. It must:
 - manually dispatch the existing `.github/workflows/windows-powershell51.yml` against the exact final `work/LBS-<issue>` revision and require its hosted Windows PowerShell 5.1 contract suite to pass before Candidate creation;
 - after that hosted Windows run, re-read the work-branch head and require it still to be the exact revision that was tested; rerun if the branch advanced.
 
-If a complete worktree or another required pre-Candidate capability is unavailable, record the exact tooling limitation in the Issue/journal. Do **not** replace missing permanent validators with dozens of approximate connector-side assertions and do not claim unavailable checks passed.
+If a complete worktree or another required pre-Candidate capability is unavailable, record the exact tooling limitation in the Issue rolling comment. Do **not** replace missing permanent validators with dozens of approximate connector-side assertions and do not claim unavailable checks passed.
 
 All executable Development Completion checks must be green and all known deterministic integration findings must be resolved before the Candidate is exposed. Candidate Preflight remains authoritative and reruns its mandatory Linux and hosted Windows gates; Development Completion evidence never substitutes for it.
 
@@ -509,7 +499,7 @@ Use:
 
 Do not reconstruct fields already covered by a successful aggregate summary through many additional connector calls unless investigating an inconsistency.
 
-For any Candidate derived from a durable work branch, first remove the temporary Work-Path heartbeat journal, then create a clean current-`main`-parent Candidate commit whose tree exactly matches the cleaned work-branch tree. The work-branch journal/checkpoint history is recovery state and must not become Candidate ancestry.
+For any Candidate derived from a durable work branch, first ensure no legacy `.chatgpt-work/LBS-<issue>.md` remains, then create a clean current-`main`-parent Candidate commit whose tree exactly matches the cleaned work-branch tree. The work-branch journal/checkpoint history is recovery state and must not become Candidate ancestry.
 
 Include exactly one unique candidate-history trailer:
 
@@ -599,7 +589,7 @@ The Candidate must remain expected GREEN. It is not the normal place to discover
 
 ### Required Development Completion evidence
 
-Before Candidate creation, record enough durable evidence in the active Issue and/or Work-Path journal for a fresh session to reconstruct what was actually checked.
+Before Candidate creation, record enough durable evidence in the active Issue's rolling recovery comment for a fresh session to reconstruct what was actually checked.
 
 At minimum record:
 

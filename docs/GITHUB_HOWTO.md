@@ -21,7 +21,7 @@ Mandatory order:
    - `tools/candidate_preflight.py`
    - `tools/release_verification.py`
    - the four permanent validators under `tests/`
-8. If resuming an existing `work/LBS-*` task, read that work-branch head and its temporary `.chatgpt-work/LBS-<issue>.md` continuation journal when present, then directly verify any referenced GitHub Actions run before continuing.
+8. If resuming an existing `work/LBS-*` task, read that work-branch head and the Issue's rolling recovery comment, then directly verify any referenced GitHub Actions run before continuing. A legacy `.chatgpt-work/LBS-<issue>.md` may exist on older active branches but is not the primary recovery surface.
 9. Only then determine scope, target version, and implementation/release plan. For Patch/Hotfix, perform the brief effort/risk analysis **before implementation** and default to the branchless atomic path unless the analysis justifies escalation.
 
 ### Authority order
@@ -484,7 +484,7 @@ Priority is independent of type/status and development-path labels. Reassess it 
 The two development-path labels are mutually exclusive:
 
 - `dev-path: fast` — the Issue will use the branchless atomic Patch/Hotfix path.
-- `dev-path: work-branch` — the Issue will use `work/LBS-<issue>` with product checkpoints and the Work-Path heartbeat/recovery standard.
+- `dev-path: work-branch` — the Issue will use `work/LBS-<issue>` with product checkpoints and the Work-Path rolling-comment recovery standard.
 
 A backlog Issue may intentionally have **no** `dev-path:*` label while the implementation path is still undecided. For Issue-backed **executable/product release work**, choose the path during the required pre-implementation effort/risk analysis and set exactly one development-path label before implementation starts:
 
@@ -584,76 +584,23 @@ Other consequences remain:
 - A branch push made by a GitHub Actions job with `GITHUB_TOKEN` does not normally trigger another workflow. Cross-workflow promotion therefore uses explicit `workflow_dispatch`; do not rely on recursive push triggering.
 - A stale branch must never be reused merely to avoid creating a new branch.
 
-### Work-Path heartbeat journal
+### Work-Path rolling recovery comment
 
-LBS-36 established a lightweight continuation journal **only for development that already uses `work/LBS-*`**. The normal branchless Patch/Hotfix fast path is unaffected.
+Work-Path development maintains exactly one cumulative recovery comment in the active Issue.
 
-The active work branch may temporarily track:
+Operational contract:
 
-`.chatgpt-work/LBS-<issue>.md`
+1. Prefer the implementation-start comment and update that same comment in place.
+2. While `Agent-State: ACTIVE`, update it often enough that `Last heartbeat` is never more than approximately **3 minutes old**.
+3. Do not overwrite history with only the latest three-minute delta. The comment must cumulatively retain the complete Build & Release lifecycle: SHAs, checkpoints, decisions, successes, failures, test/gate results, timings, Actions runs, Candidate/Release history, open risks and exact next action.
+4. If no new finding exists, a minimal liveness refresh is allowed; otherwise the latest engineering findings belong in the same update.
+5. Use `WAITING_FOR_GITHUB` only with an exact run ID that is independently `queued` or `in_progress`; use `IDLE`/`STOPPED` when no interactive work is continuing.
+6. Serialize comment writes and avoid redundant mutative GitHub calls.
+7. Product/checkpoint commits remain source-history events. **Do not create Git commits solely for heartbeat timing.**
+8. Legacy `.chatgpt-work/LBS-<issue>.md` files on already-active branches must be absorbed into the rolling comment and removed before Candidate creation; do not create new ones.
+9. After Candidate exposure, Candidate/Actions/Release state is the canonical recovery surface. Continue using the rolling Issue comment for cumulative supervision/timing, but do not mutate the work branch after the exact Candidate tree has been exposed.
 
-Use it to persist the same concise engineering information that would normally appear in progress updates: findings, failed approaches and reasons, validator/test evidence, current phase, next action, last product checkpoint and any independently running GitHub workflow.
-
-Heartbeat cadence is **time-based** while the interactive agent is active. With `Agent-State: ACTIVE`, persist a journal commit often enough that the latest heartbeat never becomes more than approximately **3 minutes old**, whether or not a new finding exists. A substantive finding/decision/failure entry counts as the heartbeat; otherwise commit a minimal truthful liveness entry such as `still investigating <phase>; no new conclusion yet`. Prefer a single-file contents update/commit when available. Journal-only commits are intentionally cheap and must not trigger product builds, runtime regeneration, test matrices or checkpoint gates merely because the journal changed.
-
-Also heartbeat before a potentially long/high-risk tool sequence. Use recognizable subjects such as `worklog(LBS-XX): heartbeat` for timer-only liveness and `worklog(LBS-XX): record <finding>` for substantive updates.
-
-The periodic cadence may pause only when the interactive agent is genuinely `IDLE`/`STOPPED`, or when it has first persisted `Agent-State: WAITING_FOR_GITHUB` plus the exact independent GitHub Actions run identifier. When interactive work resumes, return to `ACTIVE` and resume the maximum-three-minute cadence immediately.
-
-Treat an `ACTIVE` heartbeat older than roughly **3 minutes** as a missed heartbeat. Treat a heartbeat older than roughly **5 minutes** as evidence that the interactive stream is no longer progressing **only after** directly checking any referenced GitHub Actions run. GitHub automation can continue independently; the interactive agent cannot.
-
-Before Candidate creation, delete the journal from the work branch and ensure the final work tree contains only intended release content. Build the Candidate as one clean commit with current `main` as parent and the exact cleaned work-branch tree. This deliberately prevents temporary journal commits from becoming Candidate/`main` ancestry while preserving the existing Candidate/work-tree equality check and release-owned work-branch cleanup.
-
-A fresh session resuming a Work-Path task **before Candidate exposure** must read the journal when present, then verify branch/run state directly before acting. The journal is a continuation record, not private chain-of-thought.
-
-After Candidate exposure, the recovery surface changes deliberately. The journal has already been removed; do not recreate it just to represent Candidate/Release supervision. Recover by reading the Candidate SHA/ref and its Actions run. If the Candidate ref is already absent, check whether promotion succeeded and continue through the release branch/run, PR, tag and current `main`. This exact case occurred during LBS-29: the interactive stream terminated after Candidate publication, GitHub completed Candidate Preflight and the Release Orchestrator independently, and a later session recovered the completed state without reconstructing unpublished work.
-
-The standard is retained after repeated real Work-Path use. LBS-31 established that event-driven updates were too sparse; LBS-29 verified the refined maximum-three-minute `ACTIVE` cadence with 15 worklog commits over 21m48s, a maximum interval of 165 seconds, zero missed three-minute heartbeats, and 40.53 seconds of measured connector write latency across 14 journal updates. LBS-27 then provided the clearest cost measurement: about 19m11s of active Work-Path journal time, 33.791 seconds of explicitly measured write latency across nine journal updates, and an estimated practical total heartbeat overhead of roughly 50–70 seconds after including create/remove/read/status-preparation work. That is approximately **4–6% (about 5%)** of the active Work-Path phase.
-
-Treat approximately five percent as an observed and accepted Work-Path resilience cost, not a guaranteed constant. It applies only when the durable Work-Path was already justified; normal small Patch/Hotfix work remains on the journal-free fast path. The relevant comparison is against recovery/reconstruction loss after an interrupted stream/session/runtime, including operational environments where long interactive execution may encounter timeout/limit behavior on the order of tens of minutes. Journal-only commits still must not trigger product builds, runtime regeneration, test matrices or checkpoint gates.
-
-### Bounded connector orchestration
-
-Do not compose dozens of GitHub reads/writes into one connector/code-mode call. Use small bounded batches (typically about 5–8 nested GitHub actions), then persist/verify state before the next batch.
-
-After any orchestration error, re-read the branch ref and `main` before retrying. Partial Git-object side effects may exist even when the visible branch did not move.
-
-For any Work-Path development, the complete checkpoint/session-resilience rules are defined in `docs/DEVELOPMENT_GUIDELINES.md`.
-
-### Atomic Git-object preparation
-
-When a local clone is unavailable, it is possible to prepare a change safely with GitHub Git objects:
-
-1. Create blobs for all intended files.
-2. Create one tree based on the verified current base tree.
-3. Create one commit with the verified current parent.
-4. Inspect that commit/diff.
-5. Only then move/create the visible branch ref.
-
-This prevents exposing partially assembled repository state.
-
-## Pre-Candidate Development Completion for Work-Path releases
-
-LBS-38 defines a guideline-first Development Completion review for the final intended `work/LBS-<issue>` state. It does not add a new workflow.
-
-Before Candidate creation:
-
-1. pin the exact final Work-Branch SHA;
-2. run deterministic runtime build/check and all four permanent Python validators against that final state whenever a complete worktree is available;
-3. where independent validators can safely continue, run all of them before correcting findings so one pass exposes multiple actionable failures;
-4. run relevant focused/native tests and cheap parser/encoding checks for changed source types;
-5. when responsibilities or ownership moved, inspect the affected validators, regression contracts, native aggregate wiring, and workflow-facing references for stale assumptions;
-6. manually dispatch `.github/workflows/windows-powershell51.yml` on the `work/LBS-<issue>` ref before Candidate exposure;
-7. consume the resulting `WINDOWS_POWERSHELL51_SUMMARY=<json>`, retain the run ID/totals/timings, and verify the tested SHA;
-8. re-read the work-branch head after the hosted run; if it advanced, the Windows evidence is stale and must be rerun;
-9. record any unavailable pre-Candidate check and its exact tooling limitation instead of claiming PASS or replacing it with ad-hoc approximations;
-10. expose the Candidate only after all executable Development Completion checks are GREEN and known deterministic integration findings are resolved.
-
-The manually dispatched Windows run is **hosted Windows PowerShell 5.1 contract-suite evidence only**. It does not publish `preflight/windows-powershell51`, does not authorize a release, and is not physical Lenovo/UEFI E2E.
-
-Candidate Preflight remains authoritative and reruns the mandatory Linux and hosted Windows checks on the Candidate SHA.
-
-For the next Work-Branch pilot, retain enough evidence to compare Development Completion effort with first-Candidate success, Candidate correction loops, and Candidate-to-release timing. If an unavailable hosted Linux/full-worktree precheck is shown to be a material recurring gap, capture that as a separate automation Issue supported by the pilot evidence.
+A stale `ACTIVE` heartbeat older than roughly three minutes is a missed heartbeat. A heartbeat older than roughly five minutes indicates stopped interactive progress only after any referenced GitHub Actions run has been checked directly.
 
 ## Documentation-only changes
 

@@ -59,7 +59,7 @@ For executable/product release work, Work-branch policy is intentionally asymmet
 - Before Patch/Hotfix implementation, perform a brief effort/risk analysis. Use a work branch only as an exception when the change is likely to be substantial, cross-cutting, migration-heavy, interruption-prone, or otherwise likely to require several recoverable checkpoints.
 - A Patch/Hotfix exception must be recorded durably before implementation and the Candidate must contain exactly one `Work-Branch-Reason: <reason>` trailer.
 - Do not escalate a small Patch/Hotfix merely to reuse the Major/Minor process.
-- The Work-Path heartbeat journal is development/recovery state governed by `docs/DEVELOPMENT_GUIDELINES.md`; it is never release content. Before Candidate creation it must be removed, and the cleaned work-branch tree becomes the exact release-ready tree.
+- Work-Path recovery state is maintained in the Issue's single rolling recovery comment and is never release content. New Work-Path tasks do not create timer heartbeat commits. If a legacy `.chatgpt-work/LBS-<issue>.md` exists, absorb its relevant state into the rolling comment and remove the file before Candidate creation; the cleaned work-branch tree becomes the exact release-ready tree.
 
 ## Test-first bug/regression preparation
 
