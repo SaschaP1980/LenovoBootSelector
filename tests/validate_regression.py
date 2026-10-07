@@ -84,7 +84,7 @@ def main():
     s.has('LBS-14 header click opens shared dialog',popup_surface,'[void](Show-AvailableUpdateDialog)')
     s.eq('LBS-14 popup contains one shared-dialog invocation',popup_surface.count('Show-AvailableUpdateDialog'),1)
     s.has('No periodic update polling remains',ui,'There is no periodic polling')
-    s.has('LBS-21 popup-open automatic update mode retained',ui,"Start-UpdateCheckUiWorker -Mode 'Popup'")
+    s.has('LBS-21 popup-open automatic update mode retained',ui,"Start-UpdateCheckWorkflow -State $script:UpdateState -Mode 'Popup'")
     s.has('LBS-21 popup open triggers automatic version check',popup_ui,'[void](Start-PopupUpdateCheck)')
     s.no('LBS-21 process-once startup update state remains removed',update_runtime,'StartupCheckStarted')
     s.no('LBS-21 tray startup trigger remains removed',app_template,'Start-StartupUpdateCheck')
