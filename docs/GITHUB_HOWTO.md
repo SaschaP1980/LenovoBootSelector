@@ -671,6 +671,8 @@ Classify this scope **before** choosing a development path. If the complete repo
 
 The document's subject does not change this classification. A tiny edit to Work-Branch, Candidate, or Release guidance is still documentation-only if it changes no executable contract.
 
+**Hard rule: no executable source/code change → no `work/LBS-*` branch.** Here, source/code includes product source, tests, workflows, validators, tools/scripts, and other machine-enforced executable repository contracts. Markdown/documentation and GitHub Issue metadata do not qualify. When the intended diff is documentation/Issue metadata only, creating a Work-Branch is a process error and must be corrected before implementation continues.
+
 Do not describe such a documentation update as a product release.
 
 ## Repository and GitHub documentation language

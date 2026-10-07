@@ -20,6 +20,10 @@ Documentation-only work:
 
 The **subject of the documentation is not implementation complexity**. Editing Work-Branch or release guidance does not itself make a small documentation correction a Work-Branch change.
 
+> **Hard rule: no executable source/code change → no Work-Branch.**
+
+For this rule, **source/code** means any executable or machine-enforced repository implementation artifact: product source under `src/**`, tests, GitHub Actions workflows, validators, build/release tooling, scripts, or equivalent executable contracts. Markdown/documentation and GitHub Issue metadata do **not** count as source/code. If the complete intended change contains none of those executable/machine-enforced changes, `work/LBS-*` is forbidden regardless of topic, Issue priority, perceived importance, or the fact that the edited documentation governs the Work-Path itself.
+
 Patch and Hotfix work uses the shortest safe atomic path **without a work branch by default**. Before implementation begins, perform a brief effort/risk analysis. Escalate a Patch or Hotfix to the work-branch/checkpoint model only when that analysis indicates that the work is likely to be substantial, cross-cutting, migration-heavy, interruption-prone, or otherwise unlikely to fit safely into one short implementation cycle. Record the reason durably and carry it into the Candidate as exactly one `Work-Branch-Reason:` trailer.
 
 Do not use a work branch for a small Patch/Hotfix merely for consistency with Major/Minor releases; the resilience machinery must not become routine overhead for short fixes.

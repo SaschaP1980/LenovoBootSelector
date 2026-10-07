@@ -91,6 +91,8 @@ A **documentation-only/process-guidance implementation** is also excluded from t
 
 The **subject matter** of a document does not determine the development path. A small documentation change about Work-Branch policy is still documentation-only work.
 
+**Hard rule:** **No executable source/code change → no `work/LBS-*` branch.** For this rule, executable source/code includes product source, tests, workflows, validators, build/release tools, scripts, and other machine-enforced repository artifacts. Markdown/documentation and GitHub Issue metadata are not source/code. If the complete intended diff contains only documentation/Issue metadata, a Work-Branch is prohibited.
+
 ### Engineering design baseline
 
 Use `docs/DEVELOPMENT_GUIDELINES.md` as the canonical design guidance. Favor Clean Code and SOLID with clear responsibility boundaries, cohesive modules, explicit dependencies, and testable behavior. Apply DRY pragmatically: deduplicate the same rule/knowledge/responsibility, not merely similar-looking code. When responsibilities, reasons to change, lifecycles, safety constraints, or failure semantics differ, keep the implementations separate even if limited duplication remains. Prefer small explicit duplication over a false abstraction that couples unrelated concerns.

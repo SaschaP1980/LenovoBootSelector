@@ -20,6 +20,8 @@ Such a change is **not a product release**:
 
 A process document discussing Work-Branch/Candidate/Release behavior remains documentation-only unless the executable contracts themselves are changed.
 
+**Hard rule: no executable source/code change → no Work-Branch.** In this release-process rule, executable source/code includes product source, tests, workflows, validators, build/release tooling, scripts, and other machine-enforced repository artifacts. Markdown/documentation and Issue metadata alone can never justify `work/LBS-*`, a Candidate, or a product release.
+
 ## Canonical inputs
 
 - `bin/version.json` is the only authoritative release-version source. Schema v2 intentionally contains no `publishedUtc`.
