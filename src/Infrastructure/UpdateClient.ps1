@@ -33,6 +33,44 @@ function Remove-LenovoUpdateResult {
 }
 
 
+function New-LenovoUpdateCheckResultPath {
+    return (Join-Path ([System.IO.Path]::GetTempPath()) ('LenovoBootSelector-UpdateCheck-{0}.json' -f ([guid]::NewGuid().ToString('N'))))
+}
+
+function Read-LenovoUpdateWorkerResult {
+    param([AllowNull()][string]$Path)
+
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+    $json = [System.IO.File]::ReadAllText($Path,[System.Text.Encoding]::UTF8)
+    if ([string]::IsNullOrWhiteSpace($json)) { return $null }
+    return ($json | ConvertFrom-Json)
+}
+
+function Remove-LenovoUpdateWorkflowFile {
+    param([AllowNull()][string]$Path)
+
+    if (-not $Path) { return }
+    try {
+        if (Test-Path -LiteralPath $Path) { Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue }
+    } catch { }
+}
+
+function New-LenovoUpdatePrepareInput {
+    param([Parameter(Mandatory=$true)]$Manifest)
+
+    $manifestPath = Join-Path ([System.IO.Path]::GetTempPath()) ('LenovoBootSelector-UpdateManifest-{0}.json' -f ([guid]::NewGuid().ToString('N')))
+    $resultPath = Join-Path ([System.IO.Path]::GetTempPath()) ('LenovoBootSelector-UpdatePrepare-{0}.json' -f ([guid]::NewGuid().ToString('N')))
+    try {
+        [System.IO.File]::WriteAllText($manifestPath,($Manifest | ConvertTo-Json -Depth 10),(New-Object System.Text.UTF8Encoding($false)))
+        return [pscustomobject]@{ ManifestPath=$manifestPath; ResultPath=$resultPath }
+    }
+    catch {
+        Remove-LenovoUpdateWorkflowFile -Path $manifestPath
+        throw
+    }
+}
+
+
 function Get-LenovoUpdateManifestRemote {
     $json = Invoke-LenovoUpdateTextDownload -Uri (Get-LenovoUpdateManifestUri)
     if ([string]::IsNullOrWhiteSpace($json)) { throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-content' -Message 'Update-Manifest ist leer.') }
