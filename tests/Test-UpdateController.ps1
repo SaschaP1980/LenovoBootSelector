@@ -9,7 +9,7 @@ $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $script:checks = 0
 function Assert-UpdateController {
     param([Parameter(Mandatory=$true)][string]$Name,[Parameter(Mandatory=$true)][bool]$Condition)
-    if (-not $Condition) { throw "$Name: assertion failed" }
+    if (-not $Condition) { throw "${Name}: assertion failed" }
     $script:checks++
     Write-Host "PASS  $Name"
 }

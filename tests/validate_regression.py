@@ -95,7 +95,7 @@ def main():
     s.has('LBS-5 package network failure is structured',transport,"-Category 'network' -Stage 'package-download'")
     s.has('LBS-5 hash failure is separate from package failure',infra,"-Category 'hash' -Stage 'package-hash'")
     s.has('LBS-5 check worker returns failure stage',infra,"FailureStage=''")
-    s.has('LBS-5 prepare UI propagates network status',ui,'networkStatus=$networkStatus')
+    s.has('LBS-5 prepare Application workflow propagates network status',update_controller,'networkStatus=$networkStatus')
     s.no('Updater remains unelevated',infra+'\n'+transport,'RunAs')
     s.no('Updater has no TaskBroker mutation',infra+'\n'+transport,'TaskBroker')
     s.no('Updater has no bcdedit',(infra+'\n'+transport).lower(),'bcdedit')
