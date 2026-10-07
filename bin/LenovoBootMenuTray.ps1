@@ -1756,7 +1756,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.10.4.0'
+$script:AppVersion = '0.10.5.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -2412,7 +2412,8 @@ function Set-HeaderUpdateInteractionState {
 }
 
 function Update-HeaderRefreshStatus {
-    if (Test-MaintenanceBusy) {
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    if ([string]$capabilities.State -eq 'Busy') {
         if ($script:HeaderTitleLabel -and -not $script:HeaderTitleLabel.IsDisposed) { $script:HeaderTitleLabel.Location = New-Object Drawing.Point(16, 10) }
         if ($script:HeaderStatusLabel -and -not $script:HeaderStatusLabel.IsDisposed) {
             $script:HeaderStatusLabel.Text = Get-MaintenanceBusyStatusText
@@ -2461,7 +2462,8 @@ function Update-RefreshButtonVisual {
     }
     $active = $false
     try { $active = (Test-BackgroundRefreshActive -State $script:BackgroundRefreshState) } catch { }
-    $script:RefreshButton.Enabled = ((Get-SystemFunctionsPresentationState) -eq 'Ready')
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    $script:RefreshButton.Enabled = [bool]$capabilities.CanRefresh
     $script:RefreshButton.ForeColor = if ($active -or $script:RefreshButtonHovered) { $script:ColorAccent } else { $script:ColorSecondary }
     Update-HeaderRefreshStatus
 }
@@ -4308,6 +4310,7 @@ function Move-ManageEntry {
 
 function Update-ManageEntriesUiState {
     if (-not $script:Popup -or $script:Popup.IsDisposed) { return }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
     $sectionLabel = $script:Popup.Controls.Find('SectionLabel', $true) | Select-Object -First 1
     $manageButton = $script:Popup.Controls.Find('ManageEntriesButton', $true) | Select-Object -First 1
     $managePanel = $script:Popup.Controls.Find('ManageEntriesPanel', $true) | Select-Object -First 1
@@ -4321,7 +4324,7 @@ function Update-ManageEntriesUiState {
     if ($sectionLabel) { $sectionLabel.Text = if ($script:IsManageEntriesMode) { Get-LocalizedString -Key 'Manage.Section' } else { Get-LocalizedString -Key 'Popup.NextBootSection' } }
     if ($manageButton) {
         $manageButton.Visible = -not $script:IsManageEntriesMode
-        $manageButton.Enabled = (-not $script:IsManageEntriesMode -and -not (Test-BootTargetDriftDetected) -and $script:CurrentEntries.Count -gt 0)
+        $manageButton.Enabled = (-not $script:IsManageEntriesMode -and [bool]$capabilities.CanManageEntries)
     }
     if ($managePanel) {
         $managePanel.Visible = $script:IsManageEntriesMode
@@ -4332,14 +4335,14 @@ function Update-ManageEntriesUiState {
     }
 
     if ($script:ManageEntriesMenuItem) {
-        $script:ManageEntriesMenuItem.Enabled = (-not $script:IsManageEntriesMode -and -not (Test-BootTargetDriftDetected) -and $script:CurrentEntries.Count -gt 0)
+        $script:ManageEntriesMenuItem.Enabled = (-not $script:IsManageEntriesMode -and [bool]$capabilities.CanManageEntries)
     }
 }
 
 function Start-ManageEntriesMode {
-    if (Test-MaintenanceBusy -or (Test-BootTargetDriftDetected)) { return }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    if (-not $capabilities.CanManageEntries) { return }
     if ($script:IsManageEntriesMode) { return }
-    if ($script:CurrentEntries.Count -eq 0) { return }
 
     $script:ManageEntryOrder = @((Get-OrderedEntriesForUi -IncludeHidden) | ForEach-Object { $_.Guid })
     $script:ManageHiddenEntryGuids = @($script:HiddenEntryGuids)
@@ -4393,11 +4396,9 @@ function Get-DefaultEntryTitle {
 
 function Update-DefaultUi {
     if ($script:DefaultButton -and -not $script:DefaultButton.IsDisposed) {
-        $meta = Get-TaskBrokerMetadata
-        $schemaReady = ($meta -and ($script:SupportedTaskBrokerVersions -contains [string]$meta.version))
-        $checking = ($schemaReady -and $null -eq $script:TaskBrokerReadyCached)
-        $sessionReady = ($script:TaskBrokerReadyCached -eq $true)
-        $enabled = ($schemaReady -and $sessionReady -and -not (Test-BootTargetDriftDetected) -and $script:CurrentEntries.Count -gt 0)
+        $capabilities = Get-CurrentSystemFunctionsCapabilities
+        $checking = [bool]$capabilities.IsChecking
+        $enabled = [bool]$capabilities.CanSetDefaultTarget
         $visualEnabled = ($enabled -or $checking)
         $script:DefaultInteractionEnabled = $enabled
         $script:DefaultButton.Enabled = $visualEnabled
@@ -4442,15 +4443,13 @@ function Complete-LegacyDefaultMigration {
 
 function Set-DefaultGuid {
     param([AllowNull()][string]$Guid)
-    if (Test-MaintenanceBusy) { throw 'Während der Wartung kann das Standard-Startziel nicht geändert werden.' }
-    if (Test-BootTargetDriftDetected) { throw 'Nach einer Änderung der Startziele müssen die Systemfunktionen zuerst neu initialisiert werden.' }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
+    if ([string]$capabilities.State -eq 'Busy') { throw 'Während der Wartung kann das Standard-Startziel nicht geändert werden.' }
+    if ([string]$capabilities.State -eq 'ReinitializeRequired') { throw 'Nach einer Änderung der Startziele müssen die Systemfunktionen zuerst neu initialisiert werden.' }
+    if (-not $capabilities.CanUseDefaultTarget) { throw 'Das Standard-Startziel ist erst nach Einrichtung der Systemfunktionen verfügbar.' }
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     $operation = if ($Guid) { 'set' } else { 'clear' }
     try {
-        if (-not (Test-TaskBrokerReady)) {
-            throw 'Das Standard-Startziel ist erst nach Einrichtung der Systemfunktionen verfügbar.'
-        }
-
         if ($Guid) {
             $normalized = $Guid.ToLowerInvariant()
             Set-TaskBrokerDefaultTarget -Guid $normalized
@@ -4915,18 +4914,6 @@ function Get-MaintenanceMode {
     return (Get-MaintenanceRuntimeMode -State $script:MaintenanceState)
 }
 
-function Get-SystemFunctionsPresentationState {
-    if (Test-MaintenanceBusy) {
-        return ('Busy-' + (Get-MaintenanceMode))
-    }
-    if (Get-TaskBrokerInteractiveReady) {
-        if (Test-BootTargetDriftDetected) { return 'ReinitializeRequired' }
-        return 'Ready'
-    }
-    if (Test-TaskBrokerInstallationPresent) { return 'RepairRequired' }
-    return 'SetupRequired'
-}
-
 function Get-MaintenanceBusyStatusText {
     $mode = Get-MaintenanceMode
     if ($mode -eq 'Remove') { return (Get-LocalizedString -Key 'Maintenance.Busy.Remove') }
@@ -4980,8 +4967,9 @@ function New-MaintenanceStatePanel {
     $action.Size = New-Object Drawing.Size(280, 38)
     $action.Cursor = [System.Windows.Forms.Cursors]::Hand
     $action.Add_Click({
-        if (Test-MaintenanceBusy) { return }
-        if ((Get-SystemFunctionsPresentationState) -eq 'ReinitializeRequired') {
+        $capabilities = Get-CurrentSystemFunctionsCapabilities
+        if (-not $capabilities.CanConfigureSystemFunctions) { return }
+        if ([string]$capabilities.State -eq 'ReinitializeRequired') {
             Prompt-TaskBrokerReinitialize
             return
         }
@@ -5000,9 +4988,11 @@ function New-MaintenanceStatePanel {
 
 function Update-MaintenanceUi {
     if (-not $script:Popup -or $script:Popup.IsDisposed) { return }
-    $state = Get-SystemFunctionsPresentationState
-    $busy = $state.StartsWith('Busy-')
-    $ready = ($state -eq 'Ready')
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    $state = [string]$capabilities.State
+    $busy = ($state -eq 'Busy')
+    $ready = [bool]$capabilities.IsReady
+    $checking = [bool]$capabilities.IsChecking
 
     $panelMatches = $script:Popup.Controls.Find('MaintenanceStatePanel', $true)
     $panel = if ($panelMatches.Count -gt 0) { $panelMatches[0] } else { $null }
@@ -5013,7 +5003,7 @@ function Update-MaintenanceUi {
         $hint = $panel.Controls['MaintenanceHint']
         $glyph = $panel.Controls['MaintenanceGlyph']
 
-        if ($ready) {
+        if ($ready -or $checking) {
             $panel.Visible = $false
         }
         else {
@@ -5026,17 +5016,17 @@ function Update-MaintenanceUi {
                 $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupMessage'
                 $action.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHeading'
                 $action.Visible = $true
-                $action.Enabled = $true
+                $action.Enabled = [bool]$capabilities.CanConfigureSystemFunctions
                 $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHint'
             }
-            elseif ($state -eq 'RepairRequired') {
+            elseif ($state -eq 'RepairRequired' -or $state -eq 'Unknown') {
                 $glyph.Text = '!'
                 $glyph.ForeColor = $script:ColorWarning
                 $heading.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHeading'
                 $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairMessage'
                 $action.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHeading'
                 $action.Visible = $true
-                $action.Enabled = $true
+                $action.Enabled = [bool]$capabilities.CanConfigureSystemFunctions
                 $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHint'
             }
             elseif ($state -eq 'ReinitializeRequired') {
@@ -5052,7 +5042,7 @@ function Update-MaintenanceUi {
                 }
                 $action.Text = Get-LocalizedString -Key 'Maintenance.Action.Reinitialize'
                 $action.Visible = $true
-                $action.Enabled = $true
+                $action.Enabled = [bool]$capabilities.CanConfigureSystemFunctions
                 $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHint'
             }
             else {
@@ -5069,14 +5059,14 @@ function Update-MaintenanceUi {
     }
 
     if ($script:RefreshButton -and -not $script:RefreshButton.IsDisposed) {
-        $script:RefreshButton.Enabled = ($ready -and -not $busy)
+        $script:RefreshButton.Enabled = [bool]$capabilities.CanRefresh
         $script:RefreshButton.Cursor = if ($script:RefreshButton.Enabled) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
     }
     if ($script:ManageEntriesButton -and -not $script:ManageEntriesButton.IsDisposed) {
-        $script:ManageEntriesButton.Enabled = ($ready -and -not $busy)
+        $script:ManageEntriesButton.Enabled = [bool]$capabilities.CanManageEntries
     }
-    if ($script:DefaultContextRoot) { $script:DefaultContextRoot.Enabled = ($ready -and -not $busy) }
-    if ($script:RestartMenuItem) { $script:RestartMenuItem.Enabled = -not $busy }
+    if ($script:DefaultContextRoot) { $script:DefaultContextRoot.Enabled = [bool]$capabilities.CanUseDefaultTarget }
+    if ($script:RestartMenuItem) { $script:RestartMenuItem.Enabled = [bool]$capabilities.CanRestart }
 
     Update-HeaderRefreshStatus
 }
@@ -5110,7 +5100,8 @@ function Update-RestartTargetUi {
 }
 
 function Restart-Windows {
-    if (Test-MaintenanceBusy -or (Test-BootTargetDriftDetected)) { return }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    if (-not $capabilities.CanRestart) { return }
     $targetName = Get-NextBootTargetDisplayName
     $choice = Show-LenovoRestartDialog -TargetName $targetName
     if ($choice -ne [System.Windows.Forms.DialogResult]::Yes) {
@@ -5574,6 +5565,124 @@ function Clear-TaskBrokerDefaultTarget {
     Invoke-AuthorizedTask -Operation 'DefaultClear' | Out-Null
 }
 
+function Resolve-SystemFunctionsCapabilities {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)][bool]$FactsValid,
+        [Parameter(Mandatory=$true)][bool]$InstallationPresent,
+        [Parameter(Mandatory=$true)][bool]$MetadataCompatible,
+        [AllowNull()]$SessionReady,
+        [Parameter(Mandatory=$true)][bool]$MaintenanceBusy,
+        [AllowEmptyString()][string]$MaintenanceMode = '',
+        [Parameter(Mandatory=$true)][bool]$DriftDetected,
+        [int]$EntryCount = 0
+    )
+
+    $readyKnown = ($null -ne $SessionReady)
+    $sessionReadyIsBoolean = (-not $readyKnown -or $SessionReady -is [bool])
+    $ready = ($readyKnown -and $sessionReadyIsBoolean -and [bool]$SessionReady)
+    $consistent = (
+        $FactsValid -and
+        $EntryCount -ge 0 -and
+        $sessionReadyIsBoolean -and
+        (-not $MetadataCompatible -or $InstallationPresent) -and
+        (-not $ready -or $MetadataCompatible)
+    )
+
+    $state = if (-not $consistent) {
+        'Unknown'
+    }
+    elseif ($MaintenanceBusy) {
+        'Busy'
+    }
+    elseif (-not $InstallationPresent) {
+        'SetupRequired'
+    }
+    elseif (-not $MetadataCompatible) {
+        'RepairRequired'
+    }
+    elseif (-not $readyKnown) {
+        'Checking'
+    }
+    elseif (-not $ready) {
+        'RepairRequired'
+    }
+    elseif ($DriftDetected) {
+        'ReinitializeRequired'
+    }
+    else {
+        'Ready'
+    }
+
+    $isReady = ($state -eq 'Ready')
+    $isChecking = ($state -eq 'Checking')
+    $hasEntries = ($EntryCount -gt 0)
+    $canUseCachedBootState = (
+        $consistent -and
+        -not $MaintenanceBusy -and
+        $MetadataCompatible -and
+        (-not $readyKnown -or $ready) -and
+        -not $DriftDetected
+    )
+
+    [pscustomobject]@{
+        State = $state
+        Reason = $state
+        MaintenanceMode = if ($MaintenanceBusy) { [string]$MaintenanceMode } else { '' }
+        InstallationPresent = [bool]$InstallationPresent
+        MetadataCompatible = [bool]$MetadataCompatible
+        SessionReadyKnown = [bool]$readyKnown
+        SessionReady = [bool]$ready
+        DriftDetected = [bool]$DriftDetected
+        EntryCount = [int]$EntryCount
+        HasEntries = [bool]$hasEntries
+        IsReady = [bool]$isReady
+        IsChecking = [bool]$isChecking
+        CanUseCachedBootState = [bool]$canUseCachedBootState
+        CanRefresh = [bool]$isReady
+        CanSetBootNext = [bool]($isReady -and $hasEntries)
+        CanUseDefaultTarget = [bool]$isReady
+        CanSetDefaultTarget = [bool]($isReady -and $hasEntries)
+        CanManageEntries = [bool]($isReady -and $hasEntries)
+        CanRestart = [bool]($consistent -and -not $MaintenanceBusy -and -not $DriftDetected)
+        CanConfigureSystemFunctions = [bool](-not $MaintenanceBusy)
+        CanRemoveSystemFunctions = [bool](-not $MaintenanceBusy)
+    }
+}
+
+function Get-CurrentSystemFunctionsCapabilities {
+    [CmdletBinding()]
+    param([switch]$ProbeReadiness)
+
+    try {
+        $busy = Test-MaintenanceRuntimeBusy -State $script:MaintenanceState
+        $mode = Get-MaintenanceRuntimeMode -State $script:MaintenanceState
+        $entryCount = @($script:CurrentEntries).Count
+        if ($busy) {
+            return (Resolve-SystemFunctionsCapabilities -FactsValid $true -InstallationPresent $false -MetadataCompatible $false -SessionReady $null -MaintenanceBusy $true -MaintenanceMode $mode -DriftDetected $false -EntryCount $entryCount)
+        }
+
+        $present = [bool](Test-TaskBrokerInstallationPresent)
+        $compatible = if ($present) { [bool](Test-TaskBrokerMetadataCompatible) } else { $false }
+        $sessionReady = $null
+
+        if ($present -and $compatible) {
+            if ($ProbeReadiness) {
+                $sessionReady = [bool](Test-TaskBrokerReady)
+            }
+            elseif ($null -ne $script:TaskBrokerReadyCached) {
+                $sessionReady = [bool]$script:TaskBrokerReadyCached
+            }
+        }
+
+        $drift = [bool](Test-BootTargetDriftRuntimeDetected -State $script:BootTargetDriftState)
+        return (Resolve-SystemFunctionsCapabilities -FactsValid $true -InstallationPresent $present -MetadataCompatible $compatible -SessionReady $sessionReady -MaintenanceBusy $busy -MaintenanceMode $mode -DriftDetected $drift -EntryCount $entryCount)
+    }
+    catch {
+        return (Resolve-SystemFunctionsCapabilities -FactsValid $false -InstallationPresent $false -MetadataCompatible $false -SessionReady $null -MaintenanceBusy $false -MaintenanceMode '' -DriftDetected $false -EntryCount 0)
+    }
+}
+
 
 function Test-BootTargetDriftDetected {
     return (Test-BootTargetDriftRuntimeDetected -State $script:BootTargetDriftState)
@@ -5631,46 +5740,35 @@ function Show-BootTargetDriftNotificationIfNeeded {
 
 function Update-TaskBrokerUiState {
     param([switch]$Fast)
-    $busy = Test-MaintenanceBusy
-    $ready = if ($busy) {
-        $false
-    }
-    elseif ($Fast) {
-        if ($null -ne $script:TaskBrokerReadyCached) { [bool]$script:TaskBrokerReadyCached } else { $false }
-    }
-    else {
-        Test-TaskBrokerReady
-    }
-    $present = Test-TaskBrokerInstallationPresent
-    $drift = [bool]($ready -and (Test-BootTargetDriftDetected))
-    $interactiveReady = [bool]($ready -and -not $drift)
+    $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness:(-not $Fast)
+    $state = [string]$capabilities.State
 
     if ($script:TaskBrokerSetupMenuItem) {
-        $script:TaskBrokerSetupMenuItem.Enabled = -not $busy
-        if ($busy) {
-            $mode = Get-MaintenanceMode
+        $script:TaskBrokerSetupMenuItem.Enabled = [bool]$capabilities.CanConfigureSystemFunctions
+        if ($state -eq 'Busy') {
+            $mode = [string]$capabilities.MaintenanceMode
             $script:TaskBrokerSetupMenuItem.Text = if ($mode -eq 'Remove') { Get-LocalizedString -Key 'Maintenance.Menu.Generic' } elseif ($mode -eq 'Reinitialize') { Get-LocalizedString -Key 'Maintenance.Menu.Reinitializing' } elseif ($mode -eq 'Repair' -or $mode -eq 'Migrate') { Get-LocalizedString -Key 'Maintenance.Menu.Repairing' } else { Get-LocalizedString -Key 'Maintenance.Menu.SettingUp' }
         }
-        elseif ($drift) {
+        elseif ($state -eq 'ReinitializeRequired') {
             $script:TaskBrokerSetupMenuItem.Text = Get-LocalizedString -Key 'Maintenance.Menu.Reinitialize'
         }
-        elseif ($ready -or $present) {
-            $script:TaskBrokerSetupMenuItem.Text = Get-LocalizedString -Key 'Maintenance.Menu.Repair'
+        elseif ($state -eq 'SetupRequired') {
+            $script:TaskBrokerSetupMenuItem.Text = Get-LocalizedString -Key 'Maintenance.Setup'
         }
         else {
-            $script:TaskBrokerSetupMenuItem.Text = Get-LocalizedString -Key 'Maintenance.Setup'
+            $script:TaskBrokerSetupMenuItem.Text = Get-LocalizedString -Key 'Maintenance.Menu.Repair'
         }
     }
 
     if ($script:TaskBrokerRemoveMenuItem) {
         # Cleanup is intentionally available even when metadata is already gone;
         # it also knows historical/probe task names from pre-TaskBroker builds.
-        $script:TaskBrokerRemoveMenuItem.Enabled = -not $busy
+        $script:TaskBrokerRemoveMenuItem.Enabled = [bool]$capabilities.CanRemoveSystemFunctions
     }
-    if ($script:DefaultContextRoot) { $script:DefaultContextRoot.Enabled = ($interactiveReady -and -not $busy) }
-    if ($script:RestartMenuItem) { $script:RestartMenuItem.Enabled = (-not $busy -and -not $drift) }
+    if ($script:DefaultContextRoot) { $script:DefaultContextRoot.Enabled = [bool]$capabilities.CanUseDefaultTarget }
+    if ($script:RestartMenuItem) { $script:RestartMenuItem.Enabled = [bool]$capabilities.CanRestart }
     Update-MaintenanceUi
-    return $interactiveReady
+    return [bool]$capabilities.IsReady
 }
 
 function Enter-SystemFunctionsMaintenance {
@@ -5813,14 +5911,30 @@ function Start-TaskBrokerInstall {
 }
 
 function Prompt-TaskBrokerInstall {
-    if (Test-MaintenanceBusy) { return }
-    $mode = if (Test-BootTargetDriftDetected) { 'Reinitialize' } elseif (Test-TaskBrokerReady) { 'Repair' } elseif (Test-TaskBrokerInstallationPresent) { 'Migrate' } else { 'Setup' }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
+    if ([string]$capabilities.State -eq 'Busy') { return }
+    $mode = if ([string]$capabilities.State -eq 'ReinitializeRequired') {
+        'Reinitialize'
+    }
+    elseif ([string]$capabilities.State -eq 'Ready') {
+        'Repair'
+    }
+    elseif ([string]$capabilities.State -eq 'SetupRequired') {
+        'Setup'
+    }
+    elseif ($capabilities.InstallationPresent) {
+        'Migrate'
+    }
+    else {
+        'Repair'
+    }
     $choice = Show-LenovoSystemFunctionsDialog -Mode $mode
     if ($choice -eq [System.Windows.Forms.DialogResult]::Yes) { Start-TaskBrokerInstall -Mode $mode }
 }
 
 function Prompt-TaskBrokerReinitialize {
-    if (Test-MaintenanceBusy -or -not (Test-BootTargetDriftDetected)) { return }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    if ([string]$capabilities.State -ne 'ReinitializeRequired') { return }
     $choice = Show-LenovoSystemFunctionsDialog -Mode 'Reinitialize'
     if ($choice -eq [System.Windows.Forms.DialogResult]::Yes) { Start-TaskBrokerInstall -Mode 'Reinitialize' }
 }
@@ -6946,6 +7060,8 @@ function Get-FirmwareBootState {
 
 function Set-BootNextTarget {
     param([Parameter(Mandatory=$true)][string]$Guid)
+    $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
+    if (-not $capabilities.CanSetBootNext) { throw 'Das Startziel ist derzeit nicht verfügbar.' }
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     try {
         $result = Set-BootNextTargetService -Guid $Guid
@@ -6971,7 +7087,13 @@ function Get-EntryByGuid([string]$Guid) {
 function New-BootEntryInteractionHandlers {
     $clickHandler = {
         param($sender, $eventArgs)
-        if (Test-MaintenanceBusy -or (Test-BootTargetDriftDetected)) { return }
+        $capabilities = Get-CurrentSystemFunctionsCapabilities
+        if ($script:IsManageEntriesMode) {
+            if (-not $capabilities.CanManageEntries) { return }
+        }
+        elseif (-not $capabilities.CanSetBootNext) {
+            return
+        }
         $guid = [string]$sender.Tag
         if (-not $guid) {
             $row = Get-BootRowFromControl $sender
@@ -7650,7 +7772,8 @@ function Apply-FirmwareBootState {
         $script:LastStatusText = Get-LocalizedString -Key 'Status.NoOneTimeNextBoot'
     }
 
-    if (Get-TaskBrokerInteractiveReady) { [void](Refresh-SystemDefaultState) }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    if ($capabilities.CanUseCachedBootState) { [void](Refresh-SystemDefaultState) }
     Update-PopupRows
 }
 
@@ -8134,7 +8257,8 @@ function New-PopupForm {
     # v0.2.28: no window region is applied; the popup stays rectangular.
 
     $form.Add_Deactivate({
-        if (-not $script:ExitRequested -and -not (Test-MaintenanceBusy)) { $this.Hide() }
+        $capabilities = Get-CurrentSystemFunctionsCapabilities
+        if (-not $script:ExitRequested -and [string]$capabilities.State -ne 'Busy') { $this.Hide() }
     })
 
     return $form
@@ -8160,9 +8284,10 @@ function Show-OrTogglePopup {
         return
     }
 
-    $maintenanceBusy = Test-MaintenanceBusy
-    $brokerReady = if ($maintenanceBusy) { $false } else { ((Get-SystemFunctionsPresentationState) -eq 'Ready') }
-    if ($brokerReady) {
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    $maintenanceBusy = ([string]$capabilities.State -eq 'Busy')
+    $canUseSystemState = [bool]$capabilities.CanUseCachedBootState
+    if ($canUseSystemState) {
         if ($script:CurrentEntries.Count -eq 0) { [void](Load-BootStateFromExistingCache) }
         try { [void](Refresh-SystemDefaultState) } catch { }
     }
@@ -8170,14 +8295,14 @@ function Show-OrTogglePopup {
         if (-not $maintenanceBusy) {
             $script:CurrentEntries = @()
             $script:SelectedGuid = $null
-            if (Test-BootTargetDriftDetected) {
+            if ([string]$capabilities.State -eq 'ReinitializeRequired') {
                 $script:LastStatusText = if (Test-BootTargetDriftHasNewTargets) { Get-LocalizedString -Key 'Status.NewBootTargetDetected' } else { Get-LocalizedString -Key 'Status.BootTargetsChanged' }
             }
-            elseif (Test-TaskBrokerInstallationPresent) {
-                $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsRepairRequired'
+            elseif ([string]$capabilities.State -eq 'SetupRequired') {
+                $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsSetupRequired'
             }
             else {
-                $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsSetupRequired'
+                $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsRepairRequired'
             }
         }
         Update-PopupRows
@@ -8196,7 +8321,7 @@ function Show-OrTogglePopup {
     # Critical latency path: the form is visible before any fresh Scheduled-Task
     # refresh begins. Maintenance/missing-system-function states never launch a
     # competing worker; slow firmware/storage work stays in the hidden child.
-    if ($brokerReady -and -not $maintenanceBusy) {
+    if ($canUseSystemState -and -not $maintenanceBusy) {
         Start-BackgroundBootRefresh -RefreshStorage:($null -eq $script:StorageContext)
     }
 }
