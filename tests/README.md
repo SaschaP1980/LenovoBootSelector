@@ -26,6 +26,7 @@ These four files are the permanent Python gates used by the GitHub Release Orche
 | `Test-RefreshRuntime.ps1` | Runtime | Background refresh state/request lifecycle and child-worker diagnostics-session correlation |
 | `Test-RefreshController.ps1` | Application / Infrastructure | Background-refresh admission, coalescing, completion, maintenance cancellation, result application, worker success/failure, and cleanup ownership with faked boundaries |
 | `Test-MaintenanceRuntime.ps1` | Runtime | Maintenance state and modes |
+| `Test-SystemCapabilities.ps1` | Application | Canonical system-function readiness/capability derivation from explicit facts |
 | `Test-SingleInstanceMutex.ps1` | Runtime | Single-instance / mutex lifecycle |
 | `Test-BootTargetDrift.ps1` | Safety | Drift detection and fail-closed states |
 | `Test-TaskBrokerBoundary.ps1` | Safety | Fixed-task / metadata privilege boundary without privileged execution |
@@ -64,10 +65,11 @@ Native PowerShell suites intentionally use different count strategies; one gener
 | `Test-SingleInstanceMutex.ps1` | Explicit manual increments; fixed fail guard of 4. |
 | `Test-IdentifierCompatibility.ps1` | Straight-line: fixed runtime count of 29 covering LBS-19 naming, migration-failure safety, unrelated-value isolation, and retained compatibility roots. |
 | `Test-MaintenanceRuntime.ps1` | Loop-derived: 15 runtime checks from static assertions plus assertions repeated per mode. |
+| `Test-SystemCapabilities.ps1` | Straight-line: fixed runtime count of 47 covering setup/repair/checking/ready/drift/busy/unknown capability derivation and fail-closed actions. |
 | `Test-ArchitectureSoak.ps1` | Four aggregate soak assertions; each assertion covers many iterations. |
 | `Test-FunctionalCore.ps1` | Dynamic PASS counting; includes deterministic LBS-31 storage-resolution cases with no hardware dependency. |
 | `Test-StorageInfrastructure.ps1` | Straight-line: fixed runtime count of 17 covering Windows disk/partition normalization, per-disk partition-query failure, and unavailable inventory. |
-| `Test-UIPresentation.ps1` | Straight-line: fixed runtime count of 23 covering normal selected rows, hidden/manage visual state, alias-editor state, hover behavior, and scroll layout using real WinForms controls. |
+| `Test-UIPresentation.ps1` | Straight-line: fixed runtime count of 25 covering normal selected rows, hidden/manage visual state, alias-editor state, hover behavior, scroll layout, and canonical capability interaction gates using real WinForms controls. |
 | `Test-LocalizationRuntime.ps1` | Straight-line: fixed runtime count of 32 covering native locale selection, explicit-preference persistence, v0.8.0.0 ambiguity resolution, startup-recovery migration, reload, parity, and lookup. |
 | `Test-WindowsPowerShell51.ps1` | Aggregate runner/parser gate; file count is dynamic and is not an assertion-coverage count. |
 

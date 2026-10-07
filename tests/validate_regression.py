@@ -148,6 +148,16 @@ def main():
     boot_entry_ui=txt(root/'src/UI/BootEntryList.ps1')
     boot_entry_rows=txt(root/'src/UI/BootEntryRows.ps1') if (root/'src/UI/BootEntryRows.ps1').is_file() else ''
     boot_entry_surface=boot_entry_ui+'\n'+boot_entry_rows
+    default_target_ui=txt(root/'src/UI/DefaultTargetPresentation.ps1')
+    maintenance_capability_ui=txt(root/'src/UI/MaintenancePresentation.ps1')
+    system_capabilities=txt(root/'src/Application/SystemCapabilities.ps1') if (root/'src/Application/SystemCapabilities.ps1').is_file() else ''
+    system_capabilities_test=txt(root/'tests/Test-SystemCapabilities.ps1') if (root/'tests/Test-SystemCapabilities.ps1').is_file() else ''
+    s.has('LBS-28 canonical capability resolver retained',system_capabilities,'function Resolve-SystemFunctionsCapabilities')
+    s.has('LBS-28 canonical capability runtime adapter retained',system_capabilities,'function Get-CurrentSystemFunctionsCapabilities')
+    s.has('LBS-28 direct capability contract retained',system_capabilities_test,'SYSTEM CAPABILITIES TOTAL $script:checks/47')
+    s.no('LBS-28 removed duplicated presentation-state function stays removed',maintenance_capability_ui,'function Get-SystemFunctionsPresentationState')
+    s.no('LBS-28 default target no longer derives readiness from TaskBrokerReadyCached',default_target_ui,'TaskBrokerReadyCached')
+    s.has('LBS-28 boot row consumes canonical BootNext capability',boot_entry_rows,'$capabilities.CanSetBootNext')
     s.has('LBS-17 template ready status remains localized',app_template,"Get-LocalizedString -Key 'Status.Ready'")
     s.has('LBS-17 template maintenance launch errors remain localized',app_template,"Get-LocalizedString -Key 'Maintenance.SetupNotStartedTitle'")
     s.has('LBS-17 entry visibility accessibility remains localized',boot_entry_surface,"Get-LocalizedString -Key 'Manage.HiddenAccessible'")

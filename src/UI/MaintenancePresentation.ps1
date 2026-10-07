@@ -6,18 +6,6 @@ function Get-MaintenanceMode {
     return (Get-MaintenanceRuntimeMode -State $script:MaintenanceState)
 }
 
-function Get-SystemFunctionsPresentationState {
-    if (Test-MaintenanceBusy) {
-        return ('Busy-' + (Get-MaintenanceMode))
-    }
-    if (Get-TaskBrokerInteractiveReady) {
-        if (Test-BootTargetDriftDetected) { return 'ReinitializeRequired' }
-        return 'Ready'
-    }
-    if (Test-TaskBrokerInstallationPresent) { return 'RepairRequired' }
-    return 'SetupRequired'
-}
-
 function Get-MaintenanceBusyStatusText {
     $mode = Get-MaintenanceMode
     if ($mode -eq 'Remove') { return (Get-LocalizedString -Key 'Maintenance.Busy.Remove') }
@@ -71,8 +59,9 @@ function New-MaintenanceStatePanel {
     $action.Size = New-Object Drawing.Size(280, 38)
     $action.Cursor = [System.Windows.Forms.Cursors]::Hand
     $action.Add_Click({
-        if (Test-MaintenanceBusy) { return }
-        if ((Get-SystemFunctionsPresentationState) -eq 'ReinitializeRequired') {
+        $capabilities = Get-CurrentSystemFunctionsCapabilities
+        if (-not $capabilities.CanConfigureSystemFunctions) { return }
+        if ([string]$capabilities.State -eq 'ReinitializeRequired') {
             Prompt-TaskBrokerReinitialize
             return
         }
@@ -91,9 +80,11 @@ function New-MaintenanceStatePanel {
 
 function Update-MaintenanceUi {
     if (-not $script:Popup -or $script:Popup.IsDisposed) { return }
-    $state = Get-SystemFunctionsPresentationState
-    $busy = $state.StartsWith('Busy-')
-    $ready = ($state -eq 'Ready')
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    $state = [string]$capabilities.State
+    $busy = ($state -eq 'Busy')
+    $ready = [bool]$capabilities.IsReady
+    $checking = [bool]$capabilities.IsChecking
 
     $panelMatches = $script:Popup.Controls.Find('MaintenanceStatePanel', $true)
     $panel = if ($panelMatches.Count -gt 0) { $panelMatches[0] } else { $null }
@@ -104,7 +95,7 @@ function Update-MaintenanceUi {
         $hint = $panel.Controls['MaintenanceHint']
         $glyph = $panel.Controls['MaintenanceGlyph']
 
-        if ($ready) {
+        if ($ready -or $checking) {
             $panel.Visible = $false
         }
         else {
@@ -117,17 +108,17 @@ function Update-MaintenanceUi {
                 $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupMessage'
                 $action.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHeading'
                 $action.Visible = $true
-                $action.Enabled = $true
+                $action.Enabled = [bool]$capabilities.CanConfigureSystemFunctions
                 $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHint'
             }
-            elseif ($state -eq 'RepairRequired') {
+            elseif ($state -eq 'RepairRequired' -or $state -eq 'Unknown') {
                 $glyph.Text = '!'
                 $glyph.ForeColor = $script:ColorWarning
                 $heading.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHeading'
                 $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairMessage'
                 $action.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHeading'
                 $action.Visible = $true
-                $action.Enabled = $true
+                $action.Enabled = [bool]$capabilities.CanConfigureSystemFunctions
                 $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHint'
             }
             elseif ($state -eq 'ReinitializeRequired') {
@@ -143,7 +134,7 @@ function Update-MaintenanceUi {
                 }
                 $action.Text = Get-LocalizedString -Key 'Maintenance.Action.Reinitialize'
                 $action.Visible = $true
-                $action.Enabled = $true
+                $action.Enabled = [bool]$capabilities.CanConfigureSystemFunctions
                 $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHint'
             }
             else {
@@ -160,14 +151,14 @@ function Update-MaintenanceUi {
     }
 
     if ($script:RefreshButton -and -not $script:RefreshButton.IsDisposed) {
-        $script:RefreshButton.Enabled = ($ready -and -not $busy)
+        $script:RefreshButton.Enabled = [bool]$capabilities.CanRefresh
         $script:RefreshButton.Cursor = if ($script:RefreshButton.Enabled) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
     }
     if ($script:ManageEntriesButton -and -not $script:ManageEntriesButton.IsDisposed) {
-        $script:ManageEntriesButton.Enabled = ($ready -and -not $busy)
+        $script:ManageEntriesButton.Enabled = [bool]$capabilities.CanManageEntries
     }
-    if ($script:DefaultContextRoot) { $script:DefaultContextRoot.Enabled = ($ready -and -not $busy) }
-    if ($script:RestartMenuItem) { $script:RestartMenuItem.Enabled = -not $busy }
+    if ($script:DefaultContextRoot) { $script:DefaultContextRoot.Enabled = [bool]$capabilities.CanUseDefaultTarget }
+    if ($script:RestartMenuItem) { $script:RestartMenuItem.Enabled = [bool]$capabilities.CanRestart }
 
     Update-HeaderRefreshStatus
 }

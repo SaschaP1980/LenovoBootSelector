@@ -4,7 +4,13 @@
 function New-BootEntryInteractionHandlers {
     $clickHandler = {
         param($sender, $eventArgs)
-        if (Test-MaintenanceBusy -or (Test-BootTargetDriftDetected)) { return }
+        $capabilities = Get-CurrentSystemFunctionsCapabilities
+        if ($script:IsManageEntriesMode) {
+            if (-not $capabilities.CanManageEntries) { return }
+        }
+        elseif (-not $capabilities.CanSetBootNext) {
+            return
+        }
         $guid = [string]$sender.Tag
         if (-not $guid) {
             $row = Get-BootRowFromControl $sender

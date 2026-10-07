@@ -73,7 +73,7 @@ Starting with v0.10.0.0, the privileged TaskBroker installation uses `LenovoBoot
 
 Historical migration and repair details for v0.6.4.0/v0.6.4.1 are retained in [CHANGELOG.md](CHANGELOG.md) rather than presented as current maintenance instructions.
 
-**Current development version:** v0.10.4.0  
+**Current development version:** v0.10.5.0  
 **Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads and revision history

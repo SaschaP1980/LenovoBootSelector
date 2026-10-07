@@ -125,7 +125,7 @@ def main():
     ui_presentation_path=root/'tests/Test-UIPresentation.ps1'
     s.c('LBS-29 native UI presentation test exists',ui_presentation_path.is_file())
     ui_presentation=txt(ui_presentation_path) if ui_presentation_path.is_file() else ''
-    s.has('LBS-29 UI presentation suite keeps fixed total 23',ui_presentation,'Write-Host "UI PRESENTATION TOTAL $script:checks/23"')
+    s.has('LBS-29 UI presentation suite keeps fixed total 25',ui_presentation,'Write-Host "UI PRESENTATION TOTAL $script:checks/25"')
     s.has('LBS-29 native aggregate runner invokes UI presentation suite',windows_wrapper,"Test-UIPresentation.ps1")
     mutex_test=txt(root/'tests/Test-SingleInstanceMutex.ps1')
     s.has('Mutex native test keeps explicit total output',mutex_test,'Write-Host "MUTEX TOTAL $checks/4"')
@@ -354,6 +354,9 @@ def main():
         s.has('LBS-26 Windows workflow parses update controller total',ww,"updateController = Get-TestTotal $logText '^UPDATE CONTROLLER TOTAL")
         s.has('LBS-26 Windows workflow includes update controller in aggregate passed',ww,'$totals.updateController.passed')
         s.has('LBS-26 Windows workflow includes update controller in aggregate expected',ww,'$totals.updateController.expected')
+        s.has('LBS-28 Windows workflow parses system capability total',ww,"systemCapabilities = Get-TestTotal $logText '^SYSTEM CAPABILITIES TOTAL")
+        s.has('LBS-28 Windows workflow includes system capabilities in aggregate passed',ww,'$totals.systemCapabilities.passed')
+        s.has('LBS-28 Windows workflow includes system capabilities in aggregate expected',ww,'$totals.systemCapabilities.expected')
         s.has('LBS-31 Windows workflow parses storage infrastructure total',ww,"storageInfrastructure = Get-TestTotal $logText '^STORAGE INFRA TOTAL")
         s.has('LBS-31 Windows workflow includes storage infrastructure in aggregate passed',ww,'$totals.storageInfrastructure.passed')
         s.has('LBS-31 Windows workflow includes storage infrastructure in aggregate expected',ww,'$totals.storageInfrastructure.expected')
@@ -364,6 +367,15 @@ def main():
 
     for rel in ['tests/validate_release.py','tests/validate_core.py','tests/validate_boundary.py','tests/validate_regression.py']:
         s.c(f'Permanent validator exists: {rel}',(root/rel).is_file())
+    system_capabilities_path=root/'src/Application/SystemCapabilities.ps1'
+    system_capabilities=txt(system_capabilities_path) if system_capabilities_path.is_file() else ''
+    system_capabilities_test=txt(root/'tests/Test-SystemCapabilities.ps1') if (root/'tests/Test-SystemCapabilities.ps1').is_file() else ''
+    s.c('LBS-28 canonical Application capability model exists',system_capabilities_path.is_file())
+    s.has('LBS-28 capability model owns pure derivation',system_capabilities,'function Resolve-SystemFunctionsCapabilities')
+    s.has('LBS-28 capability model exposes runtime adapter',system_capabilities,'function Get-CurrentSystemFunctionsCapabilities')
+    s.has('LBS-28 direct capability behavior test exists',system_capabilities_test,'SYSTEM CAPABILITIES TOTAL $script:checks/47')
+    template=txt(root/'src/App/LenovoBootSelector.template.ps1')
+    s.eq('LBS-28 Application model runtime include appears once',template.count('# @include src/Application/SystemCapabilities.ps1'),1)
     default_ui=txt(root/'src/UI/DefaultTargetPresentation.ps1'); popup_ui=txt(root/'src/UI/Popup.ps1')
     popup_composition=txt(root/'src/UI/PopupComposition.ps1') if (root/'src/UI/PopupComposition.ps1').is_file() else ''
     popup_surface=popup_ui+'\n'+popup_composition
@@ -371,7 +383,8 @@ def main():
     boot_entry_rows=txt(root/'src/UI/BootEntryRows.ps1') if (root/'src/UI/BootEntryRows.ps1').is_file() else ''
     boot_entry_surface=boot_entry_ui+'\n'+boot_entry_rows
     s.has('LBS-17 default target startup check is localized',default_ui,"Get-LocalizedString -Key 'Status.Checking'")
-    s.has('Default target pending state is limited to compatible metadata plus unknown readiness',default_ui,'$checking = ($schemaReady -and $null -eq $script:TaskBrokerReadyCached)')
+    s.has('LBS-28 default target consumes canonical checking capability',default_ui,'$checking = [bool]$capabilities.IsChecking')
+    s.has('LBS-28 default target consumes canonical mutation capability',default_ui,'$enabled = [bool]$capabilities.CanSetDefaultTarget')
     s.has('Default target pending state stays visually readable',default_ui,'$visualEnabled = ($enabled -or $checking)')
     s.has('Default target interaction remains separately gated',default_ui,'$script:DefaultInteractionEnabled = $enabled')
     s.has('Default target chevron is hidden only while checking',default_ui,'$script:DefaultArrowLabel.Visible = -not $checking')
