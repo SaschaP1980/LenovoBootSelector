@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.10.7.1 – Version-only Hotfix
+
+- Version number only; no product source or behavior changes.
+
+
 ## v0.10.7.0 – LBS-37 verified public update-pointer activation
 
 - Treat the existing release PR merge as the single atomic public activation switch for `downloads/latest.json`; no second activation PR and no direct push to `main` are introduced.
