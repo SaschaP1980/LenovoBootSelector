@@ -181,7 +181,7 @@ def main():
     update_native=txt(root/'tests/Test-UpdateCore.ps1')
     mutex_native=txt(root/'tests/Test-SingleInstanceMutex.ps1')
     s.has('Native update test retains AST source-count self-audit',update_native,'[System.Management.Automation.Language.Parser]::ParseFile')
-    s.has('Native update test retains explicit 62 runtime guard',update_native,'if ($checks -ne 62) { throw "Unexpected update test count $checks" }')
+    s.has('Native update test retains explicit 75 runtime guard',update_native,'if ($checks -ne 75) { throw "Unexpected update test count $checks" }')
     s.has('Native mutex test retains explicit count guard',mutex_native,'if ($checks -ne 4) { throw "Unexpected mutex test count $checks" }')
     cp=subprocess.run([sys.executable,str(root/'tools/release_verification.py'),'--self-test'],capture_output=True,text=True); s.eq('LBS-16 release verification self-test',cp.returncode,0)
     cp=subprocess.run([sys.executable,str(root/'tools/build_runtime.py'),'--root',str(root),'--check'],capture_output=True,text=True); s.eq('Runtime deterministic',cp.returncode,0)

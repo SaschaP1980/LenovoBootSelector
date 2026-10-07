@@ -25,6 +25,19 @@ Assert-True 'Update runtime has no process-once startup completion flag' ($null 
 Assert-Equal 'Update check mode starts empty' '' $runtime.CheckMode
 $threw=$false; try { [void](Compare-LenovoAppVersionCore -Current '0.5.7' -Candidate 'dev') } catch { $threw=$true }; Assert-True 'Invalid compare throws' $threw
 
+
+$manifestBaseUri=[string](Get-LenovoUpdateManifestBaseUri)
+$manifestUri1=[string](Get-LenovoUpdateManifestUri)
+$manifestUri2=[string](Get-LenovoUpdateManifestUri)
+Assert-Equal 'Manifest base URI remains exact mutable latest.json resource' 'https://raw.githubusercontent.com/SaschaP1980/LenovoBootSelector/main/downloads/latest.json' $manifestBaseUri
+Assert-True 'Manifest URI appends cache-buster only after exact base resource' ($manifestUri1.StartsWith($manifestBaseUri + '?cb='))
+Assert-True 'Consecutive manifest checks use distinct cache-busters' ($manifestUri1 -ne $manifestUri2)
+Assert-True 'Manifest cache-buster is one GUID nonce query' ($manifestUri1 -match '\?cb=[0-9a-f]{32}$')
+$downloadBaseUri=[string](Get-LenovoUpdateDownloadBaseUri)
+Assert-Equal 'Versioned package download base remains query-free' 'https://raw.githubusercontent.com/SaschaP1980/LenovoBootSelector/main/downloads/' $downloadBaseUri
+$packageUri=$downloadBaseUri+[Uri]::EscapeDataString('LenovoBootMenuTray-v0.8.0.4.zip')
+Assert-Equal 'Versioned package URI remains stable and cacheable' 'https://raw.githubusercontent.com/SaschaP1980/LenovoBootSelector/main/downloads/LenovoBootMenuTray-v0.8.0.4.zip' $packageUri
+
 $dnsError=[System.Net.WebException]::new('dns',[System.Net.WebExceptionStatus]::NameResolutionFailure)
 $failure=Get-LenovoUpdateFailureInfo -ErrorRecord $dnsError -DefaultCategory 'runtime' -DefaultStage 'fixture'
 Assert-Equal 'DNS failure classified as network' 'network' $failure.Category
@@ -80,6 +93,46 @@ $x=$valid.psobject.Copy(); $x.packageFiles=@($files | Where-Object { $_ -ne 'Ins
 $x=$valid.psobject.Copy(); $x.packageFiles=@($files | Where-Object { $_ -ne 'Uninstall-LenovoBootMenuTasks.ps1' }); Assert-True 'Missing uninstaller rejected' (-not (Test-LenovoUpdateManifestCore -Manifest $x).IsValid)
 Assert-True 'Null manifest rejected' (-not (Test-LenovoUpdateManifestCore -Manifest $null).IsValid)
 
+
+function New-UpdateCheckFixtureManifest([string]$Version,[string]$PublishedUtc) {
+    return [pscustomobject]@{
+        schemaVersion=1
+        version=$Version
+        file=('LenovoBootMenuTray-v{0}.zip' -f $Version)
+        sha256=('a'*64)
+        size=123
+        tag=('v{0}' -f $Version)
+        publishedUtc=$PublishedUtc
+        packageFiles=$files
+    }
+}
+function New-RuntimeDiagnosticData { param([hashtable]$Data) return $Data }
+function Write-RuntimeDiagnosticEvent {
+    param([string]$Event,[string]$Stage,[bool]$Success,$Data,[string]$Level)
+    if ($Event -eq 'UPDATE_CHECK_WORKER_COMPLETED') { $script:CapturedUpdateDiagnostic=$Data }
+}
+function Get-LenovoUpdateManifestRemote { return $script:UpdateManifestFixture }
+
+$script:AppVersion='0.8.0.3'
+$script:UpdateResultPath=$null
+$script:UpdateManifestFixture=New-UpdateCheckFixtureManifest -Version '0.8.0.4' -PublishedUtc '2026-10-07T03:00:00Z'
+$script:CapturedUpdateDiagnostic=$null
+Assert-Equal 'Newer manifest worker succeeds' 0 (Invoke-UpdateCheckWorker)
+Assert-Equal 'Update diagnostics record running version' '0.8.0.3' ([string]$script:CapturedUpdateDiagnostic.runningVersion)
+Assert-Equal 'Update diagnostics record received manifest version' '0.8.0.4' ([string]$script:CapturedUpdateDiagnostic.manifestVersion)
+Assert-Equal 'Update diagnostics record manifest publishedUtc' '2026-10-07T03:00:00Z' ([string]$script:CapturedUpdateDiagnostic.manifestPublishedUtc)
+Assert-True 'Newer manifest reports update available' ([bool]$script:CapturedUpdateDiagnostic.updateAvailable)
+
+$script:UpdateManifestFixture=New-UpdateCheckFixtureManifest -Version '0.8.0.3' -PublishedUtc '2026-10-07T03:01:00Z'
+$script:CapturedUpdateDiagnostic=$null
+[void](Invoke-UpdateCheckWorker)
+Assert-True 'Equal manifest reports no update available' (-not [bool]$script:CapturedUpdateDiagnostic.updateAvailable)
+
+$script:UpdateManifestFixture=New-UpdateCheckFixtureManifest -Version '0.8.0.2' -PublishedUtc '2026-10-07T03:02:00Z'
+$script:CapturedUpdateDiagnostic=$null
+[void](Invoke-UpdateCheckWorker)
+Assert-True 'Older manifest reports no update available' (-not [bool]$script:CapturedUpdateDiagnostic.updateAvailable)
+
 $legacyOk=[pscustomobject]@{utc='2026-10-05T11:00:00Z';success=$true;message='Update auf v0.5.8.1 installiert.'}
 $rr=Resolve-LenovoUpdateRestartResultCore -Result $legacyOk -RunningVersion '0.5.8.1'
 Assert-Equal 'Legacy success format detected' 'legacy-success' $rr.ResultFormat
@@ -130,8 +183,8 @@ $sourceAssertionCount = @(
 if ($checks -ne $sourceAssertionCount) {
     throw "Update assertion execution/source mismatch: executed $checks, source $sourceAssertionCount"
 }
-Write-Host "UPDATE ASSERTION SOURCE $sourceAssertionCount/62"
-if ($sourceAssertionCount -ne 62) { throw "Unexpected update assertion source count $sourceAssertionCount" }
+Write-Host "UPDATE ASSERTION SOURCE $sourceAssertionCount/75"
+if ($sourceAssertionCount -ne 75) { throw "Unexpected update assertion source count $sourceAssertionCount" }
 
-Write-Host "UPDATE TOTAL $checks/62"
-if ($checks -ne 62) { throw "Unexpected update test count $checks" }
+Write-Host "UPDATE TOTAL $checks/75"
+if ($checks -ne 75) { throw "Unexpected update test count $checks" }
