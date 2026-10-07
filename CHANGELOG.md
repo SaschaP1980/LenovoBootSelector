@@ -1,5 +1,15 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.10.0.1 – LBS-34 native TaskBroker trigger-verification hotfix
+
+- Fix the physical v0.10.0.0 Repair/Migrate failure at `verify-canonical-installation` where the ScheduledTasks CIM `.Triggers` projection falsely classified `LenovoBootSelector-RefreshManager` as triggered.
+- Verify the trigger contract from the authoritative registered Task Scheduler COM XML instead: normal privileged tasks require zero trigger elements; `LenovoBootSelector-Default-Restore` requires exactly one 30-second `BootTrigger`.
+- Keep principal, action, arguments, metadata, state ACL and task DACL verification unchanged.
+- Keep fail-closed verify-before-legacy-cleanup ordering unchanged; the recoverable v0.10.0.0 dual-task state is intentionally supported by another Repair run.
+- Expand the permanent TaskBroker Migration suite from 28 to 36 checks with triggerless, wrong-trigger, wrong-delay and multiple-trigger XML regressions.
+- No TaskBroker schema, task name, ProgramData path, privilege-boundary, BootNext or default-target semantics change.
+- Release profile: `patch`. `protectedFragmentIntent` and `repositoryDeleteIntent` are empty.
+
 ## v0.10.0.0 – LBS-33 privileged TaskBroker identifier migration
 
 - Move the privileged TaskBroker installation to canonical `LenovoBootSelector-*` Scheduled Task names and `%ProgramData%\Lenovo Boot Selector\TaskBroker`.
