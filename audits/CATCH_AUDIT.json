@@ -1,5 +1,5 @@
 {
-  "version": "0.8.0.3",
+  "version": "0.8.0.4",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
@@ -431,56 +431,56 @@
     },
     {
       "source": "src/Infrastructure/UpdateClient.ps1",
-      "line": 184,
+      "line": 188,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "finally { try { if (Test-Path -LiteralPath $probe) { Remove-Item -LiteralPath $probe -Force } } catch { } }"
     },
     {
       "source": "src/Infrastructure/UpdateClient.ps1",
-      "line": 242,
+      "line": 246,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { Add-Type -AssemblyName System.Windows.Forms; [void][System.Windows.Forms.MessageBox]::Show($Message,'Lenovo Boot Selector – Update',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) } catch { }"
     },
     {
       "source": "src/Infrastructure/UpdateClient.ps1",
-      "line": 246,
+      "line": 250,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { $parent=[System.Diagnostics.Process]::GetProcessById($ParentPid); [void]$parent.WaitForExit(30000) } catch { }"
     },
     {
       "source": "src/Infrastructure/UpdateClient.ps1",
-      "line": 278,
+      "line": 282,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $started.Dispose() } catch { }"
     },
     {
       "source": "src/Infrastructure/UpdateClient.ps1",
-      "line": 310,
+      "line": 314,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { Remove-Item -LiteralPath $WorkDir -Recurse -Force -ErrorAction SilentlyContinue } catch { }"
     },
     {
       "source": "src/Infrastructure/UpdateClient.ps1",
-      "line": 320,
+      "line": 324,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "if ($restart) { try { $restart.Dispose() } catch { } }"
     },
     {
       "source": "src/Infrastructure/UpdateClient.ps1",
-      "line": 328,
+      "line": 332,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue } catch { }"
     },
     {
       "source": "src/Infrastructure/UpdateTransport.ps1",
-      "line": 13,
+      "line": 18,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "} catch { }"
