@@ -113,6 +113,11 @@ def main():
     s.has('LBS-17 native localization test covers persisted language selection',localization_native,"Set-ActiveLocale -Locale 'de-DE' -Persist")
     s.has('LBS-23 native localization test covers English legacy migration',localization_native,'Pre-localization schema migrates to en-US')
     s.has('LBS-17 native aggregate runner invokes localization suite',windows_wrapper,"Test-LocalizationRuntime.ps1")
+    storage_infra_path=root/'tests/Test-StorageInfrastructure.ps1'
+    s.c('LBS-31 native storage infrastructure test exists',storage_infra_path.is_file())
+    storage_infra=txt(storage_infra_path) if storage_infra_path.is_file() else ''
+    s.has('LBS-31 storage infrastructure suite keeps fixed total 17',storage_infra,'Write-Host "STORAGE INFRA TOTAL $checks/17"')
+    s.has('LBS-31 native aggregate runner invokes storage infrastructure suite',windows_wrapper,"Test-StorageInfrastructure.ps1")
     mutex_test=txt(root/'tests/Test-SingleInstanceMutex.ps1')
     s.has('Mutex native test keeps explicit total output',mutex_test,'Write-Host "MUTEX TOTAL $checks/4"')
     s.has('Mutex native test fails closed on count drift',mutex_test,'if ($checks -ne 4) { throw "Unexpected mutex test count $checks" }')
@@ -331,6 +336,9 @@ def main():
         s.has('LBS-17 Windows workflow parses localization total',ww,"localizationRuntime = Get-TestTotal $logText '^LOCALIZATION TOTAL")
         s.has('LBS-17 Windows workflow includes localization in aggregate passed',ww,'$totals.localizationRuntime.passed')
         s.has('LBS-17 Windows workflow includes localization in aggregate expected',ww,'$totals.localizationRuntime.expected')
+        s.has('LBS-31 Windows workflow parses storage infrastructure total',ww,"storageInfrastructure = Get-TestTotal $logText '^STORAGE INFRA TOTAL")
+        s.has('LBS-31 Windows workflow includes storage infrastructure in aggregate passed',ww,'$totals.storageInfrastructure.passed')
+        s.has('LBS-31 Windows workflow includes storage infrastructure in aggregate expected',ww,'$totals.storageInfrastructure.expected')
         s.has('LBS-20 Windows workflow reports setup timing',ww,'setupMs')
         s.has('LBS-20 Windows workflow reports runtime preparation timing',ww,'runtimePreparationMs')
         s.has('LBS-20 Windows workflow reports test timing',ww,'testMs')

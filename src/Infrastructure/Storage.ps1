@@ -1,55 +1,48 @@
-﻿function Test-PartitionBootStructure {
+﻿# Windows-specific storage acquisition and normalization.
+# Classification and product-facing storage resolution live in Core/StorageResolution.ps1.
+
+function ConvertTo-WindowsStorageDiskSnapshot {
     param(
         [Parameter(Mandatory=$true)]$Disk,
-        [Parameter(Mandatory=$true)][object[]]$Partitions
+        [Parameter(Mandatory=$true)][AllowEmptyCollection()][object[]]$Partitions
     )
 
-    $hasEfiSystemPartition = $false
-    $hasActiveFatPartition = $false
-
-    foreach ($partition in $Partitions) {
-        $gptType = ([string]$partition.GptType).Trim().Trim([char[]]'{}').ToLowerInvariant()
-        if ($gptType -eq 'c12a7328-f81f-11d2-ba4b-00a0c93ec93b') {
-            $hasEfiSystemPartition = $true
-        }
-
-        if (([string]$Disk.PartitionStyle -eq 'MBR') -and ($partition.IsActive -eq $true)) {
-            $partitionType = [string]$partition.Type
-            $mbrType = [string]$partition.MbrType
-            if (($partitionType -match '(?i)FAT32') -or ($mbrType -eq '11') -or ($mbrType -eq '12')) {
-                $hasActiveFatPartition = $true
+    $normalizedPartitions = @(
+        foreach ($partition in @($Partitions)) {
+            [pscustomobject]@{
+                GptType = [string]$partition.GptType
+                IsActive = [bool]$partition.IsActive
+                Type = [string]$partition.Type
+                MbrType = [string]$partition.MbrType
             }
         }
-    }
+    )
 
-    [pscustomobject]@{
-        HasEfiSystemPartition = $hasEfiSystemPartition
-        HasActiveFatPartition = $hasActiveFatPartition
-        HasBootStructure = ($hasEfiSystemPartition -or $hasActiveFatPartition)
+    return [pscustomobject]@{
+        Number = $Disk.Number
+        Model = ([string]$Disk.FriendlyName).Trim()
+        SerialNumber = ([string]$Disk.SerialNumber).Trim()
+        BusType = [string]$Disk.BusType
+        PartitionStyle = [string]$Disk.PartitionStyle
+        Path = [string]$Disk.Path
+        Partitions = @($normalizedPartitions)
     }
 }
-function Get-StorageContextCore {
-    # Performance-critical path: resolve storage from Get-Disk/Get-Partition only.
-    # v0.2.0 queried every present DiskDrive PnP node plus Parent/LocationPaths
-    # synchronously on the WinForms UI thread. On the target ThinkPad this could
-    # take ~20 seconds and blocked both left-click and the tray context menu.
-    # PnP enrichment is intentionally not part of the interactive refresh path.
-    $inventory = @()
 
+function Get-WindowsStorageSnapshot {
+    # Performance-critical Windows IO path. PnP enrichment remains intentionally
+    # excluded from interactive refresh; only Get-Disk/Get-Partition are queried.
     try {
         $disks = @(Get-Disk -ErrorAction Stop)
     }
     catch {
         return [pscustomobject]@{
+            Available = $false
             Disks = @()
-            UsbDisks = @()
-            UsbBootCandidates = @()
-            ResolvedUsbHdd = $null
-            UsbResolution = 'Unavailable'
-            UsbResolutionReason = 'Speichergeräte konnten nicht gelesen werden.'
         }
     }
 
+    $inventory = @()
     foreach ($disk in $disks) {
         $partitions = @()
         try {
@@ -57,65 +50,20 @@ function Get-StorageContextCore {
         }
         catch { }
 
-        $bootStructure = Test-PartitionBootStructure -Disk $disk -Partitions $partitions
-
-        $model = ([string]$disk.FriendlyName).Trim()
-        if (-not $model) { $model = "Datenträger $($disk.Number)" }
-
-        $inventory += [pscustomobject]@{
-            Number = $disk.Number
-            Model = $model
-            SerialNumber = ([string]$disk.SerialNumber).Trim()
-            BusType = [string]$disk.BusType
-            PartitionStyle = [string]$disk.PartitionStyle
-            Path = [string]$disk.Path
-            IsBootCandidate = [bool]$bootStructure.HasBootStructure
-            HasEfiSystemPartition = [bool]$bootStructure.HasEfiSystemPartition
-            HasActiveFatPartition = [bool]$bootStructure.HasActiveFatPartition
-            PnpInstanceId = $null
-            PnpParent = $null
-            PnpLocationPaths = @()
-        }
+        $inventory += ConvertTo-WindowsStorageDiskSnapshot -Disk $disk -Partitions $partitions
     }
 
-    $usbDisks = @($inventory | Where-Object { $_.BusType -eq 'USB' })
-    $usbBootCandidates = @($usbDisks | Where-Object { $_.IsBootCandidate })
-    $resolvedUsbHdd = $null
-    $resolution = 'Ambiguous'
-    $reason = 'Mehrere mögliche USB-Laufwerke erkannt.'
-
-    if ($usbBootCandidates.Count -eq 1) {
-        $resolvedUsbHdd = $usbBootCandidates[0]
-        $resolution = 'Candidate'
-        $reason = 'Genau ein aktuelles USB-Laufwerk besitzt eine erkannte Bootstruktur. Der Lenovo-Eintrag USB HDD ist jedoch generisch; die physische Zuordnung wird erst durch den Boottest bestätigt.'
-    }
-    elseif ($usbBootCandidates.Count -gt 1) {
-        $resolution = 'Ambiguous'
-        $reason = "$($usbBootCandidates.Count) USB-Laufwerke besitzen eine erkannte Bootstruktur."
-    }
-    elseif ($usbDisks.Count -eq 1) {
-        $resolvedUsbHdd = $usbDisks[0]
-        $resolution = 'Medium'
-        $reason = 'Nur ein aktuelles USB-Laufwerk ist angeschlossen; eine Bootstruktur konnte jedoch nicht bestätigt werden.'
-    }
-    elseif ($usbDisks.Count -eq 0) {
-        $resolution = 'None'
-        $reason = 'Kein aktuelles USB-Speicherlaufwerk erkannt.'
-    }
-
-    [pscustomobject]@{
+    return [pscustomobject]@{
+        Available = $true
         Disks = @($inventory)
-        UsbDisks = @($usbDisks)
-        UsbBootCandidates = @($usbBootCandidates)
-        ResolvedUsbHdd = $resolvedUsbHdd
-        UsbResolution = $resolution
-        UsbResolutionReason = $reason
     }
 }
+
 function Get-StorageContext {
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     try {
-        $result = Get-StorageContextCore
+        $snapshot = Get-WindowsStorageSnapshot
+        $result = Resolve-StorageContextCore -Snapshot $snapshot
         $sw.Stop()
         $storageSuccess = ([string]$result.UsbResolution -ne 'Unavailable')
         Write-RuntimeDiagnosticEvent -Event 'STORAGE_RESOLUTION' -Stage 'storage' -Success $storageSuccess -DurationMs $sw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{

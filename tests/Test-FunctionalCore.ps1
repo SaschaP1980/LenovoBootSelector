@@ -4,6 +4,7 @@ $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 . (Join-Path $root 'src\Core\Localization.ps1')
 . (Join-Path $root 'src\Core\EntryPreferences.ps1')
 . (Join-Path $root 'src\Core\FirmwareParsing.ps1')
+. (Join-Path $root 'src\Core\StorageResolution.ps1')
 . (Join-Path $root 'src\Core\BootTargetModel.ps1')
 
 $script:Pass = 0
@@ -60,6 +61,111 @@ bootsequence            $g2
 $mgr = ConvertFrom-FirmwareManagerText $manager
 Assert-Equal @($g1.ToLowerInvariant(),$g2.ToLowerInvariant()) @($mgr.DisplayOrder) 'Manager parser display order'
 Assert-Equal $g2.ToLowerInvariant() $mgr.SelectedGuid 'Manager parser bootsequence'
+
+# LBS-31: storage classification is a pure contract over explicit snapshot data.
+$efiType = '{c12a7328-f81f-11d2-ba4b-00a0c93ec93b}'
+$gptEfiSnapshot = [pscustomobject]@{
+    Available = $true
+    Disks = @([pscustomobject]@{
+        Number=1; Model='USB EFI'; SerialNumber='EFI-1'; BusType='USB'; PartitionStyle='GPT'; Path='disk-1'
+        Partitions=@([pscustomobject]@{ GptType=$efiType; IsActive=$false; Type='Basic'; MbrType='' })
+    })
+}
+$gptEfi = Resolve-StorageContextCore -Snapshot $gptEfiSnapshot
+Assert-Equal $true $gptEfi.Disks[0].HasEfiSystemPartition 'Storage GPT EFI partition is detected'
+Assert-Equal $false $gptEfi.Disks[0].HasActiveFatPartition 'Storage GPT EFI disk has no MBR active FAT flag'
+Assert-Equal $true $gptEfi.Disks[0].IsBootCandidate 'Storage GPT EFI disk is a boot candidate'
+
+$mbrFatSnapshot = [pscustomobject]@{
+    Available = $true
+    Disks = @([pscustomobject]@{
+        Number=2; Model='USB MBR'; SerialNumber='MBR-1'; BusType='USB'; PartitionStyle='MBR'; Path='disk-2'
+        Partitions=@([pscustomobject]@{ GptType=''; IsActive=$true; Type='FAT32'; MbrType='12' })
+    })
+}
+$mbrFat = Resolve-StorageContextCore -Snapshot $mbrFatSnapshot
+Assert-Equal $false $mbrFat.Disks[0].HasEfiSystemPartition 'Storage MBR disk has no EFI partition flag'
+Assert-Equal $true $mbrFat.Disks[0].HasActiveFatPartition 'Storage MBR active FAT boot structure is detected'
+Assert-Equal $true $mbrFat.Disks[0].IsBootCandidate 'Storage MBR active FAT disk is a boot candidate'
+
+$noBootSnapshot = [pscustomobject]@{
+    Available = $true
+    Disks = @([pscustomobject]@{
+        Number=3; Model='USB Data'; SerialNumber='DATA-1'; BusType='USB'; PartitionStyle='GPT'; Path='disk-3'
+        Partitions=@([pscustomobject]@{ GptType='{e3c9e316-0b5c-4db8-817d-f92df00215ae}'; IsActive=$false; Type='Basic'; MbrType='' })
+    })
+}
+$noBoot = Resolve-StorageContextCore -Snapshot $noBootSnapshot
+Assert-Equal $false $noBoot.Disks[0].IsBootCandidate 'Storage disk without recognized boot structure is not a boot candidate'
+
+$nvmeSnapshot = [pscustomobject]@{
+    Available = $true
+    Disks = @([pscustomobject]@{
+        Number=0; Model='KXG8AZNV2T04 LA KIOXIA'; SerialNumber=' NVME-1 '; BusType='NVMe'; PartitionStyle='GPT'; Path='nvme-path'; Partitions=@()
+    })
+}
+$nvmeStorage = Resolve-StorageContextCore -Snapshot $nvmeSnapshot
+Assert-Equal 'None' $nvmeStorage.UsbResolution 'Storage zero USB disks resolves to None'
+Assert-Equal 0 @($nvmeStorage.UsbDisks).Count 'Storage zero USB disks exposes empty UsbDisks'
+Assert-Equal 1 @($nvmeStorage.Disks).Count 'Storage preserves non-USB disks'
+Assert-Equal 'KXG8AZNV2T04 LA KIOXIA' $nvmeStorage.Disks[0].Model 'Storage preserves NVMe model for friendly presentation'
+Assert-Equal 'NVME-1' $nvmeStorage.Disks[0].SerialNumber 'Storage normalizes preserved NVMe serial'
+Assert-Equal 'NVMe' $nvmeStorage.Disks[0].BusType 'Storage preserves NVMe bus type'
+
+$singleNonBoot = Resolve-StorageContextCore -Snapshot $noBootSnapshot
+Assert-Equal 'Medium' $singleNonBoot.UsbResolution 'Storage one USB disk without boot structure resolves to Medium'
+Assert-Equal 0 @($singleNonBoot.UsbBootCandidates).Count 'Storage non-boot USB disk exposes no boot candidate'
+Assert-Equal 'USB Data' $singleNonBoot.ResolvedUsbHdd.Model 'Storage single non-boot USB disk remains read-only medium context'
+
+$singleBoot = Resolve-StorageContextCore -Snapshot $gptEfiSnapshot
+Assert-Equal 'Candidate' $singleBoot.UsbResolution 'Storage one USB boot candidate resolves to Candidate'
+Assert-Equal 1 @($singleBoot.UsbBootCandidates).Count 'Storage one USB boot candidate is exposed exactly once'
+Assert-Equal 'USB EFI' $singleBoot.ResolvedUsbHdd.Model 'Storage candidate retains the resolved read-only disk context'
+Assert-Equal 'Genau ein aktuelles USB-Laufwerk besitzt eine erkannte Bootstruktur. Der Lenovo-Eintrag USB HDD ist jedoch generisch; die physische Zuordnung wird erst durch den Boottest bestätigt.' $singleBoot.UsbResolutionReason 'Storage candidate reason preserves generic firmware-target evidence limit'
+
+$multiBootSnapshot = [pscustomobject]@{
+    Available = $true
+    Disks = @(
+        $gptEfiSnapshot.Disks[0],
+        [pscustomobject]@{
+            Number=4; Model='USB EFI 2'; SerialNumber='EFI-2'; BusType='USB'; PartitionStyle='GPT'; Path='disk-4'
+            Partitions=@([pscustomobject]@{ GptType=$efiType; IsActive=$false; Type='Basic'; MbrType='' })
+        }
+    )
+}
+$multiBoot = Resolve-StorageContextCore -Snapshot $multiBootSnapshot
+Assert-Equal 'Ambiguous' $multiBoot.UsbResolution 'Storage multiple USB boot candidates remain ambiguous'
+Assert-Equal 2 @($multiBoot.UsbBootCandidates).Count 'Storage multiple USB boot candidates are preserved'
+Assert-Equal $null $multiBoot.ResolvedUsbHdd 'Storage multiple boot candidates do not invent a physical mapping'
+
+$multiNoBootSnapshot = [pscustomobject]@{
+    Available = $true
+    Disks = @(
+        $noBootSnapshot.Disks[0],
+        [pscustomobject]@{
+            Number=5; Model='USB Data 2'; SerialNumber='DATA-2'; BusType='USB'; PartitionStyle='GPT'; Path='disk-5'; Partitions=@()
+        }
+    )
+}
+$multiNoBoot = Resolve-StorageContextCore -Snapshot $multiNoBootSnapshot
+Assert-Equal 'Ambiguous' $multiNoBoot.UsbResolution 'Storage multiple USB disks without boot candidates remain ambiguous'
+Assert-Equal 2 @($multiNoBoot.UsbDisks).Count 'Storage multiple USB disks are preserved'
+Assert-Equal 0 @($multiNoBoot.UsbBootCandidates).Count 'Storage multiple non-boot USB disks expose no boot candidates'
+Assert-Equal $null $multiNoBoot.ResolvedUsbHdd 'Storage multiple non-boot USB disks do not invent a mapping'
+
+$oneOfManyBootSnapshot = [pscustomobject]@{
+    Available = $true
+    Disks = @($gptEfiSnapshot.Disks[0],$noBootSnapshot.Disks[0])
+}
+$oneOfManyBoot = Resolve-StorageContextCore -Snapshot $oneOfManyBootSnapshot
+Assert-Equal 'Candidate' $oneOfManyBoot.UsbResolution 'Storage one boot candidate among multiple USB disks preserves Candidate semantics'
+Assert-Equal 'USB EFI' $oneOfManyBoot.ResolvedUsbHdd.Model 'Storage one defensible candidate is retained without claiming firmware identity'
+
+$unavailableStorage = Resolve-StorageContextCore -Snapshot ([pscustomobject]@{ Available=$false; Disks=@($gptEfiSnapshot.Disks[0]) })
+Assert-Equal 'Unavailable' $unavailableStorage.UsbResolution 'Storage unavailable Windows inventory resolves to Unavailable'
+Assert-Equal 0 @($unavailableStorage.Disks).Count 'Storage unavailable inventory does not expose stale disks'
+Assert-Equal 0 @($unavailableStorage.UsbDisks).Count 'Storage unavailable inventory exposes no USB disks'
+Assert-Equal 'Speichergeräte konnten nicht gelesen werden.' $unavailableStorage.UsbResolutionReason 'Storage unavailable reason preserves existing contract'
 
 $defaults = New-DefaultAppSettingsCore
 Assert-Equal 6 $defaults.schemaVersion 'Default settings schema'
