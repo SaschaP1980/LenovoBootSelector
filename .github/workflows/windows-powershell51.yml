@@ -176,8 +176,8 @@ jobs:
               'taskBrokerMigration',
               'identifierCompatibility',
               'updateAssertionSource',
-              'updateCore'
-              'updateController',
+              'updateCore',
+              'updateController'
           )) {
               $row = $totals[$name]
               if (-not $row.found -or $row.passed -ne $row.expected) {
