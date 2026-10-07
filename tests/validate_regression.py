@@ -64,7 +64,7 @@ def main():
         s.eq('Uninstaller byte-identical to basis outside declared migrations',sha(root/'bin/Uninstall-LenovoBootMenuTasks.ps1'),sha(basis_runtime_path(basis,'Uninstall-LenovoBootMenuTasks.ps1')))
     if profile=='version-only':
         s.eq('Installer byte-identical for non-product release',sha(root/'bin/Install-LenovoBootMenuTasks.ps1'),sha(basis_runtime_path(basis,'Install-LenovoBootMenuTasks.ps1')))
-    ui=txt(root/'src/UI/UpdatePresentation.ps1'); infra=txt(root/'src/Infrastructure/UpdateClient.ps1'); transport=txt(root/'src/Infrastructure/UpdateTransport.ps1')
+    ui=txt(root/'src/UI/UpdatePresentation.ps1'); infra=txt(root/'src/Infrastructure/UpdateClient.ps1'); transport=txt(root/'src/Infrastructure/UpdateTransport.ps1'); update_controller=txt(root/'src/Application/UpdateController.ps1')
     refresh_ui=txt(root/'src/UI/RefreshPresentation.ps1'); popup_ui=txt(root/'src/UI/Popup.ps1')
     popup_composition=txt(root/'src/UI/PopupComposition.ps1') if (root/'src/UI/PopupComposition.ps1').is_file() else ''
     popup_surface=popup_ui+'\n'+popup_composition
@@ -84,7 +84,7 @@ def main():
     s.has('LBS-14 header click opens shared dialog',popup_surface,'[void](Show-AvailableUpdateDialog)')
     s.eq('LBS-14 popup contains one shared-dialog invocation',popup_surface.count('Show-AvailableUpdateDialog'),1)
     s.has('No periodic update polling remains',ui,'There is no periodic polling')
-    s.has('LBS-21 popup-open automatic update mode retained',ui,"Start-UpdateCheckUiWorker -Mode 'Popup'")
+    s.has('LBS-21 popup-open automatic update mode retained',ui,"Start-UpdateCheckWorkflow -State $script:UpdateState -Mode 'Popup'")
     s.has('LBS-21 popup open triggers automatic version check',popup_ui,'[void](Start-PopupUpdateCheck)')
     s.no('LBS-21 process-once startup update state remains removed',update_runtime,'StartupCheckStarted')
     s.no('LBS-21 tray startup trigger remains removed',app_template,'Start-StartupUpdateCheck')
@@ -95,7 +95,7 @@ def main():
     s.has('LBS-5 package network failure is structured',transport,"-Category 'network' -Stage 'package-download'")
     s.has('LBS-5 hash failure is separate from package failure',infra,"-Category 'hash' -Stage 'package-hash'")
     s.has('LBS-5 check worker returns failure stage',infra,"FailureStage=''")
-    s.has('LBS-5 prepare UI propagates network status',ui,'networkStatus=$networkStatus')
+    s.has('LBS-5 prepare Application workflow propagates network status',update_controller,'networkStatus=$networkStatus')
     s.no('Updater remains unelevated',infra+'\n'+transport,'RunAs')
     s.no('Updater has no TaskBroker mutation',infra+'\n'+transport,'TaskBroker')
     s.no('Updater has no bcdedit',(infra+'\n'+transport).lower(),'bcdedit')

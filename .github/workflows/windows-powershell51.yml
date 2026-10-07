@@ -157,6 +157,7 @@ jobs:
               identifierCompatibility = Get-TestTotal $logText '^IDENTIFIER TOTAL\s+(\d+)/(\d+)\s*$'
               updateAssertionSource = Get-TestTotal $logText '^UPDATE ASSERTION SOURCE\s+(\d+)/(\d+)\s*$'
               updateCore = Get-TestTotal $logText '^UPDATE TOTAL\s+(\d+)/(\d+)\s*$'
+              updateController = Get-TestTotal $logText '^UPDATE CONTROLLER TOTAL\s+(\d+)/(\d+)\s*$'
           }
 
           foreach ($name in @(
@@ -175,7 +176,8 @@ jobs:
               'taskBrokerMigration',
               'identifierCompatibility',
               'updateAssertionSource',
-              'updateCore'
+              'updateCore',
+              'updateController'
           )) {
               $row = $totals[$name]
               if (-not $row.found -or $row.passed -ne $row.expected) {
@@ -199,7 +201,8 @@ jobs:
               $totals.taskBrokerBoundary.passed +
               $totals.taskBrokerMigration.passed +
               $totals.identifierCompatibility.passed +
-              $totals.updateCore.passed
+              $totals.updateCore.passed +
+              $totals.updateController.passed
           )
           $functionalExpected = (
               $totals.functionalCore.expected +
@@ -215,7 +218,8 @@ jobs:
               $totals.taskBrokerBoundary.expected +
               $totals.taskBrokerMigration.expected +
               $totals.identifierCompatibility.expected +
-              $totals.updateCore.expected
+              $totals.updateCore.expected +
+              $totals.updateController.expected
           )
 
           $completed = [DateTimeOffset]::UtcNow

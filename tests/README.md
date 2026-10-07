@@ -22,6 +22,7 @@ These four files are the permanent Python gates used by the GitHub Release Orche
 | `Test-UIPresentation.ps1` | Presentation | Native WinForms characterization of selected/hidden boot rows, alias editing, hover state, and scrolling |
 | `Test-LocalizationRuntime.ps1` | Runtime | Native PS5.1 language selection, persistence, migration, and central lookup |
 | `Test-UpdateCore.ps1` | Core | Update model, transport failure contract, and update contracts |
+| `Test-UpdateController.ps1` | Application / Infrastructure | Update check/prepare lifecycle, busy gating, result classification, resource cleanup, explicit installer handoff, and restart-result consumption with faked boundaries |
 | `Test-RefreshRuntime.ps1` | Runtime | Background refresh state/request lifecycle and child-worker diagnostics-session correlation |
 | `Test-RefreshController.ps1` | Application / Infrastructure | Background-refresh admission, coalescing, completion, maintenance cancellation, result application, worker success/failure, and cleanup ownership with faked boundaries |
 | `Test-MaintenanceRuntime.ps1` | Runtime | Maintenance state and modes |
@@ -54,6 +55,7 @@ Native PowerShell suites intentionally use different count strategies; one gener
 | Suite | Strategy |
 | --- | --- |
 | `Test-UpdateCore.ps1` | **AST self-audit + fixed coverage guard.** PowerShell counts the `Assert-True` / `Assert-Equal` command ASTs, compares them with the actually executed `$checks`, and additionally requires exactly 79. The permanent release gate validates the same contract statically. |
+| `Test-UpdateController.ps1` | Straight-line: fixed runtime count of 56 covering LBS-26 Application orchestration and explicit Infrastructure/UI adapter boundaries. |
 | `Test-RefreshRuntime.ps1` | Straight-line: fixed runtime count of 28, including LBS-22 inherited/fresh diagnostics-session coverage for background-refresh, update-check, and update-prepare roles. |
 | `Test-RefreshController.ps1` | Straight-line: fixed runtime count of 38 covering LBS-27 lifecycle orchestration and the explicit Infrastructure worker boundary. |
 | `Test-TaskBrokerBoundary.ps1` | Straight-line: fixed runtime count of 25, including rejection of the v1 boundary and legacy fixed task names. |

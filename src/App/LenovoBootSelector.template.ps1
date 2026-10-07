@@ -893,6 +893,7 @@ $script:UpdateState = New-UpdateRuntimeState
 # @include src/Infrastructure/RuntimeDiagnostics.ps1
 # @include src/Infrastructure/UpdateTransport.ps1
 # @include src/Infrastructure/UpdateClient.ps1
+# @include src/Application/UpdateController.ps1
 
 # @include src/UI/DiagnosticsPresentation.ps1
 # @include src/UI/UpdatePresentation.ps1
@@ -1845,8 +1846,8 @@ finally {
         try { $script:TaskBrokerRemoveTimer.Dispose() } catch { }
     }
     if ($script:UpdateState) {
-        try { Stop-UpdateCheckUiWorker } catch { }
-        try { Stop-UpdatePrepareUiWorker } catch { }
+        try { Stop-UpdateCheckWorkflow -State $script:UpdateState } catch { }
+        try { Stop-UpdatePrepareWorkflow -State $script:UpdateState } catch { }
     }
     $backgroundRefreshContext = $null
     if ($script:BackgroundRefreshState) {

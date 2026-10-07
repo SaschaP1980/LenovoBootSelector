@@ -1,5 +1,18 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.10.4.0 – LBS-26 update workflow controller extraction
+
+- Move update-check and update-prepare lifecycle orchestration out of `src/UI/UpdatePresentation.ps1` into the focused `src/Application/UpdateController.ps1` application controller.
+- Keep `src/Application/UpdateRuntime.ps1` as the explicit update state model; the controller receives state and callback dependencies explicitly and contains no script-global state or WinForms construction.
+- Keep HTTP/download mechanics, worker process creation, manifest/package IO, package validation, update workspace handling, result-file IO, and installer-helper mechanics in `src/Infrastructure/UpdateTransport.ps1` / `src/Infrastructure/UpdateClient.ps1`.
+- Reduce `src/UI/UpdatePresentation.ps1` to menu/header state, user-triggered commands, dialogs/status messages, tray exit behavior, and a thin WinForms timer adapter.
+- Preserve popup-open read-only update checks, manual check/install entry points, busy gating, update-available/no-update transitions, malformed/failed worker-result handling, failure classification, cleanup ownership, restart-result consumption, and the explicit installer-helper handoff.
+- Preserve fail-closed manifest/package/hash validation and keep installation unelevated, user-controlled, and never automatic.
+- Add a 56-check native Windows PowerShell 5.1 `Test-UpdateController.ps1` suite using faked process/timer/filesystem/diagnostic/installer boundaries, while retaining the existing 79-check `Test-UpdateCore.ps1` contract unchanged.
+- Extend permanent Boundary/Regression/Release validators and the Windows aggregate to enforce the new responsibility split without creating a generic worker framework shared with background refresh.
+- No BootService, TaskBroker, Storage, firmware/BCD, privilege-boundary, polling, or device-arrival behavior changes are introduced.
+- Release profile: `patch`. Protected fragment intent and repository-delete intent are both empty.
+
 ## v0.10.3.0 – LBS-27 background-refresh controller extraction
 
 - Move background-refresh request admission, coalescing, completion, maintenance cancellation, pending continuation, result interpretation, application-state updates, and diagnostics coordination out of the app template into the focused `src/Application/RefreshController.ps1` controller.
