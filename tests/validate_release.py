@@ -118,6 +118,11 @@ def main():
     storage_infra=txt(storage_infra_path) if storage_infra_path.is_file() else ''
     s.has('LBS-31 storage infrastructure suite keeps fixed total 17',storage_infra,'Write-Host "STORAGE INFRA TOTAL $checks/17"')
     s.has('LBS-31 native aggregate runner invokes storage infrastructure suite',windows_wrapper,"Test-StorageInfrastructure.ps1")
+    ui_presentation_path=root/'tests/Test-UIPresentation.ps1'
+    s.c('LBS-29 native UI presentation test exists',ui_presentation_path.is_file())
+    ui_presentation=txt(ui_presentation_path) if ui_presentation_path.is_file() else ''
+    s.has('LBS-29 UI presentation suite keeps fixed total 23',ui_presentation,'Write-Host "UI PRESENTATION TOTAL $script:checks/23"')
+    s.has('LBS-29 native aggregate runner invokes UI presentation suite',windows_wrapper,"Test-UIPresentation.ps1")
     mutex_test=txt(root/'tests/Test-SingleInstanceMutex.ps1')
     s.has('Mutex native test keeps explicit total output',mutex_test,'Write-Host "MUTEX TOTAL $checks/4"')
     s.has('Mutex native test fails closed on count drift',mutex_test,'if ($checks -ne 4) { throw "Unexpected mutex test count $checks" }')
@@ -334,6 +339,9 @@ def main():
         s.has('LBS-20 Windows workflow publishes dedicated status',ww,'preflight/windows-powershell51')
         s.has('LBS-20 Windows workflow emits machine-readable summary',ww,'WINDOWS_POWERSHELL51_SUMMARY=')
         s.has('LBS-17 Windows workflow parses localization total',ww,"localizationRuntime = Get-TestTotal $logText '^LOCALIZATION TOTAL")
+        s.has('LBS-29 Windows workflow parses UI presentation total',ww,"uiPresentation = Get-TestTotal $logText '^UI PRESENTATION TOTAL")
+        s.has('LBS-29 Windows workflow includes UI presentation in aggregate passed',ww,'$totals.uiPresentation.passed')
+        s.has('LBS-29 Windows workflow includes UI presentation in aggregate expected',ww,'$totals.uiPresentation.expected')
         s.has('LBS-17 Windows workflow includes localization in aggregate passed',ww,'$totals.localizationRuntime.passed')
         s.has('LBS-17 Windows workflow includes localization in aggregate expected',ww,'$totals.localizationRuntime.expected')
         s.has('LBS-31 Windows workflow parses storage infrastructure total',ww,"storageInfrastructure = Get-TestTotal $logText '^STORAGE INFRA TOTAL")
@@ -347,13 +355,18 @@ def main():
     for rel in ['tests/validate_release.py','tests/validate_core.py','tests/validate_boundary.py','tests/validate_regression.py']:
         s.c(f'Permanent validator exists: {rel}',(root/rel).is_file())
     default_ui=txt(root/'src/UI/DefaultTargetPresentation.ps1'); popup_ui=txt(root/'src/UI/Popup.ps1')
+    popup_composition=txt(root/'src/UI/PopupComposition.ps1') if (root/'src/UI/PopupComposition.ps1').is_file() else ''
+    popup_surface=popup_ui+'\n'+popup_composition
+    boot_entry_ui=txt(root/'src/UI/BootEntryList.ps1')
+    boot_entry_rows=txt(root/'src/UI/BootEntryRows.ps1') if (root/'src/UI/BootEntryRows.ps1').is_file() else ''
+    boot_entry_surface=boot_entry_ui+'\n'+boot_entry_rows
     s.has('LBS-17 default target startup check is localized',default_ui,"Get-LocalizedString -Key 'Status.Checking'")
     s.has('Default target pending state is limited to compatible metadata plus unknown readiness',default_ui,'$checking = ($schemaReady -and $null -eq $script:TaskBrokerReadyCached)')
     s.has('Default target pending state stays visually readable',default_ui,'$visualEnabled = ($enabled -or $checking)')
     s.has('Default target interaction remains separately gated',default_ui,'$script:DefaultInteractionEnabled = $enabled')
     s.has('Default target chevron is hidden only while checking',default_ui,'$script:DefaultArrowLabel.Visible = -not $checking')
-    s.has('Popup default target click uses interaction gate',popup_ui,'if ($script:DefaultInteractionEnabled -and $script:DefaultButton)')
-    s.has('Popup stores default target arrow for state updates',popup_ui,'$script:DefaultArrowLabel = $defaultArrow')
+    s.has('Popup default target click uses interaction gate',popup_surface,'if ($script:DefaultInteractionEnabled -and $script:DefaultButton)')
+    s.has('Popup stores default target arrow for state updates',popup_surface,'$script:DefaultArrowLabel = $defaultArrow')
     ui=txt(root/'src/UI/UpdatePresentation.ps1'); infra=txt(root/'src/Infrastructure/UpdateClient.ps1'); transport=txt(root/'src/Infrastructure/UpdateTransport.ps1')
     complete=fn(ui,'Complete-UpdateCheck')
     available_dialog=fn(ui,'Show-AvailableUpdateDialog')
@@ -366,6 +379,13 @@ def main():
     header_visual=fn(refresh_ui,'Update-HeaderStatusInteractionVisual')
     header_interaction=fn(refresh_ui,'Set-HeaderUpdateInteractionState')
     popup_form=fn(popup_ui,'New-PopupForm')
+    s.c('LBS-29 New-PopupForm is composition-sized',len((popup_form or '').splitlines()) <= 80,len((popup_form or '').splitlines()))
+    update_popup_rows=fn(boot_entry_ui,'Update-PopupRows')
+    s.c('LBS-29 Update-PopupRows is orchestration-sized',len((update_popup_rows or '').splitlines()) <= 100,len((update_popup_rows or '').splitlines()))
+    s.has('LBS-29 drag/drop presentation still delegates ordering to canonical manage operation',boot_entry_surface,'Move-ManageEntry -MovedGuid $movedGuid -TargetGuid ([string]$targetRow.Tag) -After:$after')
+    s.has('LBS-29 alias apply still updates the canonical manage alias draft',boot_entry_surface,'Set-ManageEntryAliasDraft -Guid ([string]$editor.Tag) -Alias ([string]$editor.Text)')
+    s.no('LBS-29 popup decomposition introduces no generic New-Control factory',popup_surface,'function New-Control')
+    s.no('LBS-29 boot-entry decomposition introduces no generic New-Control factory',boot_entry_surface,'function New-Control')
     update_runtime=txt(root/'src/Application/UpdateRuntime.ps1')
     s.has('LBS-17 manual update button is localized',available_dialog,"-SecondaryButtonText (Get-LocalizedString -Key 'Update.InstallNow')")
     s.has('Manual update button still reuses manual update path',available_dialog,'Start-ManualAppUpdate')
@@ -386,20 +406,20 @@ def main():
     s.has('Header keeps boot refresh as first update-status branch',refresh_ui,"if ($active) {")
     s.has('LBS-17 header boot refresh text is localized',refresh_ui,"Get-LocalizedString -Key 'Header.Refreshing'")
     s.has('Header restores update state after refresh',refresh_ui,"elseif ($updateAvailable)")
-    s.has('LBS-14 header status uses focusable button control',popup_form,'$headerSub = New-Object System.Windows.Forms.Button')
-    s.has('LBS-14 header button documents native Enter/Space activation',popup_form,'native Enter/Space activation')
-    s.has('LBS-14 hover enters interactive visual state',popup_form,'$script:HeaderStatusHovered = $true')
-    s.has('LBS-14 hover leave clears interactive visual state',popup_form,'$script:HeaderStatusHovered = $false')
-    s.has('LBS-14 click is gated by update interaction state',popup_form,'if (-not $script:HeaderUpdateInteractionEnabled) { return }')
-    s.has('LBS-14 click opens shared available-update dialog',popup_form,'[void](Show-AvailableUpdateDialog)')
-    s.eq('LBS-14 shared dialog is invoked only from header click in popup form',popup_form.count('Show-AvailableUpdateDialog'),1)
+    s.has('LBS-14 header status uses focusable button control',popup_surface,'$headerSub = New-Object System.Windows.Forms.Button')
+    s.has('LBS-14 header button documents native Enter/Space activation',popup_surface,'native Enter/Space activation')
+    s.has('LBS-14 hover enters interactive visual state',popup_surface,'$script:HeaderStatusHovered = $true')
+    s.has('LBS-14 hover leave clears interactive visual state',popup_surface,'$script:HeaderStatusHovered = $false')
+    s.has('LBS-14 click is gated by update interaction state',popup_surface,'if (-not $script:HeaderUpdateInteractionEnabled) { return }')
+    s.has('LBS-14 click opens shared available-update dialog',popup_surface,'[void](Show-AvailableUpdateDialog)')
+    s.eq('LBS-14 shared dialog is invoked once from popup header interaction',popup_surface.count('Show-AvailableUpdateDialog'),1)
     language_ui=txt(root/'src/UI/LanguagePresentation.ps1')
     localization=txt(root/'src/Core/Localization.ps1')
     s.has('LBS-17 tray exposes English selector',template,"Set-LanguageFromUi -Locale 'en-US'")
     s.has('LBS-17 tray exposes German selector',template,"Set-LanguageFromUi -Locale 'de-DE'")
     s.has('LBS-17 language selector persists through active locale service',language_ui,'Set-ActiveLocale -Locale $Locale -Persist')
     s.has('LBS-17 language change rebuilds visible popup',language_ui,'Rebuild-PopupForLocale')
-    s.has('LBS-17 popup strings consume localization API',popup_ui,"Get-LocalizedString -Key 'Popup.NextBootSection'")
+    s.has('LBS-17 popup strings consume localization API',popup_surface,"Get-LocalizedString -Key 'Popup.NextBootSection'")
     s.has('LBS-17 English catalog exposes tray maintenance',localization,"'Tray.Maintenance' = 'Maintenance'")
     s.has('LBS-17 German catalog exposes tray maintenance',localization,"'Tray.Maintenance' = 'Wartung'")
     catalog_match=re.search(r"'en-US'\s*=\s*\[ordered\]@\{([\s\S]*?)\n\s*\}\n\s*'de-DE'\s*=\s*\[ordered\]@\{([\s\S]*?)\n\s*\}\n\s*\}",localization)
@@ -411,10 +431,10 @@ def main():
     s.eq('LBS-17 English and German localization key sets match',set(en_keys),set(de_keys))
 
     visible_literal_paths=[
-        'src/UI/AutostartPresentation.ps1','src/UI/BootEntryList.ps1','src/UI/DefaultTargetMenu.ps1',
+        'src/UI/AutostartPresentation.ps1','src/UI/BootEntryList.ps1','src/UI/BootEntryRows.ps1','src/UI/DefaultTargetMenu.ps1',
         'src/UI/DefaultTargetPresentation.ps1','src/UI/DiagnosticsPresentation.ps1','src/UI/Dialogs.ps1',
         'src/UI/LanguagePresentation.ps1','src/UI/MaintenancePresentation.ps1','src/UI/ManageEntries.ps1',
-        'src/UI/ManageEntriesState.ps1','src/UI/MenuAppearance.ps1','src/UI/Popup.ps1',
+        'src/UI/ManageEntriesState.ps1','src/UI/MenuAppearance.ps1','src/UI/Popup.ps1','src/UI/PopupComposition.ps1',
         'src/UI/RefreshPresentation.ps1','src/UI/StartupRecoveryDialog.ps1','src/UI/UpdatePresentation.ps1',
         'src/App/LenovoBootSelector.template.ps1'
     ]

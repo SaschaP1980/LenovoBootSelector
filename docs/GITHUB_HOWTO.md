@@ -554,15 +554,19 @@ The active work branch may temporarily track:
 
 Use it to persist the same concise engineering information that would normally appear in progress updates: findings, failed approaches and reasons, validator/test evidence, current phase, next action, last product checkpoint and any independently running GitHub workflow.
 
-During substantive interactive work, update it approximately every **1–3 minutes** when meaningful state changes. Prefer a single-file contents update/commit when available. A journal-only commit is intentionally cheap and must not trigger product builds, runtime regeneration, test matrices or checkpoint gates merely because the journal changed.
+Heartbeat cadence is **time-based** while the interactive agent is active. With `Agent-State: ACTIVE`, persist a journal commit often enough that the latest heartbeat never becomes more than approximately **3 minutes old**, whether or not a new finding exists. A substantive finding/decision/failure entry counts as the heartbeat; otherwise commit a minimal truthful liveness entry such as `still investigating <phase>; no new conclusion yet`. Prefer a single-file contents update/commit when available. Journal-only commits are intentionally cheap and must not trigger product builds, runtime regeneration, test matrices or checkpoint gates merely because the journal changed.
 
-Treat a heartbeat older than roughly **5 minutes** as evidence that the interactive stream is no longer progressing **only after** checking whether the journal references a GitHub Actions run that is still `queued` or `in_progress`. GitHub automation can continue independently; the interactive agent cannot.
+Also heartbeat before a potentially long/high-risk tool sequence. Use recognizable subjects such as `worklog(LBS-XX): heartbeat` for timer-only liveness and `worklog(LBS-XX): record <finding>` for substantive updates.
+
+The periodic cadence may pause only when the interactive agent is genuinely `IDLE`/`STOPPED`, or when it has first persisted `Agent-State: WAITING_FOR_GITHUB` plus the exact independent GitHub Actions run identifier. When interactive work resumes, return to `ACTIVE` and resume the maximum-three-minute cadence immediately.
+
+Treat an `ACTIVE` heartbeat older than roughly **3 minutes** as a missed heartbeat. Treat a heartbeat older than roughly **5 minutes** as evidence that the interactive stream is no longer progressing **only after** directly checking any referenced GitHub Actions run. GitHub automation can continue independently; the interactive agent cannot.
 
 Before Candidate creation, delete the journal from the work branch and ensure the final work tree contains only intended release content. Build the Candidate as one clean commit with current `main` as parent and the exact cleaned work-branch tree. This deliberately prevents temporary journal commits from becoming Candidate/`main` ancestry while preserving the existing Candidate/work-tree equality check and release-owned work-branch cleanup.
 
 A fresh session resuming a Work-Path task must read the journal when present, then verify branch/run state directly before acting. The journal is a continuation record, not private chain-of-thought.
 
-This process is experimental. After the next suitable Work-Path development task, keep it only if it provides material recovery/liveness value; otherwise revert the LBS-36 process change cleanly.
+This process is experimental. LBS-31 confirmed useful recovery behavior but also showed that event-driven updates were too sparse. The refined maximum-three-minute ACTIVE cadence must therefore be exercised on another suitable Work-Path development task; keep it only if that stricter heartbeat provides material recovery/liveness value without disproportionate overhead.
 
 ### Bounded connector orchestration
 

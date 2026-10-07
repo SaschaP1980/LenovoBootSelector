@@ -66,6 +66,8 @@ def main():
         s.eq('Installer byte-identical for non-product release',sha(root/'bin/Install-LenovoBootMenuTasks.ps1'),sha(basis_runtime_path(basis,'Install-LenovoBootMenuTasks.ps1')))
     ui=txt(root/'src/UI/UpdatePresentation.ps1'); infra=txt(root/'src/Infrastructure/UpdateClient.ps1'); transport=txt(root/'src/Infrastructure/UpdateTransport.ps1')
     refresh_ui=txt(root/'src/UI/RefreshPresentation.ps1'); popup_ui=txt(root/'src/UI/Popup.ps1')
+    popup_composition=txt(root/'src/UI/PopupComposition.ps1') if (root/'src/UI/PopupComposition.ps1').is_file() else ''
+    popup_surface=popup_ui+'\n'+popup_composition
     taskbroker=txt(root/'src/Infrastructure/TaskBroker.ps1'); install=txt(root/'bin/Install-LenovoBootMenuTasks.ps1'); diagnostics=txt(root/'src/Infrastructure/RuntimeDiagnostics.ps1'); update_runtime=txt(root/'src/Application/UpdateRuntime.ps1')
     diagnostics_init=diagnostics[diagnostics.find('function Initialize-RuntimeDiagnostics'):diagnostics.find('function Write-RuntimeDiagnosticEvent')]
     s.has('LBS-22 template preserves inherited diagnostics session input',app_template,'$script:InheritedRuntimeSessionId = [string]$RuntimeSessionId')
@@ -76,11 +78,11 @@ def main():
     s.has('LBS-17 LBS-14 header message remains localized through canonical key',refresh_ui,"Get-LocalizedString -Key 'Update.Available'")
     s.has('LBS-14 header interaction remains refresh-gated',refresh_ui,'Set-HeaderUpdateInteractionState -Enabled (-not $active -and $updateAvailable)')
     s.has('LBS-14 header hover uses Lenovo accent state',refresh_ui,'$script:HeaderStatusLabel.Focused')
-    s.has('LBS-14 header control is a Button for native keyboard activation',popup_ui,'$headerSub = New-Object System.Windows.Forms.Button')
-    s.has('LBS-14 header hover is tracked',popup_ui,'$script:HeaderStatusHovered = $true')
-    s.has('LBS-14 header click is interaction-gated',popup_ui,'if (-not $script:HeaderUpdateInteractionEnabled) { return }')
-    s.has('LBS-14 header click opens shared dialog',popup_ui,'[void](Show-AvailableUpdateDialog)')
-    s.eq('LBS-14 popup contains one shared-dialog invocation',popup_ui.count('Show-AvailableUpdateDialog'),1)
+    s.has('LBS-14 header control is a Button for native keyboard activation',popup_surface,'$headerSub = New-Object System.Windows.Forms.Button')
+    s.has('LBS-14 header hover is tracked',popup_surface,'$script:HeaderStatusHovered = $true')
+    s.has('LBS-14 header click is interaction-gated',popup_surface,'if (-not $script:HeaderUpdateInteractionEnabled) { return }')
+    s.has('LBS-14 header click opens shared dialog',popup_surface,'[void](Show-AvailableUpdateDialog)')
+    s.eq('LBS-14 popup contains one shared-dialog invocation',popup_surface.count('Show-AvailableUpdateDialog'),1)
     s.has('No periodic update polling remains',ui,'There is no periodic polling')
     s.has('LBS-21 popup-open automatic update mode retained',ui,"Start-UpdateCheckUiWorker -Mode 'Popup'")
     s.has('LBS-21 popup open triggers automatic version check',popup_ui,'[void](Start-PopupUpdateCheck)')
@@ -144,9 +146,11 @@ def main():
     s.has('LBS-17 startup recovery locale resolver retained',startup_recovery,'Get-StartupRecoveryLocale')
     s.c('LBS-17 localization remains before startup recovery',app_template.find('# @include src/Core/Localization.ps1') < app_template.find('# @include src/UI/StartupRecoveryDialog.ps1'))
     boot_entry_ui=txt(root/'src/UI/BootEntryList.ps1')
+    boot_entry_rows=txt(root/'src/UI/BootEntryRows.ps1') if (root/'src/UI/BootEntryRows.ps1').is_file() else ''
+    boot_entry_surface=boot_entry_ui+'\n'+boot_entry_rows
     s.has('LBS-17 template ready status remains localized',app_template,"Get-LocalizedString -Key 'Status.Ready'")
     s.has('LBS-17 template maintenance launch errors remain localized',app_template,"Get-LocalizedString -Key 'Maintenance.SetupNotStartedTitle'")
-    s.has('LBS-17 entry visibility accessibility remains localized',boot_entry_ui,"Get-LocalizedString -Key 'Manage.HiddenAccessible'")
+    s.has('LBS-17 entry visibility accessibility remains localized',boot_entry_surface,"Get-LocalizedString -Key 'Manage.HiddenAccessible'")
     s.no('LBS-17 update UI never exposes raw restart result text',ui,'-Message $resolved.Message')
     s.c('LBS-17 update UI never exposes raw worker exception text',re.search(r"Show-LenovoNoticeDialog[^\\n]*-Message\\s+\\$_\\.Exception\\.Message",ui) is None)
     s.has('LBS-17 update installer helper receives localized failure prefix',ui,"Get-LocalizedString -Key 'Update.HelperFailurePrefix'")
