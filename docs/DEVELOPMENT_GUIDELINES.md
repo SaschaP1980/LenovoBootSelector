@@ -242,7 +242,7 @@ Maintain exactly **one rolling recovery comment** in the active GitHub Issue. Pr
 The rolling comment and a product checkpoint have different responsibilities:
 
 - a **product checkpoint** is a coherent recoverable source state on `work/LBS-<issue>` and may include focused validation;
-- the **rolling recovery comment** is the cumulative operational handover state for the complete Build & Release lifecycle.
+- the **rolling recovery comment** is the **canonical cumulative Build & Release ledger** for the complete Work-Path lifecycle: implementation, Development Completion, Candidate correction, Release, recovery, timing, and retrospective evidence.
 
 The rolling comment must remain sufficient for a fresh session to continue without reconstructing prior chat. It is not private chain-of-thought. Keep concise but complete durable facts such as:
 
@@ -272,10 +272,13 @@ While the interactive agent is actively working on a Work-Path task, cadence is 
 
 The active cadence may pause only when:
 
-- `Agent-State: WAITING_FOR_GITHUB` names an exact independently running Actions run, or
+- `Agent-State: WAITING_FOR_GITHUB` names an exact independently running Actions run;
+- `Agent-State: BLOCKED_EXTERNAL` names a verified external GitHub/service outage or unavailable write path and records the last confirmed repository SHA/state; or
 - `Agent-State: IDLE` / `STOPPED` truthfully states that interactive work is not continuing.
 
-When a referenced workflow completes and interactive work resumes, set `Agent-State: ACTIVE` and immediately resume the maximum-three-minute cadence.
+`BLOCKED_EXTERNAL` is not a development failure. Do not spam retries, create no-op commits, or create alternate branches to work around an external outage. If the rolling-comment write path itself is unavailable, do not claim a heartbeat was persisted; update the ledger immediately after write capability is independently confirmed.
+
+When a referenced workflow completes, an external block clears, or interactive work otherwise resumes, set `Agent-State: ACTIVE` and immediately resume the maximum-three-minute cadence.
 
 Interpretation:
 
@@ -285,6 +288,28 @@ Interpretation:
 - when `WAITING_FOR_GITHUB` references a live run, GitHub automation may continue independently even if the chat stream stops.
 
 On recovery, re-read current `main`, the Issue including the rolling recovery comment, the `work/LBS-<issue>` head and the latest product checkpoint before continuing. Re-check referenced Actions runs directly.
+
+#### Timing ledger
+
+The rolling comment must preserve both raw wall-clock history and normalized process timing. Keep these categories separate when they occur:
+
+- active implementation time;
+- checkpoint/orchestration overhead;
+- Development Completion queue time and execution time;
+- Candidate queue, execution, and correction time;
+- Release queue and execution time;
+- external infrastructure outage time;
+- user/interactive pause time;
+- chat/runtime timeout and recovery time.
+
+Never subtract external/user/timeout delays from the raw total; retain them as part of the chronology. For process comparisons, also report at least:
+
+- first Candidate creation → authoritative Release Verification summary;
+- final GREEN Candidate creation → authoritative Release Verification summary;
+- number of failed Candidate revisions/correction loops;
+- cause classification for every unexpected Candidate failure.
+
+This separation prevents external outages or session interruptions from being misreported as repository-development performance.
 
 Tracked `.chatgpt-work/LBS-<issue>.md` heartbeat files are now **legacy only**. Do not create them for new work. If an already-active branch contains one from the previous standard, keep it only until the rolling Issue comment has absorbed all recovery-relevant information, then remove it before Candidate creation. Timer-only Git commits are prohibited under the rolling-comment model.
 
@@ -389,9 +414,9 @@ If the connector has no repository-archive action and direct clone/network acces
 4. continue connector-first for canonical file/ref/Git-object work;
 5. prefer repository-hosted GitHub Actions for operations that genuinely require a complete worktree.
 
-A dedicated **Work Checkpoint Gate** is the intended permanent solution for this friction. It should run the repository build and standardized validators on GitHub against the exact work-branch checkpoint instead of forcing the agent to emulate a full worktree through connector reads. The target contract is defined in section 14 below.
+LBS-40 / #85 tracks the dedicated hosted **Development Completion gate** for the exact final Work-Branch SHA. It is intentionally a final Candidate-entry qualification gate, not a mandatory full-matrix runner for every routine checkpoint.
 
-Until that workflow exists, lack of a local full worktree must be treated as a known precheck limitation, not compensated for with increasingly elaborate archive workarounds. If necessary, persist a coherent modular-source checkpoint and record runtime synchronization or full-worktree validation as pending rather than performing unsafe manual runtime reconstruction. Such a checkpoint is recoverable development state, not a GREEN development-completion gate and not a release-ready Candidate.
+If a local full worktree is unavailable during ordinary checkpoint work, persist a coherent recoverable source checkpoint and record full-worktree qualification as pending rather than emulating the repository through ad-hoc connector assertions. This is acceptable checkpoint state only. Before Candidate exposure, the final exact SHA must satisfy the mandatory Candidate-entry contract; if no truthful full-worktree execution path exists, Candidate Entry is `BLOCKED`.
 
 ## 8. Generated runtime handling
 
@@ -408,9 +433,11 @@ Preferred order:
 
 If a full local worktree is unavailable, prefer a GitHub-hosted full-worktree validation/build path over manual reconstruction.
 
-For routine work-branch checkpoints, the agent should edit the canonical modular source and let the future Work Checkpoint Gate own deterministic runtime synchronization. If the tracked runtime must change, the preferred hosted model is at most **one deterministic canonicalization follow-up commit** on the same work branch, containing only the generated runtime/audit outputs that the workflow is explicitly authorized to update. The workflow must never create a chain of incremental staging commits. The exact generated follow-up SHA, when one is needed, becomes the validated checkpoint head.
+For routine work-branch checkpoints, edit the canonical modular source and persist only coherent recoverable states. A checkpoint may honestly record deterministic runtime regeneration or full-worktree validation as pending; it must not be labeled synchronized/GREEN when tracked generated output is stale.
 
-Until that hosted path is implemented, do not claim a source-only checkpoint is fully synchronized or validator-GREEN when `bin/LenovoBootMenuTray.ps1` still needs deterministic regeneration. Before Candidate creation, the tracked runtime must be regenerated from canonical source and the real development-completion checks must pass.
+Do not assume a future workflow may mutate source or generated files unless that mutation contract is explicitly implemented and reviewed. LBS-40 is currently scoped as an exact-SHA qualification gate, not as automatic source canonicalization.
+
+Before Candidate creation, tracked runtime state must match canonical source and the mandatory Development Completion/Candidate Entry checks must PASS on the exact frozen Work SHA.
 
 When text composition is unavoidable in JavaScript tooling, treat PowerShell `$` characters as data. Do not use the replacement-string form of JavaScript `String.replace()` for generated PowerShell content because `$` sequences have replacement semantics. Use a literal-safe method such as `split/join` or a replacement callback.
 
@@ -440,11 +467,12 @@ Use validation proportional to the Git object's role:
 
 - **RED-evidence state:** the focused regression is expected to fail for the defect-specific reason.
 - **Work-branch checkpoint:** run the focused checks needed to establish a coherent recoverable phase; broader/native suites may remain pending and must be recorded honestly.
-- **Branchless Patch/Hotfix candidate preparation:** require the same focused test that proved RED to be GREEN, plus directly relevant syntax/encoding/determinism smoke checks before exposing the Candidate.
-- **Release-ready Candidate:** all available prechecks should indicate expected GREEN; GitHub Candidate Preflight then runs the authoritative Linux and Windows PowerShell 5.1 gates on the exact exposed SHA.
+- **Branchless Patch/Hotfix candidate preparation:** require the same focused test that proved RED to be GREEN, plus directly relevant syntax/encoding/determinism smoke checks before exposing the Candidate. The authoritative full repository integration matrix begins at Candidate Preflight for this deliberately lightweight path unless a separate contract makes a precheck mandatory.
+- **Work-Path Candidate preparation:** require `Candidate-Entry: PASS` from the final exact-SHA Development Completion contract before exposing the Candidate.
+- **Release-ready Candidate:** after the path-specific preparation above, the Candidate is expected GREEN; GitHub Candidate Preflight then reruns the authoritative Linux and Windows PowerShell 5.1 gates on the exact exposed SHA.
 - **Release:** the Release Orchestrator reruns the publication/reproducibility/status gates as defense in depth.
 
-The full repository matrix belongs at the Candidate/Release boundary, not mechanically before every persistence commit.
+The full repository matrix does **not** run before every persistence commit. For Work-Path releases it runs once during final Development Completion immediately before Candidate and is rerun by Candidate/Release automation. For the branchless fast path, Candidate Preflight remains the first full integration matrix by design.
 
 ### Test ownership and redundancy
 
@@ -461,22 +489,151 @@ A new permanent regression should normally encode behavior or a stable architect
 
 Hand-written structural checks are useful focused prechecks, but they must not be mistaken for the actual repository validators.
 
-Before Candidate creation, every Work-Path release must perform one deliberate **Development Completion review** against the final intended Work-Branch state.
+### Safe transformation and diff-anomaly rule
 
-The review is a development discipline, not a new publication gate. It must:
+Automated text transformation of executable or machine-consumed files is itself a development risk.
 
-- run deterministic runtime generation/check on the final work-tree;
-- run all four permanent Python validators — Release, Core, Boundary, and Regression — whenever a complete local/full worktree is available;
-- execute independent permanent validators in one pass before correction where technically safe, so multiple actionable findings are collected instead of discovered through repeated Candidate loops;
-- run the relevant focused product/native tests already owned by the changed behavior;
-- apply the cheapest relevant PowerShell parser/encoding smoke checks to changed PowerShell runtime or test sources before Candidate exposure;
-- perform an **ownership/integration sweep** whenever responsibilities move: review affected permanent validators, regression contracts, native aggregate wiring, and workflow-facing references for assumptions about the old owner;
-- manually dispatch the existing `.github/workflows/windows-powershell51.yml` against the exact final `work/LBS-<issue>` revision and require its hosted Windows PowerShell 5.1 contract suite to pass before Candidate creation;
-- after that hosted Windows run, re-read the work-branch head and require it still to be the exact revision that was tested; rerun if the branch advanced.
+For PowerShell, YAML/workflows, Python, JSON, or other executable/machine-consumed content:
 
-If a complete worktree or another required pre-Candidate capability is unavailable, record the exact tooling limitation in the Issue rolling comment. Do **not** replace missing permanent validators with dozens of approximate connector-side assertions and do not claim unavailable checks passed.
+- prefer structure-aware editing or literal/function-based replacement over replacement-string semantics that interpret metacharacters;
+- never assume characters such as PowerShell `$`, regex escapes, backreferences, YAML indentation, or JSON quoting survive an unverified generic replacement;
+- inspect the exact per-file diff immediately after a transformation and before persisting the checkpoint;
+- treat unexpectedly large line-count changes, duplicated blocks, unrelated hunks, or scope outside the intended files as a **hard stop**;
+- on an anomalous transformation, discard/rebuild the affected file from the last verified canonical basis instead of incrementally repairing an untrusted transformed copy;
+- run the cheapest applicable parser/syntax/encoding check before checkpointing when such a check is available.
 
-All executable Development Completion checks must be green and all known deterministic integration findings must be resolved before the Candidate is exposed. Candidate Preflight remains authoritative and reruns its mandatory Linux and hosted Windows gates; Development Completion evidence never substitutes for it.
+A checkpoint must never be justified only by “the replacement command succeeded”; the resulting diff is the evidence.
+
+### Development Completion and Candidate Entry
+
+Before Candidate creation, every Work-Path release must perform one deliberate **Development Completion** against the exact final intended Work-Branch state.
+
+Development Completion has two classes of evidence:
+
+1. **mandatory Candidate-entry evidence** — absence or failure blocks Candidate creation;
+2. **best-effort development evidence** — useful additional evidence that may be unavailable without blocking Candidate when it is genuinely outside the Candidate-entry contract, such as physical Lenovo/UEFI E2E unless the Issue explicitly makes it mandatory.
+
+A tooling limitation is never `N/A`. For mandatory evidence:
+- `PASS` means the exact required check ran successfully against the exact required state;
+- `N/A` is allowed only when the check is genuinely not applicable to the change and the reason is recorded;
+- unavailable tooling, missing dispatch capability, unavailable full worktree, stale evidence, or inability to run the check means **`BLOCKED`**;
+- `FAIL` means the check ran and found a defect.
+
+`BLOCKED` and `FAIL` both prohibit Candidate exposure.
+
+#### Mandatory Candidate-entry evidence
+
+For the exact final Work-Branch SHA, require:
+
+- current `main` re-read and deliberately reconciled;
+- final Work-Branch SHA frozen for Development Completion;
+- deterministic runtime generation/check GREEN;
+- catch-audit generation/check GREEN;
+- architecture-baseline generation/check GREEN;
+- exact `protectedFragmentIntent` against current reconciled `main...final-work-head`;
+- exact `repositoryDeleteIntent` against that same range;
+- Release validator GREEN;
+- Core validator GREEN;
+- Boundary validator GREEN;
+- Regression validator GREEN;
+- relevant focused/native tests GREEN;
+- source-type parser/encoding checks GREEN when applicable, including changed PowerShell runtime/test sources;
+- **Contract Propagation Sweep** PASS when a test/validator/workflow contract changed;
+- **Ownership/Change-Impact Matrix** PASS when responsibility ownership moved;
+- hosted Windows PowerShell 5.1 contract-suite evidence GREEN on the exact final Work-Branch SHA;
+- zero unresolved deterministic Development Completion findings.
+
+For this contract, **relevant focused/native tests** means every active permanent suite that directly owns changed behavior, every active suite modified by the work, and every additional test explicitly required by the Issue acceptance criteria. If none exist for a category, record `N/A` with the concrete reason; lack of tooling is not a reason for `N/A`.
+
+Run independent validators/checks in the same Development Completion pass where technically safe so one failure does not hide other independent actionable findings.
+
+Candidate Preflight remains authoritative and reruns its mandatory Linux/Windows release-entry gates. Development Completion never substitutes for Candidate Preflight and never authorizes publication.
+
+#### Contract Propagation Sweep
+
+Whenever a test, validator, aggregate, or workflow contract changes, perform a repository-wide propagation sweep before Candidate entry.
+
+Review at minimum:
+
+- suite/test/validator name;
+- summary/total marker;
+- fixed expected count or expected aggregate key;
+- direct/native aggregate wrapper;
+- hosted Windows aggregate parser/required-total list;
+- permanent Release/Core/Boundary/Regression validators;
+- test inventory/documentation where the value is contractually recorded;
+- issue-specific compatibility/regression contracts that duplicate the changed expectation.
+
+Search for both the old and new contract values where practical. A changed fixed count or summary marker must not reach Candidate while any stale active reference remains.
+
+Prefer one canonical machine-readable owner over repeated hard-coded totals where practical. If a fixed total is intentionally duplicated as a compatibility contract, its propagation points must be explicit.
+
+#### Ownership/Change-Impact Matrix
+
+Whenever a responsibility or canonical owner moves, review and record the impact across:
+
+1. canonical product owner;
+2. all product consumers;
+3. focused/native tests;
+4. aggregate/wrapper wiring;
+5. permanent validators;
+6. workflow-facing references;
+7. release metadata/intents affected by changed protected functions/fragments or repository paths;
+8. documentation/test inventory where contractually relevant.
+
+Do not close this matrix with a generic “validators checked”. Record the affected owners/contracts or explicitly record that an item is `N/A` and why.
+
+#### Release-intent derivation and invalidation
+
+`protectedFragmentIntent` and `repositoryDeleteIntent` are release-integrity declarations derived from the final reconciled diff, not remembered metadata.
+
+For a Work-Path release:
+
+1. stabilize the product/test/workflow tree;
+2. re-read and reconcile current `main`;
+3. compute actual protected-fragment changes and repository deletions from that exact `main...final-work-head` range;
+4. set the declared intents to exact set equality with the computed result;
+5. record actual vs declared values in the rolling comment;
+6. if any later executable/source/workflow/test/repository-path change occurs, or `main` is reconciled again, mark the intent evidence stale and recompute it before Candidate entry.
+
+An empty intent list is a valid PASS only after the exact final diff proves that the actual set is empty.
+
+#### Hosted Windows exact-SHA evidence
+
+Hosted Windows PowerShell 5.1 evidence must test the exact final Work-Branch SHA.
+
+After the run:
+- retain the run ID, exact tested SHA, `WINDOWS_POWERSHELL51_SUMMARY`, totals, and timing;
+- re-read the Work-Branch head;
+- if the head differs from the tested SHA, the evidence is stale and Candidate entry returns to `BLOCKED` until the exact new SHA is tested.
+
+This is Windows contract-suite evidence only. It is not physical Lenovo/UEFI E2E.
+
+#### Candidate Entry block
+
+Immediately before exposing `candidate/v<version>`, the rolling comment must contain one explicit Candidate Entry block for the exact final Work SHA.
+
+Minimum fields:
+
+- `Candidate-Entry: PASS|BLOCKED`;
+- current reconciled `Main-SHA`;
+- frozen `Work-SHA`;
+- runtime / catch audit / architecture baseline;
+- protected-fragment intent;
+- repository-delete intent;
+- Release / Core / Boundary / Regression;
+- relevant focused/native tests;
+- parser/encoding checks when applicable;
+- Contract Propagation Sweep: `PASS|N/A`;
+- Ownership/Change-Impact Matrix: `PASS|N/A`;
+- hosted Windows exact-SHA run;
+- unresolved findings count;
+- intended Candidate tree equality with the frozen Work tree;
+- intended Candidate parent = current reconciled `main`.
+
+`Candidate-Entry: PASS` is permitted only when every mandatory applicable item is PASS, every genuine non-applicable item is explicitly N/A with a reason, and unresolved deterministic findings are zero.
+
+If any mandatory evidence cannot be produced, set `Candidate-Entry: BLOCKED`; do not use Candidate Preflight as the first runner for that missing evidence.
 
 LBS-17's first Candidate failed because a regression assertion was too broad. The product behavior was correct; the exact permanent validator had not been executed against the work branch before Candidate exposure. A hosted work-branch preflight would have caught this earlier.
 
@@ -559,101 +716,61 @@ For a comparable feature, aim for:
 6. bounded connector operations;
 7. no clone/ZIP detours after the environment limitation is known;
 8. no manual incremental generated-runtime reconstruction;
-9. perform one final Development Completion review on the exact intended Work-Branch state, including the permanent validators that can run in the available full worktree, the ownership/parser sweep, and an exact-revision manual hosted Windows PowerShell 5.1 run;
-10. record any unavailable pre-Candidate capability explicitly instead of inventing substitute evidence;
-11. create one release-ready Candidate only after all executable Development Completion checks are green, carrying the exact `Work-Branch:` provenance trailer;
+9. perform Development Completion on the exact final Work-Branch SHA and produce all mandatory Candidate-entry evidence;
+10. if any mandatory Candidate-entry evidence is unavailable, stale, or failed, set Candidate Entry to `BLOCKED` and resolve the tooling/finding before proceeding;
+11. create one release-ready Candidate only after the rolling comment records `Candidate-Entry: PASS`, carrying the exact `Work-Branch:` provenance trailer;
 12. normal Candidate/Release automation;
 13. automatic, tree-verified work-branch cleanup after successful publication.
 
 Never optimize by weakening validation, safety boundaries, reproducibility, or release verification.
 
-## 14. Development Completion guideline pilot
+## 14. LBS-39 post-pilot Development Completion contract
 
-### Purpose
+### LBS-28 empirical result
 
-LBS-38 establishes a **guideline-first pilot** for the gap between final Work-Branch implementation and Candidate exposure.
+LBS-28 / v0.10.5.0 was the first measured pilot of the LBS-38 guidance.
 
-It deliberately does **not** add a new GitHub Actions workflow, validator, test, build tool, or release status. The next real Work-Branch Issue is the empirical pilot.
+Compared with LBS-26 / v0.10.4.0:
 
-The immediate rule is:
+- failed Candidate revisions before GREEN: **4 → 2** (**50% fewer**);
+- first Candidate → Release Verification: **22m51.862s → 8m49.446s** (about **61.4% lower**);
+- final GREEN Candidate → Release Verification: **1m33.862s → 1m22.446s** (about **12.2% lower**);
+- Release Orchestrator attempts remained **1 → 1**.
 
-```text
-final intended work-branch state
-  -> Development Completion review
-  -> all executable pre-Candidate checks GREEN
-  -> release-ready Candidate
-  -> authoritative Candidate Preflight
-```
+The pilot proved that the Development Completion discipline moved several deterministic defects earlier:
 
-The Candidate must remain expected GREEN. It is not the normal place to discover stale validator ownership, parser errors, incomplete aggregate wiring, or other deterministic integration defects that could have been found on the final Work-Branch state.
+- malformed Windows-workflow text transformation;
+- stale UI test dependencies after ownership migration;
+- stale permanent-validator ownership assumptions.
 
-### Required Development Completion evidence
+It also exposed two remaining failure classes:
 
-Before Candidate creation, record enough durable evidence in the active Issue's rolling recovery comment for a fresh session to reconstruct what was actually checked.
+1. Candidate #1 failed on `protectedFragmentIntent` because the prescribed exact full-worktree check had no executable pre-Candidate path in the active environment. Classification: **Tooling gap**.
+2. Candidate #2 failed on a stale fixed UI test count (23 vs 25) that was visible in repository source and should have been caught by the propagation sweep. Classification: **Development Guideline miss**.
 
-At minimum record:
+These are now permanent process requirements above, not optional pilot observations.
 
-- exact final Work-Branch SHA used for Development Completion;
-- deterministic runtime build/check result;
-- Release/Core/Boundary/Regression results when a complete worktree was available;
-- focused/native tests relevant to the implementation;
-- ownership/integration sweep result when responsibilities moved;
-- PowerShell parser/encoding checks performed for changed PowerShell sources;
-- hosted Windows PowerShell 5.1 workflow run ID, exact tested SHA, machine-readable summary/totals, and timing;
-- any pre-Candidate check that could not be executed and the concrete tooling reason.
+### Mandatory failure classification
 
-Do not convert missing evidence into a claimed PASS.
+Every unexpected Candidate failure must be classified in the rolling comment as exactly one primary category:
 
-### Multiple-finding discipline
+- **Development Guideline miss** — the required check was applicable and executable/inspectable before Candidate, but the process failed to perform or propagate it correctly;
+- **Tooling gap** — the required pre-Candidate evidence had no executable path;
+- **Genuinely Candidate-only** — the condition could not reasonably exist or be evaluated before Candidate exposure;
+- **External infrastructure failure** — GitHub/runner/service failure unrelated to repository correctness.
 
-Where checks are independent and safe to continue after one failure, run all of them before starting the correction cycle.
+Each classification requires a follow-up action:
 
-For example, if Release, Core, Boundary, and Regression can all execute against the same complete worktree, collect all four results even if Release fails first. This reduces repeated development feedback loops without weakening any validator.
+- Guideline miss → harden the guideline/checklist or permanent executable contract so the same class is not repeated;
+- Tooling gap → create or link an automation/tooling Issue;
+- Candidate-only → document why Candidate is the correct first evaluation point;
+- External infrastructure → preserve exact repository state, avoid retry storms, and keep outage time separate in benchmark metrics.
 
-The same principle applies to an ownership move: inspect the product change together with the validators, regression contracts, native aggregate wrapper, and workflow-facing references that encode the old responsibility boundary.
+### Executable-gate follow-up
 
-### Hosted Windows PowerShell 5.1 before Candidate
+LBS-40 / #85 is the dedicated executable follow-up for a hosted/full-worktree Development Completion gate on the exact final Work-Branch SHA.
 
-The existing `.github/workflows/windows-powershell51.yml` already supports manual dispatch.
-
-For the final Development Completion state:
-
-1. pin the final `work/LBS-<issue>` head SHA;
-2. manually dispatch the Windows PowerShell 5.1 workflow for that work-branch ref;
-3. require the run to execute on hosted Windows PowerShell 5.1 and complete GREEN;
-4. consume `WINDOWS_POWERSHELL51_SUMMARY=<json>` and retain the run ID/totals/timings;
-5. re-read the work branch after the run;
-6. if the branch head differs from the tested SHA, the Windows evidence is stale and must be rerun.
-
-This is Windows contract-suite evidence only. It is not physical Lenovo/UEFI E2E.
-
-### Current Linux/full-worktree limitation
-
-LBS-38 does not invent a new hosted Linux Work-Branch workflow.
-
-If the active environment has a complete worktree, run the four permanent Python validators there against the final Work-Branch state before Candidate exposure. If the environment cannot obtain a complete worktree, record that exact limitation and continue only with checks that can be executed truthfully.
-
-Do not repeatedly probe unavailable clone/archive routes and do not rebuild permanent validator logic by hand through many connector reads.
-
-The next Work-Branch pilot must tell us whether this remaining limitation materially causes Candidate-only findings. If it does, open a separate automation Issue with the pilot evidence rather than silently expanding LBS-38 after the fact.
-
-### Pilot measurement
-
-The next real Work-Branch Issue must record:
-
-- final Development Completion SHA;
-- which prescribed checks executed and which could not;
-- hosted Windows pre-Candidate run and summary;
-- first Candidate run result;
-- number and causes of any Candidate correction revisions;
-- Development Completion effort/timing where measurable;
-- Candidate-to-release timing;
-- classification of each unexpected Candidate failure as:
-  - a missed check that the new guidelines already required;
-  - a tooling gap that prevented the required pre-Candidate check;
-  - or a genuinely Candidate-only integration condition.
-
-The pilot succeeds if the revised discipline materially reduces avoidable Candidate correction loops without weakening Candidate or Release safety.
+Until that automation exists, the mandatory Candidate-entry contract still applies. A developer may satisfy it through another truthful exact-SHA execution path, but an agent/environment that cannot produce the mandatory evidence is **BLOCKED** and must not expose a Candidate merely to obtain the missing result.
 
 ### Release separation
 

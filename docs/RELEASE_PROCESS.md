@@ -85,25 +85,34 @@ The Candidate branch is **release-ready**, not a RED-test vehicle. Do not intent
 
 ## Work-Path Development Completion before Candidate
 
-A Work-Path release must complete a final Development Completion review before the release-ready Candidate is exposed.
+A Work-Path release must complete **Development Completion** and an explicit **Candidate Entry** decision before exposing `candidate/v<version>`.
 
-The review applies to the exact final intended `work/LBS-<issue>` state and must, as available before Candidate exposure:
+The detailed normative contract lives in `docs/DEVELOPMENT_GUIDELINES.md`. This release document defines the release-entry consequence:
 
-- run deterministic runtime build/check;
-- run Release/Core/Boundary/Regression against a complete worktree;
-- run relevant focused/native tests;
-- run cheap parser/encoding checks for changed PowerShell sources;
-- review validators, regression contracts, native aggregate wiring, and workflow-facing references when responsibility ownership moved;
-- manually dispatch the existing hosted Windows PowerShell 5.1 workflow against the exact final Work-Branch revision;
-- verify after that run that the Work-Branch head still equals the tested SHA.
+- mandatory Candidate-entry evidence must be produced on the exact final Work-Branch SHA;
+- unavailable mandatory evidence means `BLOCKED`, not PASS and not `N/A`;
+- `N/A` is allowed only for a genuinely non-applicable check with a recorded reason;
+- Candidate Preflight must not be used as the first runner for missing mandatory Development Completion evidence.
 
-Run independent permanent validators through the same Development Completion pass where technically safe instead of stopping after the first independent failure.
+Mandatory Candidate-entry coverage includes:
 
-If a prescribed pre-Candidate check cannot be executed because the active environment lacks a complete worktree or another capability, record the exact limitation in durable Work-Path/Issue state. Do not claim the check passed and do not substitute a large hand-built approximation.
+- current `main` reconciliation and frozen Work SHA;
+- deterministic runtime, catch-audit and architecture-baseline checks;
+- exact `protectedFragmentIntent` and `repositoryDeleteIntent` derived from the exact final reconciled diff;
+- Release/Core/Boundary/Regression;
+- relevant focused/native tests and applicable parser/encoding checks;
+- Contract Propagation Sweep when a test/validator/workflow contract changed;
+- Ownership/Change-Impact Matrix when responsibility ownership moved;
+- hosted Windows PowerShell 5.1 evidence on the exact final Work SHA;
+- zero unresolved deterministic findings.
 
-All executable Development Completion checks must be GREEN before Candidate creation. This discipline does **not** create a release status and does not replace Candidate Preflight. Candidate Preflight remains the authoritative release-entry gate and reruns all mandatory Linux/Windows checks.
+Any later executable/source/workflow/test/repository-path change, any Work-Branch head movement, or a later `main` reconciliation invalidates affected Candidate-entry evidence. Recompute/re-run it before Candidate exposure.
 
-The next real Work-Branch Issue after LBS-38 is the pilot: record the final Development Completion SHA/evidence, first Candidate outcome, any correction count/causes, and timing sufficient to decide whether further automation is justified.
+The Issue rolling recovery comment must contain an explicit `Candidate-Entry: PASS|BLOCKED` block for the exact SHA. Candidate creation is permitted only when every mandatory applicable item is PASS and every genuine `N/A` has a reason.
+
+LBS-40 / #85 tracks the reusable hosted/full-worktree Development Completion automation. Until it exists, another truthful exact-SHA execution path may satisfy the contract; otherwise the Work-Path remains BLOCKED.
+
+Candidate Preflight remains the authoritative release-entry gate and reruns the mandatory Linux/Windows checks. Development Completion is defense-in-depth development qualification, not publication authorization.
 
 ## Local release preparation
 
@@ -114,7 +123,7 @@ The next real Work-Branch Issue after LBS-38 is the pilot: record the final Deve
 5. Set `repositoryDeleteIntent` to exactly the repository paths intentionally deleted by this version; normally `[]`.
 6. For a bug/regression, complete the focused RED→GREEN proof described above and run applicable broader prechecks.
 7. For a normal Patch/Hotfix without a work branch, assemble the complete intended change as one atomic candidate tree/commit rather than persisting file-by-file implementation commits.
-8. When a Work-Path branch is used, first complete the Development Completion review above on the exact final intended work state and require every executable pre-Candidate check to be GREEN. Then remove `.chatgpt-work/LBS-<issue>.md`, verify that the final cleaned work tree contains only intended release content, and re-read current `main` before Candidate creation.
+8. When a Work-Path branch is used, require the rolling Issue ledger to record `Candidate-Entry: PASS` for the exact final Work SHA under the Development Completion contract above. Any mandatory BLOCKED/FAIL/stale item prohibits Candidate creation. Remove any legacy `.chatgpt-work/LBS-<issue>.md`, verify that the final cleaned work tree contains only intended release content, re-read current `main`, and if that reconciliation changes the basis, invalidate/recompute affected Candidate-entry evidence before Candidate creation.
 9. Prepare one exact **release-ready** candidate commit based on current `main`. For a Work-Path release, this must be a clean current-`main`-parent commit whose tree exactly equals the final cleaned work-branch tree; temporary worklog/checkpoint history must not become Candidate ancestry.
 10. The candidate-only commit range must contain exactly one unique `Work-Branch:` trailer:
    - Major/Minor: `Work-Branch: work/LBS-<issue>` is mandatory;
@@ -148,6 +157,9 @@ The promotion job emits `CANDIDATE_TIMING_SUMMARY=<json>` with Linux/Windows que
 The explicit `workflow_dispatch` is mandatory because a `GITHUB_TOKEN` branch push does not recursively trigger another workflow. If dispatch fails, promotion marks `preflight/candidate` failed and rolls the new release branch back.
 
 `release.yml` refuses a release SHA unless `preflight/candidate`, `preflight/linux`, and `preflight/windows-powershell51` are all successful and current `main` remains an ancestor. GitHub then reruns the authoritative publication gates.
+
+An unexpected Candidate failure must be classified in the Issue rolling ledger as `Development Guideline miss`, `Tooling gap`, `Genuinely Candidate-only`, or `External infrastructure failure`, with the corrective/follow-up action recorded. This classification does not weaken the same-branch fail-closed correction path.
+
 
 The Windows workflow also supports manual `workflow_dispatch` benchmark/retest runs. Those runs are Windows contract-suite evidence only; they are not physical Lenovo firmware/UEFI E2E.
 

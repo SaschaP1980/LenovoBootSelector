@@ -111,7 +111,7 @@ For **PATCH and HOTFIX**, default to the shortest safe branchless atomic path. B
 
 For a normal branchless Patch/Hotfix, do not create a chain of intermediate commits: establish focused RED evidence against the unfixed basis, prepare the complete fix atomically, require focused GREEN plus directly relevant syntax/encoding/determinism checks, then expose one release-ready Candidate. Do not run the full test matrix before every commit; full authoritative validation belongs at the Candidate/Release gates. Reuse permanent validators instead of duplicating their assertions with ad-hoc connector checks.
 
-When a `work/LBS-*` Work-Path is selected, use the established continuation model in `docs/DEVELOPMENT_GUIDELINES.md`: maintain coherent product checkpoints plus exactly one cumulative rolling recovery comment in the Issue; keep an `ACTIVE` heartbeat no more than approximately three minutes old; include all new recovery-relevant findings/decisions/failures/gate results/timings in that same comment; use `WAITING_FOR_GITHUB` only with an exact independently running Actions run; and treat a roughly five-minute stale heartbeat with no running workflow as a stopped interactive stream. Do not create Git commits solely for heartbeat timing. A fresh session must re-read current `main`, the Issue rolling comment, work-branch head and latest product checkpoint before continuing, then directly verify any referenced Actions run.
+When a `work/LBS-*` Work-Path is selected, use the established continuation model in `docs/DEVELOPMENT_GUIDELINES.md`: maintain coherent product checkpoints plus exactly one **canonical cumulative Build & Release rolling comment** in the Issue; keep an `ACTIVE` heartbeat age no greater than approximately three minutes; include all new recovery-relevant findings/decisions/failures/gate results/timings in that same comment; use `WAITING_FOR_GITHUB` only with an exact independently running Actions run; use `BLOCKED_EXTERNAL` for verified external GitHub/service outages; and treat a roughly five-minute stale ACTIVE heartbeat with no running workflow as a stopped interactive stream. Do not create Git commits solely for heartbeat timing. A fresh session must re-read current `main`, the Issue rolling comment, work-branch head and latest product checkpoint before continuing, then directly verify any referenced Actions run.
 
 - **MAJOR:** a relevant GitHub Issue is mandatory.
 - **MINOR:** a relevant GitHub Issue is mandatory.
@@ -163,7 +163,7 @@ Also keep these fields in `bin/version.json` accurate:
 - `protectedFragmentIntent`
 - `repositoryDeleteIntent`
 
-The normal value for both is `[]`. Never hide intentionally changed protected fragments or repository deletions.
+The normal value for both is `[]`, but never assume emptiness. For Work-Path Candidate entry, derive both from the exact final reconciled `main...work-head` diff and require exact equality. Any later executable/source/workflow/test/repository-path change or later `main` reconciliation invalidates the evidence and requires recomputation before Candidate exposure. Never hide intentionally changed protected fragments or repository deletions.
 
 ## 8. Product safety boundaries
 
@@ -215,7 +215,7 @@ Before exposing a visible branch ref:
 
 Do not publish partially assembled intermediate states. The exact Candidate must already be release-ready: all intended implementation, regression coverage, focused RED→GREEN evidence, release metadata and applicable prechecks are complete before the Candidate ref is exposed.
 
-For a Work-Path Candidate, first complete the final **Development Completion review** defined in `docs/DEVELOPMENT_GUIDELINES.md`: exhaust the permanent checks that are executable before Candidate exposure, perform the ownership/parser integration sweep, and run the existing manually dispatchable hosted Windows PowerShell 5.1 workflow against the exact final Work-Branch revision. Record any tooling limitation explicitly; do not invent substitute evidence. Only after that review is green for every executable check should any legacy `.chatgpt-work/LBS-<issue>.md` be removed and the Candidate be created as a clean current-`main`-parent commit whose tree exactly equals the cleaned work tree. The rolling Issue comment remains the cumulative recovery/timing record; temporary checkpoint history must not become Candidate ancestry. After the Candidate is exposed, Candidate/Actions/Release state—not a recreated journal—is the canonical recovery surface.
+For a Work-Path Candidate, first complete the final **Development Completion and Candidate Entry** contract in `docs/DEVELOPMENT_GUIDELINES.md` on the exact final Work-Branch SHA. Mandatory evidence includes deterministic runtime/audit/baseline checks, exact protected/delete intent, all four permanent validators, relevant focused/native and source-type checks, applicable Contract Propagation and Ownership/Change-Impact sweeps, and hosted Windows PowerShell 5.1 evidence on that exact SHA. Missing tooling for a mandatory item means `Candidate-Entry: BLOCKED`; it is never `N/A` and Candidate Preflight must not be used as the first runner. Only `Candidate-Entry: PASS` permits Candidate creation. Then remove any legacy `.chatgpt-work/LBS-<issue>.md` and create a clean current-`main`-parent Candidate commit whose tree exactly equals the cleaned frozen Work tree. If `main` or the Work-Branch changes after evidence was produced, invalidate/recompute affected evidence first. The rolling Issue comment remains the cumulative recovery/timing record; checkpoint history must not become Candidate ancestry. After the Candidate is exposed, Candidate/Actions/Release state is authoritative while the same rolling comment continues as the supervision/retrospective ledger.
 
 For normal releases, **never create `release/v<version>` manually**. Only a successful Candidate Preflight may create it.
 
@@ -270,6 +270,9 @@ The permanent LBS-20 policy is **always mandatory** for Major, Minor, Patch, and
 ### Candidate failures
 
 A Candidate failure is an **unexpected validation/integration finding**, not a planned test-first RED step.
+
+For every unexpected Candidate failure, record one primary classification in the rolling Issue ledger: `Development Guideline miss`, `Tooling gap`, `Genuinely Candidate-only`, or `External infrastructure failure`. Record the follow-up action so the same avoidable class is not merely documented and repeated.
+
 
 If either mandatory candidate job fails:
 
