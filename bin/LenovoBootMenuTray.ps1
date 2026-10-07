@@ -1693,16 +1693,16 @@ if ($HideConsole) {
     Add-Type @"
 using System;
 using System.Runtime.InteropServices;
-public static class LenovoBootMenuConsoleWindow {
+public static class LenovoBootSelectorConsoleWindow {
     [DllImport("kernel32.dll")]
     public static extern IntPtr GetConsoleWindow();
     [DllImport("user32.dll")]
     public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 }
 "@
-    $consoleHandle = [LenovoBootMenuConsoleWindow]::GetConsoleWindow()
+    $consoleHandle = [LenovoBootSelectorConsoleWindow]::GetConsoleWindow()
     if ($consoleHandle -ne [IntPtr]::Zero) {
-        [LenovoBootMenuConsoleWindow]::ShowWindow($consoleHandle, 0) | Out-Null
+        [LenovoBootSelectorConsoleWindow]::ShowWindow($consoleHandle, 0) | Out-Null
     }
 }
 
@@ -1756,7 +1756,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.8.0.4'
+$script:AppVersion = '0.9.0.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -1825,7 +1825,8 @@ $script:RefreshButtonHovered = $false
 $script:HeaderTitleLabel = $null
 $script:HeaderStatusLabel = $null
 $script:LegacyAutostartTaskName = 'Lenovo Boot Menu Tray Autostart'
-$script:AutostartRunValueName = 'Lenovo Boot Menu Tray'
+$script:AutostartRunValueName = 'Lenovo Boot Selector'
+$script:LegacyAutostartRunValueName = 'Lenovo Boot Menu Tray'
 $script:SettingsDir = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray'
 $script:SettingsPath = Join-Path $script:SettingsDir 'settings.json'
 $script:UiLocale = 'en-US'
@@ -3543,22 +3544,42 @@ function Get-AutostartCommand {
     return ('"{0}" //B //NoLogo "{1}"' -f $wscript, $launcher)
 }
 
-function Get-AutostartInfo {
+function Get-AutostartRunValue {
+    param([Parameter(Mandatory=$true)][string]$Name)
+
     try {
         $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
-        $props = Get-ItemProperty -Path $runKey -Name $script:AutostartRunValueName -ErrorAction SilentlyContinue
-        $value = if ($props) { [string]$props.($script:AutostartRunValueName) } else { '' }
+        $props = Get-ItemProperty -Path $runKey -Name $Name -ErrorAction SilentlyContinue
+        if (-not $props) { return '' }
+        return [string]$props.($Name)
+    }
+    catch {
+        return ''
+    }
+}
+
+function Get-AutostartInfo {
+    try {
+        $canonicalValue = Get-AutostartRunValue -Name $script:AutostartRunValueName
+        $legacyValue = Get-AutostartRunValue -Name $script:LegacyAutostartRunValueName
+        $usesLegacyValue = (-not $canonicalValue -and [bool]$legacyValue)
+        $value = if ($canonicalValue) { $canonicalValue } else { $legacyValue }
         if (-not $value) {
-            return [pscustomobject]@{ Enabled = $false; CurrentPath = $false }
+            return [pscustomobject]@{ Enabled = $false; CurrentPath = $false; UsesHiddenLauncher = $false; UsesLegacyValue = $false }
         }
         $launcher = Get-AutostartLauncherPath
         $currentPath = (($launcher -and ($value.IndexOf($launcher, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)) -or
             ($script:ScriptPath -and ($value.IndexOf($script:ScriptPath, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)))
         $usesHiddenLauncher = ($launcher -and ($value.IndexOf($launcher, [System.StringComparison]::OrdinalIgnoreCase) -ge 0))
-        return [pscustomobject]@{ Enabled = $true; CurrentPath = $currentPath; UsesHiddenLauncher = $usesHiddenLauncher }
+        return [pscustomobject]@{
+            Enabled = $true
+            CurrentPath = $currentPath
+            UsesHiddenLauncher = $usesHiddenLauncher
+            UsesLegacyValue = $usesLegacyValue
+        }
     }
     catch {
-        return [pscustomobject]@{ Enabled = $false; CurrentPath = $false }
+        return [pscustomobject]@{ Enabled = $false; CurrentPath = $false; UsesHiddenLauncher = $false; UsesLegacyValue = $false }
     }
 }
 
@@ -3572,10 +3593,20 @@ function Set-AutostartEnabled([bool]$Enabled) {
         if (-not (Test-Path $runKey)) { [void](New-Item -Path $runKey -Force) }
         $command = Get-AutostartCommand
         if (-not $command) { throw 'Der versteckte Autostart-Launcher wurde nicht gefunden.' }
+
+        # LBS-19 migration is deliberately ordered: establish the canonical value
+        # first, then remove the exact legacy value. A failed canonical write leaves
+        # the working legacy registration untouched and retryable.
         Set-ItemProperty -Path $runKey -Name $script:AutostartRunValueName -Type String -Value $command
+        if ($script:LegacyAutostartRunValueName -and $script:LegacyAutostartRunValueName -ne $script:AutostartRunValueName) {
+            Remove-ItemProperty -Path $runKey -Name $script:LegacyAutostartRunValueName -ErrorAction SilentlyContinue
+        }
     }
     else {
         Remove-ItemProperty -Path $runKey -Name $script:AutostartRunValueName -ErrorAction SilentlyContinue
+        if ($script:LegacyAutostartRunValueName -and $script:LegacyAutostartRunValueName -ne $script:AutostartRunValueName) {
+            Remove-ItemProperty -Path $runKey -Name $script:LegacyAutostartRunValueName -ErrorAction SilentlyContinue
+        }
     }
 }
 
@@ -7234,7 +7265,7 @@ function New-PopupForm {
     }
 
     $form = New-Object System.Windows.Forms.Form
-    $form.Name = 'LenovoBootMenuPopup'
+    $form.Name = 'LenovoBootSelectorPopup'
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
     $form.ShowInTaskbar = $false
     $form.TopMost = $true
