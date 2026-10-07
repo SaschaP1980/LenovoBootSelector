@@ -110,9 +110,11 @@ Any later executable/source/workflow/test/repository-path change, any Work-Branc
 
 The Issue rolling recovery comment must contain an explicit `Candidate-Entry: PASS|BLOCKED` block for the exact SHA. Candidate creation is permitted only when every mandatory applicable item is PASS and every genuine `N/A` has a reason.
 
-LBS-40 / #85 tracks the reusable hosted/full-worktree Development Completion automation. Until it exists, another truthful exact-SHA execution path may satisfy the contract; otherwise the Work-Path remains BLOCKED.
+LBS-40 / #85 implements the reusable hosted/full-worktree Development Completion automation in `.github/workflows/development-completion.yml`.
 
-Candidate Preflight remains the authoritative release-entry gate and reruns the mandatory Linux/Windows checks. Development Completion is defense-in-depth development qualification, not publication authorization.
+For the repository-supported Work-Path flow, freeze the final tree by creating one tree-identical Work-Branch request commit containing exactly one `Development-Completion: requested` trailer. Require its workflow to finish PASS and publish `development-completion/gate=success` for that exact Work SHA and current Main SHA. Any subsequent Work-Branch or relevant Main change makes the evidence stale and requires another request run.
+
+Candidate Preflight remains the authoritative release-entry gate and reruns the mandatory Linux/Windows checks. It also fails closed when a declared Work-Branch lacks the exact successful Development Completion evidence. Development Completion is defense-in-depth development qualification, not publication authorization.
 
 ## Local release preparation
 

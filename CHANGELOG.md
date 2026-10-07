@@ -1,5 +1,20 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.10.6.0 – LBS-40 executable Work-Branch Development Completion gate
+
+- Add `.github/workflows/development-completion.yml` as an exact-SHA pre-Candidate qualification gate for `work/LBS-*` development.
+- Start the gate connector-only through one final tree-identical Work-Branch request commit carrying exactly one `Development-Completion: requested` trailer; ordinary checkpoint pushes are recognized but skip the expensive gate.
+- Reuse `tools/candidate_preflight.py` in `development-completion` mode for Linux/full-worktree preparation, reproducibility, exact protected/delete intent, and Release/Core/Boundary/Regression instead of duplicating release-entry logic.
+- Require tracked runtime, catch audit, and architecture baseline to be deterministic on the exact Work-SHA before temporary release preparation begins.
+- Reuse the hosted Windows PowerShell 5.1 workflow through explicit `candidate`, `development-completion`, and `manual-benchmark` modes while preserving Candidate as the reusable default.
+- Publish one `DEVELOPMENT_COMPLETION_SUMMARY=<json>` and a `development-completion/gate` commit status bound to both the exact Work-SHA and the tested current Main SHA.
+- Make Candidate Preflight fail closed for declared Work-Branches unless the current Work-SHA has a successful Development Completion status for the same current Main SHA and an exactly matching Candidate tree.
+- Add `tools/validate_test_contracts.py` to detect stale fixed-total literals in permanent validators, mismatched fixed runtime counts in `tests/README.md`, and Windows aggregate TOTAL markers that no active PowerShell test emits; Candidate Preflight and Development Completion share this check.
+- Preserve Candidate Preflight and Release Orchestrator as the authoritative release/publication gates; Development Completion creates no Candidate/Release refs, tags, PRs, or publication ZIP state.
+- No `src/**` product behavior, privilege boundary, TaskBroker, storage, firmware/BCD, polling, PnP, updater, or UI behavior changes are introduced.
+- Release profile: `version-only`. Protected-fragment intent and repository-delete intent are both empty.
+
+
 ## v0.10.5.0 – LBS-28 canonical system-function capability model
 
 - Add `src/Application/SystemCapabilities.ps1` as the single Application-level owner for system-function readiness/capability derivation from explicit Maintenance, TaskBroker metadata/readiness, drift, and entry-count facts.

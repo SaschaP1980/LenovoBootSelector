@@ -111,6 +111,18 @@ jobs:
               exit 1
             }
             git fetch origin "refs/heads/$WORK_BRANCH:refs/remotes/origin/$WORK_BRANCH" --force
+            WORK_STATUS_JSON=$(gh api "repos/$GITHUB_REPOSITORY/commits/$REMOTE_WORK_SHA/status")
+            DEVELOPMENT_COMPLETION_STATE=$(printf '%s' "$WORK_STATUS_JSON" | jq -r '[.statuses[] | select(.context=="development-completion/gate")][0].state // ""')
+            DEVELOPMENT_COMPLETION_DESCRIPTION=$(printf '%s' "$WORK_STATUS_JSON" | jq -r '[.statuses[] | select(.context=="development-completion/gate")][0].description // ""')
+            CURRENT_MAIN_SHA=$(git rev-parse origin/main)
+            test "$DEVELOPMENT_COMPLETION_STATE" = "success" || {
+              echo "Declared work branch lacks successful Development Completion on exact SHA $REMOTE_WORK_SHA: state=$DEVELOPMENT_COMPLETION_STATE" >&2
+              exit 1
+            }
+            test "$DEVELOPMENT_COMPLETION_DESCRIPTION" = "PASS main=$CURRENT_MAIN_SHA" || {
+              echo "Declared work branch Development Completion is stale against current main: $DEVELOPMENT_COMPLETION_DESCRIPTION expected=PASS main=$CURRENT_MAIN_SHA" >&2
+              exit 1
+            }
             CANDIDATE_TREE=$(git rev-parse "$GITHUB_SHA^{tree}")
             WORK_TREE=$(git rev-parse "refs/remotes/origin/$WORK_BRANCH^{tree}")
             test "$WORK_TREE" = "$CANDIDATE_TREE" || {
@@ -163,6 +175,8 @@ jobs:
   windows-powershell51:
     name: Windows PowerShell 5.1 Gate
     uses: ./.github/workflows/windows-powershell51.yml
+    with:
+      mode: candidate
 
   promote:
     name: Promote exact candidate

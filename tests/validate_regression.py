@@ -176,6 +176,14 @@ def main():
     candidate_workflow=txt(root/'.github/workflows/candidate-preflight.yml')
     release_workflow=txt(root/'.github/workflows/release.yml')
     windows_workflow=txt(root/'.github/workflows/windows-powershell51.yml')
+    development_completion_workflow=txt(root/'.github/workflows/development-completion.yml') if (root/'.github/workflows/development-completion.yml').is_file() else ''
+    contract_propagation=txt(root/'tools/validate_test_contracts.py') if (root/'tools/validate_test_contracts.py').is_file() else ''
+    s.has('LBS-40 Development Completion remains pre-publication only',development_completion_workflow,'Exact-SHA Development Completion')
+    s.no('LBS-40 Development Completion never creates release ref',development_completion_workflow,'refs/heads/$EXPECTED_RELEASE')
+    s.no('LBS-40 Development Completion never dispatches release workflow',development_completion_workflow,'release.yml/dispatches')
+    s.has('LBS-40 Candidate requires exact Work-SHA gate status',candidate_workflow,'development-completion/gate')
+    s.has('LBS-40 Candidate binds Development Completion to current main SHA',candidate_workflow,'PASS main=$CURRENT_MAIN_SHA')
+    s.has('LBS-40 propagation validator is Candidate-owned',preflight,'tools/validate_test_contracts.py')
     s.no('LBS-15 static runtime include registry remains removed',runtime_builder,'INCLUDES = [')
     s.has('LBS-15 template is runtime include source of truth',runtime_builder,'template_include_paths')
     s.has('LBS-15 candidate preflight remains executable',preflight,'CANDIDATE PREFLIGHT PASS')
