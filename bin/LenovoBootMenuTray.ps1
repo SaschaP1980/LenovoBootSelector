@@ -5763,6 +5763,7 @@ function Resolve-StorageContextCore {
         UsbResolutionReason = $reason
     }
 }
+
 # Windows-specific storage acquisition and normalization.
 # Classification and product-facing storage resolution live in Core/StorageResolution.ps1.
 
