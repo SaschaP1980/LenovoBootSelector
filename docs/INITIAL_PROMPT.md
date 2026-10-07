@@ -215,7 +215,7 @@ Before exposing a visible branch ref:
 
 Do not publish partially assembled intermediate states. The exact Candidate must already be release-ready: all intended implementation, regression coverage, focused RED→GREEN evidence, release metadata and applicable prechecks are complete before the Candidate ref is exposed.
 
-For a Work-Path Candidate, first complete the final **Development Completion and Candidate Entry** contract in `docs/DEVELOPMENT_GUIDELINES.md` on the exact final Work-Branch SHA. Mandatory evidence includes deterministic runtime/audit/baseline checks, exact protected/delete intent, all four permanent validators, relevant focused/native and source-type checks, applicable Contract Propagation and Ownership/Change-Impact sweeps, and hosted Windows PowerShell 5.1 evidence on that exact SHA. Use the repository's `.github/workflows/development-completion.yml`: after the final substantive checkpoint, create one tree-identical Work-Branch commit with exactly one `Development-Completion: requested` trailer; that exact request SHA is the frozen/tested Work-SHA. Missing or stale mandatory evidence means `Candidate-Entry: BLOCKED`; it is never `N/A` and Candidate Preflight must not be used as the first runner. Only `Candidate-Entry: PASS` permits Candidate creation. Then remove any legacy `.chatgpt-work/LBS-<issue>.md` and create a clean current-`main`-parent Candidate commit whose tree exactly equals the cleaned frozen Work tree. If `main` or the Work-Branch changes after evidence was produced, invalidate/recompute affected evidence first. The rolling Issue comment remains the cumulative recovery/timing record; checkpoint history must not become Candidate ancestry. After the Candidate is exposed, Candidate/Actions/Release state is authoritative while the same rolling comment continues as the supervision/retrospective ledger.
+For a Work-Path Candidate, first complete the final **Development Completion and Candidate Entry** contract in `docs/DEVELOPMENT_GUIDELINES.md` on the exact final Work-Branch SHA. Mandatory evidence includes deterministic runtime/audit/baseline checks, exact protected/delete intent, all four permanent validators, relevant focused/native and source-type checks, a direct runtime-binding smoke for changed Python validators/release tools/workflow helpers before the first hosted Development Completion request when applicable, applicable Contract Propagation and Ownership/Change-Impact sweeps, and hosted Windows PowerShell 5.1 evidence on that exact SHA. Use the repository's `.github/workflows/development-completion.yml`: after the final substantive checkpoint, create one tree-identical Work-Branch commit with exactly one `Development-Completion: requested` trailer; that exact request SHA is the frozen/tested Work-SHA. Missing or stale mandatory evidence means `Candidate-Entry: BLOCKED`; it is never `N/A` and Candidate Preflight must not be used as the first runner. Only `Candidate-Entry: PASS` permits Candidate creation. Then remove any legacy `.chatgpt-work/LBS-<issue>.md` and create a clean current-`main`-parent Candidate commit whose tree exactly equals the cleaned frozen Work tree. If `main` or the Work-Branch changes after evidence was produced, invalidate/recompute affected evidence first. The rolling Issue comment remains the cumulative recovery/timing record; checkpoint history must not become Candidate ancestry. After the Candidate is exposed, Candidate/Actions/Release state is authoritative while the same rolling comment continues as the supervision/retrospective ledger.
 
 For normal releases, **never create `release/v<version>` manually**. Only a successful Candidate Preflight may create it.
 
@@ -308,8 +308,9 @@ Then it:
 10. creates exactly one PR;
 11. creates the annotated source tag;
 12. sets `release/tag`;
-13. merges the PR and deletes the release branch;
-14. performs complete post-release verification.
+13. runs the pre-activation verifier and requires `RELEASE_PREACTIVATION_SUMMARY=PASS` while public `main/downloads/latest.json` still points to the previous version;
+14. merges the PR and deletes the release branch; this merge is the single atomic public update-pointer activation;
+15. performs complete post-release verification using the exact pre-activation evidence.
 
 Historical `downloads/*.zip` files are **immutable**. A release may add exactly one new ZIP; existing ZIPs must not be modified or deleted.
 
@@ -356,7 +357,8 @@ The summary confirms, among other things:
 - consistent `downloads/latest.json`;
 - consistent published release ZIP;
 - successful reproducibility check;
-- successful historical ZIP integrity check.
+- successful historical ZIP integrity check;
+- successful chained pre-activation verification proving the public pointer was not switched before the activation gate passed.
 
 When the workflow is terminal `success` and `RELEASE_VERIFICATION_SUMMARY.result == "PASS"`, use that aggregated data as the verified final facts. Do not reconstruct the same facts again through many redundant connector requests.
 

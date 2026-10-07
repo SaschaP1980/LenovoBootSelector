@@ -203,14 +203,15 @@ For any `work/LBS-*` release, the detailed Candidate-entry contract in `docs/DEV
 Operationally:
 
 1. freeze the intended final Work-Branch SHA;
-2. produce all mandatory Candidate-entry evidence on that exact SHA;
-3. run the Contract Propagation Sweep when test/validator/workflow contracts changed;
-4. run the Ownership/Change-Impact Matrix when responsibility ownership moved;
-5. derive and verify protected/delete intent from the exact final reconciled diff;
-6. require hosted Windows PowerShell 5.1 evidence on the exact final Work SHA;
-7. re-read `main` and Work-Branch head after the checks;
-8. update the Issue rolling comment with an explicit `Candidate-Entry: PASS|BLOCKED` block;
-9. expose Candidate only when the block is PASS.
+2. before the first hosted Development Completion request, directly execute the changed Python validator/release-tool/workflow-helper runtime path when applicable; syntax/AST/import-only checks do not satisfy this runtime-binding smoke;
+3. produce all mandatory Candidate-entry evidence on that exact SHA;
+4. run the Contract Propagation Sweep when test/validator/workflow contracts changed;
+5. run the Ownership/Change-Impact Matrix when responsibility ownership moved;
+6. derive and verify protected/delete intent from the exact final reconciled diff;
+7. require hosted Windows PowerShell 5.1 evidence on the exact final Work SHA;
+8. re-read `main` and Work-Branch head after the checks;
+9. update the Issue rolling comment with an explicit `Candidate-Entry: PASS|BLOCKED` block;
+10. expose Candidate only when the block is PASS.
 
 For mandatory evidence, unavailable tooling is **BLOCKED**, not `N/A`. `N/A` is valid only when a check is genuinely not applicable to the change and the reason is recorded.
 
@@ -223,13 +224,14 @@ The canonical implementation is `.github/workflows/development-completion.yml`.
 After the intended Work tree is complete and all release metadata/generated artifacts are synchronized:
 
 1. re-read current `main` and reconcile the Work tree;
-2. persist the last substantive Work-Branch checkpoint;
-3. create one new commit with **the identical tree** and the exact trailer `Development-Completion: requested`;
-4. advance the same `work/LBS-<issue>` ref to that request commit;
-5. observe the resulting `Development Completion` Actions run for that exact SHA;
-6. require terminal PASS, `DEVELOPMENT_COMPLETION_SUMMARY=<json>`, and `development-completion/gate=success`;
-7. require the summary/status Main SHA to remain current and the Work-Branch head to remain the tested SHA;
-8. record the run ID, summaries, totals, timings and Candidate Entry block in the rolling Issue ledger.
+2. if changed Python validators/release tools/workflow helpers are part of the tree, run a direct focused runtime smoke that reaches each changed execution path; record the exact command/test and PASS result. `py_compile`, AST/source inspection, or import-only success is not enough to catch runtime binding/order failures;
+3. persist the last substantive Work-Branch checkpoint;
+4. create one new commit with **the identical tree** and the exact trailer `Development-Completion: requested`;
+5. advance the same `work/LBS-<issue>` ref to that request commit;
+6. observe the resulting `Development Completion` Actions run for that exact SHA;
+7. require terminal PASS, `DEVELOPMENT_COMPLETION_SUMMARY=<json>`, and `development-completion/gate=success`;
+8. require the summary/status Main SHA to remain current and the Work-Branch head to remain the tested SHA;
+9. record the run ID, summaries, totals, timings and Candidate Entry block in the rolling Issue ledger.
 
 No direct `workflow_dispatch` action is required. Ordinary checkpoint pushes intentionally produce only a skipped Development Completion run because they lack the request trailer.
 
@@ -373,9 +375,10 @@ A successful release run should, in substance:
 12. Create exactly one PR.
 13. Create the annotated source tag only after the PR exists and all preceding gates passed.
 14. Add the tag status gate.
-15. Merge the PR and delete the release branch.
-16. Verify the merged `main` publication metadata.
-17. Run the integrated LBS-16 post-release verifier and emit one `RELEASE_VERIFICATION_SUMMARY=<json>` line plus the GitHub Job Summary.
+15. Run `tools/release_pre_activation.py` and require `RELEASE_PREACTIVATION_SUMMARY=PASS` while public `main/downloads/latest.json` still advertises the previous version and the staged PR head already contains the verified new pointer/ZIP.
+16. Merge the PR and delete the release branch. This single merge is the atomic public update-pointer activation.
+17. Verify the merged `main` publication metadata.
+18. Run the integrated post-release verifier with the exact pre-activation evidence and emit one `RELEASE_VERIFICATION_SUMMARY=<json>` line plus the GitHub Job Summary.
 
 ## LBS-16 orchestration efficiency
 
@@ -390,7 +393,9 @@ Use phase snapshots:
 5. **Release observation:** after dispatch, avoid re-reading unchanged candidate facts. On terminal success, consume the single `RELEASE_VERIFICATION_SUMMARY=<json>` emitted by the Release Orchestrator.
 6. **Issue completion:** use the verified summary for the release facts, add the final Issue comment and close the Issue. Do not repeat individual PR/tag/status/latest/ZIP/source-tree reads merely to reconstruct facts already verified in the summary.
 
-`tools/release_verification.py` performs the complete server-side post-release aggregation after the merge. It verifies the merged PR, exactly one publication PR, 8/8 release statuses, all 3/3 candidate statuses (`preflight/candidate`, `preflight/linux`, `preflight/windows-powershell51`), annotated source tag/commit, ZIP-/cache-free source tree, `downloads/latest.json`, published release ZIP size/hash, candidate/release branch cleanup and the prior reproducibility marker.
+`tools/release_pre_activation.py` is the public-pointer activation gate. Immediately before merge it proves that the old public pointer is still live, the staged new pointer/ZIP/tag are internally consistent, Base Main has not moved, the PR is still open/unmerged, and all 3/3 Candidate plus 8/8 release contexts are GREEN. It emits `RELEASE_PREACTIVATION_SUMMARY=<json>`.
+
+`tools/release_verification.py` performs the complete server-side post-release aggregation after the merge. It requires the exact pre-activation PASS evidence, then verifies the merged PR, exactly one publication PR, 8/8 release statuses, all 3/3 candidate statuses (`preflight/candidate`, `preflight/linux`, `preflight/windows-powershell51`), annotated source tag/commit, ZIP-/cache-free source tree, the now-live `downloads/latest.json`, published release ZIP size/hash, candidate/release branch cleanup and the prior reproducibility marker.
 
 The structured summary is an **aggregation of completed checks**, not a replacement for them. If the workflow is not terminal success, the summary is missing, `result != PASS`, or a requested fact is absent, fall back to the full direct post-release checklist below.
 

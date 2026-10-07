@@ -17,8 +17,31 @@ class S:
         for n,o,d in self.rows: print(('PASS  ' if o else 'FAIL  ')+n+(f' [{d}]' if d and not o else ''))
         p=sum(o for _,o,_ in self.rows); print(f'\nTOTAL {p}/{len(self.rows)}'); return 0 if p==len(self.rows) else 1
 
+def validate_lbs37_regression_contract(s:S,release_pre_activation:str,release_verification:str,release_workflow:str):
+    s.has('LBS-37 pre-activation summary remains machine-readable',release_pre_activation,'RELEASE_PREACTIVATION_SUMMARY=')
+    s.has('LBS-37 public latest must remain previous before activation',release_pre_activation,'public latest version changed before activation')
+    s.has('LBS-37 staged latest must already match new release',release_pre_activation,'staged downloads/latest.json mismatch')
+    s.has('LBS-37 final verifier requires chained pre-activation evidence',release_verification,'preActivationVerified')
+    s.c('LBS-37 workflow keeps activation ordering',
+        release_workflow.index('tools/release_pre_activation.py') <
+        release_workflow.index('gh pr merge') <
+        release_workflow.index('tools/release_verification.py'))
+    s.eq('LBS-37 mutable pointer switches through one PR merge only',release_workflow.count('gh pr merge'),1)
+
+def self_test_lbs37()->int:
+    s=S()
+    release_pre_activation='RELEASE_PREACTIVATION_SUMMARY= public latest version changed before activation staged downloads/latest.json mismatch'
+    release_verification='preActivationVerified'
+    release_workflow='tools/release_pre_activation.py gh pr merge tools/release_verification.py'
+    validate_lbs37_regression_contract(s,release_pre_activation,release_verification,release_workflow)
+    rc=s.done()
+    if rc==0: print('PASS LBS-37 regression validator smoke')
+    return rc
+
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); ap.add_argument('--basis-root',type=Path,required=True); ap.add_argument('--release-zip',type=Path); a=ap.parse_args()
+    ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); ap.add_argument('--basis-root',type=Path); ap.add_argument('--release-zip',type=Path); ap.add_argument('--self-test-lbs37',action='store_true'); a=ap.parse_args()
+    if a.self_test_lbs37: return self_test_lbs37()
+    if a.basis_root is None: ap.error('--basis-root is required')
     root=a.root.resolve(); basis=a.basis_root.resolve(); s=S()
     meta=json.loads((root/'bin/version.json').read_text(encoding='utf-8')); version=str(meta['version']); profile=str(meta.get('releaseProfile','patch'))
     markdown_validator=txt(root/'tools/validate_markdown_language.py')
@@ -172,6 +195,7 @@ def main():
     runtime_builder=txt(root/'tools/build_runtime.py')
     preflight=txt(root/'tools/candidate_preflight.py')
     release_verification=txt(root/'tools/release_verification.py')
+    release_pre_activation=txt(root/'tools/release_pre_activation.py') if (root/'tools/release_pre_activation.py').is_file() else ''
     core_validator=txt(root/'tests/validate_core.py')
     candidate_workflow=txt(root/'.github/workflows/candidate-preflight.yml')
     release_workflow=txt(root/'.github/workflows/release.yml')
@@ -213,6 +237,15 @@ def main():
     s.has('LBS-16 candidate summary remains machine-readable',preflight,'CANDIDATE_PREFLIGHT_SUMMARY=')
     s.has('LBS-16 release summary remains machine-readable',release_verification,'RELEASE_VERIFICATION_SUMMARY=')
     s.has('LBS-16 release workflow retains aggregated verifier',release_workflow,'tools/release_verification.py')
+    s.has('LBS-37 pre-activation summary remains machine-readable',release_pre_activation,'RELEASE_PREACTIVATION_SUMMARY=')
+    s.has('LBS-37 public latest must remain previous before activation',release_pre_activation,'public latest version changed before activation')
+    s.has('LBS-37 staged latest must already match new release',release_pre_activation,'staged downloads/latest.json mismatch')
+    s.has('LBS-37 final verifier requires chained pre-activation evidence',release_verification,'preActivationVerified')
+    s.c('LBS-37 workflow keeps activation ordering',
+        release_workflow.index('tools/release_pre_activation.py') <
+        release_workflow.index('gh pr merge') <
+        release_workflow.index('tools/release_verification.py'))
+    s.eq('LBS-37 mutable pointer switches through one PR merge only',release_workflow.count('gh pr merge'),1)
     s.has('LBS-16 release summary retains eight-gate contract',release_verification,'EXPECTED_RELEASE_CONTEXTS')
     s.has('LBS-20 release summary retains three candidate-gate contract',release_verification,'EXPECTED_CANDIDATE_CONTEXTS')
     s.has('LBS-20 release summary exposes candidate gates',release_verification,"'candidateGates':candidate_gates")
@@ -224,6 +257,7 @@ def main():
     s.has('Native update test retains AST source-count self-audit',update_native,'[System.Management.Automation.Language.Parser]::ParseFile')
     s.has('Native update test retains explicit 79 runtime guard',update_native,'if ($checks -ne 79) { throw "Unexpected update test count $checks" }')
     s.has('Native mutex test retains explicit count guard',mutex_native,'if ($checks -ne 4) { throw "Unexpected mutex test count $checks" }')
+    cp=subprocess.run([sys.executable,str(root/'tools/release_pre_activation.py'),'--self-test'],capture_output=True,text=True); s.eq('LBS-37 pre-activation verification self-test',cp.returncode,0)
     cp=subprocess.run([sys.executable,str(root/'tools/release_verification.py'),'--self-test'],capture_output=True,text=True); s.eq('LBS-16 release verification self-test',cp.returncode,0)
     cp=subprocess.run([sys.executable,str(root/'tools/build_runtime.py'),'--root',str(root),'--check'],capture_output=True,text=True); s.eq('Runtime deterministic',cp.returncode,0)
     cp=subprocess.run([sys.executable,str(root/'tools/build_catch_audit.py'),'--root',str(root),'--check'],capture_output=True,text=True); s.eq('Catch audit deterministic',cp.returncode,0)

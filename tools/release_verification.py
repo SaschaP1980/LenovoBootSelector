@@ -103,6 +103,19 @@ def validate_work_branch(value:str)->str:
 def sha256_bytes(data:bytes)->str:
     return hashlib.sha256(data).hexdigest()
 
+def validate_pre_activation_evidence(payload:dict, *, version:str, candidate_sha:str, final_sha:str, source_commit:str, pr_number:int)->dict:
+    require(payload.get('result')=='PASS','pre-activation evidence is not PASS')
+    require(payload.get('phase')=='pre-activation','pre-activation evidence phase mismatch')
+    require(payload.get('version')==version,'pre-activation version mismatch')
+    require(payload.get('candidateSha')==candidate_sha,'pre-activation candidate SHA mismatch')
+    require(payload.get('finalPrHeadSha')==final_sha,'pre-activation final head mismatch')
+    require(payload.get('sourceCommit')==source_commit,'pre-activation source commit mismatch')
+    require(int(payload.get('prNumber',0))==pr_number,'pre-activation PR number mismatch')
+    require(payload.get('stagedLatestConsistent') is True,'pre-activation staged latest was not verified')
+    require(payload.get('stagedReleaseZipConsistent') is True,'pre-activation staged release ZIP was not verified')
+    require(payload.get('reproducible') is True,'pre-activation reproducibility evidence missing')
+    return payload
+
 def self_test()->int:
     good={'statuses':[{'context':c,'state':'success'} for c in EXPECTED_RELEASE_CONTEXTS]}
     result=validate_release_statuses(good)
@@ -126,6 +139,23 @@ def self_test()->int:
         raise RuntimeError('self-test accepted missing candidate status')
     require(validate_work_branch('none')=='none','self-test rejected no-work-branch marker')
     require(validate_work_branch('work/LBS-23')=='work/LBS-23','self-test rejected valid work branch')
+    evidence={
+        'result':'PASS','phase':'pre-activation','version':'2.0.0','candidateSha':'candidate',
+        'finalPrHeadSha':'final','sourceCommit':'source','prNumber':12,
+        'stagedLatestConsistent':True,'stagedReleaseZipConsistent':True,'reproducible':True,
+    }
+    validate_pre_activation_evidence(
+        evidence,version='2.0.0',candidate_sha='candidate',final_sha='final',source_commit='source',pr_number=12,
+    )
+    bad_evidence=dict(evidence); bad_evidence['result']='FAIL'
+    try:
+        validate_pre_activation_evidence(
+            bad_evidence,version='2.0.0',candidate_sha='candidate',final_sha='final',source_commit='source',pr_number=12,
+        )
+    except RuntimeError:
+        pass
+    else:
+        raise RuntimeError('self-test accepted failed pre-activation evidence')
     try:
         validate_work_branch('work/not-safe')
     except RuntimeError:
@@ -148,6 +178,7 @@ def main()->int:
     ap.add_argument('--published-utc')
     ap.add_argument('--release-build-json',type=Path)
     ap.add_argument('--reproducibility-marker',type=Path)
+    ap.add_argument('--pre-activation-json',type=Path)
     ap.add_argument('--output',type=Path)
     args=ap.parse_args()
 
@@ -164,7 +195,8 @@ def main()->int:
             'work-branch':args.work_branch,'final-sha':args.final_sha,'source-commit':args.source_commit,
             'pr-url':args.pr_url,'published-utc':args.published_utc,
             'release-build-json':args.release_build_json,
-            'reproducibility-marker':args.reproducibility_marker,'output':args.output,
+            'reproducibility-marker':args.reproducibility_marker,
+            'pre-activation-json':args.pre_activation_json,'output':args.output,
         }
         missing=[k for k,v in required.items() if v is None or v=='']
         require(not missing,f'missing required arguments: {missing}')
@@ -176,6 +208,16 @@ def main()->int:
         pr_match=re.search(r'/pull/(\d+)(?:$|[/?#])',args.pr_url)
         require(pr_match is not None,f'invalid PR URL: {args.pr_url!r}')
         pr_number=int(pr_match.group(1))
+
+        pre_activation=json.loads(args.pre_activation_json.read_text(encoding='utf-8'))
+        validate_pre_activation_evidence(
+            pre_activation,
+            version=args.version,
+            candidate_sha=args.candidate_sha,
+            final_sha=args.final_sha,
+            source_commit=args.source_commit,
+            pr_number=pr_number,
+        )
 
         build=json.loads(args.release_build_json.read_text(encoding='utf-8'))
         require(build.get('version')==args.version,'release-build version mismatch')
@@ -287,6 +329,9 @@ def main()->int:
             'releaseZipConsistent':release_zip_consistent,
             'reproducible':True,
             'historicalZipIntegrity':True,
+            'preActivationVerified':True,
+            'preActivationBaseMainSha':pre_activation.get('baseMainSha'),
+            'preActivationPublicLatestVersion':pre_activation.get('publicLatestVersionBeforeActivation'),
         }
 
         args.output.parent.mkdir(parents=True,exist_ok=True)
@@ -307,6 +352,7 @@ def main()->int:
                 f.write(f'- Source commit: `{args.source_commit}`\n')
                 f.write(f'- Main SHA: `{main_sha}`\n')
                 f.write(f'- Release ZIP SHA-256: `{release.get("sha256")}`\n')
+                f.write('- Pre-activation verification: **PASS**\n')
                 f.write('- Candidate/release branches: **deleted**\n')
                 if work_branch=='none':
                     f.write('- Work branch: **none declared**\n')
