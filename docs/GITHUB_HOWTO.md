@@ -203,14 +203,15 @@ For any `work/LBS-*` release, the detailed Candidate-entry contract in `docs/DEV
 Operationally:
 
 1. freeze the intended final Work-Branch SHA;
-2. produce all mandatory Candidate-entry evidence on that exact SHA;
-3. run the Contract Propagation Sweep when test/validator/workflow contracts changed;
-4. run the Ownership/Change-Impact Matrix when responsibility ownership moved;
-5. derive and verify protected/delete intent from the exact final reconciled diff;
-6. require hosted Windows PowerShell 5.1 evidence on the exact final Work SHA;
-7. re-read `main` and Work-Branch head after the checks;
-8. update the Issue rolling comment with an explicit `Candidate-Entry: PASS|BLOCKED` block;
-9. expose Candidate only when the block is PASS.
+2. before the first hosted Development Completion request, directly execute the changed Python validator/release-tool/workflow-helper runtime path when applicable; syntax/AST/import-only checks do not satisfy this runtime-binding smoke;
+3. produce all mandatory Candidate-entry evidence on that exact SHA;
+4. run the Contract Propagation Sweep when test/validator/workflow contracts changed;
+5. run the Ownership/Change-Impact Matrix when responsibility ownership moved;
+6. derive and verify protected/delete intent from the exact final reconciled diff;
+7. require hosted Windows PowerShell 5.1 evidence on the exact final Work SHA;
+8. re-read `main` and Work-Branch head after the checks;
+9. update the Issue rolling comment with an explicit `Candidate-Entry: PASS|BLOCKED` block;
+10. expose Candidate only when the block is PASS.
 
 For mandatory evidence, unavailable tooling is **BLOCKED**, not `N/A`. `N/A` is valid only when a check is genuinely not applicable to the change and the reason is recorded.
 
@@ -223,13 +224,14 @@ The canonical implementation is `.github/workflows/development-completion.yml`.
 After the intended Work tree is complete and all release metadata/generated artifacts are synchronized:
 
 1. re-read current `main` and reconcile the Work tree;
-2. persist the last substantive Work-Branch checkpoint;
-3. create one new commit with **the identical tree** and the exact trailer `Development-Completion: requested`;
-4. advance the same `work/LBS-<issue>` ref to that request commit;
-5. observe the resulting `Development Completion` Actions run for that exact SHA;
-6. require terminal PASS, `DEVELOPMENT_COMPLETION_SUMMARY=<json>`, and `development-completion/gate=success`;
-7. require the summary/status Main SHA to remain current and the Work-Branch head to remain the tested SHA;
-8. record the run ID, summaries, totals, timings and Candidate Entry block in the rolling Issue ledger.
+2. if changed Python validators/release tools/workflow helpers are part of the tree, run a direct focused runtime smoke that reaches each changed execution path; record the exact command/test and PASS result. `py_compile`, AST/source inspection, or import-only success is not enough to catch runtime binding/order failures;
+3. persist the last substantive Work-Branch checkpoint;
+4. create one new commit with **the identical tree** and the exact trailer `Development-Completion: requested`;
+5. advance the same `work/LBS-<issue>` ref to that request commit;
+6. observe the resulting `Development Completion` Actions run for that exact SHA;
+7. require terminal PASS, `DEVELOPMENT_COMPLETION_SUMMARY=<json>`, and `development-completion/gate=success`;
+8. require the summary/status Main SHA to remain current and the Work-Branch head to remain the tested SHA;
+9. record the run ID, summaries, totals, timings and Candidate Entry block in the rolling Issue ledger.
 
 No direct `workflow_dispatch` action is required. Ordinary checkpoint pushes intentionally produce only a skipped Development Completion run because they lack the request trailer.
 

@@ -101,6 +101,7 @@ Mandatory Candidate-entry coverage includes:
 - exact `protectedFragmentIntent` and `repositoryDeleteIntent` derived from the exact final reconciled diff;
 - Release/Core/Boundary/Regression;
 - relevant focused/native tests and applicable parser/encoding checks;
+- changed Python validator/release-tool/workflow-helper runtime-binding smoke before the first hosted Development Completion request when applicable; syntax/compile/import-only evidence is insufficient;
 - Contract Propagation Sweep when a test/validator/workflow contract changed;
 - Ownership/Change-Impact Matrix when responsibility ownership moved;
 - hosted Windows PowerShell 5.1 evidence on the exact final Work SHA;

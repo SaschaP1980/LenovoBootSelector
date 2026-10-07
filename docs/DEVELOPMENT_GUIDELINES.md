@@ -504,6 +504,22 @@ For PowerShell, YAML/workflows, Python, JSON, or other executable/machine-consum
 
 A checkpoint must never be justified only by “the replacement command succeeded”; the resulting diff is the evidence.
 
+### Python runtime-binding smoke rule
+
+A Python parser/syntax check proves only that the file can be parsed. It does **not** prove that names are bound in the correct order, that a changed function/CLI path can execute, or that runtime imports/locals used by the changed path exist.
+
+When a change modifies a Python validator, release/build tool, workflow helper, or other Python path that is expected to execute during Development Completion, Candidate Preflight, or Release:
+
+- before the **first hosted Development Completion request** for that Work tree, execute at least one focused runtime path that reaches the changed code;
+- prefer the script's real non-destructive CLI against the current worktree when available;
+- otherwise use an existing focused consumer/test, or add/use a narrow `--self-test` / smoke entrypoint that exercises the changed binding/control path without publication side effects;
+- for imported helpers, importing the module alone is insufficient when the defect could exist inside a function body; exercise the changed callable through its focused owner;
+- `python -m py_compile`, AST parsing, lint/source inspection, or import-only success may accompany the runtime smoke but **cannot substitute for it**;
+- record the command/test and PASS result in the rolling Issue ledger before creating the first `Development-Completion: requested` commit;
+- if no safe focused runtime path can be executed, the first hosted Development Completion request is **BLOCKED** until such a path exists or the exact dependency closure can be executed truthfully.
+
+This rule is intentionally targeted. It does not require the full repository matrix before ordinary checkpoints and does not duplicate permanent validators; it exists to catch runtime-only integration defects such as `NameError`, `UnboundLocalError`, initialization-order errors, and changed CLI/control-flow wiring before consuming a hosted Development Completion attempt.
+
 ### Development Completion and Candidate Entry
 
 Before Candidate creation, every Work-Path release must perform one deliberate **Development Completion** against the exact final intended Work-Branch state.
@@ -538,6 +554,7 @@ For the exact final Work-Branch SHA, require:
 - Regression validator GREEN;
 - relevant focused/native tests GREEN;
 - source-type parser/encoding checks GREEN when applicable, including changed PowerShell runtime/test sources;
+- changed Python validator/release-tool/runtime-helper binding smoke PASS when the Python runtime-binding rule applies;
 - **Contract Propagation Sweep** PASS when a test/validator/workflow contract changed;
 - **Ownership/Change-Impact Matrix** PASS when responsibility ownership moved;
 - hosted Windows PowerShell 5.1 contract-suite evidence GREEN on the exact final Work-Branch SHA;
@@ -605,16 +622,17 @@ LBS-40 implements the mandatory hosted/full-worktree path as `.github/workflows/
 Operational contract:
 
 1. stabilize the complete intended Work-Branch tree, including release metadata and all tracked deterministic generated artifacts required by the Candidate-entry contract;
-2. persist the last substantive product/tooling checkpoint;
-3. create exactly one **tree-identical qualification request commit** on the same `work/LBS-<issue>` branch with exactly one trailer line:
+2. before the first hosted request for that tree, execute and record the targeted Python runtime-binding smoke when changed Python validators/release tooling/workflow helpers make it applicable;
+3. persist the last substantive product/tooling checkpoint;
+4. create exactly one **tree-identical qualification request commit** on the same `work/LBS-<issue>` branch with exactly one trailer line:
    `Development-Completion: requested`;
-4. that request commit becomes the frozen Work-SHA for Development Completion;
-5. the Work-Branch push automatically triggers the workflow; ordinary Work-Branch pushes without the trailer are recognized but skip the expensive gate;
-6. Linux first checks tracked runtime, catch audit, and architecture baseline directly on the exact Work-SHA, then reuses `tools/candidate_preflight.py --mode development-completion` for reproducible preparation, protected/delete intent, contract propagation, and Release/Core/Boundary/Regression;
-7. hosted Windows PowerShell 5.1 runs in parallel through the reusable Windows workflow's `development-completion` mode on the same exact Work-SHA;
-8. the final job emits `DEVELOPMENT_COMPLETION_SUMMARY=<json>` and writes `development-completion/gate` on the exact Work-SHA;
-9. a successful status description records the exact tested Main SHA as `PASS main=<sha>`;
-10. Candidate Preflight later requires both that exact Work-SHA success status and the same current Main SHA before accepting the Work-Branch provenance.
+5. that request commit becomes the frozen Work-SHA for Development Completion;
+6. the Work-Branch push automatically triggers the workflow; ordinary Work-Branch pushes without the trailer are recognized but skip the expensive gate;
+7. Linux first checks tracked runtime, catch audit, and architecture baseline directly on the exact Work-SHA, then reuses `tools/candidate_preflight.py --mode development-completion` for reproducible preparation, protected/delete intent, contract propagation, and Release/Core/Boundary/Regression;
+8. hosted Windows PowerShell 5.1 runs in parallel through the reusable Windows workflow's `development-completion` mode on the same exact Work-SHA;
+9. the final job emits `DEVELOPMENT_COMPLETION_SUMMARY=<json>` and writes `development-completion/gate` on the exact Work-SHA;
+10. a successful status description records the exact tested Main SHA as `PASS main=<sha>`;
+11. Candidate Preflight later requires both that exact Work-SHA success status and the same current Main SHA before accepting the Work-Branch provenance.
 
 The tree-identical qualification request commit is an explicit gate-orchestration commit, not a product checkpoint and not heartbeat churn. It is permitted only for a final Development Completion attempt. If the Work-Branch tree changes after the request, the old status is irrelevant; persist the correction and create a new tree-identical request commit for the new exact SHA.
 
@@ -646,6 +664,7 @@ Minimum fields:
 - Release / Core / Boundary / Regression;
 - relevant focused/native tests;
 - parser/encoding checks when applicable;
+- changed Python runtime-binding smoke: `PASS|N/A`;
 - Contract Propagation Sweep: `PASS|N/A`;
 - Ownership/Change-Impact Matrix: `PASS|N/A`;
 - hosted Windows exact-SHA run;
