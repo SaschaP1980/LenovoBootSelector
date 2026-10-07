@@ -34,6 +34,9 @@ def psfn(s,n):
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); a=ap.parse_args(); root=a.root
     s=Suite(); tray=txt(root/'bin/LenovoBootMenuTray.ps1'); template=txt(root/'src/App/LenovoBootSelector.template.ps1')
+    refresh_controller=txt(root/'src/Application/RefreshController.ps1') if (root/'src/Application/RefreshController.ps1').is_file() else ''
+    refresh_worker=txt(root/'src/Infrastructure/BackgroundRefreshWorker.ps1') if (root/'src/Infrastructure/BackgroundRefreshWorker.ps1').is_file() else ''
+    refresh_ui=txt(root/'src/UI/RefreshPresentation.ps1') if (root/'src/UI/RefreshPresentation.ps1').is_file() else ''
     version=load_version(root)
     s.check('bin/version.json provides version',bool(version))
     expected=f"$script:AppVersion = '{version}'" if version else ''
@@ -103,9 +106,26 @@ def main():
     s.contains('Default UI shell uses explicit broker set',default,'Set-TaskBrokerDefaultTarget')
     s.contains('Default UI shell uses explicit broker clear',default,'Clear-TaskBrokerDefaultTarget')
     dstate=psfn(tray,'Refresh-SystemDefaultState'); s.contains('Default read uses explicit broker operation',dstate,'Get-TaskBrokerDefaultTargetGuid')
-    worker=psfn(tray,'Invoke-BackgroundRefreshWorker')
+    s.check('LBS-27 refresh controller module exists',(root/'src/Application/RefreshController.ps1').is_file())
+    s.check('LBS-27 refresh worker infrastructure module exists',(root/'src/Infrastructure/BackgroundRefreshWorker.ps1').is_file())
+    s.eq('LBS-27 refresh controller include marker exactly once',template.count('# @include src/Application/RefreshController.ps1'),1)
+    for fn_name in ['Get-BackgroundRefreshResult','Apply-BackgroundRefreshResult','Stop-BackgroundBootRefreshForMaintenance','Complete-BackgroundBootRefresh','Start-BackgroundBootRefresh']:
+        s.eq(f'LBS-27 {fn_name} removed from app template',len(re.findall(rf'(?m)^function\s+{re.escape(fn_name)}\b',template)),0)
+        s.eq(f'LBS-27 {fn_name} owned once by Application controller',len(re.findall(rf'(?m)^function\s+{re.escape(fn_name)}\b',refresh_controller)),1)
+    s.eq('LBS-27 worker execution removed from app template',len(re.findall(r'(?m)^function\s+Invoke-BackgroundRefreshWorker\b',template)),0)
+    s.eq('LBS-27 worker execution owned once by Infrastructure',len(re.findall(r'(?m)^function\s+Invoke-BackgroundRefreshWorker\b',refresh_worker)),1)
+    s.absent('LBS-27 Application controller has no direct WinForms construction',refresh_controller,'System.Windows.Forms')
+    for forbidden in ['[System.IO.File]','Get-Disk','Get-Partition','Get-ScheduledTask','Invoke-AuthorizedTask']:
+        s.absent(f'LBS-27 Application controller excludes infrastructure token {forbidden}',refresh_controller,forbidden)
+    s.contains('LBS-27 UI owns completion timer construction',refresh_ui,'function New-BackgroundRefreshCompletionTimer')
+    s.contains('LBS-27 controller delegates completion timer construction',psfn(refresh_controller,'Start-BackgroundBootRefresh'),'New-BackgroundRefreshCompletionTimer')
+    s.absent('LBS-27 refresh controller does not depend on update workflow',refresh_controller,'UpdateCheck')
+    s.absent('LBS-27 refresh controller does not depend on update prepare workflow',refresh_controller,'UpdatePrepare')
+    worker=psfn(refresh_worker,'Invoke-BackgroundRefreshWorker')
     s.contains('Background worker uses explicit manager read',worker,'Get-TaskBrokerFirmwareManagerText -Force')
     s.contains('Background worker uses explicit firmware read',worker,'Get-TaskBrokerFirmwareEntriesText -Force')
+    s.contains('LBS-27 Background worker owns result-file write',worker,'[System.IO.File]::WriteAllText')
+    s.contains('LBS-27 Background worker owns storage access',worker,'Get-StorageContext')
     # No new generic privileged command/GUID API.
     for bad in ['Invoke-PrivilegedCommand','Invoke-PrivilegedTask','-CommandText','-Arguments $Arguments','param([string]$TaskName)']:
         s.absent(f'No generic privileged API token: {bad}',app+'\n'+template,bad)
