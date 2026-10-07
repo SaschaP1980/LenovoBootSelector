@@ -486,11 +486,13 @@ The two development-path labels are mutually exclusive:
 - `dev-path: fast` — the Issue will use the branchless atomic Patch/Hotfix path.
 - `dev-path: work-branch` — the Issue will use `work/LBS-<issue>` with product checkpoints and the Work-Path heartbeat/recovery standard.
 
-A backlog Issue may intentionally have **no** `dev-path:*` label while the implementation path is still undecided. For Issue-backed work, choose the path during the required pre-implementation effort/risk analysis and set exactly one development-path label before implementation starts:
+A backlog Issue may intentionally have **no** `dev-path:*` label while the implementation path is still undecided. For Issue-backed **executable/product release work**, choose the path during the required pre-implementation effort/risk analysis and set exactly one development-path label before implementation starts:
 
 - Major/Minor work uses `dev-path: work-branch`;
 - Patch/Hotfix defaults to `dev-path: fast`;
 - a Patch/Hotfix uses `dev-path: work-branch` only when the documented escalation criteria are met and the reason is recorded durably.
+
+A documentation-only/process-guidance Issue that changes no executable or package input is outside this development-path dimension and needs no `dev-path:*` label. In particular, documentation about Work-Path behavior does not itself justify `dev-path: work-branch`.
 
 Preserve the selected development-path label after completion as useful implementation provenance. Do not apply both development-path labels at once. An Issue-less Hotfix has no Issue label to maintain; its path/provenance remains in the release history.
 
@@ -502,7 +504,7 @@ GitHub Issue state reasons such as `completed`, `duplicate`, and `not_planned` a
 
 Do not invent new `priority:*` or `dev-path:*` values without updating this taxonomy and the corresponding process documentation in the same change.
 
-After a successful release that completes an Issue, close it as `completed`.
+After a successful product release that completes an Issue, close it as `completed`. For a documentation-only/process-guidance Issue that intentionally has no product release, close it as `completed` after the atomic documentation commit is verified on current `main`, and record that main SHA in the final Issue comment.
 
 ## Connector-specific operating notes
 
@@ -630,11 +632,44 @@ When a local clone is unavailable, it is possible to prepare a change safely wit
 
 This prevents exposing partially assembled repository state.
 
+## Pre-Candidate Development Completion for Work-Path releases
+
+LBS-38 defines a guideline-first Development Completion review for the final intended `work/LBS-<issue>` state. It does not add a new workflow.
+
+Before Candidate creation:
+
+1. pin the exact final Work-Branch SHA;
+2. run deterministic runtime build/check and all four permanent Python validators against that final state whenever a complete worktree is available;
+3. where independent validators can safely continue, run all of them before correcting findings so one pass exposes multiple actionable failures;
+4. run relevant focused/native tests and cheap parser/encoding checks for changed source types;
+5. when responsibilities or ownership moved, inspect the affected validators, regression contracts, native aggregate wiring, and workflow-facing references for stale assumptions;
+6. manually dispatch `.github/workflows/windows-powershell51.yml` on the `work/LBS-<issue>` ref before Candidate exposure;
+7. consume the resulting `WINDOWS_POWERSHELL51_SUMMARY=<json>`, retain the run ID/totals/timings, and verify the tested SHA;
+8. re-read the work-branch head after the hosted run; if it advanced, the Windows evidence is stale and must be rerun;
+9. record any unavailable pre-Candidate check and its exact tooling limitation instead of claiming PASS or replacing it with ad-hoc approximations;
+10. expose the Candidate only after all executable Development Completion checks are GREEN and known deterministic integration findings are resolved.
+
+The manually dispatched Windows run is **hosted Windows PowerShell 5.1 contract-suite evidence only**. It does not publish `preflight/windows-powershell51`, does not authorize a release, and is not physical Lenovo/UEFI E2E.
+
+Candidate Preflight remains authoritative and reruns the mandatory Linux and hosted Windows checks on the Candidate SHA.
+
+For the next Work-Branch pilot, retain enough evidence to compare Development Completion effort with first-Candidate success, Candidate correction loops, and Candidate-to-release timing. If an unavailable hosted Linux/full-worktree precheck is shown to be a material recurring gap, capture that as a separate automation Issue supported by the pilot evidence.
+
 ## Documentation-only changes
 
 A documentation-only change that does not alter product/runtime/release inputs does not require a product version bump or release package.
 
-Prefer an atomic docs commit on current `main` when creating a temporary branch would leave an undeletable stale ref through the connector.
+Classify this scope **before** choosing a development path. If the complete repository diff is Markdown/process documentation only and does not change product source, tests, workflows, validators, build/release tooling, machine-consumed release inputs, or package contents:
+
+- do not create `work/LBS-*`;
+- do not create a Candidate or Release;
+- do not modify `bin/version.json` or add a release `CHANGELOG.md` section;
+- do not apply a `dev-path:*` label to the Issue;
+- prefer one atomic docs commit directly on freshly re-read `main`;
+- inspect the unreferenced commit/diff before moving `main`;
+- close the Issue after the new main SHA is verified, with a final documentation-completion comment.
+
+The document's subject does not change this classification. A tiny edit to Work-Branch, Candidate, or Release guidance is still documentation-only if it changes no executable contract.
 
 Do not describe such a documentation update as a product release.
 

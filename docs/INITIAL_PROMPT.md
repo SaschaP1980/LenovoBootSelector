@@ -42,7 +42,10 @@ Before planning or implementing a product change:
    - `tests/validate_regression.py`
 5. If the user names an LBS Issue, Issue number, or concrete planned feature, read the **current GitHub Issue in full**, including state, labels, comments, and acceptance criteria.
 6. Before implementation, verify whether `main` advanced since the initial snapshot. If it did, refresh the basis.
-7. Only then determine scope, target version, release profile, and concrete file set.
+7. Only then classify the change scope **before** choosing a development path:
+   - documentation-only/process-guidance change;
+   - executable product/release/tooling change.
+8. Only for executable/product release work determine target version, release profile, development path, and concrete file set.
 
 If the user only asks you to read this file and has not yet provided a concrete task, perform the complete bootstrap and then report briefly:
 - current `main` SHA;
@@ -78,6 +81,16 @@ Do not ask separately whether the project should be built or published after the
 
 A pure analysis/planning request without build authorization is excluded from this rule.
 
+A **documentation-only/process-guidance implementation** is also excluded from the automatic product build/release interpretation. If the complete repository change is limited to Markdown/process documentation and GitHub Issue metadata, and it does not change product source, tests, workflows, validators, build/release tooling, machine-consumed release inputs, or package contents, then:
+
+- do not assign a product version;
+- do not create a Candidate or Release;
+- do not create a `work/LBS-*` branch merely because the documentation describes Work-Path behavior;
+- do not assign a `dev-path:*` label, because no product implementation path is being selected;
+- use one atomic documentation commit directly on freshly verified `main` after inspecting the exact diff.
+
+The **subject matter** of a document does not determine the development path. A small documentation change about Work-Branch policy is still documentation-only work.
+
 ### Engineering design baseline
 
 Use `docs/DEVELOPMENT_GUIDELINES.md` as the canonical design guidance. Favor Clean Code and SOLID with clear responsibility boundaries, cohesive modules, explicit dependencies, and testable behavior. Apply DRY pragmatically: deduplicate the same rule/knowledge/responsibility, not merely similar-looking code. When responsibilities, reasons to change, lifecycles, safety constraints, or failure semantics differ, keep the implementations separate even if limited duplication remains. Prefer small explicit duplication over a false abstraction that couples unrelated concerns.
@@ -88,9 +101,9 @@ Version format:
 
 `MAJOR.MINOR.PATCH.HOTFIX`
 
-Before implementation:
+Before implementation, first apply the documentation-only scope rule above. Only executable/product release work proceeds to version-level and development-path selection.
 
-For **MAJOR and MINOR** work, follow the persistent work-branch/checkpoint model in `docs/DEVELOPMENT_GUIDELINES.md`.
+For **MAJOR and MINOR** product work, follow the persistent work-branch/checkpoint model in `docs/DEVELOPMENT_GUIDELINES.md`.
 
 For **PATCH and HOTFIX**, default to the shortest safe branchless atomic path. Before implementation, perform a brief effort/risk analysis. Escalate to the work-branch/checkpoint model only when that analysis shows the work is likely to be substantial, cross-cutting, migration-heavy, interruption-prone, or otherwise likely to require several recoverable checkpoints. Record the exception reason durably and carry it into the Candidate as `Work-Branch-Reason:`.
 
@@ -105,7 +118,7 @@ When a `work/LBS-*` Work-Path is selected, use the established continuation mode
 
 If a released defect is a direct regression or incomplete implementation of an existing Issue, **reopen the original Issue**, document root cause and Hotfix plan, reassess priority, and close it as `completed` only after the corrective release succeeds.
 
-Open Issues should carry exactly one `priority:*` label. For Issue-backed implementation, select exactly one `dev-path:*` label during the pre-implementation path decision; backlog Issues may remain without a development-path label until that decision is made. The canonical label taxonomy is defined in `docs/GITHUB_HOWTO.md`.
+Open Issues should carry exactly one `priority:*` label. For Issue-backed **product/release implementation**, select exactly one `dev-path:*` label during the pre-implementation path decision; backlog Issues and documentation-only/process-guidance Issues do not require a development-path label. The canonical label taxonomy is defined in `docs/GITHUB_HOWTO.md`.
 
 ## 6. Release profiles
 
@@ -200,7 +213,7 @@ Before exposing a visible branch ref:
 
 Do not publish partially assembled intermediate states. The exact Candidate must already be release-ready: all intended implementation, regression coverage, focused RED→GREEN evidence, release metadata and applicable prechecks are complete before the Candidate ref is exposed.
 
-For a Work-Path Candidate, first remove `.chatgpt-work/LBS-<issue>.md`, verify the cleaned work-branch tree, re-read current `main`, and create the Candidate as a clean current-`main`-parent commit whose tree exactly equals that cleaned work tree. Temporary journal/checkpoint history must not become Candidate ancestry. After the Candidate is exposed, Candidate/Actions/Release state—not a recreated journal—is the canonical recovery surface.
+For a Work-Path Candidate, first complete the final **Development Completion review** defined in `docs/DEVELOPMENT_GUIDELINES.md`: exhaust the permanent checks that are executable before Candidate exposure, perform the ownership/parser integration sweep, and run the existing manually dispatchable hosted Windows PowerShell 5.1 workflow against the exact final Work-Branch revision. Record any tooling limitation explicitly; do not invent substitute evidence. Only after that review is green for every executable check should the temporary journal be removed and the Candidate be created as a clean current-`main`-parent commit whose tree exactly equals the cleaned work tree. Temporary journal/checkpoint history must not become Candidate ancestry. After the Candidate is exposed, Candidate/Actions/Release state—not a recreated journal—is the canonical recovery surface.
 
 For normal releases, **never create `release/v<version>` manually**. Only a successful Candidate Preflight may create it.
 
