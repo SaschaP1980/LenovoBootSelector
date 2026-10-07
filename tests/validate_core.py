@@ -208,7 +208,7 @@ def main():
     s.absent('No permanent displayorder mutation in tray',tray,"'/set', '{fwbootmgr}', 'displayorder'")
     s.absent('No custom SYSTEM EXE introduced',install,'LenovoBootMenuBroker.exe')
     s.contains('Cleanup exact allowlist retained',uninstall,'$exactTaskNames = @(')
-    s.contains('Cleanup owned prefixes retained',uninstall,'$ownedPrefixes = @(')
+    s.contains('Cleanup exact per-GUID ownership pattern retained',uninstall,"'^LenovoBootSelector-Set-[0-9a-fA-F]{32}$'")
     s.check('LBS-6 canonical security boundary document exists',(root/'docs/SECURITY_BOUNDARY.md').is_file())
     s.contains('v0.6.4.1 installer has explicit ACL mutation predicate',install,'function Test-TaskBrokerRightsContainMutation')
     s.contains('v0.6.4.1 installer tests concrete write data bit',install,'FileSystemRights]::WriteData')
