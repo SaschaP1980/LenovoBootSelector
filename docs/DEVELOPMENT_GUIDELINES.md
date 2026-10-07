@@ -190,6 +190,8 @@ Checkpoint frequency is a **resilience requirement**. Do not reduce the number o
 
 For a normal checkpoint, target no more than about **1–2 minutes of agent/connector orchestration overhead after the substantive implementation is complete**, excluding the actual runtime of tests and external GitHub-runner queue time.
 
+Focused validation that belongs to the just-completed implementation phase should normally run **before or as part of that checkpoint**, not be accumulated into a late pre-Development-Completion validation project. In particular, if the phase introduced a new focused self-test/smoke and it is runnable in the current environment, run it before calling that phase validated.
+
 A checkpoint must not become a separate mini-build project. In particular:
 
 - do not run the complete Release/Core/Boundary/Regression/native matrix before every checkpoint commit;
@@ -504,12 +506,46 @@ For PowerShell, YAML/workflows, Python, JSON, or other executable/machine-consum
 
 A checkpoint must never be justified only by “the replacement command succeeded”; the resulting diff is the evidence.
 
+### Focused validation planning
+
+Focused validation is part of implementation design, not a final release-preparation task.
+
+As soon as the intended executable/tooling scope is known, identify for every changed behavior/control path:
+
+- the canonical implementation owner;
+- the focused validation owner that can execute the changed path;
+- whether that validation path already exists and is non-destructive;
+- whether a new focused smoke/self-test is required;
+- when that smoke will be executed relative to the checkpoint that introduces it.
+
+For changed Python validators, release/build tools, workflow helpers, or similar executable tooling expected to run during Development Completion, Candidate Preflight, or Release:
+
+1. define the focused runtime path **before or together with the implementation change**;
+2. prefer, in order:
+   - the real non-destructive CLI against the current worktree;
+   - an existing focused consumer/test that executes the changed callable/control path;
+   - only then a narrow new `--self-test` / smoke harness;
+3. if a new smoke/harness is required, implement it in the **same coherent implementation phase/checkpoint** as the executable change it validates whenever practical;
+4. execute a newly created or materially changed smoke **immediately after implementing it and before treating that phase as validated** when the current environment can run it;
+5. do not defer designing the smoke until release metadata, final reconciliation, or Development Completion preparation;
+6. if the smoke cannot yet run, the checkpoint may still be persisted for resilience only when it records `runtime smoke pending/BLOCKED`; it must not be described as validation-complete or release-ready.
+
+A newly added smoke/self-test is itself executable code. Apply the same transformation/diff-anomaly discipline to it:
+
+- inspect the helper body and call path after extraction/refactoring;
+- reject empty, self-recursive, disconnected, duplicated, or assertion-free helper bodies unless that structure is explicitly intended and tested;
+- run the new smoke itself before relying on it as evidence;
+- never infer correctness merely because the smoke option/function exists in source.
+
+This rule minimizes late validation-harness construction and prevents the validation mechanism itself from becoming the last-minute source of Development Completion failures.
+
 ### Python runtime-binding smoke rule
 
 A Python parser/syntax check proves only that the file can be parsed. It does **not** prove that names are bound in the correct order, that a changed function/CLI path can execute, or that runtime imports/locals used by the changed path exist.
 
 When a change modifies a Python validator, release/build tool, workflow helper, or other Python path that is expected to execute during Development Completion, Candidate Preflight, or Release:
 
+- use the focused runtime path selected during Focused Validation Planning; do not invent it only at final release preparation unless new evidence makes the earlier plan invalid;
 - before the **first hosted Development Completion request** for that Work tree, execute at least one focused runtime path that reaches the changed code;
 - prefer the script's real non-destructive CLI against the current worktree when available;
 - otherwise use an existing focused consumer/test, or add/use a narrow `--self-test` / smoke entrypoint that exercises the changed binding/control path without publication side effects;

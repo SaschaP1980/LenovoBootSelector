@@ -73,6 +73,8 @@ Before implementing the fix:
 
 Then implement the smallest fix, rerun the same regression test and require GREEN. Complete applicable broader prechecks before Candidate creation.
 
+For executable tooling changes, define the focused validation path **with the implementation plan**. When Python validators/release tools/workflow helpers change, prefer a real non-destructive CLI or existing focused consumer; add a self-test only when necessary, keep it with the implementation it validates, and execute it immediately when runnable. Do not defer creation of required smoke infrastructure to final Development Completion preparation.
+
 For a normal branchless Patch/Hotfix, RED evidence does **not** require a durable RED commit. Run the focused regression against the unfixed canonical basis, record the failure durably, then prepare the complete fix as one atomic candidate state. Avoid a chain of intermediate commits unless the work has been deliberately escalated to the work-branch model.
 
 Do not run the entire repository/native test matrix before every intermediate commit. Before Candidate exposure, require:
