@@ -1756,7 +1756,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.9.0.0'
+$script:AppVersion = '0.10.0.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -1784,9 +1784,11 @@ $script:RuntimeDiagnosticsErrorCount = 0
 $script:LastRuntimeDiagnosticPackage = $null
 $script:RuntimeDiagnosticMenuItem = $null
 
-$script:SupportedTaskBrokerVersions = @('0.2.13')
-$script:TaskBrokerStateDir = Join-Path $env:ProgramData 'Lenovo Boot Menu\TaskBroker'
+$script:SupportedTaskBrokerVersions = @('0.2.14')
+$script:TaskBrokerStateDir = Join-Path $env:ProgramData 'Lenovo Boot Selector\TaskBroker'
 $script:TaskBrokerMetadataPath = Join-Path $script:TaskBrokerStateDir 'task-broker.json'
+$script:LegacyTaskBrokerStateDir = Join-Path $env:ProgramData 'Lenovo Boot Menu\TaskBroker'
+$script:LegacyTaskBrokerMetadataPath = Join-Path $script:LegacyTaskBrokerStateDir 'task-broker.json'
 $script:TaskBrokerInstallScript = Join-Path $PSScriptRoot 'Install-LenovoBootMenuTasks.ps1'
 $script:TaskBrokerUninstallScript = Join-Path $PSScriptRoot 'Uninstall-LenovoBootMenuTasks.ps1'
 $script:TaskBrokerLocalDir = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray\TaskBroker'
@@ -4876,19 +4878,19 @@ function Get-TaskBrokerExpectedTargetTaskName {
     $normalized = Normalize-TaskBrokerGuid -Guid $Guid
     if (-not $normalized) { return $null }
     $compact = $normalized.Trim('{}').Replace('-','')
-    if ($DefaultTarget) { return ('LenovoBootMenu-Default-Set-' + $compact) }
-    return ('LenovoBootMenu-Set-' + $compact)
+    if ($DefaultTarget) { return ('LenovoBootSelector-Default-Set-' + $compact) }
+    return ('LenovoBootSelector-Set-' + $compact)
 }
 
 function Test-TaskBrokerMetadataContract {
     param([Parameter(Mandatory=$true)]$Metadata)
     try {
         if ($script:SupportedTaskBrokerVersions -notcontains [string]$Metadata.version) { return $false }
-        if ([string]$Metadata.boundaryContract -ne 'fixed-task-v1') { return $false }
-        if ([string]$Metadata.managerRefreshTask -ne 'LenovoBootMenu-RefreshManager') { return $false }
-        if ([string]$Metadata.firmwareRefreshTask -ne 'LenovoBootMenu-RefreshFirmware') { return $false }
-        if ([string]$Metadata.defaultClearTask -ne 'LenovoBootMenu-Default-Clear') { return $false }
-        if ([string]$Metadata.defaultRestoreTask -ne 'LenovoBootMenu-Default-Restore') { return $false }
+        if ([string]$Metadata.boundaryContract -ne 'fixed-task-v2') { return $false }
+        if ([string]$Metadata.managerRefreshTask -ne 'LenovoBootSelector-RefreshManager') { return $false }
+        if ([string]$Metadata.firmwareRefreshTask -ne 'LenovoBootSelector-RefreshFirmware') { return $false }
+        if ([string]$Metadata.defaultClearTask -ne 'LenovoBootSelector-Default-Clear') { return $false }
+        if ([string]$Metadata.defaultRestoreTask -ne 'LenovoBootSelector-Default-Restore') { return $false }
 
         $expectedManagerFile = Join-Path $script:TaskBrokerStateDir 'fwbootmgr.txt'
         $expectedFirmwareFile = Join-Path $script:TaskBrokerStateDir 'firmware.txt'
@@ -4962,9 +4964,9 @@ function Resolve-TaskBrokerAuthorizedTaskName {
     }
 
     switch ($Operation) {
-        'ManagerRefresh' { return 'LenovoBootMenu-RefreshManager' }
-        'FirmwareRefresh' { return 'LenovoBootMenu-RefreshFirmware' }
-        'DefaultClear' { return 'LenovoBootMenu-Default-Clear' }
+        'ManagerRefresh' { return 'LenovoBootSelector-RefreshManager' }
+        'FirmwareRefresh' { return 'LenovoBootSelector-RefreshFirmware' }
+        'DefaultClear' { return 'LenovoBootSelector-Default-Clear' }
         'BootNext' {
             $normalized = Normalize-TaskBrokerGuid -Guid $Guid
             if (-not $normalized) { throw 'Ungültiges BootNext-Ziel.' }
@@ -5154,10 +5156,10 @@ function Test-TaskBrokerReady {
         if ([string]$meta.userSid -ne $sid) { throw 'TaskBroker ist nicht für den aktuellen Benutzer autorisiert.' }
 
         $required = @(
-            'LenovoBootMenu-RefreshManager',
-            'LenovoBootMenu-RefreshFirmware',
-            'LenovoBootMenu-Default-Clear',
-            'LenovoBootMenu-Default-Restore'
+            'LenovoBootSelector-RefreshManager',
+            'LenovoBootSelector-RefreshFirmware',
+            'LenovoBootSelector-Default-Clear',
+            'LenovoBootSelector-Default-Restore'
         )
         foreach ($target in @($meta.targets)) {
             $normalized = Normalize-TaskBrokerGuid -Guid ([string]$target.guid)
@@ -5188,6 +5190,7 @@ function Test-TaskBrokerReady {
 }
 function Test-TaskBrokerInstallationPresent {
     if (Test-Path -LiteralPath $script:TaskBrokerMetadataPath) { return $true }
+    if ($script:LegacyTaskBrokerMetadataPath -and (Test-Path -LiteralPath $script:LegacyTaskBrokerMetadataPath)) { return $true }
     return $false
 }
 

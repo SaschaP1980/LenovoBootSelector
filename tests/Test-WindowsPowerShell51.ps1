@@ -32,5 +32,6 @@ Write-Host "PARSER TOTAL $pass/$($files.Count)"
 & (Join-Path $root 'tests\Test-MaintenanceRuntime.ps1')
 & (Join-Path $root 'tests\Test-BootTargetDrift.ps1')
 & (Join-Path $root 'tests\Test-TaskBrokerBoundary.ps1')
+& (Join-Path $root 'tests\Test-TaskBrokerMigration.ps1')
 & (Join-Path $root 'tests\Test-IdentifierCompatibility.ps1')
 & (Join-Path $root 'tests\Test-UpdateCore.ps1')

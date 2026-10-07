@@ -1,11 +1,9 @@
 {
   "schemaVersion": 2,
-  "version": "0.9.0.0",
+  "version": "0.10.0.0",
   "releaseProfile": "patch",
   "protectedFragmentIntent": [
-    "ps:New-PopupForm"
+    "ps:Test-TaskBrokerReady"
   ],
-  "repositoryDeleteIntent": [
-    "src/App/LenovoBootMenuTray.template.ps1"
-  ]
+  "repositoryDeleteIntent": []
 }

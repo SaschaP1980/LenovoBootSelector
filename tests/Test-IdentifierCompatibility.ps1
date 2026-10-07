@@ -102,10 +102,10 @@ Assert-True 'Popup internal name uses canonical identifier' ($popupText.Contains
 Assert-True 'Legacy popup internal name is removed' (-not $popupText.Contains("$form.Name = 'LenovoBootMenuPopup'"))
 Assert-True 'Legacy-compatible packaged runtime filename remains present' ([System.IO.File]::Exists((Join-Path $root 'bin\LenovoBootMenuTray.ps1')))
 Assert-True 'Legacy-compatible release ZIP pattern remains retained' ($releaseCommonText.Contains("return f'LenovoBootMenuTray-v{version}.zip'"))
-Assert-True 'Hardened TaskBroker fixed task identifier remains retained' ($taskBrokerText.Contains("return 'LenovoBootMenu-RefreshManager'"))
+Assert-True 'Canonical TaskBroker fixed task identifier uses LenovoBootSelector' ($taskBrokerText.Contains("return 'LenovoBootSelector-RefreshManager'"))
 Assert-True 'Cross-version singleton mutex identifier remains retained' ($templateText.Contains("'Local\LenovoBootMenuTray'"))
 Assert-True 'Persisted LocalAppData root remains retained compatibility identifier' ($templateText.Contains('Join-Path $env:LOCALAPPDATA ''Lenovo Boot Menu Tray'''))
-Assert-True 'Hardened ProgramData TaskBroker root remains retained compatibility identifier' ($templateText.Contains('Join-Path $env:ProgramData ''Lenovo Boot Menu\TaskBroker'''))
+Assert-True 'Canonical ProgramData TaskBroker root uses Lenovo Boot Selector' ($templateText.Contains('Join-Path $env:ProgramData ''Lenovo Boot Selector\TaskBroker'''))
 
 Write-Host "IDENTIFIER TOTAL $checks/29"
 if ($checks -ne 29) { throw "Unexpected identifier compatibility test count $checks" }
