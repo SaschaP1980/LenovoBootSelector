@@ -240,7 +240,7 @@ Keep a compact status header with at least:
 Branch: work/LBS-XX
 Base-Main: <sha>
 Last-Heartbeat-UTC: <timestamp>
-Agent-State: ACTIVE
+Agent-State: ACTIVE | WAITING_FOR_GITHUB | IDLE | STOPPED
 GitHub-Run: none | <workflow/run identifier>
 Last-Product-Checkpoint: <sha>
 Current-Phase: <short phase>
@@ -251,13 +251,27 @@ Exact formatting may evolve, but the semantics above must remain recoverable.
 
 #### Heartbeat cadence and stale interpretation
 
-While substantive interactive Work-Path development is actively producing findings or state changes, update the journal approximately every **1–3 minutes**. Also update it before a potentially long/high-risk tool sequence when the intended next action matters for recovery. Do not create meaningless commits merely to satisfy a timer when nothing changed.
+While the interactive agent is actively working on a Work-Path task, heartbeat cadence is **time-based, not event-based**.
+
+- With `Agent-State: ACTIVE`, the latest journal commit must not become more than approximately **3 minutes old**, even when no new technical conclusion has been reached.
+- A finding, decision, failed experiment, checkpoint, or other substantive journal update may serve as the heartbeat for that interval.
+- If no new finding exists when the interval expires, write a minimal truthful heartbeat such as `still investigating <phase>; no new conclusion yet`. A timer-only heartbeat is valid and intentional because liveness is itself durable information.
+- Also write a heartbeat immediately before a potentially long/high-risk tool sequence when the intended next action matters for recovery.
+- Use concise commit subjects that distinguish liveness from findings, for example `worklog(LBS-XX): heartbeat`, `worklog(LBS-XX): record <finding>`, or `worklog(LBS-XX): record <failure>`.
+
+The active-agent cadence may pause only in two cases:
+
+1. the interactive agent is genuinely no longer working, represented as `IDLE` or `STOPPED`; or
+2. execution is intentionally waiting on independent GitHub Actions work. Before pausing, set `Agent-State: WAITING_FOR_GITHUB` and persist the exact workflow/run identifier in `GitHub-Run`.
+
+When the referenced GitHub run completes or fails and interactive work resumes, set `Agent-State: ACTIVE` again and immediately resume the maximum-three-minute heartbeat cadence.
 
 Operationally:
 
-- a recent heartbeat means only that the interactive agent was active at that recorded point;
+- a recent `ACTIVE` heartbeat means only that the interactive agent was active at that recorded point;
+- an `ACTIVE` heartbeat older than roughly **3 minutes** is a missed heartbeat and should be treated as suspicious;
 - when the latest heartbeat is older than roughly **5 minutes** and no referenced GitHub Actions run is currently `queued` or `in_progress`, treat the interactive agent/stream as stopped and resume from durable GitHub state;
-- when a referenced GitHub Actions run is still `queued` or `in_progress`, that GitHub work continues independently even if the chat stream stopped;
+- when `Agent-State: WAITING_FOR_GITHUB` references a workflow that is still `queued` or `in_progress`, GitHub continues independently even if the chat stream stopped;
 - never describe interactive-agent work as continuing in the background when no independent automation is actually running.
 
 On recovery from an interrupted Work-Path session, a fresh agent must read current `main`, the Issue, the `work/LBS-<issue>` head, the latest product checkpoint context and the journal when it exists before taking further action. Re-check any referenced GitHub run directly rather than trusting a stale journal status.
@@ -277,7 +291,7 @@ Before Candidate creation:
 
 The Work-Path journal commits therefore remain reachable only through the disposable work branch. They must not become ancestors of the Candidate, source tag, publication PR or `main`. Existing exact Candidate/work-branch tree equality remains the release safety contract, and the Release Orchestrator retains responsibility for deleting the work branch only after rechecking that equality.
 
-This mechanism is an experiment introduced by LBS-36. Evaluate it on the next suitable Work-Path development task. If it does not materially improve liveness visibility and recovery, revert this process rule cleanly rather than preserving ceremony without value.
+This mechanism is an experiment introduced by LBS-36. The first LBS-31 trial validated the recovery model but showed that an event-driven interpretation produced too few heartbeat commits; the time-based maximum-three-minute ACTIVE cadence above is the refined contract. Evaluate the refined cadence on the next suitable Work-Path development task. If it does not materially improve liveness visibility and recovery, revert this process rule cleanly rather than preserving ceremony without value.
 
 ## 5. Stream/session resilience
 
