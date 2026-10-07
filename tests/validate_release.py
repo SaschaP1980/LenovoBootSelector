@@ -344,6 +344,9 @@ def main():
         s.has('LBS-29 Windows workflow includes UI presentation in aggregate expected',ww,'$totals.uiPresentation.expected')
         s.has('LBS-17 Windows workflow includes localization in aggregate passed',ww,'$totals.localizationRuntime.passed')
         s.has('LBS-17 Windows workflow includes localization in aggregate expected',ww,'$totals.localizationRuntime.expected')
+        s.has('LBS-27 Windows workflow parses refresh controller total',ww,"refreshController = Get-TestTotal $logText '^REFRESH CONTROLLER TOTAL")
+        s.has('LBS-27 Windows workflow includes refresh controller in aggregate passed',ww,'$totals.refreshController.passed')
+        s.has('LBS-27 Windows workflow includes refresh controller in aggregate expected',ww,'$totals.refreshController.expected')
         s.has('LBS-31 Windows workflow parses storage infrastructure total',ww,"storageInfrastructure = Get-TestTotal $logText '^STORAGE INFRA TOTAL")
         s.has('LBS-31 Windows workflow includes storage infrastructure in aggregate passed',ww,'$totals.storageInfrastructure.passed')
         s.has('LBS-31 Windows workflow includes storage infrastructure in aggregate expected',ww,'$totals.storageInfrastructure.expected')
@@ -503,6 +506,10 @@ def main():
     diagnostics=txt(root/'src/Infrastructure/RuntimeDiagnostics.ps1')
     diagnostics_init=fn(diagnostics,'Initialize-RuntimeDiagnostics')
     refresh_native=txt(root/'tests/Test-RefreshRuntime.ps1')
+    refresh_controller_native=txt(root/'tests/Test-RefreshController.ps1') if (root/'tests/Test-RefreshController.ps1').is_file() else ''
+    s.c('LBS-27 native refresh controller test exists',bool(refresh_controller_native))
+    s.has('LBS-27 refresh controller suite keeps fixed total 38',refresh_controller_native,'Write-Host "REFRESH CONTROLLER TOTAL $script:checks/38"')
+    s.has('LBS-27 native aggregate runner invokes refresh controller suite',windows_wrapper,"Test-RefreshController.ps1")
     inherited_capture='$script:InheritedRuntimeSessionId = [string]$RuntimeSessionId'
     active_reset='$script:RuntimeSessionId = $null'
     s.c('LBS-22 inherited runtime session is captured before active diagnostics reset',template.find(inherited_capture)>=0 and template.find(active_reset)>template.find(inherited_capture))

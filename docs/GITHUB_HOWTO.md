@@ -455,14 +455,52 @@ Before implementing an Issue:
 - update/implement only the remaining valid contract;
 - do not resurrect a `wontfix` item without explicit user direction.
 
-Every open Issue should carry exactly one priority label from the repository's canonical priority taxonomy:
+### Canonical Issue label taxonomy
+
+Use labels as independent dimensions. Do not encode priority, development path, and work type into one label.
+
+#### Primary type
+
+For a newly created actionable LBS Issue, normally choose exactly one primary type:
+
+- `bug` — existing/released behavior is incorrect, regressed, or fails its documented contract. A confirmed bug/regression is subject to the project's focused RED-before-fix rule.
+- `enhancement` — new capability, refactoring, architecture work, release/process hardening, documentation/process improvement, or other planned change that is not a defect in existing behavior.
+
+Historical closed Issues that predate this taxonomy do not need retroactive relabeling.
+
+#### Priority
+
+Every **open** Issue must carry exactly one current priority label:
 
 - `priority: critical` — active severe defect or security/safety boundary violation requiring immediate attention; release-blocking when applicable.
 - `priority: high` — high-impact correctness/security/architecture risk that should be addressed ahead of normal enhancements, but is not an active critical failure.
 - `priority: medium` — meaningful product/release/process improvement with clear value but no immediate safety or availability impact.
-- `priority: low` — parked, evidence-dependent, cosmetic, explicitly non-urgent or currently `wontfix` work.
+- `priority: low` — parked, evidence-dependent, cosmetic, explicitly non-urgent or deliberately deferred work.
 
-Priority is independent of type/status labels such as `enhancement` or `wontfix`; preserve those labels. Reassess priority whenever an Issue's evidence, scope, risk or implementation status materially changes.
+Priority is independent of type/status and development-path labels. Reassess it whenever evidence, scope, risk, or implementation status materially changes. Closed Issues may retain their final priority as historical provenance; old closed Issues are not required to be normalized.
+
+#### Development path
+
+The two development-path labels are mutually exclusive:
+
+- `dev-path: fast` — the Issue will use the branchless atomic Patch/Hotfix path.
+- `dev-path: work-branch` — the Issue will use `work/LBS-<issue>` with product checkpoints and the Work-Path heartbeat/recovery standard.
+
+A backlog Issue may intentionally have **no** `dev-path:*` label while the implementation path is still undecided. For Issue-backed work, choose the path during the required pre-implementation effort/risk analysis and set exactly one development-path label before implementation starts:
+
+- Major/Minor work uses `dev-path: work-branch`;
+- Patch/Hotfix defaults to `dev-path: fast`;
+- a Patch/Hotfix uses `dev-path: work-branch` only when the documented escalation criteria are met and the reason is recorded durably.
+
+Preserve the selected development-path label after completion as useful implementation provenance. Do not apply both development-path labels at once. An Issue-less Hotfix has no Issue label to maintain; its path/provenance remains in the release history.
+
+#### Status / special-case label
+
+- `wontfix` — the item is deliberately not planned for implementation. Do not resume it without explicit user direction. It may coexist with a primary type label and may remain on a closed Issue as historical status.
+
+GitHub Issue state reasons such as `completed`, `duplicate`, and `not_planned` are lifecycle state, not replacements for the label dimensions above while an Issue is open.
+
+Do not invent new `priority:*` or `dev-path:*` values without updating this taxonomy and the corresponding process documentation in the same change.
 
 After a successful release that completes an Issue, close it as `completed`.
 
@@ -546,7 +584,7 @@ Other consequences remain:
 
 ### Work-Path heartbeat journal
 
-LBS-36 adds an experimental lightweight continuation journal **only for development that already uses `work/LBS-*`**. The normal branchless Patch/Hotfix fast path is unaffected.
+LBS-36 established a lightweight continuation journal **only for development that already uses `work/LBS-*`**. The normal branchless Patch/Hotfix fast path is unaffected.
 
 The active work branch may temporarily track:
 
@@ -564,9 +602,11 @@ Treat an `ACTIVE` heartbeat older than roughly **3 minutes** as a missed heartbe
 
 Before Candidate creation, delete the journal from the work branch and ensure the final work tree contains only intended release content. Build the Candidate as one clean commit with current `main` as parent and the exact cleaned work-branch tree. This deliberately prevents temporary journal commits from becoming Candidate/`main` ancestry while preserving the existing Candidate/work-tree equality check and release-owned work-branch cleanup.
 
-A fresh session resuming a Work-Path task must read the journal when present, then verify branch/run state directly before acting. The journal is a continuation record, not private chain-of-thought.
+A fresh session resuming a Work-Path task **before Candidate exposure** must read the journal when present, then verify branch/run state directly before acting. The journal is a continuation record, not private chain-of-thought.
 
-This process is experimental. LBS-31 confirmed useful recovery behavior but also showed that event-driven updates were too sparse. The refined maximum-three-minute ACTIVE cadence must therefore be exercised on another suitable Work-Path development task; keep it only if that stricter heartbeat provides material recovery/liveness value without disproportionate overhead.
+After Candidate exposure, the recovery surface changes deliberately. The journal has already been removed; do not recreate it just to represent Candidate/Release supervision. Recover by reading the Candidate SHA/ref and its Actions run. If the Candidate ref is already absent, check whether promotion succeeded and continue through the release branch/run, PR, tag and current `main`. This exact case occurred during LBS-29: the interactive stream terminated after Candidate publication, GitHub completed Candidate Preflight and the Release Orchestrator independently, and a later session recovered the completed state without reconstructing unpublished work.
+
+The standard is retained after two real Work-Path trials. LBS-31 established that event-driven updates were too sparse; LBS-29 verified the refined maximum-three-minute `ACTIVE` cadence with 15 worklog commits over 21m48s, a maximum interval of 165 seconds, zero missed three-minute heartbeats, and 40.53 seconds of measured connector write latency across 14 journal updates. Journal-only commits did not trigger product builds, runtime regeneration, test matrices or checkpoint gates.
 
 ### Bounded connector orchestration
 
@@ -574,7 +614,7 @@ Do not compose dozens of GitHub reads/writes into one connector/code-mode call. 
 
 After any orchestration error, re-read the branch ref and `main` before retrying. Partial Git-object side effects may exist even when the visible branch did not move.
 
-For long-running Major/Minor work, the complete checkpoint/session-resilience rules are defined in `docs/DEVELOPMENT_GUIDELINES.md`.
+For any Work-Path development, the complete checkpoint/session-resilience rules are defined in `docs/DEVELOPMENT_GUIDELINES.md`.
 
 ### Atomic Git-object preparation
 

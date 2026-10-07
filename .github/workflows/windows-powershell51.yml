@@ -147,6 +147,7 @@ jobs:
               uiPresentation = Get-TestTotal $logText '^UI PRESENTATION TOTAL\s+(\d+)/(\d+)\s*$'
               localizationRuntime = Get-TestTotal $logText '^LOCALIZATION TOTAL\s+(\d+)/(\d+)\s*$'
               refreshRuntime = Get-TestTotal $logText '^REFRESH TOTAL\s+(\d+)/(\d+)\s*$'
+              refreshController = Get-TestTotal $logText '^REFRESH CONTROLLER TOTAL\s+(\d+)/(\d+)\s*$'
               mutex = Get-TestTotal $logText '^MUTEX TOTAL\s+(\d+)/(\d+)\s*$'
               architectureSoak = Get-TestTotal $logText '^SOAK TOTAL\s+(\d+)/(\d+)\s*$'
               maintenance = Get-TestTotal $logText '^MAINTENANCE TOTAL\s+(\d+)/(\d+)\s*$'
@@ -165,6 +166,7 @@ jobs:
               'uiPresentation',
               'localizationRuntime',
               'refreshRuntime',
+              'refreshController',
               'mutex',
               'architectureSoak',
               'maintenance',
@@ -189,6 +191,7 @@ jobs:
               $totals.uiPresentation.passed +
               $totals.localizationRuntime.passed +
               $totals.refreshRuntime.passed +
+              $totals.refreshController.passed +
               $totals.mutex.passed +
               $totals.architectureSoak.passed +
               $totals.maintenance.passed +
@@ -204,6 +207,7 @@ jobs:
               $totals.uiPresentation.expected +
               $totals.localizationRuntime.expected +
               $totals.refreshRuntime.expected +
+              $totals.refreshController.expected +
               $totals.mutex.expected +
               $totals.architectureSoak.expected +
               $totals.maintenance.expected +

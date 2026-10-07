@@ -67,3 +67,12 @@ function Update-RefreshButtonVisual {
     $script:RefreshButton.ForeColor = if ($active -or $script:RefreshButtonHovered) { $script:ColorAccent } else { $script:ColorSecondary }
     Update-HeaderRefreshStatus
 }
+
+function New-BackgroundRefreshCompletionTimer {
+    param([Parameter(Mandatory=$true)][scriptblock]$TickAction)
+
+    $timer = New-Object System.Windows.Forms.Timer
+    $timer.Interval = 100
+    $timer.Add_Tick($TickAction)
+    return $timer
+}
