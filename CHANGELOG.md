@@ -1,5 +1,18 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+
+## v0.10.0.2 – LBS-35 TaskBroker Repair performance hotfix
+
+- Reduce the physical `Repair privileged tasks` cost caused by repeated ScheduledTasks CIM roundtrips on the affected ThinkPad.
+- Load the exact canonical task definition set through one `Get-ScheduledTask` invocation, then preserve the existing per-task SYSTEM principal, Highest run level, action, arguments, authoritative COM/XML trigger, and Read+Execute-only DACL verification.
+- Batch-unregister the already allowlisted legacy TaskBroker task-name set and the fixed historical probe-task list instead of invoking `Unregister-ScheduledTask` once per task.
+- Cache the Task Scheduler root COM folder while keeping the existing `Schedule.Service` connection cache and exact task lookup semantics.
+- Add durable installer timing diagnostics for every major step, canonical definition batch read, canonical task verification aggregate/slowest task, legacy discovery, legacy batch unregister, and overall installer duration.
+- Expand the permanent TaskBroker Migration suite from 36 to 42 checks to lock the batched ScheduledTasks contract and timing diagnostics.
+- Preserve the LBS-34 authoritative XML trigger validation, exact legacy ownership filters, verify-before-cleanup ordering, TaskBroker schema `0.2.14 / fixed-task-v2`, BootNext/default semantics, and privilege boundary.
+- Physical ThinkPad duration acceptance remains required in LBS-35 after publication.
+- Release profile: `patch`. `protectedFragmentIntent` and `repositoryDeleteIntent` are empty.
+
 ## v0.10.0.1 – LBS-34 native TaskBroker trigger-verification hotfix
 
 - Fix the physical v0.10.0.0 Repair/Migrate failure at `verify-canonical-installation` where the ScheduledTasks CIM `.Triggers` projection falsely classified `LenovoBootSelector-RefreshManager` as triggered.

@@ -32,6 +32,9 @@ $cmd = Join-Path $env:SystemRoot 'System32\cmd.exe'
 $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 
 $script:ScheduleService = $null
+$script:ScheduleRootFolder = $null
+$script:InstallStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+$script:StepStopwatch = $null
 
 function Get-ScheduleService {
     if (-not $script:ScheduleService) {
@@ -39,6 +42,13 @@ function Get-ScheduleService {
         $script:ScheduleService.Connect()
     }
     return $script:ScheduleService
+}
+
+function Get-ScheduleRootFolder {
+    if (-not $script:ScheduleRootFolder) {
+        $script:ScheduleRootFolder = (Get-ScheduleService).GetFolder('\')
+    }
+    return $script:ScheduleRootFolder
 }
 
 function Test-IsAdministrator {
@@ -53,8 +63,17 @@ function Write-InstallLog([string]$Message) {
     Add-Content -LiteralPath $installLog -Value $line -Encoding UTF8
 }
 
+function Complete-CurrentStepTiming {
+    if (-not $script:StepStopwatch) { return }
+    $script:StepStopwatch.Stop()
+    Write-InstallLog ("END durationMs={0}" -f $script:StepStopwatch.ElapsedMilliseconds)
+    $script:StepStopwatch = $null
+}
+
 function Set-Step([string]$Name) {
+    Complete-CurrentStepTiming
     $script:CurrentStep = $Name
+    $script:StepStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     Write-InstallLog 'BEGIN'
 }
 
@@ -115,19 +134,26 @@ function Test-LegacyTaskBrokerOwnedTaskName {
 }
 
 function Get-LegacyTaskBrokerOwnedTaskNames {
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $scheduled = @(Get-ScheduledTask -ErrorAction SilentlyContinue)
     $names = New-Object System.Collections.Generic.List[string]
-    foreach ($task in @(Get-ScheduledTask -ErrorAction SilentlyContinue)) {
+    foreach ($task in $scheduled) {
         $name = [string]$task.TaskName
         if (Test-LegacyTaskBrokerOwnedTaskName -TaskName $name) { [void]$names.Add($name) }
     }
-    return @($names | Sort-Object -Unique)
+    $owned = @($names | Sort-Object -Unique)
+    $sw.Stop()
+    Write-InstallLog ("Legacy task discovery: scanned={0}; owned={1}; durationMs={2}" -f $scheduled.Count,$owned.Count,$sw.ElapsedMilliseconds)
+    return $owned
 }
 
 function Remove-LegacyTaskBrokerInstallation {
-    $removed = New-Object System.Collections.Generic.List[string]
-    foreach ($name in @(Get-LegacyTaskBrokerOwnedTaskNames)) {
-        Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction Stop
-        [void]$removed.Add($name)
+    $removed = @(Get-LegacyTaskBrokerOwnedTaskNames)
+    if ($removed.Count -gt 0) {
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        Unregister-ScheduledTask -TaskName $removed -Confirm:$false -ErrorAction Stop
+        $sw.Stop()
+        Write-InstallLog ("Legacy task batch unregister: tasks={0}; durationMs={1}" -f $removed.Count,$sw.ElapsedMilliseconds)
     }
 
     $canonicalFull = [System.IO.Path]::GetFullPath($canonicalStateDir)
@@ -378,14 +404,14 @@ function Protect-TaskBrokerMetadataFile {
 
 function Grant-TaskReadExecute([string]$TaskName, [string]$Sid) {
     $service = Get-ScheduleService
-    $task = $service.GetFolder('\').GetTask("\$TaskName")
+    $task = (Get-ScheduleRootFolder).GetTask("\$TaskName")
     $sddl = $task.GetSecurityDescriptor(0x7)
 
     if (-not (Test-SddlReadExecuteAce -Sddl $sddl -Sid $Sid)) {
         $newSddl = Get-TaskReadExecuteOnlySddl -Sddl $sddl -Sid $Sid
         $task.SetSecurityDescriptor($newSddl, 0)
 
-        $task = $service.GetFolder('\').GetTask("\$TaskName")
+        $task = (Get-ScheduleRootFolder).GetTask("\$TaskName")
         $verifySddl = $task.GetSecurityDescriptor(0x7)
         if (-not (Test-SddlReadExecuteAce -Sddl $verifySddl -Sid $Sid)) {
             Write-InstallLog ("ACL verification failed after least-privilege replacement: {0}; SDDL={1}" -f $TaskName,$verifySddl)
@@ -409,7 +435,7 @@ function Register-FixedSystemTask {
     $exists = $false
     try {
         $service = Get-ScheduleService
-        $existing = $service.GetFolder('\').GetTask("\$TaskName")
+        $existing = (Get-ScheduleRootFolder).GetTask("\$TaskName")
         if ($existing) { $exists = $true }
     } catch { $exists = $false }
 
@@ -469,10 +495,42 @@ function Test-CanonicalTaskTriggerXml {
 }
 
 
-function Assert-CanonicalTaskSpec {
-    param([Parameter(Mandatory=$true)]$Spec)
+function Get-CanonicalTaskDefinitionMap {
+    param([Parameter(Mandatory=$true)][object[]]$Specs)
 
-    $definition = Get-ScheduledTask -TaskName ([string]$Spec.Name) -ErrorAction Stop
+    $names = @($Specs | ForEach-Object { [string]$_.Name })
+    if ($names.Count -eq 0) { throw 'Canonical task verification requires at least one task.' }
+
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $definitions = @(Get-ScheduledTask -TaskName $names -ErrorAction Stop)
+    $sw.Stop()
+    Write-InstallLog ("Canonical task definition batch read: requested={0}; returned={1}; durationMs={2}" -f $names.Count,$definitions.Count,$sw.ElapsedMilliseconds)
+
+    if ($definitions.Count -ne $names.Count) {
+        throw ("Canonical task definition count mismatch: expected={0}; actual={1}" -f $names.Count,$definitions.Count)
+    }
+
+    $map = @{}
+    foreach ($definition in $definitions) {
+        $name = [string]$definition.TaskName
+        if (-not ($names -contains $name)) { throw "Unexpected canonical task definition returned: $name" }
+        if ($map.ContainsKey($name)) { throw "Duplicate canonical task definition returned: $name" }
+        $map[$name] = $definition
+    }
+    foreach ($name in $names) {
+        if (-not $map.ContainsKey($name)) { throw "Canonical task definition is missing: $name" }
+    }
+    return $map
+}
+
+function Assert-CanonicalTaskSpec {
+    param(
+        [Parameter(Mandatory=$true)]$Spec,
+        [Parameter(Mandatory=$true)]$Definition
+    )
+
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $definition = $Definition
     $principalUser = [string]$definition.Principal.UserId
     if ($principalUser -ne 'SYSTEM' -and $principalUser -ne 'S-1-5-18') {
         throw "Task principal is not SYSTEM: $($Spec.Name)"
@@ -490,7 +548,7 @@ function Assert-CanonicalTaskSpec {
         throw "Task arguments mismatch: $($Spec.Name)"
     }
 
-    $task = (Get-ScheduleService).GetFolder('\').GetTask("\$($Spec.Name)")
+    $task = (Get-ScheduleRootFolder).GetTask("\$($Spec.Name)")
     if (-not (Test-CanonicalTaskTriggerXml -TaskXml ([string]$task.Xml) -StartupDelay ([string]$Spec.StartupDelay))) {
         throw "Task trigger contract mismatch: $($Spec.Name)"
     }
@@ -499,6 +557,9 @@ function Assert-CanonicalTaskSpec {
     if (-not (Test-SddlReadExecuteAce -Sddl $sddl -Sid $UserSid)) {
         throw "Task DACL violates Read+Execute-only contract: $($Spec.Name)"
     }
+
+    $sw.Stop()
+    return [int64]$sw.ElapsedMilliseconds
 }
 
 function Assert-CanonicalTaskBrokerMetadata {
@@ -610,9 +671,10 @@ function Remove-ProbeTasks {
         'LenovoBootMenu-SystemBaseline',
         'LenovoBootMenuBroker-SystemProbe'
     )
-    foreach ($name in $names) {
-        Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue
-    }
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    Unregister-ScheduledTask -TaskName $names -Confirm:$false -ErrorAction SilentlyContinue
+    $sw.Stop()
+    Write-InstallLog ("Probe task batch cleanup: requested={0}; durationMs={1}" -f $names.Count,$sw.ElapsedMilliseconds)
 }
 
 function New-InstallDiagnosticZip($ErrorRecord) {
@@ -819,9 +881,22 @@ exit `$LASTEXITCODE
         throw 'Canonical metadata ACL verification failed.'
     }
     Assert-CanonicalTaskBrokerMetadata
-    foreach ($spec in @($taskSpecs)) { Assert-CanonicalTaskSpec -Spec $spec }
+    $definitionMap = Get-CanonicalTaskDefinitionMap -Specs @($taskSpecs)
+    $verifyTasksSw = [System.Diagnostics.Stopwatch]::StartNew()
+    $slowestTask = ''
+    $slowestTaskDurationMs = -1
+    foreach ($spec in @($taskSpecs)) {
+        $name = [string]$spec.Name
+        $durationMs = [int64](Assert-CanonicalTaskSpec -Spec $spec -Definition $definitionMap[$name])
+        if ($durationMs -gt $slowestTaskDurationMs) {
+            $slowestTaskDurationMs = $durationMs
+            $slowestTask = $name
+        }
+    }
+    $verifyTasksSw.Stop()
+    Write-InstallLog ("Canonical task verification timings: tasks={0}; durationMs={1}; slowestTask={2}; slowestTaskDurationMs={3}" -f $taskSpecs.Count,$verifyTasksSw.ElapsedMilliseconds,$slowestTask,$slowestTaskDurationMs)
 
-    $restoreCom = (Get-ScheduleService).GetFolder('\').GetTask("\$defaultRestoreTask")
+    $restoreCom = (Get-ScheduleRootFolder).GetTask("\$defaultRestoreTask")
     if (-not $restoreCom.Enabled) { throw 'Default-Restore-Aufgabe konnte nicht aktiviert werden.' }
     Write-InstallLog 'Canonical TaskBroker installation fully verified.'
 
@@ -835,10 +910,18 @@ exit `$LASTEXITCODE
     }
 
     Set-Step 'complete'
+    Complete-CurrentStepTiming
+    $script:InstallStopwatch.Stop()
+    Write-InstallLog ("INSTALL durationMs={0}" -f $script:InstallStopwatch.ElapsedMilliseconds)
     Write-InstallLog 'SUCCESS'
     exit 0
 }
 catch {
+    try {
+        Complete-CurrentStepTiming
+        if ($script:InstallStopwatch.IsRunning) { $script:InstallStopwatch.Stop() }
+        Write-InstallLog ("FAILED durationMs={0}" -f $script:InstallStopwatch.ElapsedMilliseconds)
+    } catch { }
     try {
         [void](New-Item -ItemType Directory -Path $UserStateDir -Force)
         $zip = New-InstallDiagnosticZip -ErrorRecord $_
