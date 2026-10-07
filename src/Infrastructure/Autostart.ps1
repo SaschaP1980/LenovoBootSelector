@@ -23,22 +23,42 @@ function Get-AutostartCommand {
     return ('"{0}" //B //NoLogo "{1}"' -f $wscript, $launcher)
 }
 
-function Get-AutostartInfo {
+function Get-AutostartRunValue {
+    param([Parameter(Mandatory=$true)][string]$Name)
+
     try {
         $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
-        $props = Get-ItemProperty -Path $runKey -Name $script:AutostartRunValueName -ErrorAction SilentlyContinue
-        $value = if ($props) { [string]$props.($script:AutostartRunValueName) } else { '' }
+        $props = Get-ItemProperty -Path $runKey -Name $Name -ErrorAction SilentlyContinue
+        if (-not $props) { return '' }
+        return [string]$props.($Name)
+    }
+    catch {
+        return ''
+    }
+}
+
+function Get-AutostartInfo {
+    try {
+        $canonicalValue = Get-AutostartRunValue -Name $script:AutostartRunValueName
+        $legacyValue = Get-AutostartRunValue -Name $script:LegacyAutostartRunValueName
+        $usesLegacyValue = (-not $canonicalValue -and [bool]$legacyValue)
+        $value = if ($canonicalValue) { $canonicalValue } else { $legacyValue }
         if (-not $value) {
-            return [pscustomobject]@{ Enabled = $false; CurrentPath = $false }
+            return [pscustomobject]@{ Enabled = $false; CurrentPath = $false; UsesHiddenLauncher = $false; UsesLegacyValue = $false }
         }
         $launcher = Get-AutostartLauncherPath
         $currentPath = (($launcher -and ($value.IndexOf($launcher, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)) -or
             ($script:ScriptPath -and ($value.IndexOf($script:ScriptPath, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)))
         $usesHiddenLauncher = ($launcher -and ($value.IndexOf($launcher, [System.StringComparison]::OrdinalIgnoreCase) -ge 0))
-        return [pscustomobject]@{ Enabled = $true; CurrentPath = $currentPath; UsesHiddenLauncher = $usesHiddenLauncher }
+        return [pscustomobject]@{
+            Enabled = $true
+            CurrentPath = $currentPath
+            UsesHiddenLauncher = $usesHiddenLauncher
+            UsesLegacyValue = $usesLegacyValue
+        }
     }
     catch {
-        return [pscustomobject]@{ Enabled = $false; CurrentPath = $false }
+        return [pscustomobject]@{ Enabled = $false; CurrentPath = $false; UsesHiddenLauncher = $false; UsesLegacyValue = $false }
     }
 }
 
@@ -52,10 +72,20 @@ function Set-AutostartEnabled([bool]$Enabled) {
         if (-not (Test-Path $runKey)) { [void](New-Item -Path $runKey -Force) }
         $command = Get-AutostartCommand
         if (-not $command) { throw 'Der versteckte Autostart-Launcher wurde nicht gefunden.' }
+
+        # LBS-19 migration is deliberately ordered: establish the canonical value
+        # first, then remove the exact legacy value. A failed canonical write leaves
+        # the working legacy registration untouched and retryable.
         Set-ItemProperty -Path $runKey -Name $script:AutostartRunValueName -Type String -Value $command
+        if ($script:LegacyAutostartRunValueName -and $script:LegacyAutostartRunValueName -ne $script:AutostartRunValueName) {
+            Remove-ItemProperty -Path $runKey -Name $script:LegacyAutostartRunValueName -ErrorAction SilentlyContinue
+        }
     }
     else {
         Remove-ItemProperty -Path $runKey -Name $script:AutostartRunValueName -ErrorAction SilentlyContinue
+        if ($script:LegacyAutostartRunValueName -and $script:LegacyAutostartRunValueName -ne $script:AutostartRunValueName) {
+            Remove-ItemProperty -Path $runKey -Name $script:LegacyAutostartRunValueName -ErrorAction SilentlyContinue
+        }
     }
 }
 

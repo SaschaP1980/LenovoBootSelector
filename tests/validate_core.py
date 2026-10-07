@@ -70,7 +70,7 @@ def main():
     args=ap.parse_args()
     root=args.root
     s=Suite()
-    tray_path=root/'bin/LenovoBootMenuTray.ps1'; template_path=root/'src/App/LenovoBootMenuTray.template.ps1'; builder=root/'tools/build_runtime.py'
+    tray_path=root/'bin/LenovoBootMenuTray.ps1'; template_path=root/'src/App/LenovoBootSelector.template.ps1'; builder=root/'tools/build_runtime.py'
     s.check('Generated runtime exists',tray_path.is_file())
     s.check('Runtime template exists',template_path.is_file())
     s.check('Deterministic runtime builder exists',builder.is_file())

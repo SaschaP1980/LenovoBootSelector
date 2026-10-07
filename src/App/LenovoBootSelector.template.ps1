@@ -689,16 +689,16 @@ if ($HideConsole) {
     Add-Type @"
 using System;
 using System.Runtime.InteropServices;
-public static class LenovoBootMenuConsoleWindow {
+public static class LenovoBootSelectorConsoleWindow {
     [DllImport("kernel32.dll")]
     public static extern IntPtr GetConsoleWindow();
     [DllImport("user32.dll")]
     public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 }
 "@
-    $consoleHandle = [LenovoBootMenuConsoleWindow]::GetConsoleWindow()
+    $consoleHandle = [LenovoBootSelectorConsoleWindow]::GetConsoleWindow()
     if ($consoleHandle -ne [IntPtr]::Zero) {
-        [LenovoBootMenuConsoleWindow]::ShowWindow($consoleHandle, 0) | Out-Null
+        [LenovoBootSelectorConsoleWindow]::ShowWindow($consoleHandle, 0) | Out-Null
     }
 }
 
@@ -821,7 +821,8 @@ $script:RefreshButtonHovered = $false
 $script:HeaderTitleLabel = $null
 $script:HeaderStatusLabel = $null
 $script:LegacyAutostartTaskName = 'Lenovo Boot Menu Tray Autostart'
-$script:AutostartRunValueName = 'Lenovo Boot Menu Tray'
+$script:AutostartRunValueName = 'Lenovo Boot Selector'
+$script:LegacyAutostartRunValueName = 'Lenovo Boot Menu Tray'
 $script:SettingsDir = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray'
 $script:SettingsPath = Join-Path $script:SettingsDir 'settings.json'
 $script:UiLocale = 'en-US'

@@ -131,7 +131,7 @@ The standalone post-exit update installer cannot call the active WinForms locali
 
 `src/Core/Localization.ps1` and localization consumers enter the generated single-file runtime only through the existing template include registry in:
 
-`src/App/LenovoBootMenuTray.template.ps1`
+`src/App/LenovoBootSelector.template.ps1`
 
 There is no runtime locale-file discovery, network translation, or uncontrolled resource lookup. `tools/build_runtime.py --check` remains the authoritative deterministic runtime-closure check.
 

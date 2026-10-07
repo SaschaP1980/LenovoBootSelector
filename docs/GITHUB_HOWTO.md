@@ -154,7 +154,7 @@ The exact source tag must contain neither ZIP files nor `__pycache__`/`.pyc` art
 
 Lenovo Boot Selector is modular in source but published as a deterministic single-file PowerShell runtime.
 
-From v0.6.5.0 onward, the ordered `# @include <path>` markers in `src/App/LenovoBootMenuTray.template.ps1` are the **only runtime-module registry**. `tools/build_runtime.py` discovers the include list directly from the template; there is no second static `INCLUDES` list to keep in sync.
+From v0.6.5.0 onward, the ordered `# @include <path>` markers in `src/App/LenovoBootSelector.template.ps1` are the **only runtime-module registry**. `tools/build_runtime.py` discovers the include list directly from the template; there is no second static `INCLUDES` list to keep in sync.
 
 For every new runtime module:
 
