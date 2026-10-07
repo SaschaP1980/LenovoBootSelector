@@ -3252,6 +3252,7 @@ function Start-LenovoUpdateInstallerHelper {
     $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
     return [System.Diagnostics.Process]::Start($psi)
 }
+
 # Update check/prepare application workflow.
 # UI owns presentation and user commands; Infrastructure owns transport/process/filesystem/install mechanics.
 
