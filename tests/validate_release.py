@@ -107,10 +107,10 @@ def main():
     s.has('Update native test keeps explicit runtime coverage output 79',update_test,'Write-Host "UPDATE TOTAL $checks/79"')
     s.c('LBS-26 native update controller test exists',bool(update_controller_test))
     s.has('LBS-26 update controller suite keeps fixed total 56',update_controller_test,'Write-Host "UPDATE CONTROLLER TOTAL $script:checks/56"')
-    s.has('LBS-26 native aggregate runner invokes update controller suite',windows_wrapper,'Test-UpdateController.ps1')
     s.has('Update native test keeps explicit runtime coverage guard 79',update_test,'if ($checks -ne 79) { throw "Unexpected update test count $checks" }')
     localization_native=txt(root/'tests/Test-LocalizationRuntime.ps1') if (root/'tests/Test-LocalizationRuntime.ps1').is_file() else ''
     windows_wrapper=txt(root/'tests/Test-WindowsPowerShell51.ps1')
+    s.has('LBS-26 native aggregate runner invokes update controller suite',windows_wrapper,'Test-UpdateController.ps1')
     s.c('LBS-17 native localization test exists',bool(localization_native))
     s.has('LBS-23 native localization test keeps fixed total 32',localization_native,'Write-Host "LOCALIZATION TOTAL $checks/32"')
     s.has('LBS-23 native localization test fails closed on count drift',localization_native,'if ($checks -ne 32) { throw "Expected 32 localization checks, got $checks" }')

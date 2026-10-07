@@ -201,8 +201,8 @@ jobs:
               $totals.taskBrokerBoundary.passed +
               $totals.taskBrokerMigration.passed +
               $totals.identifierCompatibility.passed +
-              $totals.updateCore.passed
-              $totals.updateController.passed +
+              $totals.updateCore.passed +
+              $totals.updateController.passed
           )
           $functionalExpected = (
               $totals.functionalCore.expected +
@@ -218,8 +218,8 @@ jobs:
               $totals.taskBrokerBoundary.expected +
               $totals.taskBrokerMigration.expected +
               $totals.identifierCompatibility.expected +
-              $totals.updateCore.expected
-              $totals.updateController.expected +
+              $totals.updateCore.expected +
+              $totals.updateController.expected
           )
 
           $completed = [DateTimeOffset]::UtcNow
