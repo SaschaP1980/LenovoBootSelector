@@ -11,7 +11,7 @@
 - Wire the SystemCapabilities suite into the hosted Windows PowerShell 5.1 aggregate and permanent Release/Regression ownership checks.
 - The LBS-38 Development Completion pilot found and corrected pre-Candidate integration defects on the Work-Branch, including a malformed Windows workflow transformation and stale UI/permanent-validator ownership assumptions; no Candidate had been exposed when these were corrected.
 - Architecture counting on the touched source shows better-scoped implicit coupling: UI `$script:` references 549→543 and app-template references 338→336, while six Application references are concentrated in the focused runtime fact adapter.
-- Release profile: `patch`. Protected fragment intent and repository-delete intent are both empty.
+- Release profile: `patch`. Protected fragment intent is exactly `ps:New-PopupForm` and `ps:Show-OrTogglePopup`; repository-delete intent is empty.
 
 
 ## v0.10.4.0 – LBS-26 update workflow controller extraction
