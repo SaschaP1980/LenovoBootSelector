@@ -132,8 +132,12 @@ def main():
     taskbroker_migration_path=root/'tests/Test-TaskBrokerMigration.ps1'
     s.c('LBS-33 native TaskBroker migration test exists',taskbroker_migration_path.is_file())
     taskbroker_migration=txt(taskbroker_migration_path) if taskbroker_migration_path.is_file() else ''
-    s.has('LBS-33 migration suite keeps fixed total 28',taskbroker_migration,'Write-Host "TASKBROKER MIGRATION TOTAL $checks/28"')
+    s.has('LBS-34 migration suite keeps fixed total 36',taskbroker_migration,'Write-Host "TASKBROKER MIGRATION TOTAL $checks/36"')
     s.has('LBS-33 native aggregate runner invokes migration suite',windows_wrapper,'Test-TaskBrokerMigration.ps1')
+    installer_trigger_source=txt(root/'bin/Install-LenovoBootMenuTasks.ps1')
+    s.has('LBS-34 installer has authoritative XML trigger verifier',installer_trigger_source,'function Test-CanonicalTaskTriggerXml')
+    s.has('LBS-34 canonical verification reads registered task XML',installer_trigger_source,'Test-CanonicalTaskTriggerXml -TaskXml ([string]$task.Xml)')
+    s.no('LBS-34 canonical verification does not trust CIM Triggers projection',installer_trigger_source,'$definition.Triggers')
 
 
     new_template_path=root/'src/App/LenovoBootSelector.template.ps1'

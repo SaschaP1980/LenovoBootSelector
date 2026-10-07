@@ -60,6 +60,27 @@ $legacyOwnershipFunction = @($ast.FindAll({ param($n) $n -is [System.Management.
 if ($legacyOwnershipFunction.Count -ne 1) { throw 'Expected exactly one installer function: Test-LegacyTaskBrokerOwnedTaskName' }
 Invoke-Expression $legacyOwnershipFunction[0].Extent.Text
 
+$triggerXmlFunction = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Test-CanonicalTaskTriggerXml' },$true))
+if ($triggerXmlFunction.Count -ne 1) { throw 'Expected exactly one installer function: Test-CanonicalTaskTriggerXml' }
+Invoke-Expression $triggerXmlFunction[0].Extent.Text
+
+Assert-True 'Installer trigger verification uses registered-task XML' ($installer.Contains('Test-CanonicalTaskTriggerXml -TaskXml ([string]$task.Xml)'))
+Assert-False 'Installer trigger verification no longer trusts CIM Triggers projection' ($installer.Contains('$definition.Triggers'))
+
+$taskNs = 'http://schemas.microsoft.com/windows/2004/02/mit/task'
+$noTriggerXml = "<Task xmlns='$taskNs'><Triggers /></Task>"
+$timeTriggerXml = "<Task xmlns='$taskNs'><Triggers><TimeTrigger><StartBoundary>2026-10-07T09:00:00</StartBoundary><Enabled>true</Enabled></TimeTrigger></Triggers></Task>"
+$boot30Xml = "<Task xmlns='$taskNs'><Triggers><BootTrigger><Enabled>true</Enabled><Delay>PT30S</Delay></BootTrigger></Triggers></Task>"
+$boot20Xml = "<Task xmlns='$taskNs'><Triggers><BootTrigger><Enabled>true</Enabled><Delay>PT20S</Delay></BootTrigger></Triggers></Task>"
+$twoBootXml = "<Task xmlns='$taskNs'><Triggers><BootTrigger><Delay>PT30S</Delay></BootTrigger><BootTrigger><Delay>PT30S</Delay></BootTrigger></Triggers></Task>"
+
+Assert-True 'Triggerless task XML is accepted for non-startup tasks' (Test-CanonicalTaskTriggerXml -TaskXml $noTriggerXml)
+Assert-False 'Triggered task XML is rejected for non-startup tasks' (Test-CanonicalTaskTriggerXml -TaskXml $timeTriggerXml)
+Assert-True 'Default Restore accepts one 30-second BootTrigger' (Test-CanonicalTaskTriggerXml -TaskXml $boot30Xml -StartupDelay 'PT30S')
+Assert-False 'Default Restore rejects wrong BootTrigger delay' (Test-CanonicalTaskTriggerXml -TaskXml $boot20Xml -StartupDelay 'PT30S')
+Assert-False 'Default Restore rejects wrong trigger type' (Test-CanonicalTaskTriggerXml -TaskXml $timeTriggerXml -StartupDelay 'PT30S')
+Assert-False 'Default Restore rejects multiple triggers' (Test-CanonicalTaskTriggerXml -TaskXml $twoBootXml -StartupDelay 'PT30S')
+
 $g1='{11111111-1111-1111-1111-111111111111}'
 $g2='{22222222-2222-2222-2222-222222222222}'
 $g3='{33333333-3333-3333-3333-333333333333}'
@@ -86,5 +107,5 @@ Assert-True 'Uninstaller still recognizes legacy manager task' ($uninstaller.Con
 Assert-True 'Uninstaller removes canonical ProgramData root' ($uninstaller.Contains('Join-Path $env:ProgramData ''Lenovo Boot Selector\TaskBroker'''))
 Assert-True 'Uninstaller also removes exact legacy ProgramData root' ($uninstaller.Contains('Join-Path $env:ProgramData ''Lenovo Boot Menu\TaskBroker'''))
 
-Write-Host "TASKBROKER MIGRATION TOTAL $checks/28"
-if ($checks -ne 28) { throw "Unexpected TaskBroker migration test count $checks" }
+Write-Host "TASKBROKER MIGRATION TOTAL $checks/36"
+if ($checks -ne 36) { throw "Unexpected TaskBroker migration test count $checks" }

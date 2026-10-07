@@ -432,6 +432,43 @@ function Register-FixedSystemTask {
 }
 
 
+function Test-CanonicalTaskTriggerXml {
+    param(
+        [Parameter(Mandatory=$true)][AllowEmptyString()][string]$TaskXml,
+        [AllowEmptyString()][string]$StartupDelay = ''
+    )
+
+    try {
+        [xml]$xml = $TaskXml
+        $triggerNodes = @($xml.SelectNodes("/*[local-name()='Task']/*[local-name()='Triggers']/*"))
+
+        if ([string]::IsNullOrWhiteSpace($StartupDelay)) {
+            return ($triggerNodes.Count -eq 0)
+        }
+
+        if ($triggerNodes.Count -ne 1) { return $false }
+        $trigger = $triggerNodes[0]
+        if ([string]$trigger.LocalName -ne 'BootTrigger') { return $false }
+
+        $delayNode = $trigger.SelectSingleNode("./*[local-name()='Delay']")
+        if (-not $delayNode) { return $false }
+
+        try {
+            $actualDelay = [System.Xml.XmlConvert]::ToTimeSpan([string]$delayNode.InnerText)
+            $expectedDelay = [System.Xml.XmlConvert]::ToTimeSpan($StartupDelay)
+        }
+        catch {
+            return $false
+        }
+
+        return ($actualDelay -eq $expectedDelay)
+    }
+    catch {
+        return $false
+    }
+}
+
+
 function Assert-CanonicalTaskSpec {
     param([Parameter(Mandatory=$true)]$Spec)
 
@@ -453,19 +490,11 @@ function Assert-CanonicalTaskSpec {
         throw "Task arguments mismatch: $($Spec.Name)"
     }
 
-    $triggers = @($definition.Triggers)
-    if ([string]$Spec.StartupDelay) {
-        if ($triggers.Count -ne 1) { throw "Startup task trigger count mismatch: $($Spec.Name)" }
-        $delayText = [string]$triggers[0].Delay
-        if ($delayText -ne [string]$Spec.StartupDelay -and $delayText -ne '00:00:30') {
-            throw "Startup task delay mismatch: $($Spec.Name)"
-        }
-    }
-    elseif ($triggers.Count -ne 0) {
-        throw "Non-startup task unexpectedly has a trigger: $($Spec.Name)"
+    $task = (Get-ScheduleService).GetFolder('\').GetTask("\$($Spec.Name)")
+    if (-not (Test-CanonicalTaskTriggerXml -TaskXml ([string]$task.Xml) -StartupDelay ([string]$Spec.StartupDelay))) {
+        throw "Task trigger contract mismatch: $($Spec.Name)"
     }
 
-    $task = (Get-ScheduleService).GetFolder('\').GetTask("\$($Spec.Name)")
     $sddl = $task.GetSecurityDescriptor(0x7)
     if (-not (Test-SddlReadExecuteAce -Sddl $sddl -Sid $UserSid)) {
         throw "Task DACL violates Read+Execute-only contract: $($Spec.Name)"
