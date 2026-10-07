@@ -1756,7 +1756,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.10.1.0'
+$script:AppVersion = '0.10.2.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -6451,90 +6451,10 @@ function Get-EntryByGuid([string]$Guid) {
     return $script:CurrentEntries | Where-Object { $_.Guid -eq $Guid.ToLowerInvariant() } | Select-Object -First 1
 }
 
-function New-Label {
-    param(
-        [string]$Text,
-        [Drawing.Font]$Font,
-        [Drawing.Color]$ForeColor,
-        [int]$X,
-        [int]$Y,
-        [int]$Width,
-        [int]$Height
-    )
-    $label = New-Object System.Windows.Forms.Label
-    $label.Text = $Text
-    $label.Font = $Font
-    $label.ForeColor = $ForeColor
-    $label.BackColor = [Drawing.Color]::Transparent
-    $label.Location = New-Object Drawing.Point($X, $Y)
-    $label.Size = New-Object Drawing.Size($Width, $Height)
-    $label.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
-    return $label
-}
+# Lenovo Boot Selector - boot-entry row presentation helpers.
+# LBS-29 separates row rendering and interaction responsibilities from list refresh orchestration.
 
-function Get-BootRowFromControl($Control) {
-    $current = $Control
-    while ($current) {
-        if (($current -is [System.Windows.Forms.Panel]) -and $current.Name -eq 'BootRow') { return $current }
-        $current = $current.Parent
-    }
-    return $null
-}
-
-function Set-RowHoverState($Control, [bool]$Hover) {
-    $row = Get-BootRowFromControl $Control
-    if (-not $row) { return }
-
-    $rowGuid = [string]$row.Tag
-    if ($script:IsManageEntriesMode) {
-        $hidden = Test-ManageEntryHidden -Guid $rowGuid
-        if ($hidden) {
-            $row.BackColor = if ($Hover) { [Drawing.Color]::FromArgb(37,37,37) } else { [Drawing.Color]::FromArgb(27,27,27) }
-        }
-        else {
-            $row.BackColor = if ($Hover) { $script:ColorHover } else { $script:ColorRow }
-        }
-        $row.Invalidate($true)
-        return
-    }
-
-    $isSelected = $script:SelectedGuid -and ($rowGuid -eq $script:SelectedGuid)
-    if ($isSelected) {
-        $row.BackColor = $script:ColorSelectedRow
-    }
-    elseif ($Hover) {
-        $row.BackColor = $script:ColorHover
-    }
-    else {
-        $row.BackColor = $script:ColorRow
-    }
-    $row.Invalidate($true)
-}
-
-function Update-PopupRows {
-    if (-not $script:Popup -or $script:Popup.IsDisposed) { return }
-
-    $listMatches = $script:Popup.Controls.Find('EntryList', $true)
-    $listPanel = if ($listMatches.Count -gt 0) { $listMatches[0] } else { $null }
-    $contentPanel = if ($listPanel) { $listPanel.Controls['EntryContent'] } else { $null }
-    $scrollBar = if ($listPanel) { $listPanel.Controls['EntryScroll'] } else { $null }
-    $statusMatches = $script:Popup.Controls.Find('StatusLabel', $true)
-    $statusLabel = if ($statusMatches.Count -gt 0) { $statusMatches[0] } else { $null }
-    if (-not $listPanel -or -not $contentPanel) { return }
-
-    $contentPanel.SuspendLayout()
-    $contentPanel.Controls.Clear()
-
-    $baseRowHeight = 60
-    $rowGap = 4
-    $y = 0
-    $displayEntries = if ($script:IsManageEntriesMode) {
-        @(Get-OrderedEntriesForUi -IncludeHidden -UseManageDraft)
-    }
-    else {
-        @(Get-OrderedEntriesForUi)
-    }
-
+function New-BootEntryInteractionHandlers {
     $clickHandler = {
         param($sender, $eventArgs)
         if (Test-MaintenanceBusy -or (Test-BootTargetDriftDetected)) { return }
@@ -6628,388 +6548,568 @@ function Update-PopupRows {
         Update-PopupRows
     }
 
+    return [pscustomobject]@{
+        Click = $clickHandler
+        Enter = $enterHandler
+        Leave = $leaveHandler
+        Wheel = $wheelHandler
+        MouseDown = $mouseDownHandler
+        MouseMove = $mouseMoveHandler
+        DragEnter = $dragEnterHandler
+        DragDrop = $dragDropHandler
+    }
+}
+
+function Add-BootEntryAliasEditor {
+    param(
+        [Parameter(Mandatory=$true)]$Row,
+        [Parameter(Mandatory=$true)]$Entry,
+        [AllowNull()][string]$Alias
+    )
+
+    # v0.2.30: keep the expanded alias editor, but render it as a
+    # flat edit line rather than a full focus rectangle. Only the
+    # bottom rule turns Lenovo-red while the TextBox has focus.
+    $editorFrame = New-Object System.Windows.Forms.Panel
+    $editorFrame.Name = 'AliasEditorFrame'
+    $editorFrame.Location = New-Object Drawing.Point(58, 32)
+    $editorFrame.Size = New-Object Drawing.Size(318, 27)
+    $editorFrame.BackColor = $script:ColorRow
+
+    $aliasEditor = New-Object System.Windows.Forms.TextBox
+    $aliasEditor.Name = 'AliasEditor'
+    $aliasEditor.Tag = $entry.Guid
+    $aliasEditor.Text = if ($alias) { [string]$alias } else { '' }
+    $aliasEditor.Font = New-Object Drawing.Font('Segoe UI', 9.2, [Drawing.FontStyle]::Regular)
+    $aliasEditor.ForeColor = $script:ColorPrimary
+    $aliasEditor.BackColor = [Drawing.Color]::FromArgb(24,24,24)
+    $aliasEditor.BorderStyle = [System.Windows.Forms.BorderStyle]::None
+    $aliasEditor.Location = New-Object Drawing.Point(0, 2)
+    $aliasEditor.Size = New-Object Drawing.Size(288, 21)
+
+    $aliasUnderline = New-Object System.Windows.Forms.Panel
+    $aliasUnderline.Name = 'AliasEditorUnderline'
+    $aliasUnderline.Location = New-Object Drawing.Point(0, 25)
+    $aliasUnderline.Size = New-Object Drawing.Size(318, 1)
+    $aliasUnderline.BackColor = [Drawing.Color]::FromArgb(72,72,72)
+    $editorFrame.Controls.Add($aliasUnderline)
+
+
+    $clearAlias = New-Object System.Windows.Forms.Button
+    $clearAlias.Name = 'AliasClearButton'
+    $clearAlias.Text = '×'
+    $clearAlias.Font = New-Object Drawing.Font('Segoe UI', 9.5, [Drawing.FontStyle]::Regular)
+    $clearAlias.ForeColor = [Drawing.Color]::FromArgb(145,145,145)
+    $clearAlias.BackColor = [Drawing.Color]::FromArgb(24,24,24)
+    $clearAlias.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $clearAlias.FlatAppearance.BorderSize = 0
+    $clearAlias.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(38,38,38)
+    $clearAlias.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(45,30,29)
+    $clearAlias.Location = New-Object Drawing.Point(292, 0)
+    $clearAlias.Size = New-Object Drawing.Size(26, 23)
+    $clearAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $clearAlias.Visible = -not [string]::IsNullOrEmpty([string]$aliasEditor.Text)
+    $clearAlias.Add_MouseEnter({ $this.ForeColor = $script:ColorAccent })
+    $clearAlias.Add_MouseLeave({ $this.ForeColor = [Drawing.Color]::FromArgb(145,145,145) })
+    $clearAlias.Add_Click({
+        $editor = $this.Parent.Controls.Find('AliasEditor', $false) | Select-Object -First 1
+        if ($editor) {
+            $editor.Text = ''
+            $editor.Focus()
+        }
+    })
+    $editorFrame.Controls.Add($clearAlias)
+
+    $aliasEditor.Add_Enter({
+        param($sender,$eventArgs)
+        try {
+            $line = $sender.Parent.Controls.Find('AliasEditorUnderline', $false) | Select-Object -First 1
+            if ($line) { $line.BackColor = $script:ColorAccent }
+        } catch { }
+    })
+    $aliasEditor.Add_Leave({
+        param($sender,$eventArgs)
+        try {
+            $line = $sender.Parent.Controls.Find('AliasEditorUnderline', $false) | Select-Object -First 1
+            if ($line) { $line.BackColor = [Drawing.Color]::FromArgb(72,72,72) }
+        } catch { }
+    })
+    $aliasEditor.Add_TextChanged({
+        param($sender,$eventArgs)
+        try {
+            $clear = $sender.Parent.Controls.Find('AliasClearButton', $false) | Select-Object -First 1
+            if ($clear) { $clear.Visible = -not [string]::IsNullOrEmpty([string]$sender.Text) }
+            Update-ManageSaveButtonState
+        } catch { }
+    })
+    $aliasEditor.Add_KeyDown({
+        param($sender,$eventArgs)
+        if ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
+            Set-ManageEntryAliasDraft -Guid ([string]$sender.Tag) -Alias ([string]$sender.Text)
+            $script:ManageAliasEditGuid = $null
+            $script:LastStatusText = if ([string]::IsNullOrWhiteSpace([string]$sender.Text)) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
+            $eventArgs.SuppressKeyPress = $true
+            Update-PopupRows
+        }
+        elseif ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Escape) {
+            $script:ManageAliasEditGuid = $null
+            $script:LastStatusText = Get-LocalizedString -Key 'Manage.AliasDiscarded'
+            $eventArgs.SuppressKeyPress = $true
+            Update-PopupRows
+        }
+    })
+    $editorFrame.Controls.Add($aliasEditor)
+    $row.Controls.Add($editorFrame)
+
+    $applyAlias = New-Object System.Windows.Forms.Button
+    $applyAlias.Name = 'AliasApplyButton'
+    $applyAlias.Text = Get-LocalizedString -Key 'Common.Apply'
+    $applyAlias.Tag = $entry.Guid
+    $applyAlias.Font = New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Bold)
+    $applyAlias.ForeColor = $script:ColorAccent
+    $applyAlias.BackColor = $script:ColorRow
+    $applyAlias.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $applyAlias.FlatAppearance.BorderSize = 0
+    $applyAlias.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(42,42,42)
+    $applyAlias.FlatAppearance.MouseDownBackColor = $script:ColorSelectedRow
+    $applyAlias.Location = New-Object Drawing.Point(58, 62)
+    $applyAlias.Size = New-Object Drawing.Size(104, 24)
+    $applyAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $applyAlias.Add_Click({
+        param($sender,$eventArgs)
+        $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
+        if ($editor) {
+            Set-ManageEntryAliasDraft -Guid ([string]$editor.Tag) -Alias ([string]$editor.Text)
+            $empty = [string]::IsNullOrWhiteSpace([string]$editor.Text)
+            $script:ManageAliasEditGuid = $null
+            $script:LastStatusText = if ($empty) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
+            Update-PopupRows
+        }
+    })
+    $row.Controls.Add($applyAlias)
+
+    $cancelAlias = New-Object System.Windows.Forms.Button
+    $cancelAlias.Name = 'AliasCancelButton'
+    $cancelAlias.Text = Get-LocalizedString -Key 'Common.Cancel'
+    $cancelAlias.Font = New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Regular)
+    $cancelAlias.ForeColor = $script:ColorSecondary
+    $cancelAlias.BackColor = $script:ColorRow
+    $cancelAlias.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $cancelAlias.FlatAppearance.BorderSize = 0
+    $cancelAlias.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(42,42,42)
+    $cancelAlias.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(34,34,34)
+    $cancelAlias.Location = New-Object Drawing.Point(166, 62)
+    $cancelAlias.Size = New-Object Drawing.Size(94, 24)
+    $cancelAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $cancelAlias.Add_Click({
+        $script:ManageAliasEditGuid = $null
+        $script:LastStatusText = Get-LocalizedString -Key 'Manage.AliasDiscarded'
+        Update-PopupRows
+    })
+    $row.Controls.Add($cancelAlias)
+
+    $originalHint = New-Label -Text (Get-LocalizedString -Key 'Manage.OriginalNameHint') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Regular)) `
+        -ForeColor ([Drawing.Color]::FromArgb(125,125,125)) -X 266 -Y 65 -Width 110 -Height 18
+    $originalHint.TextAlign = [Drawing.ContentAlignment]::MiddleRight
+    $row.Controls.Add($originalHint)
+}
+
+function Add-ManageBootEntryControls {
+    param(
+        [Parameter(Mandatory=$true)]$Row,
+        [Parameter(Mandatory=$true)]$Entry,
+        [Parameter(Mandatory=$true)][bool]$IsHidden,
+        [Parameter(Mandatory=$true)]$Marker,
+        [Parameter(Mandatory=$true)]$Icon,
+        [Parameter(Mandatory=$true)]$Title,
+        $Subtitle
+    )
+$state = New-Object System.Windows.Forms.Panel
+$state.Name = 'VisibilityGlyph'
+$state.Tag = $entry.Guid
+$state.AccessibleName = if ($isHidden) { 'hidden' } else { 'visible' }
+$state.AccessibleDescription = if ($isHidden) { Get-LocalizedString -Key 'Manage.HiddenAccessible' } else { Get-LocalizedString -Key 'Manage.VisibleAccessible' }
+$state.Location = New-Object Drawing.Point(286, 12)
+$state.Size = New-Object Drawing.Size(32, 34)
+$state.BackColor = [Drawing.Color]::Transparent
+$state.Cursor = [System.Windows.Forms.Cursors]::Hand
+$state.AllowDrop = $true
+$state.Add_Paint({
+    param($sender,$eventArgs)
+    $hidden = ([string]$sender.AccessibleName -eq 'hidden')
+    $color = if ($hidden) { [Drawing.Color]::FromArgb(115,115,115) } else { $script:ColorAccent }
+    $eventArgs.Graphics.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $pen = New-Object Drawing.Pen($color, 1.6)
+    $pupil = New-Object Drawing.SolidBrush($color)
+    try {
+        $eye = New-Object Drawing.Rectangle(7, 11, 18, 11)
+        $eventArgs.Graphics.DrawEllipse($pen, $eye)
+        $eventArgs.Graphics.FillEllipse($pupil, 14, 14, 4, 4)
+        if ($hidden) {
+            $slash = New-Object Drawing.Pen($color, 1.8)
+            try { $eventArgs.Graphics.DrawLine($slash, 6, 24, 26, 9) } finally { $slash.Dispose() }
+        }
+    }
+    finally {
+        $pen.Dispose()
+        $pupil.Dispose()
+    }
+})
+$state.Add_MouseEnter({
+    param($sender,$eventArgs)
+    try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleDescription) } catch { }
+})
+$state.Add_MouseLeave({
+    param($sender,$eventArgs)
+    try { Hide-DarkActionTooltip } catch { }
+})
+$row.Controls.Add($state)
+
+$editAlias = New-Label -Text '✎' -Font (New-Object Drawing.Font('Segoe UI Symbol', 12.0, [Drawing.FontStyle]::Regular)) `
+    -ForeColor ([Drawing.Color]::FromArgb(190,190,190)) -X 321 -Y 12 -Width 25 -Height 34
+$editAlias.Name = 'AliasEditButton'
+$editAlias.Tag = $entry.Guid
+$editAlias.AccessibleDescription = Get-LocalizedString -Key 'Manage.EditAliasAccessible'
+$editAlias.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+$editAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
+$editAlias.Add_MouseEnter({
+    param($sender,$eventArgs)
+    $sender.ForeColor = $script:ColorAccent
+    Set-RowHoverState $sender $true
+    try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleDescription) } catch { }
+})
+$editAlias.Add_MouseLeave({
+    param($sender,$eventArgs)
+    $sender.ForeColor = [Drawing.Color]::FromArgb(190,190,190)
+    Set-RowHoverState $sender $false
+    try { Hide-DarkActionTooltip } catch { }
+})
+$editAlias.Add_Click({
+    param($sender,$eventArgs)
+    try { Hide-DarkActionTooltip } catch { }
+    $guid = ([string]$sender.Tag).ToLowerInvariant()
+    if ($script:ManageAliasEditGuid -and $script:ManageAliasEditGuid -ne $guid) {
+        Commit-ActiveManageAliasEditor
+    }
+    $script:ManageAliasEditGuid = $guid
+    $script:LastStatusText = Get-LocalizedString -Key 'Manage.EditAliasStatus'
+    Update-PopupRows
+    $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
+    if ($editor) {
+        $editor.Focus()
+        $editor.SelectAll()
+    }
+})
+$row.Controls.Add($editAlias)
+
+$grip = New-Label -Text '≡' -Font (New-Object Drawing.Font('Segoe UI Symbol', 13, [Drawing.FontStyle]::Regular)) `
+    -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 350 -Y 12 -Width 26 -Height 34
+$grip.Tag = $entry.Guid
+$grip.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+$grip.Cursor = [System.Windows.Forms.Cursors]::SizeAll
+$grip.AllowDrop = $true
+$row.Controls.Add($grip)
+
+return @($row, $marker, $icon, $title, $subtitle, $state, $grip)
+}
+
+function Add-NormalBootEntryControls {
+    param(
+        [Parameter(Mandatory=$true)]$Row,
+        [Parameter(Mandatory=$true)]$Entry,
+        [Parameter(Mandatory=$true)][bool]$IsSelected,
+        [Parameter(Mandatory=$true)]$Marker,
+        [Parameter(Mandatory=$true)]$Icon,
+        [Parameter(Mandatory=$true)]$Title,
+        $Subtitle
+    )
+
+    $checkText = if ($isSelected) { '✓' } else { '' }
+    $check = New-Label -Text $checkText `
+        -Font (New-Object Drawing.Font('Segoe UI Symbol', 12, [Drawing.FontStyle]::Bold)) `
+        -ForeColor $script:ColorAccent -X 354 -Y 12 -Width 24 -Height 34
+    $check.Tag = $entry.Guid
+    $check.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+    $check.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $row.Controls.Add($check)
+    return @($row, $marker, $icon, $title, $subtitle, $check)
+}
+
+function Connect-BootEntryRowInteractions {
+    param(
+        [Parameter(Mandatory=$true)][object[]]$RowControls,
+        [Parameter(Mandatory=$true)]$Handlers
+    )
+
+    $clickHandler = $Handlers.Click
+    $enterHandler = $Handlers.Enter
+    $leaveHandler = $Handlers.Leave
+    $wheelHandler = $Handlers.Wheel
+    $mouseDownHandler = $Handlers.MouseDown
+    $mouseMoveHandler = $Handlers.MouseMove
+    $dragEnterHandler = $Handlers.DragEnter
+    $dragDropHandler = $Handlers.DragDrop
+
+foreach ($control in $RowControls) {
+    $control.Add_Click($clickHandler)
+    $control.Add_MouseEnter($enterHandler)
+    $control.Add_MouseLeave($leaveHandler)
+    $control.Add_MouseWheel($wheelHandler)
+    if ($script:IsManageEntriesMode) {
+        $control.Add_MouseDown($mouseDownHandler)
+        $control.Add_MouseMove($mouseMoveHandler)
+        $control.Add_DragEnter($dragEnterHandler)
+        $control.Add_DragDrop($dragDropHandler)
+    }
+}
+}
+
+function New-BootEntryRow {
+    param(
+        [Parameter(Mandatory=$true)]$Entry,
+        [Parameter(Mandatory=$true)][int]$Y,
+        [Parameter(Mandatory=$true)][int]$BaseRowHeight,
+        [Parameter(Mandatory=$true)]$Handlers
+    )
+
+$guidNormalized = ([string]$entry.Guid).ToLowerInvariant()
+$aliasEditActive = $script:IsManageEntriesMode -and $script:ManageAliasEditGuid -and ($guidNormalized -eq $script:ManageAliasEditGuid)
+$rowHeight = if ($aliasEditActive) { 92 } else { $baseRowHeight }
+
+$row = New-Object System.Windows.Forms.Panel
+$row.Name = 'BootRow'
+$row.Tag = $entry.Guid
+$row.Location = New-Object Drawing.Point(0, $y)
+$row.Size = New-Object Drawing.Size(390, $rowHeight)
+$row.BackColor = $script:ColorRow
+$row.Cursor = if ($aliasEditActive) { [System.Windows.Forms.Cursors]::Default } else { [System.Windows.Forms.Cursors]::Hand }
+$row.AllowDrop = ($script:IsManageEntriesMode -and -not $aliasEditActive)
+
+$isHidden = $script:IsManageEntriesMode -and (Test-ManageEntryHidden -Guid $entry.Guid)
+$isSelected = (-not $script:IsManageEntriesMode) -and $script:SelectedGuid -and ($entry.Guid -eq $script:SelectedGuid)
+if ($isSelected) { $row.BackColor = $script:ColorSelectedRow }
+elseif ($isHidden) { $row.BackColor = [Drawing.Color]::FromArgb(27,27,27) }
+
+$marker = New-Object System.Windows.Forms.Panel
+$marker.Location = New-Object Drawing.Point(0, 0)
+$marker.Size = New-Object Drawing.Size(3, $rowHeight)
+$marker.BackColor = $script:ColorRow
+if ($isSelected -or ($script:IsManageEntriesMode -and -not $isHidden)) { $marker.BackColor = $script:ColorAccent }
+elseif ($isHidden) { $marker.BackColor = [Drawing.Color]::FromArgb(70,70,70) }
+$marker.Tag = $entry.Guid
+$marker.AllowDrop = $script:IsManageEntriesMode
+$row.Controls.Add($marker)
+
+$iconColor = if ($isHidden) { [Drawing.Color]::FromArgb(105,105,105) } else { $entry.Accent }
+$titleColor = if ($isHidden) { [Drawing.Color]::FromArgb(145,145,145) } else { $script:ColorPrimary }
+$subtitleColor = if ($isHidden) { [Drawing.Color]::FromArgb(100,100,100) } else { $script:ColorSecondary }
+
+$icon = New-Label -Text $entry.Symbol -Font (New-Object Drawing.Font('Segoe UI Symbol', 18, [Drawing.FontStyle]::Regular)) `
+    -ForeColor $iconColor -X 22 -Y 7 -Width 28 -Height 44
+$icon.Tag = $entry.Guid
+$icon.Cursor = [System.Windows.Forms.Cursors]::Hand
+$icon.AllowDrop = $script:IsManageEntriesMode
+if ($script:BootTypeToolTip -and $entry.TypeTooltip) {
+    $icon.AccessibleDescription = [string]$entry.TypeTooltip
+    $script:BootTypeToolTip.SetToolTip($icon, [string]$entry.TypeTooltip)
+    # Native SetToolTip proved unreliable on the transparent symbol label
+    # on the target PC. MouseHover explicitly shows the same tooltip and
+    # MouseLeave closes it, while the semantic text remains on the circle only.
+    $icon.Add_MouseHover({
+        param($sender, $eventArgs)
+        try {
+            $text = [string]$sender.AccessibleDescription
+            if ($text) { $script:BootTypeToolTip.Show($text, $sender, 18, [Math]::Max(18, $sender.Height - 2), 8000) }
+        } catch { }
+    })
+    $icon.Add_MouseLeave({ param($sender, $eventArgs) try { $script:BootTypeToolTip.Hide($sender) } catch { } })
+}
+$row.Controls.Add($icon)
+
+$alias = if ($script:IsManageEntriesMode) {
+    Get-EntryAlias -Guid ([string]$entry.Guid) -UseManageDraft
+}
+else {
+    Get-EntryAlias -Guid ([string]$entry.Guid)
+}
+$displayTitle = if ($script:IsManageEntriesMode) {
+    Get-EntryDisplayTitle -Entry $entry -UseManageDraft
+}
+else {
+    Get-EntryDisplayTitle -Entry $entry
+}
+
+$titleWidth = if ($script:IsManageEntriesMode) { if ($aliasEditActive) { 318 } else { 220 } } else { 284 }
+$titleText = if ($aliasEditActive) { [string]$entry.Title } else { $displayTitle }
+$title = New-Label -Text $titleText -Font (New-Object Drawing.Font('Segoe UI', 10.0, [Drawing.FontStyle]::Bold)) `
+    -ForeColor $titleColor -X 58 -Y 6 -Width $titleWidth -Height 21
+$title.Tag = $entry.Guid
+$title.Cursor = if ($aliasEditActive) { [System.Windows.Forms.Cursors]::Default } else { [System.Windows.Forms.Cursors]::Hand }
+$title.AllowDrop = ($script:IsManageEntriesMode -and -not $aliasEditActive)
+$row.Controls.Add($title)
+
+$subtitle = $null
+if (-not $aliasEditActive) {
+    $subtitleWidth = if ($script:IsManageEntriesMode) { 220 } else { 284 }
+    $subtitleText = if ($script:IsManageEntriesMode -and $alias) {
+        Get-LocalizedString -Key 'Manage.OriginalName' -Values @{ Name=[string]$entry.Title }
+    }
+    elseif ($script:IsManageEntriesMode -and ([string]$entry.RawDescription -eq 'Boot Menu')) {
+        Get-LocalizedString -Key 'Boot.MenuManageSubtitle'
+    }
+    else {
+        [string]$entry.Subtitle
+    }
+    $subtitle = New-Label -Text $subtitleText -Font (New-Object Drawing.Font('Segoe UI', 8.3, [Drawing.FontStyle]::Regular)) `
+        -ForeColor $subtitleColor -X 58 -Y 27 -Width $subtitleWidth -Height 27
+    $subtitle.AutoEllipsis = $false
+    $subtitle.Tag = $entry.Guid
+    $subtitle.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $subtitle.AllowDrop = $script:IsManageEntriesMode
+    $row.Controls.Add($subtitle)
+}
+
+    if ($script:IsManageEntriesMode) {
+        if ($aliasEditActive) {
+            Add-BootEntryAliasEditor -Row $row -Entry $entry -Alias $alias
+            $rowControls = @()
+        }
+        else {
+            $rowControls = @(Add-ManageBootEntryControls -Row $row -Entry $entry -IsHidden ([bool]$isHidden) -Marker $marker -Icon $icon -Title $title -Subtitle $subtitle)
+        }
+    }
+    else {
+        $rowControls = @(Add-NormalBootEntryControls -Row $row -Entry $entry -IsSelected ([bool]$isSelected) -Marker $marker -Icon $icon -Title $title -Subtitle $subtitle)
+    }
+
+    if ($rowControls.Count -gt 0) {
+        Connect-BootEntryRowInteractions -RowControls $rowControls -Handlers $Handlers
+    }
+
+    return [pscustomobject]@{
+        Row = $row
+        Height = $rowHeight
+    }
+}
+
+function Update-BootEntryScrollLayout {
+    param(
+        [Parameter(Mandatory=$true)]$ListPanel,
+        [Parameter(Mandatory=$true)]$ContentPanel,
+        $ScrollBar,
+        [Parameter(Mandatory=$true)][int]$ContentBottom,
+        [Parameter(Mandatory=$true)][int]$BaseRowHeight,
+        [Parameter(Mandatory=$true)][int]$RowGap
+    )
+
+$viewportHeight = $ListPanel.ClientSize.Height
+$contentHeight = [Math]::Max($viewportHeight, $ContentBottom)
+$ContentPanel.Size = New-Object Drawing.Size(390, $contentHeight)
+if ($ScrollBar) {
+    $maxScroll = [Math]::Max(0, $contentHeight - $viewportHeight)
+    $ScrollBar.LargeChange = [Math]::Max(1, $viewportHeight)
+    $ScrollBar.SmallChange = $BaseRowHeight + $RowGap
+    $ScrollBar.Maximum = $maxScroll
+    $ScrollBar.Visible = ($maxScroll -gt 0)
+    if (-not $ScrollBar.Visible) { $ScrollBar.Value = 0 }
+    elseif ($ScrollBar.Value -gt $maxScroll) { $ScrollBar.Value = $maxScroll }
+    $ContentPanel.Top = -1 * $ScrollBar.Value
+}
+}
+
+function New-Label {
+    param(
+        [string]$Text,
+        [Drawing.Font]$Font,
+        [Drawing.Color]$ForeColor,
+        [int]$X,
+        [int]$Y,
+        [int]$Width,
+        [int]$Height
+    )
+    $label = New-Object System.Windows.Forms.Label
+    $label.Text = $Text
+    $label.Font = $Font
+    $label.ForeColor = $ForeColor
+    $label.BackColor = [Drawing.Color]::Transparent
+    $label.Location = New-Object Drawing.Point($X, $Y)
+    $label.Size = New-Object Drawing.Size($Width, $Height)
+    $label.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
+    return $label
+}
+
+function Get-BootRowFromControl($Control) {
+    $current = $Control
+    while ($current) {
+        if (($current -is [System.Windows.Forms.Panel]) -and $current.Name -eq 'BootRow') { return $current }
+        $current = $current.Parent
+    }
+    return $null
+}
+
+function Set-RowHoverState($Control, [bool]$Hover) {
+    $row = Get-BootRowFromControl $Control
+    if (-not $row) { return }
+
+    $rowGuid = [string]$row.Tag
+    if ($script:IsManageEntriesMode) {
+        $hidden = Test-ManageEntryHidden -Guid $rowGuid
+        if ($hidden) {
+            $row.BackColor = if ($Hover) { [Drawing.Color]::FromArgb(37,37,37) } else { [Drawing.Color]::FromArgb(27,27,27) }
+        }
+        else {
+            $row.BackColor = if ($Hover) { $script:ColorHover } else { $script:ColorRow }
+        }
+        $row.Invalidate($true)
+        return
+    }
+
+    $isSelected = $script:SelectedGuid -and ($rowGuid -eq $script:SelectedGuid)
+    if ($isSelected) {
+        $row.BackColor = $script:ColorSelectedRow
+    }
+    elseif ($Hover) {
+        $row.BackColor = $script:ColorHover
+    }
+    else {
+        $row.BackColor = $script:ColorRow
+    }
+    $row.Invalidate($true)
+}
+
+function Update-PopupRows {
+    if (-not $script:Popup -or $script:Popup.IsDisposed) { return }
+
+    $listMatches = $script:Popup.Controls.Find('EntryList', $true)
+    $listPanel = if ($listMatches.Count -gt 0) { $listMatches[0] } else { $null }
+    $contentPanel = if ($listPanel) { $listPanel.Controls['EntryContent'] } else { $null }
+    $scrollBar = if ($listPanel) { $listPanel.Controls['EntryScroll'] } else { $null }
+    $statusMatches = $script:Popup.Controls.Find('StatusLabel', $true)
+    $statusLabel = if ($statusMatches.Count -gt 0) { $statusMatches[0] } else { $null }
+    if (-not $listPanel -or -not $contentPanel) { return }
+
+    $contentPanel.SuspendLayout()
+    $contentPanel.Controls.Clear()
+
+    $baseRowHeight = 60
+    $rowGap = 4
+    $y = 0
+    $displayEntries = if ($script:IsManageEntriesMode) {
+        @(Get-OrderedEntriesForUi -IncludeHidden -UseManageDraft)
+    }
+    else {
+        @(Get-OrderedEntriesForUi)
+    }
+    $handlers = New-BootEntryInteractionHandlers
     $contentPanel.AllowDrop = $false
 
     foreach ($entry in $displayEntries) {
-        $guidNormalized = ([string]$entry.Guid).ToLowerInvariant()
-        $aliasEditActive = $script:IsManageEntriesMode -and $script:ManageAliasEditGuid -and ($guidNormalized -eq $script:ManageAliasEditGuid)
-        $rowHeight = if ($aliasEditActive) { 92 } else { $baseRowHeight }
-
-        $row = New-Object System.Windows.Forms.Panel
-        $row.Name = 'BootRow'
-        $row.Tag = $entry.Guid
-        $row.Location = New-Object Drawing.Point(0, $y)
-        $row.Size = New-Object Drawing.Size(390, $rowHeight)
-        $row.BackColor = $script:ColorRow
-        $row.Cursor = if ($aliasEditActive) { [System.Windows.Forms.Cursors]::Default } else { [System.Windows.Forms.Cursors]::Hand }
-        $row.AllowDrop = ($script:IsManageEntriesMode -and -not $aliasEditActive)
-
-        $isHidden = $script:IsManageEntriesMode -and (Test-ManageEntryHidden -Guid $entry.Guid)
-        $isSelected = (-not $script:IsManageEntriesMode) -and $script:SelectedGuid -and ($entry.Guid -eq $script:SelectedGuid)
-        if ($isSelected) { $row.BackColor = $script:ColorSelectedRow }
-        elseif ($isHidden) { $row.BackColor = [Drawing.Color]::FromArgb(27,27,27) }
-
-        $marker = New-Object System.Windows.Forms.Panel
-        $marker.Location = New-Object Drawing.Point(0, 0)
-        $marker.Size = New-Object Drawing.Size(3, $rowHeight)
-        $marker.BackColor = $script:ColorRow
-        if ($isSelected -or ($script:IsManageEntriesMode -and -not $isHidden)) { $marker.BackColor = $script:ColorAccent }
-        elseif ($isHidden) { $marker.BackColor = [Drawing.Color]::FromArgb(70,70,70) }
-        $marker.Tag = $entry.Guid
-        $marker.AllowDrop = $script:IsManageEntriesMode
-        $row.Controls.Add($marker)
-
-        $iconColor = if ($isHidden) { [Drawing.Color]::FromArgb(105,105,105) } else { $entry.Accent }
-        $titleColor = if ($isHidden) { [Drawing.Color]::FromArgb(145,145,145) } else { $script:ColorPrimary }
-        $subtitleColor = if ($isHidden) { [Drawing.Color]::FromArgb(100,100,100) } else { $script:ColorSecondary }
-
-        $icon = New-Label -Text $entry.Symbol -Font (New-Object Drawing.Font('Segoe UI Symbol', 18, [Drawing.FontStyle]::Regular)) `
-            -ForeColor $iconColor -X 22 -Y 7 -Width 28 -Height 44
-        $icon.Tag = $entry.Guid
-        $icon.Cursor = [System.Windows.Forms.Cursors]::Hand
-        $icon.AllowDrop = $script:IsManageEntriesMode
-        if ($script:BootTypeToolTip -and $entry.TypeTooltip) {
-            $icon.AccessibleDescription = [string]$entry.TypeTooltip
-            $script:BootTypeToolTip.SetToolTip($icon, [string]$entry.TypeTooltip)
-            # Native SetToolTip proved unreliable on the transparent symbol label
-            # on the target PC. MouseHover explicitly shows the same tooltip and
-            # MouseLeave closes it, while the semantic text remains on the circle only.
-            $icon.Add_MouseHover({
-                param($sender, $eventArgs)
-                try {
-                    $text = [string]$sender.AccessibleDescription
-                    if ($text) { $script:BootTypeToolTip.Show($text, $sender, 18, [Math]::Max(18, $sender.Height - 2), 8000) }
-                } catch { }
-            })
-            $icon.Add_MouseLeave({ param($sender, $eventArgs) try { $script:BootTypeToolTip.Hide($sender) } catch { } })
-        }
-        $row.Controls.Add($icon)
-
-        $alias = if ($script:IsManageEntriesMode) {
-            Get-EntryAlias -Guid ([string]$entry.Guid) -UseManageDraft
-        }
-        else {
-            Get-EntryAlias -Guid ([string]$entry.Guid)
-        }
-        $displayTitle = if ($script:IsManageEntriesMode) {
-            Get-EntryDisplayTitle -Entry $entry -UseManageDraft
-        }
-        else {
-            Get-EntryDisplayTitle -Entry $entry
-        }
-
-        $titleWidth = if ($script:IsManageEntriesMode) { if ($aliasEditActive) { 318 } else { 220 } } else { 284 }
-        $titleText = if ($aliasEditActive) { [string]$entry.Title } else { $displayTitle }
-        $title = New-Label -Text $titleText -Font (New-Object Drawing.Font('Segoe UI', 10.0, [Drawing.FontStyle]::Bold)) `
-            -ForeColor $titleColor -X 58 -Y 6 -Width $titleWidth -Height 21
-        $title.Tag = $entry.Guid
-        $title.Cursor = if ($aliasEditActive) { [System.Windows.Forms.Cursors]::Default } else { [System.Windows.Forms.Cursors]::Hand }
-        $title.AllowDrop = ($script:IsManageEntriesMode -and -not $aliasEditActive)
-        $row.Controls.Add($title)
-
-        $subtitle = $null
-        if (-not $aliasEditActive) {
-            $subtitleWidth = if ($script:IsManageEntriesMode) { 220 } else { 284 }
-            $subtitleText = if ($script:IsManageEntriesMode -and $alias) {
-                Get-LocalizedString -Key 'Manage.OriginalName' -Values @{ Name=[string]$entry.Title }
-            }
-            elseif ($script:IsManageEntriesMode -and ([string]$entry.RawDescription -eq 'Boot Menu')) {
-                Get-LocalizedString -Key 'Boot.MenuManageSubtitle'
-            }
-            else {
-                [string]$entry.Subtitle
-            }
-            $subtitle = New-Label -Text $subtitleText -Font (New-Object Drawing.Font('Segoe UI', 8.3, [Drawing.FontStyle]::Regular)) `
-                -ForeColor $subtitleColor -X 58 -Y 27 -Width $subtitleWidth -Height 27
-            $subtitle.AutoEllipsis = $false
-            $subtitle.Tag = $entry.Guid
-            $subtitle.Cursor = [System.Windows.Forms.Cursors]::Hand
-            $subtitle.AllowDrop = $script:IsManageEntriesMode
-            $row.Controls.Add($subtitle)
-        }
-
-        if ($script:IsManageEntriesMode) {
-            if ($aliasEditActive) {
-                # v0.2.30: keep the expanded alias editor, but render it as a
-                # flat edit line rather than a full focus rectangle. Only the
-                # bottom rule turns Lenovo-red while the TextBox has focus.
-                $editorFrame = New-Object System.Windows.Forms.Panel
-                $editorFrame.Name = 'AliasEditorFrame'
-                $editorFrame.Location = New-Object Drawing.Point(58, 32)
-                $editorFrame.Size = New-Object Drawing.Size(318, 27)
-                $editorFrame.BackColor = $script:ColorRow
-
-                $aliasEditor = New-Object System.Windows.Forms.TextBox
-                $aliasEditor.Name = 'AliasEditor'
-                $aliasEditor.Tag = $entry.Guid
-                $aliasEditor.Text = if ($alias) { [string]$alias } else { '' }
-                $aliasEditor.Font = New-Object Drawing.Font('Segoe UI', 9.2, [Drawing.FontStyle]::Regular)
-                $aliasEditor.ForeColor = $script:ColorPrimary
-                $aliasEditor.BackColor = [Drawing.Color]::FromArgb(24,24,24)
-                $aliasEditor.BorderStyle = [System.Windows.Forms.BorderStyle]::None
-                $aliasEditor.Location = New-Object Drawing.Point(0, 2)
-                $aliasEditor.Size = New-Object Drawing.Size(288, 21)
-
-                $aliasUnderline = New-Object System.Windows.Forms.Panel
-                $aliasUnderline.Name = 'AliasEditorUnderline'
-                $aliasUnderline.Location = New-Object Drawing.Point(0, 25)
-                $aliasUnderline.Size = New-Object Drawing.Size(318, 1)
-                $aliasUnderline.BackColor = [Drawing.Color]::FromArgb(72,72,72)
-                $editorFrame.Controls.Add($aliasUnderline)
-
-
-                $clearAlias = New-Object System.Windows.Forms.Button
-                $clearAlias.Name = 'AliasClearButton'
-                $clearAlias.Text = '×'
-                $clearAlias.Font = New-Object Drawing.Font('Segoe UI', 9.5, [Drawing.FontStyle]::Regular)
-                $clearAlias.ForeColor = [Drawing.Color]::FromArgb(145,145,145)
-                $clearAlias.BackColor = [Drawing.Color]::FromArgb(24,24,24)
-                $clearAlias.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-                $clearAlias.FlatAppearance.BorderSize = 0
-                $clearAlias.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(38,38,38)
-                $clearAlias.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(45,30,29)
-                $clearAlias.Location = New-Object Drawing.Point(292, 0)
-                $clearAlias.Size = New-Object Drawing.Size(26, 23)
-                $clearAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
-                $clearAlias.Visible = -not [string]::IsNullOrEmpty([string]$aliasEditor.Text)
-                $clearAlias.Add_MouseEnter({ $this.ForeColor = $script:ColorAccent })
-                $clearAlias.Add_MouseLeave({ $this.ForeColor = [Drawing.Color]::FromArgb(145,145,145) })
-                $clearAlias.Add_Click({
-                    $editor = $this.Parent.Controls.Find('AliasEditor', $false) | Select-Object -First 1
-                    if ($editor) {
-                        $editor.Text = ''
-                        $editor.Focus()
-                    }
-                })
-                $editorFrame.Controls.Add($clearAlias)
-
-                $aliasEditor.Add_Enter({
-                    param($sender,$eventArgs)
-                    try {
-                        $line = $sender.Parent.Controls.Find('AliasEditorUnderline', $false) | Select-Object -First 1
-                        if ($line) { $line.BackColor = $script:ColorAccent }
-                    } catch { }
-                })
-                $aliasEditor.Add_Leave({
-                    param($sender,$eventArgs)
-                    try {
-                        $line = $sender.Parent.Controls.Find('AliasEditorUnderline', $false) | Select-Object -First 1
-                        if ($line) { $line.BackColor = [Drawing.Color]::FromArgb(72,72,72) }
-                    } catch { }
-                })
-                $aliasEditor.Add_TextChanged({
-                    param($sender,$eventArgs)
-                    try {
-                        $clear = $sender.Parent.Controls.Find('AliasClearButton', $false) | Select-Object -First 1
-                        if ($clear) { $clear.Visible = -not [string]::IsNullOrEmpty([string]$sender.Text) }
-                        Update-ManageSaveButtonState
-                    } catch { }
-                })
-                $aliasEditor.Add_KeyDown({
-                    param($sender,$eventArgs)
-                    if ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
-                        Set-ManageEntryAliasDraft -Guid ([string]$sender.Tag) -Alias ([string]$sender.Text)
-                        $script:ManageAliasEditGuid = $null
-                        $script:LastStatusText = if ([string]::IsNullOrWhiteSpace([string]$sender.Text)) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
-                        $eventArgs.SuppressKeyPress = $true
-                        Update-PopupRows
-                    }
-                    elseif ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Escape) {
-                        $script:ManageAliasEditGuid = $null
-                        $script:LastStatusText = Get-LocalizedString -Key 'Manage.AliasDiscarded'
-                        $eventArgs.SuppressKeyPress = $true
-                        Update-PopupRows
-                    }
-                })
-                $editorFrame.Controls.Add($aliasEditor)
-                $row.Controls.Add($editorFrame)
-
-                $applyAlias = New-Object System.Windows.Forms.Button
-                $applyAlias.Name = 'AliasApplyButton'
-                $applyAlias.Text = Get-LocalizedString -Key 'Common.Apply'
-                $applyAlias.Tag = $entry.Guid
-                $applyAlias.Font = New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Bold)
-                $applyAlias.ForeColor = $script:ColorAccent
-                $applyAlias.BackColor = $script:ColorRow
-                $applyAlias.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-                $applyAlias.FlatAppearance.BorderSize = 0
-                $applyAlias.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(42,42,42)
-                $applyAlias.FlatAppearance.MouseDownBackColor = $script:ColorSelectedRow
-                $applyAlias.Location = New-Object Drawing.Point(58, 62)
-                $applyAlias.Size = New-Object Drawing.Size(104, 24)
-                $applyAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
-                $applyAlias.Add_Click({
-                    param($sender,$eventArgs)
-                    $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
-                    if ($editor) {
-                        Set-ManageEntryAliasDraft -Guid ([string]$editor.Tag) -Alias ([string]$editor.Text)
-                        $empty = [string]::IsNullOrWhiteSpace([string]$editor.Text)
-                        $script:ManageAliasEditGuid = $null
-                        $script:LastStatusText = if ($empty) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
-                        Update-PopupRows
-                    }
-                })
-                $row.Controls.Add($applyAlias)
-
-                $cancelAlias = New-Object System.Windows.Forms.Button
-                $cancelAlias.Name = 'AliasCancelButton'
-                $cancelAlias.Text = Get-LocalizedString -Key 'Common.Cancel'
-                $cancelAlias.Font = New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Regular)
-                $cancelAlias.ForeColor = $script:ColorSecondary
-                $cancelAlias.BackColor = $script:ColorRow
-                $cancelAlias.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-                $cancelAlias.FlatAppearance.BorderSize = 0
-                $cancelAlias.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(42,42,42)
-                $cancelAlias.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(34,34,34)
-                $cancelAlias.Location = New-Object Drawing.Point(166, 62)
-                $cancelAlias.Size = New-Object Drawing.Size(94, 24)
-                $cancelAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
-                $cancelAlias.Add_Click({
-                    $script:ManageAliasEditGuid = $null
-                    $script:LastStatusText = Get-LocalizedString -Key 'Manage.AliasDiscarded'
-                    Update-PopupRows
-                })
-                $row.Controls.Add($cancelAlias)
-
-                $originalHint = New-Label -Text (Get-LocalizedString -Key 'Manage.OriginalNameHint') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Regular)) `
-                    -ForeColor ([Drawing.Color]::FromArgb(125,125,125)) -X 266 -Y 65 -Width 110 -Height 18
-                $originalHint.TextAlign = [Drawing.ContentAlignment]::MiddleRight
-                $row.Controls.Add($originalHint)
-
-                $rowControls = @()
-            }
-            else {
-                $state = New-Object System.Windows.Forms.Panel
-                $state.Name = 'VisibilityGlyph'
-                $state.Tag = $entry.Guid
-                $state.AccessibleName = if ($isHidden) { 'hidden' } else { 'visible' }
-                $state.AccessibleDescription = if ($isHidden) { Get-LocalizedString -Key 'Manage.HiddenAccessible' } else { Get-LocalizedString -Key 'Manage.VisibleAccessible' }
-                $state.Location = New-Object Drawing.Point(286, 12)
-                $state.Size = New-Object Drawing.Size(32, 34)
-                $state.BackColor = [Drawing.Color]::Transparent
-                $state.Cursor = [System.Windows.Forms.Cursors]::Hand
-                $state.AllowDrop = $true
-                $state.Add_Paint({
-                    param($sender,$eventArgs)
-                    $hidden = ([string]$sender.AccessibleName -eq 'hidden')
-                    $color = if ($hidden) { [Drawing.Color]::FromArgb(115,115,115) } else { $script:ColorAccent }
-                    $eventArgs.Graphics.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
-                    $pen = New-Object Drawing.Pen($color, 1.6)
-                    $pupil = New-Object Drawing.SolidBrush($color)
-                    try {
-                        $eye = New-Object Drawing.Rectangle(7, 11, 18, 11)
-                        $eventArgs.Graphics.DrawEllipse($pen, $eye)
-                        $eventArgs.Graphics.FillEllipse($pupil, 14, 14, 4, 4)
-                        if ($hidden) {
-                            $slash = New-Object Drawing.Pen($color, 1.8)
-                            try { $eventArgs.Graphics.DrawLine($slash, 6, 24, 26, 9) } finally { $slash.Dispose() }
-                        }
-                    }
-                    finally {
-                        $pen.Dispose()
-                        $pupil.Dispose()
-                    }
-                })
-                $state.Add_MouseEnter({
-                    param($sender,$eventArgs)
-                    try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleDescription) } catch { }
-                })
-                $state.Add_MouseLeave({
-                    param($sender,$eventArgs)
-                    try { Hide-DarkActionTooltip } catch { }
-                })
-                $row.Controls.Add($state)
-
-                $editAlias = New-Label -Text '✎' -Font (New-Object Drawing.Font('Segoe UI Symbol', 12.0, [Drawing.FontStyle]::Regular)) `
-                    -ForeColor ([Drawing.Color]::FromArgb(190,190,190)) -X 321 -Y 12 -Width 25 -Height 34
-                $editAlias.Name = 'AliasEditButton'
-                $editAlias.Tag = $entry.Guid
-                $editAlias.AccessibleDescription = Get-LocalizedString -Key 'Manage.EditAliasAccessible'
-                $editAlias.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
-                $editAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
-                $editAlias.Add_MouseEnter({
-                    param($sender,$eventArgs)
-                    $sender.ForeColor = $script:ColorAccent
-                    Set-RowHoverState $sender $true
-                    try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleDescription) } catch { }
-                })
-                $editAlias.Add_MouseLeave({
-                    param($sender,$eventArgs)
-                    $sender.ForeColor = [Drawing.Color]::FromArgb(190,190,190)
-                    Set-RowHoverState $sender $false
-                    try { Hide-DarkActionTooltip } catch { }
-                })
-                $editAlias.Add_Click({
-                    param($sender,$eventArgs)
-                    try { Hide-DarkActionTooltip } catch { }
-                    $guid = ([string]$sender.Tag).ToLowerInvariant()
-                    if ($script:ManageAliasEditGuid -and $script:ManageAliasEditGuid -ne $guid) {
-                        Commit-ActiveManageAliasEditor
-                    }
-                    $script:ManageAliasEditGuid = $guid
-                    $script:LastStatusText = Get-LocalizedString -Key 'Manage.EditAliasStatus'
-                    Update-PopupRows
-                    $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
-                    if ($editor) {
-                        $editor.Focus()
-                        $editor.SelectAll()
-                    }
-                })
-                $row.Controls.Add($editAlias)
-
-                $grip = New-Label -Text '≡' -Font (New-Object Drawing.Font('Segoe UI Symbol', 13, [Drawing.FontStyle]::Regular)) `
-                    -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 350 -Y 12 -Width 26 -Height 34
-                $grip.Tag = $entry.Guid
-                $grip.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
-                $grip.Cursor = [System.Windows.Forms.Cursors]::SizeAll
-                $grip.AllowDrop = $true
-                $row.Controls.Add($grip)
-
-                $rowControls = @($row, $marker, $icon, $title, $subtitle, $state, $grip)
-            }
-        }
-        else {
-            $checkText = if ($isSelected) { '✓' } else { '' }
-            $check = New-Label -Text $checkText `
-                -Font (New-Object Drawing.Font('Segoe UI Symbol', 12, [Drawing.FontStyle]::Bold)) `
-                -ForeColor $script:ColorAccent -X 354 -Y 12 -Width 24 -Height 34
-            $check.Tag = $entry.Guid
-            $check.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
-            $check.Cursor = [System.Windows.Forms.Cursors]::Hand
-            $row.Controls.Add($check)
-            $rowControls = @($row, $marker, $icon, $title, $subtitle, $check)
-        }
-
-        foreach ($control in $rowControls) {
-            $control.Add_Click($clickHandler)
-            $control.Add_MouseEnter($enterHandler)
-            $control.Add_MouseLeave($leaveHandler)
-            $control.Add_MouseWheel($wheelHandler)
-            if ($script:IsManageEntriesMode) {
-                $control.Add_MouseDown($mouseDownHandler)
-                $control.Add_MouseMove($mouseMoveHandler)
-                $control.Add_DragEnter($dragEnterHandler)
-                $control.Add_DragDrop($dragDropHandler)
-            }
-        }
-
-        $contentPanel.Controls.Add($row)
-        $y += ($rowHeight + $rowGap)
+        $rendered = New-BootEntryRow -Entry $entry -Y $y -BaseRowHeight $baseRowHeight -Handlers $handlers
+        $contentPanel.Controls.Add($rendered.Row)
+        $y += ([int]$rendered.Height + $rowGap)
     }
 
-    $viewportHeight = $listPanel.ClientSize.Height
-    $contentHeight = [Math]::Max($viewportHeight, $y)
-    $contentPanel.Size = New-Object Drawing.Size(390, $contentHeight)
-    if ($scrollBar) {
-        $maxScroll = [Math]::Max(0, $contentHeight - $viewportHeight)
-        $scrollBar.LargeChange = [Math]::Max(1, $viewportHeight)
-        $scrollBar.SmallChange = $baseRowHeight + $rowGap
-        $scrollBar.Maximum = $maxScroll
-        $scrollBar.Visible = ($maxScroll -gt 0)
-        if (-not $scrollBar.Visible) { $scrollBar.Value = 0 }
-        elseif ($scrollBar.Value -gt $maxScroll) { $scrollBar.Value = $maxScroll }
-        $contentPanel.Top = -1 * $scrollBar.Value
-    }
+    Update-BootEntryScrollLayout -ListPanel $listPanel -ContentPanel $contentPanel -ScrollBar $scrollBar -ContentBottom $y -BaseRowHeight $baseRowHeight -RowGap $rowGap
 
     if ($statusLabel) { $statusLabel.Text = $script:LastStatusText }
     Update-DefaultUi
@@ -7311,35 +7411,11 @@ function Invoke-BackgroundRefreshWorker {
     return 1
 }
 
-function New-PopupForm {
-    if (-not $script:BootTypeToolTip) {
-        $script:BootTypeToolTip = New-Object System.Windows.Forms.ToolTip
-        $script:BootTypeToolTip.InitialDelay = 350
-        $script:BootTypeToolTip.ReshowDelay = 100
-        $script:BootTypeToolTip.AutoPopDelay = 8000
-        $script:BootTypeToolTip.ShowAlways = $true
-        $script:BootTypeToolTip.UseAnimation = $true
-        $script:BootTypeToolTip.UseFading = $true
-    }
+# Lenovo Boot Selector - popup section composition.
+# Domain-specific WinForms builders extracted from New-PopupForm by LBS-29.
 
-    $form = New-Object System.Windows.Forms.Form
-    $form.Name = 'LenovoBootSelectorPopup'
-    $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
-    $form.ShowInTaskbar = $false
-    $form.TopMost = $true
-    $form.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
-    # v0.2.28: plain square utility panel, intentionally without an outer
-    # Lenovo-red frame or rounded clipping. Red remains an interaction accent.
-    $form.BackColor = $script:ColorBackground
-    $form.Width = 390
-    $form.Height = 672
-
-    $root = New-Object System.Windows.Forms.Panel
-    $root.Name = 'PopupRoot'
-    $root.Location = New-Object Drawing.Point(0, 0)
-    $root.Size = New-Object Drawing.Size(390, 672)
-    $root.BackColor = $script:ColorBackground
-    $form.Controls.Add($root)
+function Add-PopupHeaderSection {
+    param([Parameter(Mandatory=$true)]$Root)
 
     # v0.2.29: compact brand header. No decorative status dot and no permanent
     # subtitle. A status line appears only while the background refresh is active.
@@ -7423,13 +7499,13 @@ function New-PopupForm {
     $header.Controls.Add($refresh)
     if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($refresh, (Get-LocalizedString -Key 'Action.RefreshBootTargets')) }
     Update-RefreshButtonVisual
-    $root.Controls.Add($header)
+    $Root.Controls.Add($header)
 
     $headerDivider = New-Object System.Windows.Forms.Panel
     $headerDivider.Location = New-Object Drawing.Point(0, 59)
     $headerDivider.Size = New-Object Drawing.Size(390, 1)
     $headerDivider.BackColor = [Drawing.Color]::FromArgb(45, 45, 45)
-    $root.Controls.Add($headerDivider)
+    $Root.Controls.Add($headerDivider)
 
     $section = New-Object System.Windows.Forms.Panel
     $section.Location = New-Object Drawing.Point(0, 60)
@@ -7457,7 +7533,11 @@ function New-PopupForm {
     $manageButton.Add_Click({ Start-ManageEntriesMode })
     $script:ManageEntriesButton = $manageButton
     $section.Controls.Add($manageButton)
-    $root.Controls.Add($section)
+    $Root.Controls.Add($section)
+}
+
+function Add-PopupBootEntryListSection {
+    param([Parameter(Mandatory=$true)]$Root)
 
     $listPanel = New-Object System.Windows.Forms.Panel
     $listPanel.Name = 'EntryList'
@@ -7506,7 +7586,11 @@ function New-PopupForm {
         }
     })
     $listPanel.Add_MouseEnter({ $this.Focus() })
-    $root.Controls.Add($listPanel)
+    $Root.Controls.Add($listPanel)
+}
+
+function Add-PopupSettingsSection {
+    param([Parameter(Mandatory=$true)]$Root)
 
     # v0.2.31: compact lower third with two aligned configuration rows and one
     # action area. The selected next-boot target is shown directly with Restart,
@@ -7520,7 +7604,7 @@ function New-PopupForm {
     $configLabel = New-Label -Text (Get-LocalizedString -Key 'Settings.Title') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 2 -Width 220 -Height 17
     $configSection.Controls.Add($configLabel)
-    $root.Controls.Add($configSection)
+    $Root.Controls.Add($configSection)
 
     $settings = New-Object System.Windows.Forms.Panel
     $settings.Name = 'SettingsPanel'
@@ -7551,7 +7635,7 @@ function New-PopupForm {
     $autostartText.Add_Click({ if ($script:AutostartCheckbox) { $script:AutostartCheckbox.Checked = -not $script:AutostartCheckbox.Checked } })
     $script:AutostartCheckbox = $autostart
     $settings.Controls.Add($autostart)
-    $root.Controls.Add($settings)
+    $Root.Controls.Add($settings)
 
     $defaultPanel = New-Object System.Windows.Forms.Panel
     $defaultPanel.Name = 'DefaultPanel'
@@ -7596,14 +7680,18 @@ function New-PopupForm {
         $control.Add_Click($defaultRowClick)
     }
     $script:DefaultButton = $defaultPanel
-    $root.Controls.Add($defaultPanel)
+    $Root.Controls.Add($defaultPanel)
 
     $settingsDivider = New-Object System.Windows.Forms.Panel
     $settingsDivider.Name = 'SettingsDivider'
     $settingsDivider.Location = New-Object Drawing.Point(16, 586)
     $settingsDivider.Size = New-Object Drawing.Size(358, 1)
     $settingsDivider.BackColor = $script:ColorAccent
-    $root.Controls.Add($settingsDivider)
+    $Root.Controls.Add($settingsDivider)
+}
+
+function Add-PopupRestartSection {
+    param([Parameter(Mandatory=$true)]$Root)
 
     $restartPanel = New-Object System.Windows.Forms.Panel
     $restartPanel.Name = 'RestartPanel'
@@ -7633,7 +7721,7 @@ function New-PopupForm {
     $restartTarget.Name = 'RestartTargetLabel'
     $restartPanel.Controls.Add($restartTarget)
     $script:RestartTargetLabel = $restartTarget
-    $root.Controls.Add($restartPanel)
+    $Root.Controls.Add($restartPanel)
 
     # Dedicated footer height prevents Segoe UI/DPI clipping at the bottom edge.
     $footerPanel = New-Object System.Windows.Forms.Panel
@@ -7645,7 +7733,11 @@ function New-PopupForm {
         -ForeColor ([Drawing.Color]::FromArgb(115,115,115)) -X 316 -Y 0 -Width 58 -Height 18
     $versionLabel.TextAlign = [Drawing.ContentAlignment]::MiddleRight
     $footerPanel.Controls.Add($versionLabel)
-    $root.Controls.Add($footerPanel)
+    $Root.Controls.Add($footerPanel)
+}
+
+function Add-PopupManageEntriesSection {
+    param([Parameter(Mandatory=$true)]$Root)
 
     # Entry-management overlay. It temporarily replaces the normal settings/footer
     # while the same boot list switches into edit mode.
@@ -7717,8 +7809,44 @@ function New-PopupForm {
     $manageVersion.TextAlign = [Drawing.ContentAlignment]::MiddleRight
     $manageFooter.Controls.Add($manageVersion)
     $managePanel.Controls.Add($manageFooter)
-    $root.Controls.Add($managePanel)
+    $Root.Controls.Add($managePanel)
+}
 
+function New-PopupForm {
+    if (-not $script:BootTypeToolTip) {
+        $script:BootTypeToolTip = New-Object System.Windows.Forms.ToolTip
+        $script:BootTypeToolTip.InitialDelay = 350
+        $script:BootTypeToolTip.ReshowDelay = 100
+        $script:BootTypeToolTip.AutoPopDelay = 8000
+        $script:BootTypeToolTip.ShowAlways = $true
+        $script:BootTypeToolTip.UseAnimation = $true
+        $script:BootTypeToolTip.UseFading = $true
+    }
+
+    $form = New-Object System.Windows.Forms.Form
+    $form.Name = 'LenovoBootSelectorPopup'
+    $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
+    $form.ShowInTaskbar = $false
+    $form.TopMost = $true
+    $form.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
+    # v0.2.28: plain square utility panel, intentionally without an outer
+    # Lenovo-red frame or rounded clipping. Red remains an interaction accent.
+    $form.BackColor = $script:ColorBackground
+    $form.Width = 390
+    $form.Height = 672
+
+    $root = New-Object System.Windows.Forms.Panel
+    $root.Name = 'PopupRoot'
+    $root.Location = New-Object Drawing.Point(0, 0)
+    $root.Size = New-Object Drawing.Size(390, 672)
+    $root.BackColor = $script:ColorBackground
+    $form.Controls.Add($root)
+
+    Add-PopupHeaderSection -Root $root
+    Add-PopupBootEntryListSection -Root $root
+    Add-PopupSettingsSection -Root $root
+    Add-PopupRestartSection -Root $root
+    Add-PopupManageEntriesSection -Root $root
     $maintenancePanel = New-MaintenanceStatePanel
     $root.Controls.Add($maintenancePanel)
 
@@ -7730,7 +7858,6 @@ function New-PopupForm {
 
     return $form
 }
-
 function Position-Popup {
     if (-not $script:Popup) { return }
     $screen = [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position)

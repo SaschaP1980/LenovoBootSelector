@@ -144,6 +144,7 @@ jobs:
               parser = Get-TestTotal $logText '^PARSER TOTAL\s+(\d+)/(\d+)\s*$'
               functionalCore = Get-TestTotal $logText '^TOTAL\s+(\d+)/(\d+)\s*$'
               storageInfrastructure = Get-TestTotal $logText '^STORAGE INFRA TOTAL\s+(\d+)/(\d+)\s*$'
+              uiPresentation = Get-TestTotal $logText '^UI PRESENTATION TOTAL\s+(\d+)/(\d+)\s*$'
               localizationRuntime = Get-TestTotal $logText '^LOCALIZATION TOTAL\s+(\d+)/(\d+)\s*$'
               refreshRuntime = Get-TestTotal $logText '^REFRESH TOTAL\s+(\d+)/(\d+)\s*$'
               mutex = Get-TestTotal $logText '^MUTEX TOTAL\s+(\d+)/(\d+)\s*$'
@@ -161,6 +162,7 @@ jobs:
               'parser',
               'functionalCore',
               'storageInfrastructure',
+              'uiPresentation',
               'localizationRuntime',
               'refreshRuntime',
               'mutex',
@@ -184,6 +186,7 @@ jobs:
           $functionalPassed = (
               $totals.functionalCore.passed +
               $totals.storageInfrastructure.passed +
+              $totals.uiPresentation.passed +
               $totals.localizationRuntime.passed +
               $totals.refreshRuntime.passed +
               $totals.mutex.passed +
@@ -198,6 +201,7 @@ jobs:
           $functionalExpected = (
               $totals.functionalCore.expected +
               $totals.storageInfrastructure.expected +
+              $totals.uiPresentation.expected +
               $totals.localizationRuntime.expected +
               $totals.refreshRuntime.expected +
               $totals.mutex.expected +

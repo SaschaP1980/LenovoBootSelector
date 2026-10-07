@@ -19,6 +19,7 @@ These four files are the permanent Python gates used by the GitHub Release Orche
 | --- | --- | --- |
 | `Test-FunctionalCore.ps1` | Core | Parsers, settings, localization resolution/formatting, pure storage resolution, and functional core behavior |
 | `Test-StorageInfrastructure.ps1` | Infrastructure | Windows storage snapshot normalization and acquisition-failure behavior without duplicating pure classification cases |
+| `Test-UIPresentation.ps1` | Presentation | Native WinForms characterization of selected/hidden boot rows, alias editing, hover state, and scrolling |
 | `Test-LocalizationRuntime.ps1` | Runtime | Native PS5.1 language selection, persistence, migration, and central lookup |
 | `Test-UpdateCore.ps1` | Core | Update model, transport failure contract, and update contracts |
 | `Test-RefreshRuntime.ps1` | Runtime | Background refresh state/request lifecycle and child-worker diagnostics-session correlation |
@@ -62,6 +63,7 @@ Native PowerShell suites intentionally use different count strategies; one gener
 | `Test-ArchitectureSoak.ps1` | Four aggregate soak assertions; each assertion covers many iterations. |
 | `Test-FunctionalCore.ps1` | Dynamic PASS counting; includes deterministic LBS-31 storage-resolution cases with no hardware dependency. |
 | `Test-StorageInfrastructure.ps1` | Straight-line: fixed runtime count of 17 covering Windows disk/partition normalization, per-disk partition-query failure, and unavailable inventory. |
+| `Test-UIPresentation.ps1` | Straight-line: fixed runtime count of 23 covering normal selected rows, hidden/manage visual state, alias-editor state, hover behavior, and scroll layout using real WinForms controls. |
 | `Test-LocalizationRuntime.ps1` | Straight-line: fixed runtime count of 32 covering native locale selection, explicit-preference persistence, v0.8.0.0 ambiguity resolution, startup-recovery migration, reload, parity, and lookup. |
 | `Test-WindowsPowerShell51.ps1` | Aggregate runner/parser gate; file count is dynamic and is not an assertion-coverage count. |
 

@@ -26,6 +26,7 @@ foreach ($file in $files) {
 Write-Host "PARSER TOTAL $pass/$($files.Count)"
 & (Join-Path $root 'tests\Test-FunctionalCore.ps1')
 & (Join-Path $root 'tests\Test-StorageInfrastructure.ps1')
+& (Join-Path $root 'tests\Test-UIPresentation.ps1')
 & (Join-Path $root 'tests\Test-LocalizationRuntime.ps1')
 & (Join-Path $root 'tests\Test-RefreshRuntime.ps1')
 & (Join-Path $root 'tests\Test-SingleInstanceMutex.ps1')
