@@ -125,7 +125,7 @@ def main():
     ui_presentation_path=root/'tests/Test-UIPresentation.ps1'
     s.c('LBS-29 native UI presentation test exists',ui_presentation_path.is_file())
     ui_presentation=txt(ui_presentation_path) if ui_presentation_path.is_file() else ''
-    s.has('LBS-29 UI presentation suite keeps fixed total 23',ui_presentation,'Write-Host "UI PRESENTATION TOTAL $script:checks/23"')
+    s.has('LBS-29 UI presentation suite keeps fixed total 25',ui_presentation,'Write-Host "UI PRESENTATION TOTAL $script:checks/25"')
     s.has('LBS-29 native aggregate runner invokes UI presentation suite',windows_wrapper,"Test-UIPresentation.ps1")
     mutex_test=txt(root/'tests/Test-SingleInstanceMutex.ps1')
     s.has('Mutex native test keeps explicit total output',mutex_test,'Write-Host "MUTEX TOTAL $checks/4"')
