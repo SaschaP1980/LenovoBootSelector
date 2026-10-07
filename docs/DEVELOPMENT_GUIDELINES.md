@@ -109,6 +109,29 @@ For Issue-backed executable/product work, record the selected development model 
 
 When a Patch/Hotfix is escalated, record the concise reason in the Issue when Issue-backed (or equivalent durable release history for an Issue-less Hotfix) and later include the same decision as `Work-Branch-Reason: <reason>` in the Candidate history.
 
+### GitHub Issue identity and Work-Branch naming
+
+For this repository, **`LBS` is the project-specific Issue/branch prefix for Lenovo Boot Selector**.
+
+For every newly created actionable project Issue, the numeric component is the **GitHub Issue number itself**. Do not maintain or search for a separate free LBS sequence.
+
+Canonical forms:
+
+- GitHub Issue `#90` -> Issue title prefix `[LBS-90]`;
+- Work-Path branch -> `work/LBS-90`;
+- Candidate provenance -> `Work-Branch: work/LBS-90`.
+
+Because GitHub assigns the Issue number only after creation, use this two-step creation flow:
+
+1. create the Issue with the intended descriptive title/body/labels;
+2. read the returned GitHub Issue number;
+3. immediately rename the Issue to `[LBS-<github-issue-number>] <descriptive title>` before implementation starts;
+4. if Work-Path is selected, use that same GitHub Issue number in the work branch and Candidate provenance.
+
+Do not infer another numeric namespace and do not scan for an unused LBS number. The GitHub Issue number is the single numeric identity for new work.
+
+Historical Issues that predate this convention may retain older independent LBS identifiers (for example GitHub Issue `#88` titled `[LBS-41] ...`). They remain valid historical evidence and are not retroactively renumbered. New work must use the GitHub-number convention above.
+
 ### Patch/Hotfix atomic fast path
 
 For a Patch/Hotfix that is **not** escalated to a work branch, prefer one short atomic development cycle:
@@ -127,11 +150,13 @@ If the work can no longer fit safely in this atomic path because scope or durati
 
 Create the selected work branch from a freshly verified current `main`:
 
-`work/LBS-<issue-number>`
+`work/LBS-<github-issue-number>`
 
-Example:
+Example for GitHub Issue `#90`:
 
-`work/LBS-17`
+`work/LBS-90`
+
+The number is the GitHub Issue number under the naming contract above; it is not a separate project sequence.
 
 Rules:
 
@@ -237,13 +262,17 @@ A fresh agent should be able to read the Issue and latest work-branch checkpoint
 
 ### Work-Path rolling recovery comment
 
-This mechanism applies **only** to development that already uses a durable `work/LBS-<issue>` branch. Major/Minor work and explicitly escalated Patch/Hotfix work use it; the normal branchless Patch/Hotfix fast path does not.
+This mechanism applies **only** to development that already uses a durable `work/LBS-<github-issue-number>` branch. Major/Minor work and explicitly escalated Patch/Hotfix work use it; the normal branchless Patch/Hotfix fast path does not.
 
 Maintain exactly **one rolling recovery comment** in the active GitHub Issue. Prefer the implementation-start comment and update that same comment in place. Do not create a new heartbeat comment every interval.
 
+Use [`docs/templates/WORK_PATH_ROLLING_COMMENT.md`](templates/WORK_PATH_ROLLING_COMMENT.md) as the canonical default layout. Its structure is based on the successful LBS-41 / GitHub Issue #88 performance run: a compact recovery-state header, explicit intended diff and validation plan, one cumulative measurement ledger, counters, phase-specific evidence, final release verification, performance result, and plan-conformance assessment.
+
+The layout is part of the recovery standard, not merely presentation. Preserve the same major sections unless a task-specific section adds useful recovery information. At successful completion, update this **same** rolling comment to `Agent-State: COMPLETED`, record the authoritative release/PR/main/tag/artifact/cleanup facts, set the next action to Issue closure, and then close the Issue. Do not add a second redundant completion comment when the terminal rolling-comment update already contains the required final implementation/release record.
+
 The rolling comment and a product checkpoint have different responsibilities:
 
-- a **product checkpoint** is a coherent recoverable source state on `work/LBS-<issue>` and may include focused validation;
+- a **product checkpoint** is a coherent recoverable source state on `work/LBS-<github-issue-number>` and may include focused validation;
 - the **rolling recovery comment** is the **canonical cumulative Build & Release ledger** for the complete Work-Path lifecycle: implementation, Development Completion, Candidate correction, Release, recovery, timing, and retrospective evidence.
 
 The rolling comment must remain sufficient for a fresh session to continue without reconstructing prior chat. It is not private chain-of-thought. Keep concise but complete durable facts such as:
@@ -276,7 +305,8 @@ The active cadence may pause only when:
 
 - `Agent-State: WAITING_FOR_GITHUB` names an exact independently running Actions run;
 - `Agent-State: BLOCKED_EXTERNAL` names a verified external GitHub/service outage or unavailable write path and records the last confirmed repository SHA/state; or
-- `Agent-State: IDLE` / `STOPPED` truthfully states that interactive work is not continuing.
+- `Agent-State: IDLE` / `STOPPED` truthfully states that interactive work is not continuing; or
+- `Agent-State: COMPLETED` is used only after the requested Work-Path lifecycle has completed and final release verification is PASS.
 
 `BLOCKED_EXTERNAL` is not a development failure. Do not spam retries, create no-op commits, or create alternate branches to work around an external outage. If the rolling-comment write path itself is unavailable, do not claim a heartbeat was persisted; update the ledger immediately after write capability is independently confirmed.
 
@@ -289,7 +319,7 @@ Interpretation:
 - when the latest heartbeat is older than roughly **5 minutes** and no referenced Actions run is `queued` or `in_progress`, treat the interactive stream as stopped and resume from durable GitHub state;
 - when `WAITING_FOR_GITHUB` references a live run, GitHub automation may continue independently even if the chat stream stops.
 
-On recovery, re-read current `main`, the Issue including the rolling recovery comment, the `work/LBS-<issue>` head and the latest product checkpoint before continuing. Re-check referenced Actions runs directly.
+On recovery, re-read current `main`, the Issue including the rolling recovery comment, the `work/LBS-<github-issue-number>` head and the latest product checkpoint before continuing. Re-check referenced Actions runs directly.
 
 #### Timing ledger
 
@@ -313,7 +343,7 @@ Never subtract external/user/timeout delays from the raw total; retain them as p
 
 This separation prevents external outages or session interruptions from being misreported as repository-development performance.
 
-Tracked `.chatgpt-work/LBS-<issue>.md` heartbeat files are now **legacy only**. Do not create them for new work. If an already-active branch contains one from the previous standard, keep it only until the rolling Issue comment has absorbed all recovery-relevant information, then remove it before Candidate creation. Timer-only Git commits are prohibited under the rolling-comment model.
+Tracked `.chatgpt-work/LBS-<github-issue-number>.md` heartbeat files are now **legacy only**. Do not create them for new work. If an already-active branch contains one from the previous standard, keep it only until the rolling Issue comment has absorbed all recovery-relevant information, then remove it before Candidate creation. Timer-only Git commits are prohibited under the rolling-comment model.
 
 Historical measurements from LBS-29/LBS-27 remain useful evidence for why the three-minute recovery objective exists, but their journal-commit write overhead is not the target architecture anymore. The rolling-comment model preserves the recovery objective while removing heartbeat churn from Git history.
 
@@ -324,11 +354,11 @@ The journal is disposable Work-Path state and must never be published.
 Before Candidate creation:
 
 1. finish the intended product work and required development-completion checks;
-2. if a legacy `.chatgpt-work/LBS-<issue>.md` exists, first ensure its relevant state is already present in the rolling Issue comment, then remove it;
+2. if a legacy `.chatgpt-work/LBS-<github-issue-number>.md` exists, first ensure its relevant state is already present in the rolling Issue comment, then remove it;
 3. verify the final cleaned work-branch tree contains only intended release content;
 4. re-read current `main` and reconcile it if necessary;
 5. create the release-ready Candidate as a **single clean commit whose parent is current `main` and whose tree exactly equals the final cleaned work-branch tree**;
-6. include the normal `Work-Branch: work/LBS-<issue>` provenance trailer and, for an escalated Patch/Hotfix, the required `Work-Branch-Reason:` trailer.
+6. include the normal `Work-Branch: work/LBS-<github-issue-number>` provenance trailer and, for an escalated Patch/Hotfix, the required `Work-Branch-Reason:` trailer.
 
 The Work-Path journal commits therefore remain reachable only through the disposable work branch. They must not become ancestors of the Candidate, source tag, publication PR or `main`. Existing exact Candidate/work-branch tree equality remains the release safety contract, and the Release Orchestrator retains responsibility for deleting the work branch only after rechecking that equality.
 
@@ -423,6 +453,29 @@ If a local full worktree is unavailable during ordinary checkpoint work, persist
 ## 8. Generated runtime handling
 
 The tracked single-file runtime must remain deterministic.
+
+### Version-only Work-Path pre-Development-Completion checklist
+
+A deliberately minimal `releaseProfile: version-only` Hotfix routed through the Work-Path must enter its **first** hosted Development Completion request with all deterministic version-bearing tracked artifacts already synchronized. Development Completion is a qualification gate, not a generation/canonicalization step.
+
+For the current repository contract, the release-ready Work tree for a pure version-only change must contain exactly these five pre-Candidate changes:
+
+- `bin/version.json` — authoritative version bump;
+- `CHANGELOG.md` — mandatory minimal version section;
+- `bin/LenovoBootMenuTray.ps1` — deterministic generated runtime with the injected version;
+- `audits/CATCH_AUDIT.json` — deterministic catch-audit metadata with the current version;
+- `docs/architecture/ARCHITECTURE_BASELINE.json` — deterministic architecture baseline with the current version.
+
+Before creating the tree-identical `Development-Completion: requested` commit:
+
+1. synchronize those three deterministic generated/version-bearing artifacts from the new authoritative version;
+2. run or truthfully reproduce the repository-owned runtime, catch-audit, and architecture-baseline deterministic checks on the exact Work tree;
+3. inspect the complete Work diff and require the expected five-file scope;
+4. treat any additional pre-Candidate file as a scope anomaly requiring explicit review.
+
+Do **not** manually add Release-Orchestrator-owned publication outputs such as `README.md`, `bin/BUILD_INTEGRITY.txt`, `downloads/latest.json`, `downloads/releases.json`, `downloads/README.md`, or historical release ZIPs to the Work tree merely to complete a version-only Hotfix.
+
+This checklist is the persistent process lesson from comparing LBS-41 / Issue #88 with the later v0.10.7.2 benchmark: #88 synchronized the full five-file version-only Work tree before Development Completion #1, while the later run initially requested Development Completion before those deterministic artifacts were synchronized and was correctly stopped fail-closed.
 
 Do not manually patch `bin/LenovoBootMenuTray.ps1` through a long chain of ad-hoc incremental text replacements when the repository build tool can define the composition authoritatively.
 
@@ -660,7 +713,7 @@ Operational contract:
 1. stabilize the complete intended Work-Branch tree, including release metadata and all tracked deterministic generated artifacts required by the Candidate-entry contract;
 2. before the first hosted request for that tree, execute and record the targeted Python runtime-binding smoke when changed Python validators/release tooling/workflow helpers make it applicable;
 3. persist the last substantive product/tooling checkpoint;
-4. create exactly one **tree-identical qualification request commit** on the same `work/LBS-<issue>` branch with exactly one trailer line:
+4. create exactly one **tree-identical qualification request commit** on the same `work/LBS-<github-issue-number>` branch with exactly one trailer line:
    `Development-Completion: requested`;
 5. that request commit becomes the frozen Work-SHA for Development Completion;
 6. the Work-Branch push automatically triggers the workflow; ordinary Work-Branch pushes without the trailer are recognized but skip the expensive gate;
@@ -672,7 +725,7 @@ Operational contract:
 
 The tree-identical qualification request commit is an explicit gate-orchestration commit, not a product checkpoint and not heartbeat churn. It is permitted only for a final Development Completion attempt. If the Work-Branch tree changes after the request, the old status is irrelevant; persist the correction and create a new tree-identical request commit for the new exact SHA.
 
-Connector-only agents start the gate by creating that final request commit and advancing `work/LBS-<issue>` to it. No direct `workflow_dispatch`, local clone, temporary Candidate branch, or publication ref is required.
+Connector-only agents start the gate by creating that final request commit and advancing `work/LBS-<github-issue-number>` to it. No direct `workflow_dispatch`, local clone, temporary Candidate branch, or publication ref is required.
 
 #### Hosted Windows exact-SHA evidence
 
@@ -733,11 +786,11 @@ Use:
 
 Do not reconstruct fields already covered by a successful aggregate summary through many additional connector calls unless investigating an inconsistency.
 
-For any Candidate derived from a durable work branch, first ensure no legacy `.chatgpt-work/LBS-<issue>.md` remains, then create a clean current-`main`-parent Candidate commit whose tree exactly matches the cleaned work-branch tree. The work-branch journal/checkpoint history is recovery state and must not become Candidate ancestry.
+For any Candidate derived from a durable work branch, first ensure no legacy `.chatgpt-work/LBS-<github-issue-number>.md` remains, then create a clean current-`main`-parent Candidate commit whose tree exactly matches the cleaned work-branch tree. The work-branch journal/checkpoint history is recovery state and must not become Candidate ancestry.
 
 Include exactly one unique candidate-history trailer:
 
-`Work-Branch: work/LBS-<issue>`
+`Work-Branch: work/LBS-<github-issue-number>`
 
 Use `Work-Branch: none` for the normal Patch/Hotfix path and whenever no work branch exists. Major/Minor releases may not use `none`. If a Patch/Hotfix declares `work/LBS-*`, Candidate Preflight additionally requires exactly one non-empty `Work-Branch-Reason:` trailer documenting the pre-implementation effort/risk exception. Candidate Preflight requires an exact tree match between the declared work branch and the Candidate. After successful publication, the Release Orchestrator rechecks the tree and deletes that work branch automatically. If the branch changed after Candidate creation, cleanup fails closed and preserves the branch. The final `RELEASE_VERIFICATION_SUMMARY` must confirm candidate, release, and declared work-branch cleanup.
 
@@ -787,7 +840,7 @@ For a comparable feature, aim for:
 
 1. Issue and explicit product-decision gate;
 2. verified `main`;
-3. one `work/LBS-<issue>` branch (Major/Minor, or an explicitly escalated Patch/Hotfix exception);
+3. one `work/LBS-<github-issue-number>` branch (Major/Minor, or an explicitly escalated Patch/Hotfix exception);
 4. roughly 3–5 coherent checkpoints rather than many tiny checkpoints;
 5. no more than about 10–15 minutes of completed unpersisted work;
 6. bounded connector operations;

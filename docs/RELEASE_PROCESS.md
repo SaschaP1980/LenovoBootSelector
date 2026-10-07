@@ -54,12 +54,12 @@ Release level is derived from the first changed component of the four-part numer
 
 For executable/product release work, Work-branch policy is intentionally asymmetric:
 
-- **Major / Minor:** `work/LBS-<issue>` is mandatory.
+- **Major / Minor:** `work/LBS-<github-issue-number>` is mandatory. The numeric component is the backing GitHub Issue number; `LBS` is the Lenovo Boot Selector project prefix.
 - **Patch / Hotfix:** default to **no work branch** and the shortest safe atomic implementation path.
 - Before Patch/Hotfix implementation, perform a brief effort/risk analysis. Use a work branch only as an exception when the change is likely to be substantial, cross-cutting, migration-heavy, interruption-prone, or otherwise likely to require several recoverable checkpoints.
 - A Patch/Hotfix exception must be recorded durably before implementation and the Candidate must contain exactly one `Work-Branch-Reason: <reason>` trailer.
 - Do not escalate a small Patch/Hotfix merely to reuse the Major/Minor process.
-- Work-Path recovery state is maintained in the Issue's single rolling recovery comment and is never release content. New Work-Path tasks do not create timer heartbeat commits. If a legacy `.chatgpt-work/LBS-<issue>.md` exists, absorb its relevant state into the rolling comment and remove the file before Candidate creation; the cleaned work-branch tree becomes the exact release-ready tree.
+- Work-Path recovery state is maintained in the Issue's single rolling recovery comment and is never release content. New Work-Path tasks do not create timer heartbeat commits. If a legacy `.chatgpt-work/LBS-<github-issue-number>.md` exists, absorb its relevant state into the rolling comment and remove the file before Candidate creation; the cleaned work-branch tree becomes the exact release-ready tree.
 
 ## Test-first bug/regression preparation
 
@@ -128,12 +128,12 @@ Candidate Preflight remains the authoritative release-entry gate and reruns the 
 5. Set `repositoryDeleteIntent` to exactly the repository paths intentionally deleted by this version; normally `[]`.
 6. For a bug/regression, complete the focused RED→GREEN proof described above and run applicable broader prechecks.
 7. For a normal Patch/Hotfix without a work branch, assemble the complete intended change as one atomic candidate tree/commit rather than persisting file-by-file implementation commits.
-8. When a Work-Path branch is used, require the rolling Issue ledger to record `Candidate-Entry: PASS` for the exact final Work SHA under the Development Completion contract above. Any mandatory BLOCKED/FAIL/stale item prohibits Candidate creation. Remove any legacy `.chatgpt-work/LBS-<issue>.md`, verify that the final cleaned work tree contains only intended release content, re-read current `main`, and if that reconciliation changes the basis, invalidate/recompute affected Candidate-entry evidence before Candidate creation.
+8. When a Work-Path branch is used, require the rolling Issue ledger to record `Candidate-Entry: PASS` for the exact final Work SHA under the Development Completion contract above. Any mandatory BLOCKED/FAIL/stale item prohibits Candidate creation. Remove any legacy `.chatgpt-work/LBS-<github-issue-number>.md`, verify that the final cleaned work tree contains only intended release content, re-read current `main`, and if that reconciliation changes the basis, invalidate/recompute affected Candidate-entry evidence before Candidate creation.
 9. Prepare one exact **release-ready** candidate commit based on current `main`. For a Work-Path release, this must be a clean current-`main`-parent commit whose tree exactly equals the final cleaned work-branch tree; temporary worklog/checkpoint history must not become Candidate ancestry.
 10. The candidate-only commit range must contain exactly one unique `Work-Branch:` trailer:
-   - Major/Minor: `Work-Branch: work/LBS-<issue>` is mandatory;
+   - Major/Minor: `Work-Branch: work/LBS-<github-issue-number>` is mandatory;
    - Patch/Hotfix normal path: `Work-Branch: none`;
-   - Patch/Hotfix exception: `Work-Branch: work/LBS-<issue>` plus exactly one `Work-Branch-Reason: <reason>` from the pre-implementation effort/risk analysis.
+   - Patch/Hotfix exception: `Work-Branch: work/LBS-<github-issue-number>` plus exactly one `Work-Branch-Reason: <reason>` from the pre-implementation effort/risk analysis.
    Same-candidate correction commits may omit these trailers, but must not introduce conflicting values. When a work branch is declared, its current tree must exactly match the Candidate tree.
 11. Push that commit only as `candidate/v<version>`. Do **not** manually create `release/v<version>`.
 
@@ -184,7 +184,7 @@ Before the PR may merge, LBS-37 requires `tools/release_pre_activation.py` to em
 
 Only after pre-activation PASS does the workflow merge the PR and delete the release branch. A separate `pull_request` workflow is intentionally not used: pull requests created with the repository `GITHUB_TOKEN` do not recursively start another workflow.
 
-After the merge, the Release Orchestrator also owns **work-branch cleanup**. If the Candidate declared `Work-Branch: work/LBS-<issue>`, the workflow re-reads that branch immediately before deletion and deletes it only when its current tree still exactly equals the released Candidate tree. If the branch advanced or diverged, cleanup fails closed and the branch is preserved; the workflow never force-deletes active development state. `Work-Branch: none` means no work-branch deletion is expected.
+After the merge, the Release Orchestrator also owns **work-branch cleanup**. If the Candidate declared `Work-Branch: work/LBS-<github-issue-number>`, the workflow re-reads that branch immediately before deletion and deletes it only when its current tree still exactly equals the released Candidate tree. If the branch advanced or diverged, cleanup fails closed and the branch is preserved; the workflow never force-deletes active development state. `Work-Branch: none` means no work-branch deletion is expected.
 
 After cleanup, the same workflow runs `tools/release_verification.py`. The final verifier requires the exact pre-activation PASS JSON as input, then checks PR/merge state, exactly one publication PR, 8/8 release statuses, all 3/3 candidate statuses, source tag/source tree, the now-live `downloads/latest.json`, published release ZIP hash/size, candidate/release/work-branch cleanup and the completed reproducibility marker. It emits one machine-readable `RELEASE_VERIFICATION_SUMMARY=<json>` line and a human-readable GitHub Job Summary. A final PASS therefore proves both **gated activation** and **post-activation consistency**.
 
