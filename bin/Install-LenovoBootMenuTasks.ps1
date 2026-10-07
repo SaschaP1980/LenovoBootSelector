@@ -444,7 +444,7 @@ function New-InstallDiagnosticZip($ErrorRecord) {
         $diagRoot = Join-Path (Split-Path $UserStateDir -Parent) 'Diagnostics'
         [void](New-Item -ItemType Directory -Path $diagRoot -Force)
         $stamp = Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'
-        $work = Join-Path $env:TEMP ("LenovoBootMenuTaskInstall-$stamp")
+        $work = Join-Path $env:TEMP ("LenovoBootSelectorTaskInstall-$stamp")
         [void](New-Item -ItemType Directory -Path $work -Force)
         Copy-Item -LiteralPath $installLog -Destination (Join-Path $work 'install.log') -ErrorAction SilentlyContinue
         @(

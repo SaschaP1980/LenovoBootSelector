@@ -1,5 +1,16 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.9.0.0 – LBS-19 identifier standardization and compatibility migration
+
+- Standardize safe active application-owned identifiers on `Lenovo Boot Selector` / `LenovoBootSelector`, including the canonical source template, internal console helper, popup control name, installer workspace prefix, and user-visible uninstall prefix.
+- Migrate the HKCU Run value from `Lenovo Boot Menu Tray` to `Lenovo Boot Selector` idempotently: recognize the legacy registration, write the canonical value first, and remove only the exact legacy value after the canonical write succeeds; disabling autostart removes both known names.
+- Deliberately retain the pre-v0.9 release ZIP and flat package filenames so v0.8.0.4 and other compatible older installations can update directly to v0.9.0.0 without an intermediate migration release.
+- Deliberately retain the existing `%LOCALAPPDATA%\Lenovo Boot Menu Tray` state root, `%ProgramData%\Lenovo Boot Menu\TaskBroker`, `Local\LenovoBootMenuTray` mutex, fixed `LenovoBootMenu-*` TaskBroker names, and cleanup-only legacy identifiers as stable technical compatibility contracts rather than product branding.
+- Preserve visible `Lenovo Boot Menu` terminology where it describes the actual Lenovo/firmware boot menu.
+- Add `docs/IDENTIFIER_COMPATIBILITY.md`, a permanent 22-check Windows PowerShell 5.1 identifier/migration suite, and explicit v0.9 updater-compatibility regression coverage.
+- Preserve the unelevated updater, fixed TaskBroker privilege boundary, BootNext semantics, firmware/BCD safety rules, and historical release immutability.
+- Release profile: `patch`. Intentional protected-fragment delta: `ps:New-PopupForm`. Intentional repository deletion: `src/App/LenovoBootMenuTray.template.ps1` after migration to `src/App/LenovoBootSelector.template.ps1`.
+
 ## v0.8.0.4 – LBS-25 fresh update-manifest hotfix
 
 - Prevent a just-published release from being hidden behind a stale mutable `downloads/latest.json` response by adding a unique cache-busting query parameter to every manifest check.

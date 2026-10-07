@@ -150,6 +150,7 @@ jobs:
               maintenance = Get-TestTotal $logText '^MAINTENANCE TOTAL\s+(\d+)/(\d+)\s*$'
               bootTargetDrift = Get-TestTotal $logText '^DRIFT TOTAL\s+(\d+)/(\d+)\s*$'
               taskBrokerBoundary = Get-TestTotal $logText '^TASKBROKER BOUNDARY TOTAL\s+(\d+)/(\d+)\s*$'
+              identifierCompatibility = Get-TestTotal $logText '^IDENTIFIER TOTAL\s+(\d+)/(\d+)\s*$'
               updateAssertionSource = Get-TestTotal $logText '^UPDATE ASSERTION SOURCE\s+(\d+)/(\d+)\s*$'
               updateCore = Get-TestTotal $logText '^UPDATE TOTAL\s+(\d+)/(\d+)\s*$'
           }
@@ -164,6 +165,7 @@ jobs:
               'maintenance',
               'bootTargetDrift',
               'taskBrokerBoundary',
+              'identifierCompatibility',
               'updateAssertionSource',
               'updateCore'
           )) {
@@ -184,6 +186,7 @@ jobs:
               $totals.maintenance.passed +
               $totals.bootTargetDrift.passed +
               $totals.taskBrokerBoundary.passed +
+              $totals.identifierCompatibility.passed +
               $totals.updateCore.passed
           )
           $functionalExpected = (
@@ -195,6 +198,7 @@ jobs:
               $totals.maintenance.expected +
               $totals.bootTargetDrift.expected +
               $totals.taskBrokerBoundary.expected +
+              $totals.identifierCompatibility.expected +
               $totals.updateCore.expected
           )
 

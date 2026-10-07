@@ -2,6 +2,8 @@
 
 This directory contains the **historically retained built releases** of Lenovo Boot Selector.
 
+Current releases use **Lenovo Boot Selector** as the product name. The historical-looking `LenovoBootMenuTray-v<version>.zip` filename is intentionally retained as an updater compatibility identifier so pre-v0.9 installations can update directly; existing release rows and ZIPs remain immutable. See [`../docs/IDENTIFIER_COMPATIBILITY.md`](../docs/IDENTIFIER_COMPATIBILITY.md).
+
 ## Policy
 
 - Every product source revision that requires a new build receives a new version.

@@ -33,7 +33,7 @@ def psfn(s,n):
 
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); a=ap.parse_args(); root=a.root
-    s=Suite(); tray=txt(root/'bin/LenovoBootMenuTray.ps1'); template=txt(root/'src/App/LenovoBootMenuTray.template.ps1')
+    s=Suite(); tray=txt(root/'bin/LenovoBootMenuTray.ps1'); template=txt(root/'src/App/LenovoBootSelector.template.ps1')
     version=load_version(root)
     s.check('bin/version.json provides version',bool(version))
     expected=f"$script:AppVersion = '{version}'" if version else ''

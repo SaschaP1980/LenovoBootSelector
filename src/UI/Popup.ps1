@@ -10,7 +10,7 @@
     }
 
     $form = New-Object System.Windows.Forms.Form
-    $form.Name = 'LenovoBootMenuPopup'
+    $form.Name = 'LenovoBootSelectorPopup'
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
     $form.ShowInTaskbar = $false
     $form.TopMost = $true

@@ -24,6 +24,8 @@ No runtime API accepts a free Scheduled Task name.
 
 `DefaultRestore` exists as the fixed startup task `LenovoBootMenu-Default-Restore`, but it is not exposed as an unelevated runtime operation. It is driven only by its fixed AtStartup trigger.
 
+The `LenovoBootMenu-*` task family and `%ProgramData%\Lenovo Boot Menu\TaskBroker` path are retained technical compatibility/security identifiers. They are not alternate product branding and are intentionally not renamed by LBS-19 because they are part of the fixed allowlist and ACL boundary. See [IDENTIFIER_COMPATIBILITY.md](IDENTIFIER_COMPATIBILITY.md).
+
 ## Fixed task naming
 
 Static tasks have exact names:

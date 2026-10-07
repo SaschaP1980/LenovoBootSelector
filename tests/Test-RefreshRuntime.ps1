@@ -54,7 +54,7 @@ Assert-RefreshTest 'Result JSON parses through application contract' ([bool]$par
 
 # LBS-22: child workers must inherit the tray diagnostics session instead of
 # silently creating a separate session that is absent from the exported ZIP.
-$templatePath = Join-Path $root 'src\App\LenovoBootMenuTray.template.ps1'
+$templatePath = Join-Path $root 'src\App\LenovoBootSelector.template.ps1'
 $templateText = [System.IO.File]::ReadAllText($templatePath, [System.Text.Encoding]::UTF8)
 $captureMarker = '$script:InheritedRuntimeSessionId = [string]$RuntimeSessionId'
 $resetMarker = '$script:RuntimeSessionId = $null'

@@ -25,6 +25,7 @@ These four files are the permanent Python gates used by the GitHub Release Orche
 | `Test-SingleInstanceMutex.ps1` | Runtime | Single-instance / mutex lifecycle |
 | `Test-BootTargetDrift.ps1` | Safety | Drift detection and fail-closed states |
 | `Test-TaskBrokerBoundary.ps1` | Safety | LBS-6 fixed-task / metadata boundary without privileged execution |
+| `Test-IdentifierCompatibility.ps1` | Compatibility | Active naming contract, autostart migration, package compatibility IDs, and cross-version singleton/task invariants |
 | `Test-ArchitectureSoak.ps1` | Soak | Repeated architecture/state stability |
 | `Test-WindowsPowerShell51.ps1` | Compatibility | Windows PowerShell 5.1 parser/encoding gate and native aggregate runner |
 
@@ -48,18 +49,19 @@ Native PowerShell suites intentionally use different count strategies; one gener
 
 | Suite | Strategy |
 | --- | --- |
-| `Test-UpdateCore.ps1` | **AST self-audit + fixed coverage guard.** PowerShell counts the `Assert-True` / `Assert-Equal` command ASTs, compares them with the actually executed `$checks`, and additionally requires exactly 75. The permanent release gate validates the same contract statically. |
+| `Test-UpdateCore.ps1` | **AST self-audit + fixed coverage guard.** PowerShell counts the `Assert-True` / `Assert-Equal` command ASTs, compares them with the actually executed `$checks`, and additionally requires exactly 79. The permanent release gate validates the same contract statically. |
 | `Test-RefreshRuntime.ps1` | Straight-line: fixed runtime count of 28, including LBS-22 inherited/fresh diagnostics-session coverage for background-refresh, update-check, and update-prepare roles. |
 | `Test-TaskBrokerBoundary.ps1` | Straight-line: fixed runtime count of 23. |
 | `Test-BootTargetDrift.ps1` | Straight-line: fixed runtime count of 13. |
 | `Test-SingleInstanceMutex.ps1` | Explicit manual increments; fixed fail guard of 4. |
+| `Test-IdentifierCompatibility.ps1` | Straight-line: fixed runtime count of 29 covering LBS-19 naming, migration-failure safety, unrelated-value isolation, and retained compatibility roots. |
 | `Test-MaintenanceRuntime.ps1` | Loop-derived: 15 runtime checks from static assertions plus assertions repeated per mode. |
 | `Test-ArchitectureSoak.ps1` | Four aggregate soak assertions; each assertion covers many iterations. |
 | `Test-FunctionalCore.ps1` | Dynamic PASS counting; currently no separate coverage target count. |
 | `Test-LocalizationRuntime.ps1` | Straight-line: fixed runtime count of 32 covering native locale selection, explicit-preference persistence, v0.8.0.0 ambiguity resolution, startup-recovery migration, reload, parity, and lookup. |
 | `Test-WindowsPowerShell51.ps1` | Aggregate runner/parser gate; file count is dynamic and is not an assertion-coverage count. |
 
-When assertions are added, the corresponding contract must be updated deliberately. In particular, the fixed `75` guard in the update test must not be derived automatically from the source count: it is an additional change-control guard so that a suite extension cannot pass unnoticed.
+When assertions are added, the corresponding contract must be updated deliberately. In particular, the fixed `79` guard in the update test must not be derived automatically from the source count: it is an additional change-control guard so that a suite extension cannot pass unnoticed.
 
 ## Repository documentation language
 

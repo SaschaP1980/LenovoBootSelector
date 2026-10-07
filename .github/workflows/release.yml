@@ -256,6 +256,19 @@ jobs:
                 echo "LBS-13 migration left versioned validators in active tests/." >&2
                 exit 1
               fi
+            elif git cat-file -e origin/main:src/App/LenovoBootMenuTray.template.ps1 2>/dev/null && \
+                 test -f src/App/LenovoBootSelector.template.ps1; then
+              EXPECTED_LBS19_DELETIONS='src/App/LenovoBootMenuTray.template.ps1'
+              ACTUAL_DELETIONS=$(printf '%s\n' "$DELETED_PATHS" | sort)
+              test "$ACTUAL_DELETIONS" = "$EXPECTED_LBS19_DELETIONS" || {
+                echo "LBS-19 template rename delete set is not exact." >&2
+                printf '%s\n' "$DELETED_PATHS" >&2
+                exit 1
+              }
+              test -f src/App/LenovoBootSelector.template.ps1 || {
+                echo "LBS-19 canonical template target missing." >&2
+                exit 1
+              }
             else
               echo "Release unexpectedly deletes repository files." >&2
               printf '%s\n' "$DELETED_PATHS" >&2
