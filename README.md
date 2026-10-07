@@ -67,11 +67,13 @@ The application runs **unelevated** during normal operation. Privileged firmware
 
 The TaskBroker boundary is hardened fail-closed: the runtime accepts only fixed operation types, target-specific task names are derived only from validated installed firmware GUIDs, TaskBroker state/metadata are read-only for normal users, and task DACLs are validated for Read+Execute only. If the installed privileged-task metadata is missing or incompatible, the application reports that setup or repair is required and keeps privileged actions closed until explicit maintenance succeeds. The canonical contract is documented in [docs/SECURITY_BOUNDARY.md](docs/SECURITY_BOUNDARY.md).
 
-**Lenovo Boot Selector** is the only current product name. A small set of older-looking technical identifiers is deliberately retained for updater, package, persisted-state, singleton, cleanup, or TaskBroker compatibility; these are compatibility IDs rather than alternate branding. The complete naming and migration policy is documented in [docs/IDENTIFIER_COMPATIBILITY.md](docs/IDENTIFIER_COMPATIBILITY.md).
+Starting with v0.10.0.0, the privileged TaskBroker installation uses `LenovoBootSelector-*` Scheduled Task names and `%ProgramData%\Lenovo Boot Selector\TaskBroker`. Upgrading from v0.9.x or earlier requires one explicit **Repair privileged tasks** action with UAC; the repair migrates a valid system-wide default and removes the exact old TaskBroker installation only after the new one has been fully verified.
+
+**Lenovo Boot Selector** is the only current product name. A small set of older-looking technical identifiers is deliberately retained for updater, package, persisted-state, singleton, or cleanup compatibility; pre-v0.10 TaskBroker identifiers are migration/cleanup inputs only and are no longer runtime authorization identifiers. The complete naming and migration policy is documented in [docs/IDENTIFIER_COMPATIBILITY.md](docs/IDENTIFIER_COMPATIBILITY.md).
 
 Historical migration and repair details for v0.6.4.0/v0.6.4.1 are retained in [CHANGELOG.md](CHANGELOG.md) rather than presented as current maintenance instructions.
 
-**Current development version:** v0.9.0.0  
+**Current development version:** v0.10.0.0  
 **Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads and revision history

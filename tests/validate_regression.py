@@ -52,8 +52,16 @@ def main():
     if version=='0.9.0.0':
         normalized_uninstall=candidate_uninstall.replace('Lenovo Boot Selector:','Lenovo Boot Menu:',1)
         s.eq('LBS-19 uninstaller changes only the product-facing prefix',normalized_uninstall,basis_uninstall)
+    elif version=='0.10.0.0':
+        s.has('LBS-33 uninstaller recognizes canonical TaskBroker tasks',candidate_uninstall,"'LenovoBootSelector-RefreshManager'")
+        s.has('LBS-33 uninstaller retains exact legacy TaskBroker cleanup',candidate_uninstall,"'LenovoBootMenu-RefreshManager'")
+        s.has('LBS-33 uninstaller removes canonical ProgramData state',candidate_uninstall,"'Lenovo Boot Selector\\TaskBroker'")
+        s.has('LBS-33 uninstaller removes legacy ProgramData state',candidate_uninstall,"'Lenovo Boot Menu\\TaskBroker'")
+        s.has('LBS-33 uninstaller validates canonical per-GUID suffix',candidate_uninstall,"'^LenovoBootSelector-Set-[0-9a-fA-F]{32}$'")
+        s.has('LBS-33 uninstaller validates legacy per-GUID suffix',candidate_uninstall,"'^LenovoBootMenu-Set-[0-9a-fA-F]{32}$'")
+        s.no('LBS-33 uninstaller has no generic Lenovo wildcard deletion',candidate_uninstall,"Unregister-ScheduledTask -TaskName 'Lenovo")
     else:
-        s.eq('Uninstaller byte-identical to basis outside LBS-19 migration',sha(root/'bin/Uninstall-LenovoBootMenuTasks.ps1'),sha(basis_runtime_path(basis,'Uninstall-LenovoBootMenuTasks.ps1')))
+        s.eq('Uninstaller byte-identical to basis outside declared migrations',sha(root/'bin/Uninstall-LenovoBootMenuTasks.ps1'),sha(basis_runtime_path(basis,'Uninstall-LenovoBootMenuTasks.ps1')))
     if profile=='version-only':
         s.eq('Installer byte-identical for non-product release',sha(root/'bin/Install-LenovoBootMenuTasks.ps1'),sha(basis_runtime_path(basis,'Install-LenovoBootMenuTasks.ps1')))
     ui=txt(root/'src/UI/UpdatePresentation.ps1'); infra=txt(root/'src/Infrastructure/UpdateClient.ps1'); transport=txt(root/'src/Infrastructure/UpdateTransport.ps1')
@@ -89,13 +97,17 @@ def main():
     s.no('Updater remains unelevated',infra+'\n'+transport,'RunAs')
     s.no('Updater has no TaskBroker mutation',infra+'\n'+transport,'TaskBroker')
     s.no('Updater has no bcdedit',(infra+'\n'+transport).lower(),'bcdedit')
-    s.has('LBS-6 TaskBroker schema is v0.2.13',tray,"$script:SupportedTaskBrokerVersions = @('0.2.13')")
-    s.has('LBS-6 installer schema is v0.2.13',install,"$version = '0.2.13'")
-    s.has('LBS-6 explicit metadata boundary contract retained',install,"boundaryContract = 'fixed-task-v1'")
+    s.has('LBS-6 TaskBroker schema is v0.2.14',tray,"$script:SupportedTaskBrokerVersions = @('0.2.14')")
+    s.has('LBS-6 installer schema is v0.2.14',install,"$version = '0.2.14'")
+    s.has('LBS-6 explicit metadata boundary contract retained',install,"boundaryContract = 'fixed-task-v2'")
     s.no('LBS-6 no free TaskName call reaches runtime runner',taskbroker.lower(),'invoke-authorizedtask -taskname')
     s.has('LBS-6 operation-only runtime runner retained',taskbroker,"[ValidateSet('ManagerRefresh','FirmwareRefresh','BootNext','DefaultSet','DefaultClear')]")
     s.has('LBS-6 strict metadata contract retained',taskbroker,'function Test-TaskBrokerMetadataContract')
     s.has('LBS-6 fixed task-name derivation retained',taskbroker,'function Get-TaskBrokerExpectedTargetTaskName')
+    s.has('LBS-33 canonical fixed TaskBroker name retained',taskbroker,"LenovoBootSelector-RefreshManager")
+    s.no('LBS-33 legacy manager task is not a runtime return value',taskbroker,"return 'LenovoBootMenu-RefreshManager'")
+    s.has('LBS-33 legacy installation remains physically detectable',taskbroker,'LegacyTaskBrokerMetadataPath')
+
     s.has('LBS-6 task ACL dangerous-rights rejection retained',install,'$dangerousMask')
     s.has('LBS-6 ProgramData ACL protection retained',install,'function Protect-TaskBrokerStateDirectory')
     s.has('LBS-6 metadata ACL protection retained',install,'function Protect-TaskBrokerMetadataFile')

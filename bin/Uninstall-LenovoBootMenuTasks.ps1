@@ -14,11 +14,15 @@ if (-not (Test-IsAdministrator)) {
     throw 'Dieses Bereinigungsskript muss erhöht ausgeführt werden.'
 }
 
-# Safety boundary: only exact task names and the two explicit project-owned
-# per-GUID prefixes are eligible for removal. No generic Lenovo wildcard is used.
+# Safety boundary: only exact task names and exact project-owned per-GUID
+# patterns are eligible for removal. No generic Lenovo wildcard is used.
 $exactTaskNames = @(
     'Lenovo Boot Menu Next',
     'Lenovo Boot Menu Tray Autostart',
+    'LenovoBootSelector-RefreshManager',
+    'LenovoBootSelector-RefreshFirmware',
+    'LenovoBootSelector-Default-Clear',
+    'LenovoBootSelector-Default-Restore',
     'LenovoBootMenu-RefreshManager',
     'LenovoBootMenu-RefreshFirmware',
     'LenovoBootMenu-Default-Clear',
@@ -30,18 +34,20 @@ $exactTaskNames = @(
     'LenovoBootMenu-SystemBaseline',
     'LenovoBootMenuBroker-SystemProbe'
 )
-$ownedPrefixes = @(
-    'LenovoBootMenu-Set-',
-    'LenovoBootMenu-Default-Set-'
-)
+
+function Test-OwnedTaskName {
+    param([AllowEmptyString()][string]$TaskName)
+    if ([string]::IsNullOrWhiteSpace($TaskName)) { return $false }
+    if ($exactTaskNames -contains $TaskName) { return $true }
+    if ($TaskName -match '^LenovoBootSelector-Set-[0-9a-fA-F]{32}$') { return $true }
+    if ($TaskName -match '^LenovoBootSelector-Default-Set-[0-9a-fA-F]{32}$') { return $true }
+    if ($TaskName -match '^LenovoBootMenu-Set-[0-9a-fA-F]{32}$') { return $true }
+    if ($TaskName -match '^LenovoBootMenu-Default-Set-[0-9a-fA-F]{32}$') { return $true }
+    return $false
+}
 
 $tasks = @(Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object {
-    $name = [string]$_.TaskName
-    if ($exactTaskNames -contains $name) { return $true }
-    foreach ($prefix in $ownedPrefixes) {
-        if ($name.StartsWith($prefix,[System.StringComparison]::OrdinalIgnoreCase)) { return $true }
-    }
-    return $false
+    Test-OwnedTaskName -TaskName ([string]$_.TaskName)
 })
 
 $removed = New-Object System.Collections.Generic.List[string]
@@ -60,20 +66,25 @@ try {
     }
 } catch { }
 
-$oldBrokerRoot = Join-Path ${env:ProgramFiles} 'Lenovo Boot Menu\Broker'
+$oldBrokerRoot = Join-Path $env:ProgramFiles 'Lenovo Boot Menu\Broker'
 if (Test-Path -LiteralPath $oldBrokerRoot) {
     Remove-Item -LiteralPath $oldBrokerRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# System-wide TaskBroker metadata, firmware caches and default state.
-$stateRoot = Join-Path $env:ProgramData 'Lenovo Boot Menu\TaskBroker'
-if (Test-Path -LiteralPath $stateRoot) {
-    Remove-Item -LiteralPath $stateRoot -Recurse -Force -ErrorAction Stop
-}
-$projectRoot = Split-Path $stateRoot -Parent
-if (Test-Path -LiteralPath $projectRoot) {
-    $remaining = @(Get-ChildItem -LiteralPath $projectRoot -Force -ErrorAction SilentlyContinue)
-    if ($remaining.Count -eq 0) { Remove-Item -LiteralPath $projectRoot -Force -ErrorAction SilentlyContinue }
+# Remove both the canonical v0.10+ state and the exact pre-v0.10 legacy state.
+$stateRoots = @(
+    (Join-Path $env:ProgramData 'Lenovo Boot Selector\TaskBroker'),
+    (Join-Path $env:ProgramData 'Lenovo Boot Menu\TaskBroker')
+)
+foreach ($stateRoot in $stateRoots) {
+    if (Test-Path -LiteralPath $stateRoot) {
+        Remove-Item -LiteralPath $stateRoot -Recurse -Force -ErrorAction Stop
+    }
+    $projectRoot = Split-Path $stateRoot -Parent
+    if (Test-Path -LiteralPath $projectRoot) {
+        $remaining = @(Get-ChildItem -LiteralPath $projectRoot -Force -ErrorAction SilentlyContinue)
+        if ($remaining.Count -eq 0) { Remove-Item -LiteralPath $projectRoot -Force -ErrorAction SilentlyContinue }
+    }
 }
 
 Write-Host ('Lenovo Boot Selector: {0} projektbezogene Scheduled Tasks entfernt.' -f $removed.Count)

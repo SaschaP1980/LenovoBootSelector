@@ -9,14 +9,17 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $script:CurrentStep = 'init'
-$version = '0.2.13'
-$taskPrefix = 'LenovoBootMenu-Set-'
-$defaultTaskPrefix = 'LenovoBootMenu-Default-Set-'
-$managerRefreshTask = 'LenovoBootMenu-RefreshManager'
-$firmwareRefreshTask = 'LenovoBootMenu-RefreshFirmware'
-$defaultClearTask = 'LenovoBootMenu-Default-Clear'
-$defaultRestoreTask = 'LenovoBootMenu-Default-Restore'
+$version = '0.2.14'
+$taskPrefix = 'LenovoBootSelector-Set-'
+$defaultTaskPrefix = 'LenovoBootSelector-Default-Set-'
+$managerRefreshTask = 'LenovoBootSelector-RefreshManager'
+$firmwareRefreshTask = 'LenovoBootSelector-RefreshFirmware'
+$defaultClearTask = 'LenovoBootSelector-Default-Clear'
+$defaultRestoreTask = 'LenovoBootSelector-Default-Restore'
 $legacyBootMenuTask = 'Lenovo Boot Menu Next'
+$canonicalStateDir = Join-Path $env:ProgramData 'Lenovo Boot Selector\TaskBroker'
+$legacyStateDir = Join-Path $env:ProgramData 'Lenovo Boot Menu\TaskBroker'
+$legacyDefaultFile = Join-Path (Join-Path $legacyStateDir 'Default') 'default-guid.txt'
 $managerFile = Join-Path $StateDir 'fwbootmgr.txt'
 $firmwareFile = Join-Path $StateDir 'firmware.txt'
 $metadataFile = Join-Path $StateDir 'task-broker.json'
@@ -67,6 +70,80 @@ function Normalize-GuidText([AllowNull()][string]$Value) {
     $valueText = $Value.Trim().ToLowerInvariant()
     if ($valueText -match '^\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\}$') { return $valueText }
     return $null
+}
+
+
+function Resolve-TaskBrokerInitialDefault {
+    param(
+        [AllowEmptyString()][string]$CanonicalDefault = '',
+        [AllowEmptyString()][string]$LegacyTaskBrokerDefault = '',
+        [AllowEmptyString()][string]$LegacyUserDefault = '',
+        [AllowEmptyString()][string]$HistoricalBootMenuDefault = ''
+    )
+    foreach ($candidate in @($CanonicalDefault,$LegacyTaskBrokerDefault,$LegacyUserDefault,$HistoricalBootMenuDefault)) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$candidate)) { return [string]$candidate }
+    }
+    return ''
+}
+
+function Get-ValidDefaultFromPath {
+    param(
+        [AllowEmptyString()][string]$Path,
+        [Parameter(Mandatory=$true)][string[]]$AllowedGuids
+    )
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+    try {
+        $candidate = Normalize-GuidText ([System.IO.File]::ReadAllText($Path))
+        if ($candidate -and ($AllowedGuids -contains $candidate)) { return $candidate }
+    }
+    catch { }
+    return $null
+}
+
+function Test-LegacyTaskBrokerOwnedTaskName {
+    param([AllowEmptyString()][string]$TaskName)
+    if ([string]::IsNullOrWhiteSpace($TaskName)) { return $false }
+    if (@(
+        'LenovoBootMenu-RefreshManager',
+        'LenovoBootMenu-RefreshFirmware',
+        'LenovoBootMenu-Default-Clear',
+        'LenovoBootMenu-Default-Restore'
+    ) -contains $TaskName) { return $true }
+    if ($TaskName -match '^LenovoBootMenu-Set-[0-9a-fA-F]{32}$') { return $true }
+    if ($TaskName -match '^LenovoBootMenu-Default-Set-[0-9a-fA-F]{32}$') { return $true }
+    return $false
+}
+
+function Get-LegacyTaskBrokerOwnedTaskNames {
+    $names = New-Object System.Collections.Generic.List[string]
+    foreach ($task in @(Get-ScheduledTask -ErrorAction SilentlyContinue)) {
+        $name = [string]$task.TaskName
+        if (Test-LegacyTaskBrokerOwnedTaskName -TaskName $name) { [void]$names.Add($name) }
+    }
+    return @($names | Sort-Object -Unique)
+}
+
+function Remove-LegacyTaskBrokerInstallation {
+    $removed = New-Object System.Collections.Generic.List[string]
+    foreach ($name in @(Get-LegacyTaskBrokerOwnedTaskNames)) {
+        Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction Stop
+        [void]$removed.Add($name)
+    }
+
+    $canonicalFull = [System.IO.Path]::GetFullPath($canonicalStateDir)
+    $legacyFull = [System.IO.Path]::GetFullPath($legacyStateDir)
+    if ([string]::Equals($canonicalFull,$legacyFull,[System.StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Legacy and canonical TaskBroker state roots unexpectedly resolve to the same path.'
+    }
+    if (Test-Path -LiteralPath $legacyStateDir) {
+        Remove-Item -LiteralPath $legacyStateDir -Recurse -Force -ErrorAction Stop
+    }
+    $legacyProjectRoot = Split-Path $legacyStateDir -Parent
+    if (Test-Path -LiteralPath $legacyProjectRoot) {
+        $remaining = @(Get-ChildItem -LiteralPath $legacyProjectRoot -Force -ErrorAction SilentlyContinue)
+        if ($remaining.Count -eq 0) { Remove-Item -LiteralPath $legacyProjectRoot -Force -ErrorAction SilentlyContinue }
+    }
+    Write-InstallLog ("Legacy TaskBroker cleanup complete: tasks={0}; stateRoot={1}" -f $removed.Count,$legacyStateDir)
 }
 
 function Invoke-BcdEditText([string[]]$Arguments) {
@@ -354,6 +431,78 @@ function Register-FixedSystemTask {
     Grant-TaskReadExecute -TaskName $TaskName -Sid $UserSid
 }
 
+
+function Assert-CanonicalTaskSpec {
+    param([Parameter(Mandatory=$true)]$Spec)
+
+    $definition = Get-ScheduledTask -TaskName ([string]$Spec.Name) -ErrorAction Stop
+    $principalUser = [string]$definition.Principal.UserId
+    if ($principalUser -ne 'SYSTEM' -and $principalUser -ne 'S-1-5-18') {
+        throw "Task principal is not SYSTEM: $($Spec.Name)"
+    }
+    if ([string]$definition.Principal.RunLevel -ne 'Highest') {
+        throw "Task run level is not Highest: $($Spec.Name)"
+    }
+
+    $actions = @($definition.Actions)
+    if ($actions.Count -ne 1) { throw "Task action count is not exactly one: $($Spec.Name)" }
+    if (-not [string]::Equals([string]$actions[0].Execute,[string]$Spec.Execute,[System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Task executable mismatch: $($Spec.Name)"
+    }
+    if (-not [string]::Equals([string]$actions[0].Arguments,[string]$Spec.Arguments,[System.StringComparison]::Ordinal)) {
+        throw "Task arguments mismatch: $($Spec.Name)"
+    }
+
+    $triggers = @($definition.Triggers)
+    if ([string]$Spec.StartupDelay) {
+        if ($triggers.Count -ne 1) { throw "Startup task trigger count mismatch: $($Spec.Name)" }
+        $delayText = [string]$triggers[0].Delay
+        if ($delayText -ne [string]$Spec.StartupDelay -and $delayText -ne '00:00:30') {
+            throw "Startup task delay mismatch: $($Spec.Name)"
+        }
+    }
+    elseif ($triggers.Count -ne 0) {
+        throw "Non-startup task unexpectedly has a trigger: $($Spec.Name)"
+    }
+
+    $task = (Get-ScheduleService).GetFolder('\').GetTask("\$($Spec.Name)")
+    $sddl = $task.GetSecurityDescriptor(0x7)
+    if (-not (Test-SddlReadExecuteAce -Sddl $sddl -Sid $UserSid)) {
+        throw "Task DACL violates Read+Execute-only contract: $($Spec.Name)"
+    }
+}
+
+function Assert-CanonicalTaskBrokerMetadata {
+    if (-not (Test-Path -LiteralPath $metadataFile -PathType Leaf)) { throw 'Canonical TaskBroker metadata is missing.' }
+    $meta = ([System.IO.File]::ReadAllText($metadataFile,[System.Text.Encoding]::UTF8) | ConvertFrom-Json)
+    if ([string]$meta.version -ne '0.2.14') { throw 'Canonical metadata version mismatch.' }
+    if ([string]$meta.boundaryContract -ne 'fixed-task-v2') { throw 'Canonical metadata boundary contract mismatch.' }
+    if ([string]$meta.userSid -ne $UserSid) { throw 'Canonical metadata user SID mismatch.' }
+    if ([string]$meta.managerRefreshTask -ne $managerRefreshTask) { throw 'Canonical manager task mismatch.' }
+    if ([string]$meta.firmwareRefreshTask -ne $firmwareRefreshTask) { throw 'Canonical firmware task mismatch.' }
+    if ([string]$meta.defaultClearTask -ne $defaultClearTask) { throw 'Canonical default-clear task mismatch.' }
+    if ([string]$meta.defaultRestoreTask -ne $defaultRestoreTask) { throw 'Canonical default-restore task mismatch.' }
+
+    foreach ($pair in @(
+        @([string]$meta.managerFile,$managerFile),
+        @([string]$meta.firmwareFile,$firmwareFile),
+        @([string]$meta.defaultFile,$defaultFile)
+    )) {
+        if (-not [string]::Equals([System.IO.Path]::GetFullPath($pair[0]),[System.IO.Path]::GetFullPath($pair[1]),[System.StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Canonical metadata state path mismatch.'
+        }
+    }
+
+    $metaTargets = @($meta.targets)
+    if ($metaTargets.Count -ne $targets.Count) { throw 'Canonical metadata target count mismatch.' }
+    foreach ($target in @($targets)) {
+        $match = @($metaTargets | Where-Object { [string]$_.guid -eq [string]$target.guid })
+        if ($match.Count -ne 1) { throw "Canonical metadata target mismatch: $($target.guid)" }
+        if ([string]$match[0].taskName -ne [string]$target.taskName) { throw "Canonical BootNext metadata mismatch: $($target.guid)" }
+        if ([string]$match[0].defaultTaskName -ne [string]$target.defaultTaskName) { throw "Canonical DefaultSet metadata mismatch: $($target.guid)" }
+    }
+}
+
 function New-EncodedPowerShellAction([string]$ScriptText) {
     $bytes = [System.Text.Encoding]::Unicode.GetBytes($ScriptText)
     $encoded = [Convert]::ToBase64String($bytes)
@@ -397,13 +546,11 @@ function Protect-DefaultStateFile {
 }
 
 function Get-ExistingSystemDefault([string[]]$AllowedGuids) {
-    if (-not (Test-Path -LiteralPath $defaultFile)) { return $null }
-    try {
-        $candidate = Normalize-GuidText ([System.IO.File]::ReadAllText($defaultFile))
-        if ($candidate -and ($AllowedGuids -contains $candidate)) { return $candidate }
-    }
-    catch { }
-    return $null
+    return (Get-ValidDefaultFromPath -Path $defaultFile -AllowedGuids $AllowedGuids)
+}
+
+function Get-LegacyTaskBrokerDefault([string[]]$AllowedGuids) {
+    return (Get-ValidDefaultFromPath -Path $legacyDefaultFile -AllowedGuids $AllowedGuids)
 }
 
 function Test-LegacyBootMenuTaskPresent {
@@ -456,12 +603,16 @@ function New-InstallDiagnosticZip($ErrorRecord) {
             "Error: $($ErrorRecord.Exception.ToString())"
         ) | Set-Content -LiteralPath (Join-Path $work 'error.txt') -Encoding UTF8
         Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object {
+            $_.TaskName -like 'LenovoBootSelector-*' -or
             $_.TaskName -like 'LenovoBootMenu-*' -or
             $_.TaskName -eq 'Lenovo Boot Menu Next' -or
             $_.TaskName -eq 'Lenovo Boot Menu Tray Autostart'
         } | Select-Object TaskName,State,TaskPath | Format-List | Out-File -LiteralPath (Join-Path $work 'tasks.txt') -Encoding utf8
         if (Test-Path -LiteralPath $metadataFile) { Copy-Item -LiteralPath $metadataFile -Destination (Join-Path $work 'task-broker.json') -ErrorAction SilentlyContinue }
         if (Test-Path -LiteralPath $defaultFile) { Copy-Item -LiteralPath $defaultFile -Destination (Join-Path $work 'default-guid.txt') -ErrorAction SilentlyContinue }
+        $legacyMetadataFile = Join-Path $legacyStateDir 'task-broker.json'
+        if (Test-Path -LiteralPath $legacyMetadataFile) { Copy-Item -LiteralPath $legacyMetadataFile -Destination (Join-Path $work 'legacy-task-broker.json') -ErrorAction SilentlyContinue }
+        if (Test-Path -LiteralPath $legacyDefaultFile) { Copy-Item -LiteralPath $legacyDefaultFile -Destination (Join-Path $work 'legacy-default-guid.txt') -ErrorAction SilentlyContinue }
         $zip = Join-Path $diagRoot ("TaskBrokerInstall-$stamp.zip")
         Compress-Archive -Path (Join-Path $work '*') -DestinationPath $zip -Force
         Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
@@ -472,6 +623,13 @@ function New-InstallDiagnosticZip($ErrorRecord) {
 
 try {
     if (-not (Test-IsAdministrator)) { throw 'Dieses Installationsskript muss erhöht ausgeführt werden.' }
+
+    $stateFull = [System.IO.Path]::GetFullPath($StateDir)
+    $canonicalFull = [System.IO.Path]::GetFullPath($canonicalStateDir)
+    if (-not [string]::Equals($stateFull,$canonicalFull,[System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Unerwartetes TaskBroker-State-Verzeichnis: $StateDir"
+    }
+
     [void](New-Item -ItemType Directory -Path $StateDir -Force)
     [void](New-Item -ItemType Directory -Path $UserStateDir -Force)
     Remove-Item -LiteralPath $installLog -Force -ErrorAction SilentlyContinue
@@ -500,29 +658,44 @@ try {
     $bcdeditEscaped = $bcdedit.Replace("'","''")
 
     $existingDefault = Get-ExistingSystemDefault -AllowedGuids $model.AllowedGuids
+    $legacyTaskBrokerDefault = Get-LegacyTaskBrokerDefault -AllowedGuids $model.AllowedGuids
     $legacyDefault = Normalize-GuidText $LegacyDefaultGuid
     if ($legacyDefault -and -not ($model.AllowedGuids -contains $legacyDefault)) { $legacyDefault = $null }
     $legacyTaskPresent = Test-LegacyBootMenuTaskPresent
+    $historicalBootMenuDefault = if ($legacyTaskPresent -and $model.BootMenuGuid) { [string]$model.BootMenuGuid } else { '' }
 
-    $initialDefault = $existingDefault
-    $migrationSource = if ($existingDefault) { 'existing-system-default' } else { 'none' }
-    if (-not $initialDefault -and $legacyDefault) {
-        $initialDefault = $legacyDefault
-        $migrationSource = 'user-settings-v0.2.21-or-earlier'
+    $initialDefault = Resolve-TaskBrokerInitialDefault -CanonicalDefault $(if ($existingDefault) { $existingDefault } else { '' }) -LegacyTaskBrokerDefault $(if ($legacyTaskBrokerDefault) { $legacyTaskBrokerDefault } else { '' }) -LegacyUserDefault $(if ($legacyDefault) { $legacyDefault } else { '' }) -HistoricalBootMenuDefault $historicalBootMenuDefault
+
+    $migrationSource = if ($existingDefault) {
+        'canonical-system-default'
     }
-    elseif (-not $initialDefault -and $legacyTaskPresent -and $model.BootMenuGuid) {
-        $initialDefault = $model.BootMenuGuid
-        $migrationSource = 'historical-Lenovo-Boot-Menu-Next'
+    elseif ($legacyTaskBrokerDefault) {
+        'legacy-taskbroker-v0.2.13'
+    }
+    elseif ($legacyDefault) {
+        'user-settings-v0.2.21-or-earlier'
+    }
+    elseif ($historicalBootMenuDefault) {
+        'historical-Lenovo-Boot-Menu-Next'
+    }
+    else {
+        'none'
     }
     Write-InstallLog ("Initial default: {0}; source={1}; historicalTaskPresent={2}" -f $(if ($initialDefault) { $initialDefault } else { '<none>' }),$migrationSource,$legacyTaskPresent)
 
+    $taskSpecs = @()
+
     Set-Step 'register-refresh-manager'
     $mgrCmd = '/d /c ""{0}" /enum "{{fwbootmgr}}" /v > "{1}" 2>&1"' -f $bcdedit,$managerFile
-    Register-FixedSystemTask -TaskName $managerRefreshTask -Action (New-ScheduledTaskAction -Execute $cmd -Argument $mgrCmd)
+    $mgrAction = New-ScheduledTaskAction -Execute $cmd -Argument $mgrCmd
+    Register-FixedSystemTask -TaskName $managerRefreshTask -Action $mgrAction -ReplaceDefinition
+    $taskSpecs += [pscustomobject]@{ Name=$managerRefreshTask; Execute=$cmd; Arguments=$mgrCmd; StartupDelay='' }
 
     Set-Step 'register-refresh-firmware'
     $fwCmd = '/d /c ""{0}" /enum firmware /v > "{1}" 2>&1"' -f $bcdedit,$firmwareFile
-    Register-FixedSystemTask -TaskName $firmwareRefreshTask -Action (New-ScheduledTaskAction -Execute $cmd -Argument $fwCmd)
+    $fwAction = New-ScheduledTaskAction -Execute $cmd -Argument $fwCmd
+    Register-FixedSystemTask -TaskName $firmwareRefreshTask -Action $fwAction -ReplaceDefinition
+    $taskSpecs += [pscustomobject]@{ Name=$firmwareRefreshTask; Execute=$cmd; Arguments=$fwCmd; StartupDelay='' }
 
     Set-Step 'register-target-tasks'
     $targets = @()
@@ -531,11 +704,15 @@ try {
         $taskName = $taskPrefix + $compact
         $defaultTaskName = $defaultTaskPrefix + $compact
 
-        $bootAction = New-ScheduledTaskAction -Execute $bcdedit -Argument ('/set "{{fwbootmgr}}" bootsequence "{0}"' -f $guid)
-        Register-FixedSystemTask -TaskName $taskName -Action $bootAction
+        $bootArgs = '/set "{{fwbootmgr}}" bootsequence "{0}"' -f $guid
+        $bootAction = New-ScheduledTaskAction -Execute $bcdedit -Argument $bootArgs
+        Register-FixedSystemTask -TaskName $taskName -Action $bootAction -ReplaceDefinition
+        $taskSpecs += [pscustomobject]@{ Name=$taskName; Execute=$bcdedit; Arguments=$bootArgs; StartupDelay='' }
 
         $setDefaultScript = "[System.IO.File]::WriteAllText('$defaultFileEscaped','$guid',[System.Text.Encoding]::ASCII); exit 0"
-        Register-FixedSystemTask -TaskName $defaultTaskName -Action (New-EncodedPowerShellAction $setDefaultScript) -ReplaceDefinition
+        $setDefaultAction = New-EncodedPowerShellAction $setDefaultScript
+        Register-FixedSystemTask -TaskName $defaultTaskName -Action $setDefaultAction -ReplaceDefinition
+        $taskSpecs += [pscustomobject]@{ Name=$defaultTaskName; Execute=$powershell; Arguments=[string]$setDefaultAction.Arguments; StartupDelay='' }
 
         $desc = if ($model.Descriptions.ContainsKey($guid)) { [string]$model.Descriptions[$guid] } else { 'Firmware-Startziel' }
         $targets += [pscustomobject]@{ guid=$guid; taskName=$taskName; defaultTaskName=$defaultTaskName; description=$desc }
@@ -543,7 +720,9 @@ try {
 
     Set-Step 'register-default-clear'
     $clearDefaultScript = "Remove-Item -LiteralPath '$defaultFileEscaped' -Force -ErrorAction SilentlyContinue; exit 0"
-    Register-FixedSystemTask -TaskName $defaultClearTask -Action (New-EncodedPowerShellAction $clearDefaultScript) -ReplaceDefinition
+    $clearAction = New-EncodedPowerShellAction $clearDefaultScript
+    Register-FixedSystemTask -TaskName $defaultClearTask -Action $clearAction -ReplaceDefinition
+    $taskSpecs += [pscustomobject]@{ Name=$defaultClearTask; Execute=$powershell; Arguments=[string]$clearAction.Arguments; StartupDelay='' }
 
     Set-Step 'register-default-restore-disabled'
     $allowedLiteral = (@($model.AllowedGuids) | ForEach-Object { "'$_'" }) -join ','
@@ -558,9 +737,11 @@ exit `$LASTEXITCODE
 "@
     $startupTrigger = New-ScheduledTaskTrigger -AtStartup
     $startupTrigger.Delay = 'PT30S'
-    Register-FixedSystemTask -TaskName $defaultRestoreTask -Action (New-EncodedPowerShellAction $restoreScript) -Trigger $startupTrigger -ReplaceDefinition
+    $restoreAction = New-EncodedPowerShellAction $restoreScript
+    Register-FixedSystemTask -TaskName $defaultRestoreTask -Action $restoreAction -Trigger $startupTrigger -ReplaceDefinition
     Disable-ScheduledTask -TaskName $defaultRestoreTask -ErrorAction Stop | Out-Null
-    Write-InstallLog 'Default restore registered with AtStartup + PT30S and temporarily disabled for migration.'
+    $taskSpecs += [pscustomobject]@{ Name=$defaultRestoreTask; Execute=$powershell; Arguments=[string]$restoreAction.Arguments; StartupDelay='PT30S' }
+    Write-InstallLog 'Canonical default restore registered with AtStartup + PT30S and temporarily disabled.'
 
     Set-Step 'persist-initial-default'
     if ($initialDefault) {
@@ -573,41 +754,10 @@ exit `$LASTEXITCODE
         Write-InstallLog 'System default disabled (no default file).'
     }
 
-    Set-Step 'validate-user-access'
-    $requiredTasks = @($managerRefreshTask,$firmwareRefreshTask,$defaultClearTask,$defaultRestoreTask)
-    $requiredTasks += @($targets | ForEach-Object { $_.taskName })
-    $requiredTasks += @($targets | ForEach-Object { $_.defaultTaskName })
-    foreach ($name in $requiredTasks) {
-        $service = Get-ScheduleService
-        $task = $service.GetFolder('\').GetTask("\$name")
-        $sddl = $task.GetSecurityDescriptor(0x7)
-        if (-not (Test-SddlReadExecuteAce -Sddl $sddl -Sid $UserSid)) {
-            throw "Task-DACL enthält keine wirksame Read+Execute-ACE für den Benutzer: $name"
-        }
-        Write-InstallLog "ACL verified: $name"
-    }
-
-    Set-Step 'migrate-historical-default-task'
-    if ($legacyTaskPresent) {
-        Unregister-ScheduledTask -TaskName $legacyBootMenuTask -Confirm:$false -ErrorAction Stop
-        Write-InstallLog "Historical task removed after successful new-task validation: $legacyBootMenuTask"
-    }
-
-    Set-Step 'enable-default-restore'
-    Enable-ScheduledTask -TaskName $defaultRestoreTask -ErrorAction Stop | Out-Null
-    $restoreDefinition = Get-ScheduledTask -TaskName $defaultRestoreTask -ErrorAction Stop
-    $restoreCom = (Get-ScheduleService).GetFolder('\').GetTask("\$defaultRestoreTask")
-    if (-not $restoreCom.Enabled) { throw 'Default-Restore-Aufgabe konnte nicht aktiviert werden.' }
-    if (@($restoreDefinition.Triggers).Count -lt 1) { throw 'Default-Restore-Aufgabe besitzt keinen Startup-Trigger.' }
-    Write-InstallLog ("Default restore trigger delay readback: {0}" -f [string]$restoreDefinition.Triggers[0].Delay)
-    $restoreSddl = $restoreCom.GetSecurityDescriptor(0x7)
-    if (-not (Test-SddlReadExecuteAce -Sddl $restoreSddl -Sid $UserSid)) { throw 'Default-Restore-ACL wurde beim Aktivieren unerwartet verändert.' }
-    Write-InstallLog 'Default restore enabled and revalidated.'
-
     Set-Step 'write-metadata'
     $metadata = [ordered]@{
         version = $version
-        boundaryContract = 'fixed-task-v1'
+        boundaryContract = 'fixed-task-v2'
         installedUtc = [datetime]::UtcNow.ToString('o')
         userSid = $UserSid
         managerRefreshTask = $managerRefreshTask
@@ -622,10 +772,38 @@ exit `$LASTEXITCODE
     }
     $metadata | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $metadataFile -Encoding UTF8
     Protect-TaskBrokerMetadataFile
-    if (-not (Test-TaskBrokerStatePathLeastPrivilege -Path $metadataFile)) {
-        throw 'TaskBroker-Metadatendatei erfüllt den Least-Privilege-ACL-Vertrag nicht.'
+
+    Set-Step 'enable-default-restore'
+    Enable-ScheduledTask -TaskName $defaultRestoreTask -ErrorAction Stop | Out-Null
+
+    Set-Step 'verify-canonical-installation'
+    if (-not (Test-TaskBrokerStatePathLeastPrivilege -Path $StateDir)) {
+        throw 'Canonical TaskBroker state ACL verification failed.'
     }
-    Write-InstallLog 'TaskBroker metadata ACL verified: SYSTEM/Admin write, Users read/execute only.'
+    if (-not (Test-TaskBrokerStatePathLeastPrivilege -Path $defaultStateDir)) {
+        throw 'Canonical default-state directory ACL verification failed.'
+    }
+    if ($initialDefault -and -not (Test-TaskBrokerStatePathLeastPrivilege -Path $defaultFile)) {
+        throw 'Canonical default-state file ACL verification failed.'
+    }
+    if (-not (Test-TaskBrokerStatePathLeastPrivilege -Path $metadataFile)) {
+        throw 'Canonical metadata ACL verification failed.'
+    }
+    Assert-CanonicalTaskBrokerMetadata
+    foreach ($spec in @($taskSpecs)) { Assert-CanonicalTaskSpec -Spec $spec }
+
+    $restoreCom = (Get-ScheduleService).GetFolder('\').GetTask("\$defaultRestoreTask")
+    if (-not $restoreCom.Enabled) { throw 'Default-Restore-Aufgabe konnte nicht aktiviert werden.' }
+    Write-InstallLog 'Canonical TaskBroker installation fully verified.'
+
+    Set-Step 'cleanup-legacy-taskbroker'
+    Remove-LegacyTaskBrokerInstallation
+
+    Set-Step 'migrate-historical-default-task'
+    if ($legacyTaskPresent) {
+        Unregister-ScheduledTask -TaskName $legacyBootMenuTask -Confirm:$false -ErrorAction Stop
+        Write-InstallLog "Historical task removed after successful canonical validation: $legacyBootMenuTask"
+    }
 
     Set-Step 'complete'
     Write-InstallLog 'SUCCESS'

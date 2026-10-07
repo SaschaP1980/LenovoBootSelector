@@ -1,5 +1,18 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.10.0.0 – LBS-33 privileged TaskBroker identifier migration
+
+- Move the privileged TaskBroker installation to canonical `LenovoBootSelector-*` Scheduled Task names and `%ProgramData%\Lenovo Boot Selector\TaskBroker`.
+- Advance the TaskBroker metadata contract to `0.2.14 / fixed-task-v2`; the unelevated runtime authorizes only the canonical v2 names and paths.
+- Treat a pre-v0.10 TaskBroker installation as present but incompatible so the UI requires one explicit Repair/Migrate action with UAC.
+- Preserve a valid system-wide default using precedence: canonical state → legacy TaskBroker state → historical user-settings default → historical Boot Menu task fallback.
+- Build, enable and fully verify the canonical task set, metadata and ACLs before removing any exact legacy TaskBroker task or the legacy ProgramData state root.
+- Make repair idempotent and keep failed pre-cleanup migrations recoverable; diagnostics retain both canonical and legacy migration evidence.
+- Update privileged cleanup/uninstall to recognize both generations using exact static names and exact 32-hex per-GUID patterns only; no generic Lenovo wildcard removal is introduced.
+- Keep `Local\LenovoBootMenuTray`, `%LOCALAPPDATA%\Lenovo Boot Menu Tray`, release ZIP names and flat package filenames unchanged because they have separate lifecycle/compatibility semantics.
+- One manual **Repair privileged tasks** operation is required after upgrading from v0.9.x or earlier.
+- Release profile: `patch`. Intentional protected-fragment delta: `ps:Test-TaskBrokerReady`. No repository deletions.
+
 ## v0.9.0.0 – LBS-19 identifier standardization and compatibility migration
 
 - Standardize safe active application-owned identifiers on `Lenovo Boot Selector` / `LenovoBootSelector`, including the canonical source template, internal console helper, popup control name, installer workspace prefix, and user-visible uninstall prefix.

@@ -15,7 +15,7 @@ function Assert-Equal([string]$Name,$Expected,$Actual) {
     Write-Host "PASS  $Name"
 }
 
-$script:SupportedTaskBrokerVersions = @('0.2.13')
+$script:SupportedTaskBrokerVersions = @('0.2.14')
 $script:TaskBrokerStateDir = Join-Path ([System.IO.Path]::GetTempPath()) 'LenovoBootSelector-LBS6-Boundary'
 $script:TaskBrokerMetadataPath = Join-Path $script:TaskBrokerStateDir 'task-broker.json'
 $script:TaskBrokerMetadata = $null
@@ -26,36 +26,36 @@ $guid = '{11111111-2222-3333-4444-555555555555}'
 $compact = '11111111222233334444555555555555'
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $meta = [pscustomobject]@{
-    version = '0.2.13'
-    boundaryContract = 'fixed-task-v1'
+    version = '0.2.14'
+    boundaryContract = 'fixed-task-v2'
     userSid = $sid
-    managerRefreshTask = 'LenovoBootMenu-RefreshManager'
-    firmwareRefreshTask = 'LenovoBootMenu-RefreshFirmware'
+    managerRefreshTask = 'LenovoBootSelector-RefreshManager'
+    firmwareRefreshTask = 'LenovoBootSelector-RefreshFirmware'
     managerFile = (Join-Path $script:TaskBrokerStateDir 'fwbootmgr.txt')
     firmwareFile = (Join-Path $script:TaskBrokerStateDir 'firmware.txt')
     defaultFile = (Join-Path (Join-Path $script:TaskBrokerStateDir 'Default') 'default-guid.txt')
-    defaultClearTask = 'LenovoBootMenu-Default-Clear'
-    defaultRestoreTask = 'LenovoBootMenu-Default-Restore'
+    defaultClearTask = 'LenovoBootSelector-Default-Clear'
+    defaultRestoreTask = 'LenovoBootSelector-Default-Restore'
     targets = @([pscustomobject]@{
         guid = $guid
-        taskName = ('LenovoBootMenu-Set-' + $compact)
-        defaultTaskName = ('LenovoBootMenu-Default-Set-' + $compact)
+        taskName = ('LenovoBootSelector-Set-' + $compact)
+        defaultTaskName = ('LenovoBootSelector-Default-Set-' + $compact)
         description = 'Test'
     })
 }
 
 Assert-Equal 'Canonical GUID retained' $guid (Normalize-TaskBrokerGuid -Guid $guid)
 Assert-True 'Malformed GUID rejected' ($null -eq (Normalize-TaskBrokerGuid -Guid 'not-a-guid'))
-Assert-Equal 'BootNext task name derived from GUID' ('LenovoBootMenu-Set-' + $compact) (Get-TaskBrokerExpectedTargetTaskName -Guid $guid)
-Assert-Equal 'Default task name derived from GUID' ('LenovoBootMenu-Default-Set-' + $compact) (Get-TaskBrokerExpectedTargetTaskName -Guid $guid -DefaultTarget)
-Assert-True 'Valid fixed-task-v1 metadata accepted' (Test-TaskBrokerMetadataContract -Metadata $meta)
+Assert-Equal 'BootNext task name derived from GUID' ('LenovoBootSelector-Set-' + $compact) (Get-TaskBrokerExpectedTargetTaskName -Guid $guid)
+Assert-Equal 'Default task name derived from GUID' ('LenovoBootSelector-Default-Set-' + $compact) (Get-TaskBrokerExpectedTargetTaskName -Guid $guid -DefaultTarget)
+Assert-True 'Valid fixed-task-v2 metadata accepted' (Test-TaskBrokerMetadataContract -Metadata $meta)
 
 $script:TaskBrokerMetadata = $meta
-Assert-Equal 'Manager refresh resolves fixed task' 'LenovoBootMenu-RefreshManager' (Resolve-TaskBrokerAuthorizedTaskName -Operation ManagerRefresh)
-Assert-Equal 'Firmware refresh resolves fixed task' 'LenovoBootMenu-RefreshFirmware' (Resolve-TaskBrokerAuthorizedTaskName -Operation FirmwareRefresh)
-Assert-Equal 'Default clear resolves fixed task' 'LenovoBootMenu-Default-Clear' (Resolve-TaskBrokerAuthorizedTaskName -Operation DefaultClear)
-Assert-Equal 'BootNext resolves only derived task' ('LenovoBootMenu-Set-' + $compact) (Resolve-TaskBrokerAuthorizedTaskName -Operation BootNext -Guid $guid)
-Assert-Equal 'DefaultSet resolves only derived task' ('LenovoBootMenu-Default-Set-' + $compact) (Resolve-TaskBrokerAuthorizedTaskName -Operation DefaultSet -Guid $guid)
+Assert-Equal 'Manager refresh resolves fixed task' 'LenovoBootSelector-RefreshManager' (Resolve-TaskBrokerAuthorizedTaskName -Operation ManagerRefresh)
+Assert-Equal 'Firmware refresh resolves fixed task' 'LenovoBootSelector-RefreshFirmware' (Resolve-TaskBrokerAuthorizedTaskName -Operation FirmwareRefresh)
+Assert-Equal 'Default clear resolves fixed task' 'LenovoBootSelector-Default-Clear' (Resolve-TaskBrokerAuthorizedTaskName -Operation DefaultClear)
+Assert-Equal 'BootNext resolves only derived task' ('LenovoBootSelector-Set-' + $compact) (Resolve-TaskBrokerAuthorizedTaskName -Operation BootNext -Guid $guid)
+Assert-Equal 'DefaultSet resolves only derived task' ('LenovoBootSelector-Default-Set-' + $compact) (Resolve-TaskBrokerAuthorizedTaskName -Operation DefaultSet -Guid $guid)
 
 $runner = Get-Command Invoke-AuthorizedTask
 Assert-False 'Runtime task runner exposes no TaskName parameter' $runner.Parameters.ContainsKey('TaskName')
@@ -77,7 +77,7 @@ $badBoundary.boundaryContract = 'anything-goes'
 Assert-False 'Unknown boundary contract rejected' (Test-TaskBrokerMetadataContract -Metadata $badBoundary)
 
 $badVersion = $meta | ConvertTo-Json -Depth 8 | ConvertFrom-Json
-$badVersion.version = '0.2.12'
+$badVersion.version = '0.2.13'
 Assert-False 'Legacy schema rejected by hardened runtime' (Test-TaskBrokerMetadataContract -Metadata $badVersion)
 
 $duplicate = $meta | ConvertTo-Json -Depth 8 | ConvertFrom-Json
@@ -105,5 +105,12 @@ Assert-False 'ReadAndExecute is accepted as non-mutating' (Test-TaskBrokerRights
 Assert-True 'Modify is rejected as mutating' (Test-TaskBrokerRightsContainMutation -Rights ([System.Security.AccessControl.FileSystemRights]::Modify))
 Assert-True 'FullControl is rejected as mutating' (Test-TaskBrokerRightsContainMutation -Rights ([System.Security.AccessControl.FileSystemRights]::FullControl))
 
-Write-Host "TASKBROKER BOUNDARY TOTAL $checks/23"
-if ($checks -ne 23) { throw "Unexpected TaskBroker boundary test count $checks" }
+
+$legacyNames = $meta | ConvertTo-Json -Depth 6 | ConvertFrom-Json
+$legacyNames.managerRefreshTask = 'LenovoBootMenu-RefreshManager'
+Assert-False 'Legacy fixed task name rejected by fixed-task-v2 metadata' (Test-TaskBrokerMetadataContract -Metadata $legacyNames)
+$legacyBoundary = $meta | ConvertTo-Json -Depth 6 | ConvertFrom-Json
+$legacyBoundary.boundaryContract = 'fixed-task-v1'
+Assert-False 'Legacy fixed-task-v1 boundary marker rejected' (Test-TaskBrokerMetadataContract -Metadata $legacyBoundary)
+Write-Host "TASKBROKER BOUNDARY TOTAL $checks/25"
+if ($checks -ne 25) { throw "Unexpected TaskBroker boundary test count $checks" }
