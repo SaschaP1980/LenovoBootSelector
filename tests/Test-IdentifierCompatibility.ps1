@@ -104,8 +104,8 @@ Assert-True 'Legacy-compatible packaged runtime filename remains present' ([Syst
 Assert-True 'Legacy-compatible release ZIP pattern remains retained' ($releaseCommonText.Contains("return f'LenovoBootMenuTray-v{version}.zip'"))
 Assert-True 'Hardened TaskBroker fixed task identifier remains retained' ($taskBrokerText.Contains("return 'LenovoBootMenu-RefreshManager'"))
 Assert-True 'Cross-version singleton mutex identifier remains retained' ($templateText.Contains("'Local\LenovoBootMenuTray'"))
-Assert-True 'Persisted LocalAppData root remains retained compatibility identifier' ($templateText.Contains("Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray'"))
-Assert-True 'Hardened ProgramData TaskBroker root remains retained compatibility identifier' ($templateText.Contains("Join-Path $env:ProgramData 'Lenovo Boot Menu\TaskBroker'"))
+Assert-True 'Persisted LocalAppData root remains retained compatibility identifier' ($templateText.Contains('Join-Path $env:LOCALAPPDATA ''Lenovo Boot Menu Tray'''))
+Assert-True 'Hardened ProgramData TaskBroker root remains retained compatibility identifier' ($templateText.Contains('Join-Path $env:ProgramData ''Lenovo Boot Menu\TaskBroker'''))
 
 Write-Host "IDENTIFIER TOTAL $checks/29"
 if ($checks -ne 29) { throw "Unexpected identifier compatibility test count $checks" }
