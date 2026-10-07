@@ -1,5 +1,5 @@
 {
-  "version": "0.10.0.2",
+  "version": "0.10.1.0",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
@@ -396,7 +396,7 @@
     },
     {
       "source": "src/Infrastructure/Storage.ps1",
-      "line": 58,
+      "line": 51,
       "category": "optional_probe_best_effort",
       "reason": "Optional storage metadata/probe failure degrades enrichment only.",
       "code": "catch { }"
