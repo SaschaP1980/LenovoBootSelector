@@ -21,8 +21,41 @@ def fn(src,name):
     e=m.end()+n.start() if n else len(src)
     return src[m.start():e]
 
+def validate_lbs37_contract(s:S,pre_activation:str,release_verification:str,release_workflow:str):
+    s.has('LBS-37 pre-activation helper emits machine-readable summary',pre_activation,'RELEASE_PREACTIVATION_SUMMARY=')
+    s.has('LBS-37 pre-activation helper requires public pointer to remain previous version',pre_activation,'public latest version changed before activation')
+    s.has('LBS-37 pre-activation helper validates staged latest metadata',pre_activation,'staged downloads/latest.json mismatch')
+    s.has('LBS-37 pre-activation helper validates staged release ZIP',pre_activation,'staged release ZIP does not match build summary')
+    s.has('LBS-37 pre-activation helper requires open unmerged PR',pre_activation,'publication PR is already merged before activation gate')
+    s.has('LBS-37 final verifier requires pre-activation evidence',release_verification,'--pre-activation-json')
+    s.has('LBS-37 final summary exposes pre-activation verification',release_verification,"'preActivationVerified':True")
+    s.has('LBS-37 release workflow captures exact base main SHA',release_workflow,'BASE_MAIN_SHA=$(git rev-parse origin/main)')
+    s.has('LBS-37 release workflow runs pre-activation verifier',release_workflow,'tools/release_pre_activation.py')
+    s.has('LBS-37 pre-activation receives previous public version',release_workflow,'--previous-version "$PREVIOUS_VERSION"')
+    s.has('LBS-37 pre-activation binds exact base main',release_workflow,'--base-main-sha "$BASE_MAIN_SHA"')
+    s.has('LBS-37 final verification consumes pre-activation evidence',release_workflow,'--pre-activation-json /tmp/lbs-release/release-pre-activation.json')
+    pre_activation_index=release_workflow.index('python3 -B tools/release_pre_activation.py')
+    merge_index=release_workflow.index('gh pr merge')
+    final_verification_index=release_workflow.index('python3 -B tools/release_verification.py')
+    s.c('LBS-37 activation ordering is pre-activation PASS then merge then final verification',
+        pre_activation_index < merge_index < final_verification_index)
+    s.eq('LBS-37 public pointer activation uses exactly one PR merge',release_workflow.count('gh pr merge'),1)
+    s.no('LBS-37 release workflow has no direct main push activation',release_workflow,'refs/heads/main')
+
+def self_test_lbs37()->int:
+    s=S()
+    pre_activation='RELEASE_PREACTIVATION_SUMMARY= public latest version changed before activation staged downloads/latest.json mismatch staged release ZIP does not match build summary publication PR is already merged before activation gate'
+    release_verification="--pre-activation-json 'preActivationVerified':True"
+    release_workflow='BASE_MAIN_SHA=$(git rev-parse origin/main) python3 -B tools/release_pre_activation.py --previous-version "$PREVIOUS_VERSION" --base-main-sha "$BASE_MAIN_SHA" --pre-activation-json /tmp/lbs-release/release-pre-activation.json gh pr merge python3 -B tools/release_verification.py'
+    validate_lbs37_contract(s,pre_activation,release_verification,release_workflow)
+    rc=s.done()
+    if rc==0: print('PASS LBS-37 release validator smoke')
+    return rc
+
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); a=ap.parse_args(); root=a.root.resolve(); s=S()
+    ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); ap.add_argument('--self-test-lbs37',action='store_true'); a=ap.parse_args()
+    if a.self_test_lbs37: return self_test_lbs37()
+    root=a.root.resolve(); s=S()
     markdown_gate=root/'tools/validate_markdown_language.py'
     s.c('LBS-18 Markdown language validator exists',markdown_gate.is_file())
     markdown_cp=subprocess.run([sys.executable,'-B',str(markdown_gate),'--root',str(root)],capture_output=True,text=True) if markdown_gate.is_file() else None
@@ -198,11 +231,14 @@ def main():
     s.c('LBS-15 candidate preflight tool exists',(root/'tools/candidate_preflight.py').is_file())
     s.c('LBS-15 protected fragment helper exists',(root/'tools/protected_fragments.py').is_file())
     verification_path=root/'tools/release_verification.py'
+    pre_activation_path=root/'tools/release_pre_activation.py'
     s.c('LBS-16 release verification helper exists',verification_path.is_file())
+    s.c('LBS-37 release pre-activation helper exists',pre_activation_path.is_file())
     prepare=txt(root/'tools/prepare_release.py') if (root/'tools/prepare_release.py').is_file() else ''
     common=txt(root/'tools/release_common.py') if (root/'tools/release_common.py').is_file() else ''
     candidate_preflight=txt(root/'tools/candidate_preflight.py') if (root/'tools/candidate_preflight.py').is_file() else ''
     release_verification=txt(verification_path) if verification_path.is_file() else ''
+    pre_activation=txt(pre_activation_path) if pre_activation_path.is_file() else ''
     runtime_builder=txt(root/'tools/build_runtime.py')
     s.has('Prepare tool accepts explicit publication timestamp',prepare,"ap.add_argument('--published-utc')")
     s.has('Prepare tool rejects missing schema-v2 publication timestamp',prepare,'publishedUtc must be supplied explicitly for schemaVersion 2')
@@ -238,6 +274,10 @@ def main():
     s.has('LBS-16 release verification checks source tree ZIP freedom',release_verification,"source tree contains ZIP file")
     s.has('LBS-16 release verification checks source tree cache freedom',release_verification,"source tree contains Python cache artifact")
     s.has('LBS-16 release verification writes GitHub job summary',release_verification,'GITHUB_STEP_SUMMARY')
+    if pre_activation_path.is_file():
+        cp=subprocess.run([sys.executable,str(pre_activation_path),'--self-test'],capture_output=True,text=True)
+        s.eq('LBS-37 release pre-activation helper self-test passes',cp.returncode,0)
+        s.has('LBS-37 pre-activation self-test confirms pass',cp.stdout,'PASS release pre-activation helper self-test')
     if verification_path.is_file():
         cp=subprocess.run([sys.executable,str(verification_path),'--self-test'],capture_output=True,text=True)
         s.eq('LBS-16 release verification helper self-test passes',cp.returncode,0)
@@ -329,6 +369,18 @@ def main():
         s.has('Release workflow rechecks Patch/Hotfix exception reason',w,'work-branch exception requires exactly one Work-Branch-Reason trailer.')
         s.has('Release workflow creates tag only after PR creation',w,'Tag only after all gates and successful PR creation')
         s.has('Release workflow merges and deletes release branch',w,'gh pr merge')
+        s.has('LBS-37 release workflow captures exact base main SHA',w,'BASE_MAIN_SHA=$(git rev-parse origin/main)')
+        s.has('LBS-37 release workflow runs pre-activation verifier',w,'tools/release_pre_activation.py')
+        s.has('LBS-37 pre-activation receives previous public version',w,'--previous-version "$PREVIOUS_VERSION"')
+        s.has('LBS-37 pre-activation binds exact base main',w,'--base-main-sha "$BASE_MAIN_SHA"')
+        s.has('LBS-37 final verification consumes pre-activation evidence',w,'--pre-activation-json /tmp/lbs-release/release-pre-activation.json')
+        pre_activation_index=w.index('python3 -B tools/release_pre_activation.py')
+        merge_index=w.index('gh pr merge')
+        final_verification_index=w.index('python3 -B tools/release_verification.py')
+        s.c('LBS-37 activation ordering is pre-activation PASS then merge then final verification',
+            pre_activation_index < merge_index < final_verification_index)
+        s.eq('LBS-37 public pointer activation uses exactly one PR merge',w.count('gh pr merge'),1)
+        s.no('LBS-37 release workflow has no direct main push activation',w,'refs/heads/main')
         s.no('Release workflow is not version-specific',w,'0.5.10.0')
         s.no('Release workflow has no Base64 patch transport',w,'base64')
         s.no('Release workflow has no source helper branch',w,'source-v')

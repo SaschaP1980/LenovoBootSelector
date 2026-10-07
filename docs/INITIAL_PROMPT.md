@@ -308,8 +308,9 @@ Then it:
 10. creates exactly one PR;
 11. creates the annotated source tag;
 12. sets `release/tag`;
-13. merges the PR and deletes the release branch;
-14. performs complete post-release verification.
+13. runs the pre-activation verifier and requires `RELEASE_PREACTIVATION_SUMMARY=PASS` while public `main/downloads/latest.json` still points to the previous version;
+14. merges the PR and deletes the release branch; this merge is the single atomic public update-pointer activation;
+15. performs complete post-release verification using the exact pre-activation evidence.
 
 Historical `downloads/*.zip` files are **immutable**. A release may add exactly one new ZIP; existing ZIPs must not be modified or deleted.
 
@@ -356,7 +357,8 @@ The summary confirms, among other things:
 - consistent `downloads/latest.json`;
 - consistent published release ZIP;
 - successful reproducibility check;
-- successful historical ZIP integrity check.
+- successful historical ZIP integrity check;
+- successful chained pre-activation verification proving the public pointer was not switched before the activation gate passed.
 
 When the workflow is terminal `success` and `RELEASE_VERIFICATION_SUMMARY.result == "PASS"`, use that aggregated data as the verified final facts. Do not reconstruct the same facts again through many redundant connector requests.
 

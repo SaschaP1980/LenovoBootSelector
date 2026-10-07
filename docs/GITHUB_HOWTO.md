@@ -375,9 +375,10 @@ A successful release run should, in substance:
 12. Create exactly one PR.
 13. Create the annotated source tag only after the PR exists and all preceding gates passed.
 14. Add the tag status gate.
-15. Merge the PR and delete the release branch.
-16. Verify the merged `main` publication metadata.
-17. Run the integrated LBS-16 post-release verifier and emit one `RELEASE_VERIFICATION_SUMMARY=<json>` line plus the GitHub Job Summary.
+15. Run `tools/release_pre_activation.py` and require `RELEASE_PREACTIVATION_SUMMARY=PASS` while public `main/downloads/latest.json` still advertises the previous version and the staged PR head already contains the verified new pointer/ZIP.
+16. Merge the PR and delete the release branch. This single merge is the atomic public update-pointer activation.
+17. Verify the merged `main` publication metadata.
+18. Run the integrated post-release verifier with the exact pre-activation evidence and emit one `RELEASE_VERIFICATION_SUMMARY=<json>` line plus the GitHub Job Summary.
 
 ## LBS-16 orchestration efficiency
 
@@ -392,7 +393,9 @@ Use phase snapshots:
 5. **Release observation:** after dispatch, avoid re-reading unchanged candidate facts. On terminal success, consume the single `RELEASE_VERIFICATION_SUMMARY=<json>` emitted by the Release Orchestrator.
 6. **Issue completion:** use the verified summary for the release facts, add the final Issue comment and close the Issue. Do not repeat individual PR/tag/status/latest/ZIP/source-tree reads merely to reconstruct facts already verified in the summary.
 
-`tools/release_verification.py` performs the complete server-side post-release aggregation after the merge. It verifies the merged PR, exactly one publication PR, 8/8 release statuses, all 3/3 candidate statuses (`preflight/candidate`, `preflight/linux`, `preflight/windows-powershell51`), annotated source tag/commit, ZIP-/cache-free source tree, `downloads/latest.json`, published release ZIP size/hash, candidate/release branch cleanup and the prior reproducibility marker.
+`tools/release_pre_activation.py` is the public-pointer activation gate. Immediately before merge it proves that the old public pointer is still live, the staged new pointer/ZIP/tag are internally consistent, Base Main has not moved, the PR is still open/unmerged, and all 3/3 Candidate plus 8/8 release contexts are GREEN. It emits `RELEASE_PREACTIVATION_SUMMARY=<json>`.
+
+`tools/release_verification.py` performs the complete server-side post-release aggregation after the merge. It requires the exact pre-activation PASS evidence, then verifies the merged PR, exactly one publication PR, 8/8 release statuses, all 3/3 candidate statuses (`preflight/candidate`, `preflight/linux`, `preflight/windows-powershell51`), annotated source tag/commit, ZIP-/cache-free source tree, the now-live `downloads/latest.json`, published release ZIP size/hash, candidate/release branch cleanup and the prior reproducibility marker.
 
 The structured summary is an **aggregation of completed checks**, not a replacement for them. If the workflow is not terminal success, the summary is missing, `result != PASS`, or a requested fact is absent, fall back to the full direct post-release checklist below.
 
