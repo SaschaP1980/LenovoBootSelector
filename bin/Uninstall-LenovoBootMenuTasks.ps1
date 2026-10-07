@@ -76,6 +76,6 @@ if (Test-Path -LiteralPath $projectRoot) {
     if ($remaining.Count -eq 0) { Remove-Item -LiteralPath $projectRoot -Force -ErrorAction SilentlyContinue }
 }
 
-Write-Host ('Lenovo Boot Menu: {0} projektbezogene Scheduled Tasks entfernt.' -f $removed.Count)
+Write-Host ('Lenovo Boot Selector: {0} projektbezogene Scheduled Tasks entfernt.' -f $removed.Count)
 foreach ($name in $removed) { Write-Host ('  - ' + $name) }
 Write-Host 'Systemweiter TaskBroker-/Default-Zustand wurde bereinigt.'

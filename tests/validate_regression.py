@@ -35,7 +35,7 @@ def main():
     basis_tray=txt(basis_runtime_path(basis,'LenovoBootMenuTray.ps1')); tray=txt(root/'bin/LenovoBootMenuTray.ps1')
     bm=re.search(r"\$script:AppVersion = '([^']+)'",basis_tray); basis_version=bm.group(1) if bm else ''
     s.has('Generated runtime uses canonical version',tray,f"$script:AppVersion = '{version}'")
-    app_template=txt(root/'src/App/LenovoBootMenuTray.template.ps1')
+    app_template=txt(root/'src/App/LenovoBootSelector.template.ps1')
     s.has('v0.6.8.1 tray tooltip is product name only',app_template,"$script:TrayIcon.Text = 'Lenovo Boot Selector'")
     s.no('v0.6.8.1 legacy German tray-tooltip suffix removed',app_template,'Startziel wählen')
     s.c('LBS-10 active regression profile is version-only or patch',profile in {'version-only','patch'},profile)
@@ -45,8 +45,15 @@ def main():
         for p in sorted((root/'src').rglob('*.ps1')):
             rel=p.relative_to(root).as_posix()
             s.eq(f'Product module byte-identical to basis: {rel}',sha(p),sha(basis/rel))
-    for rel in ['Uninstall-LenovoBootMenuTasks.ps1','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','LenovoBootMenuTray.ico','icon-preview.png']:
+    for rel in ['Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','LenovoBootMenuTray.ico','icon-preview.png']:
         s.eq(f'Runtime asset byte-identical to basis: {rel}',sha(root/'bin'/rel),sha(basis_runtime_path(basis,rel)))
+    candidate_uninstall=txt(root/'bin/Uninstall-LenovoBootMenuTasks.ps1')
+    basis_uninstall=txt(basis_runtime_path(basis,'Uninstall-LenovoBootMenuTasks.ps1'))
+    if version=='0.9.0.0':
+        normalized_uninstall=candidate_uninstall.replace('Lenovo Boot Selector:','Lenovo Boot Menu:',1)
+        s.eq('LBS-19 uninstaller changes only the product-facing prefix',normalized_uninstall,basis_uninstall)
+    else:
+        s.eq('Uninstaller byte-identical to basis outside LBS-19 migration',sha(root/'bin/Uninstall-LenovoBootMenuTasks.ps1'),sha(basis_runtime_path(basis,'Uninstall-LenovoBootMenuTasks.ps1')))
     if profile=='version-only':
         s.eq('Installer byte-identical for non-product release',sha(root/'bin/Install-LenovoBootMenuTasks.ps1'),sha(basis_runtime_path(basis,'Install-LenovoBootMenuTasks.ps1')))
     ui=txt(root/'src/UI/UpdatePresentation.ps1'); infra=txt(root/'src/Infrastructure/UpdateClient.ps1'); transport=txt(root/'src/Infrastructure/UpdateTransport.ps1')
@@ -181,7 +188,7 @@ def main():
     update_native=txt(root/'tests/Test-UpdateCore.ps1')
     mutex_native=txt(root/'tests/Test-SingleInstanceMutex.ps1')
     s.has('Native update test retains AST source-count self-audit',update_native,'[System.Management.Automation.Language.Parser]::ParseFile')
-    s.has('Native update test retains explicit 75 runtime guard',update_native,'if ($checks -ne 75) { throw "Unexpected update test count $checks" }')
+    s.has('Native update test retains explicit 79 runtime guard',update_native,'if ($checks -ne 79) { throw "Unexpected update test count $checks" }')
     s.has('Native mutex test retains explicit count guard',mutex_native,'if ($checks -ne 4) { throw "Unexpected mutex test count $checks" }')
     cp=subprocess.run([sys.executable,str(root/'tools/release_verification.py'),'--self-test'],capture_output=True,text=True); s.eq('LBS-16 release verification self-test',cp.returncode,0)
     cp=subprocess.run([sys.executable,str(root/'tools/build_runtime.py'),'--root',str(root),'--check'],capture_output=True,text=True); s.eq('Runtime deterministic',cp.returncode,0)

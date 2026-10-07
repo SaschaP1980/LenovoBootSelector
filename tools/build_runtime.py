@@ -10,7 +10,7 @@ INCLUDE_RE=re.compile(r'(?m)^# @include ([^\r\n]+)$')
 
 def template_include_paths(root:Path,template:str|None=None)->list[str]:
     if template is None:
-        template=(root/'src/App/LenovoBootMenuTray.template.ps1').read_text(encoding='utf-8-sig')
+        template=(root/'src/App/LenovoBootSelector.template.ps1').read_text(encoding='utf-8-sig')
     includes=[m.group(1).strip() for m in INCLUDE_RE.finditer(template)]
     if not includes:
         raise RuntimeError('runtime template contains no include markers')
@@ -27,7 +27,7 @@ def template_include_paths(root:Path,template:str|None=None)->list[str]:
 
 def render(root: Path) -> bytes:
     version=load_version(root)
-    template=(root/'src/App/LenovoBootMenuTray.template.ps1').read_text(encoding='utf-8-sig')
+    template=(root/'src/App/LenovoBootSelector.template.ps1').read_text(encoding='utf-8-sig')
     count=template.count(VERSION_TOKEN)
     if count!=1: raise RuntimeError(f'{VERSION_TOKEN}: expected exactly once, found {count}')
     includes=template_include_paths(root,template)

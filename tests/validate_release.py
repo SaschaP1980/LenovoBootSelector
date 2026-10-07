@@ -98,13 +98,13 @@ def main():
         if re.match(r'\s*function\s+Assert-(?:True|Equal)\b',line,re.I):
             continue
         update_assertion_calls += len(re.findall(r'(?:^|;\s*)Assert-(?:True|Equal)\b',line))
-    s.eq('Update native test has exact 75 assertion call sites',update_assertion_calls,75)
+    s.eq('Update native test has exact 79 assertion call sites',update_assertion_calls,79)
     s.has('Update native test self-audits source via PowerShell AST',update_test,'[System.Management.Automation.Language.Parser]::ParseFile')
     s.has('Update native test derives command names from AST',update_test,'$node.GetCommandName()')
     s.has('Update native test compares executed and source assertion counts',update_test,'if ($checks -ne $sourceAssertionCount)')
-    s.has('Update native test keeps explicit source coverage guard 75',update_test,'if ($sourceAssertionCount -ne 75) { throw "Unexpected update assertion source count $sourceAssertionCount" }')
-    s.has('Update native test keeps explicit runtime coverage output 75',update_test,'Write-Host "UPDATE TOTAL $checks/75"')
-    s.has('Update native test keeps explicit runtime coverage guard 75',update_test,'if ($checks -ne 75) { throw "Unexpected update test count $checks" }')
+    s.has('Update native test keeps explicit source coverage guard 79',update_test,'if ($sourceAssertionCount -ne 79) { throw "Unexpected update assertion source count $sourceAssertionCount" }')
+    s.has('Update native test keeps explicit runtime coverage output 79',update_test,'Write-Host "UPDATE TOTAL $checks/79"')
+    s.has('Update native test keeps explicit runtime coverage guard 79',update_test,'if ($checks -ne 79) { throw "Unexpected update test count $checks" }')
     localization_native=txt(root/'tests/Test-LocalizationRuntime.ps1') if (root/'tests/Test-LocalizationRuntime.ps1').is_file() else ''
     windows_wrapper=txt(root/'tests/Test-WindowsPowerShell51.ps1')
     s.c('LBS-17 native localization test exists',bool(localization_native))
@@ -116,8 +116,46 @@ def main():
     mutex_test=txt(root/'tests/Test-SingleInstanceMutex.ps1')
     s.has('Mutex native test keeps explicit total output',mutex_test,'Write-Host "MUTEX TOTAL $checks/4"')
     s.has('Mutex native test fails closed on count drift',mutex_test,'if ($checks -ne 4) { throw "Unexpected mutex test count $checks" }')
+    identifier_doc_path=root/'docs/IDENTIFIER_COMPATIBILITY.md'
+    identifier_test_path=root/'tests/Test-IdentifierCompatibility.ps1'
+    s.c('LBS-19 identifier compatibility document exists',identifier_doc_path.is_file())
+    identifier_doc=txt(identifier_doc_path) if identifier_doc_path.is_file() else ''
+    s.has('LBS-19 inventory documents safe rename category',identifier_doc,'## A — Safe rename')
+    s.has('LBS-19 inventory documents migration category',identifier_doc,'## B — Migration required')
+    s.has('LBS-19 inventory documents retained compatibility category',identifier_doc,'## C — Stable compatibility identifiers')
+    s.has('LBS-19 inventory documents historical category',identifier_doc,'## D — Historical record')
+    s.has('LBS-19 inventory documents valid firmware Boot Menu terminology',identifier_doc,'actual Lenovo/firmware boot menu')
+    s.c('LBS-19 native identifier compatibility test exists',identifier_test_path.is_file())
+    identifier_test=txt(identifier_test_path) if identifier_test_path.is_file() else ''
+    s.has('LBS-19 native identifier test keeps fixed total 29',identifier_test,'Write-Host "IDENTIFIER TOTAL $checks/29"')
+    s.has('LBS-19 native aggregate runner invokes identifier suite',windows_wrapper,"Test-IdentifierCompatibility.ps1")
+    new_template_path=root/'src/App/LenovoBootSelector.template.ps1'
+    old_template_path=root/'src/App/LenovoBootMenuTray.template.ps1'
+    s.c('LBS-19 canonical app template uses LenovoBootSelector name',new_template_path.is_file())
+    s.c('LBS-19 obsolete app template path is removed',not old_template_path.exists())
+    identifier_template=txt(new_template_path) if new_template_path.is_file() else (txt(old_template_path) if old_template_path.is_file() else '')
+    popup_source=txt(root/'src/UI/Popup.ps1')
+    autostart_source=txt(root/'src/Infrastructure/Autostart.ps1')
+    uninstall_source=txt(root/'bin/Uninstall-LenovoBootMenuTasks.ps1')
+    common_source=txt(root/'tools/release_common.py')
+    taskbroker_source=txt(root/'src/Infrastructure/TaskBroker.ps1')
+    installer_source=txt(root/'bin/Install-LenovoBootMenuTasks.ps1')
+    s.has('LBS-19 internal console class uses canonical name',identifier_template,'LenovoBootSelectorConsoleWindow')
+    s.no('LBS-19 legacy internal console class removed',identifier_template,'LenovoBootMenuConsoleWindow')
+    s.has('LBS-19 popup internal name uses canonical name',popup_source,"$form.Name = 'LenovoBootSelectorPopup'")
+    s.no('LBS-19 legacy popup internal name removed',popup_source,"$form.Name = 'LenovoBootMenuPopup'")
+    s.has('LBS-19 canonical HKCU Run value is Lenovo Boot Selector',identifier_template,"$script:AutostartRunValueName = 'Lenovo Boot Selector'")
+    s.has('LBS-19 legacy HKCU Run value remains explicit migration input',identifier_template,"$script:LegacyAutostartRunValueName = 'Lenovo Boot Menu Tray'")
+    s.has('LBS-19 autostart migration reads legacy registration',autostart_source,'LegacyAutostartRunValueName')
+    s.has('LBS-19 release ZIP keeps pre-migration compatibility name',common_source,"return f'LenovoBootMenuTray-v{version}.zip'")
+    s.has('LBS-19 hardened TaskBroker fixed name remains stable',taskbroker_source,"return 'LenovoBootMenu-RefreshManager'")
+    s.has('LBS-19 cross-version singleton mutex remains stable',identifier_template,"'Local\LenovoBootMenuTray'")
+    s.has('LBS-19 installer workspace uses canonical internal prefix',installer_source,'LenovoBootSelectorTaskInstall-')
+    s.no('LBS-19 legacy installer workspace prefix removed',installer_source,'LenovoBootMenuTaskInstall-')
+    s.no('LBS-19 uninstall output no longer presents legacy app name',uninstall_source,"Write-Host ('Lenovo Boot Menu:")
+    s.has('LBS-19 uninstall output presents canonical product name',uninstall_source,"Write-Host ('Lenovo Boot Selector:")
     tray=txt(root/'bin/LenovoBootMenuTray.ps1') if (root/'bin/LenovoBootMenuTray.ps1').is_file() else ''
-    template=txt(root/'src/App/LenovoBootMenuTray.template.ps1')
+    template=txt(root/'src/App/LenovoBootSelector.template.ps1')
     expected=f"$script:AppVersion = '{version}'"
     s.has('Generated runtime uses canonical version',tray,expected)
     s.eq('Generated runtime version declaration exactly once',tray.count(expected),1)
@@ -259,6 +297,9 @@ def main():
         s.has('LBS-13 migration is gated by legacy versioned test path',w,'origin/main:tests/validate_v040.py')
         s.has('LBS-13 migration verifies byte-identical historical blobs',w,'LBS-13 historical validator blob missing')
         s.has('LBS-13 migration scans the committed historical tree',w,'git ls-tree -r HEAD tests-history')
+        s.has('Release workflow has one-time LBS-19 template-rename deletion gate',w,'EXPECTED_LBS19_DELETIONS')
+        s.has('LBS-19 delete gate requires legacy template on main',w,'origin/main:src/App/LenovoBootMenuTray.template.ps1')
+        s.has('LBS-19 delete gate requires canonical template target',w,'src/App/LenovoBootSelector.template.ps1')
     windows_workflow=root/'.github/workflows/windows-powershell51.yml'
     if windows_workflow.is_file():
         ww=txt(windows_workflow)
@@ -297,7 +338,7 @@ def main():
     popup_check=fn(ui,'Start-PopupUpdateCheck')
     check_worker=fn(ui,'Start-UpdateCheckUiWorker')
     popup_toggle=fn(popup_ui,'Show-OrTogglePopup')
-    template=txt(root/'src/App/LenovoBootMenuTray.template.ps1')
+    template=txt(root/'src/App/LenovoBootSelector.template.ps1')
     refresh_ui=txt(root/'src/UI/RefreshPresentation.ps1')
     header_visual=fn(refresh_ui,'Update-HeaderStatusInteractionVisual')
     header_interaction=fn(refresh_ui,'Set-HeaderUpdateInteractionState')
@@ -352,7 +393,7 @@ def main():
         'src/UI/LanguagePresentation.ps1','src/UI/MaintenancePresentation.ps1','src/UI/ManageEntries.ps1',
         'src/UI/ManageEntriesState.ps1','src/UI/MenuAppearance.ps1','src/UI/Popup.ps1',
         'src/UI/RefreshPresentation.ps1','src/UI/StartupRecoveryDialog.ps1','src/UI/UpdatePresentation.ps1',
-        'src/App/LenovoBootMenuTray.template.ps1'
+        'src/App/LenovoBootSelector.template.ps1'
     ]
     visible_patterns=[
         re.compile(r"\.Text\s*=\s*(['\"])(.*?)\1"),

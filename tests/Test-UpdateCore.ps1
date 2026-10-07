@@ -133,6 +133,14 @@ $script:CapturedUpdateDiagnostic=$null
 [void](Invoke-UpdateCheckWorker)
 Assert-True 'Older manifest reports no update available' (-not [bool]$script:CapturedUpdateDiagnostic.updateAvailable)
 
+
+$migrationManifest=[pscustomobject]@{schemaVersion=1;version='0.9.0.0';file='LenovoBootMenuTray-v0.9.0.0.zip';sha256=('b'*64);size=456;tag='v0.9.0.0';packageFiles=$files}
+$migrationResult=Test-LenovoUpdateManifestCore -Manifest $migrationManifest
+Assert-True 'v0.9.0.0 migration manifest remains acceptable to pre-migration updater contract' $migrationResult.IsValid
+Assert-Equal 'v0.9.0.0 retains legacy-compatible release ZIP filename' 'LenovoBootMenuTray-v0.9.0.0.zip' $migrationResult.File
+Assert-True 'v0.9.0.0 retains legacy-compatible runtime package filename' (@($migrationResult.PackageFiles) -contains 'LenovoBootMenuTray.ps1')
+Assert-True 'v0.9.0.0 retains legacy-compatible launcher package filename' (@($migrationResult.PackageFiles) -contains 'Start-LenovoBootMenuTray.vbs')
+
 $legacyOk=[pscustomobject]@{utc='2026-10-05T11:00:00Z';success=$true;message='Update auf v0.5.8.1 installiert.'}
 $rr=Resolve-LenovoUpdateRestartResultCore -Result $legacyOk -RunningVersion '0.5.8.1'
 Assert-Equal 'Legacy success format detected' 'legacy-success' $rr.ResultFormat
@@ -183,8 +191,8 @@ $sourceAssertionCount = @(
 if ($checks -ne $sourceAssertionCount) {
     throw "Update assertion execution/source mismatch: executed $checks, source $sourceAssertionCount"
 }
-Write-Host "UPDATE ASSERTION SOURCE $sourceAssertionCount/75"
-if ($sourceAssertionCount -ne 75) { throw "Unexpected update assertion source count $sourceAssertionCount" }
+Write-Host "UPDATE ASSERTION SOURCE $sourceAssertionCount/79"
+if ($sourceAssertionCount -ne 79) { throw "Unexpected update assertion source count $sourceAssertionCount" }
 
-Write-Host "UPDATE TOTAL $checks/75"
-if ($checks -ne 75) { throw "Unexpected update test count $checks" }
+Write-Host "UPDATE TOTAL $checks/79"
+if ($checks -ne 79) { throw "Unexpected update test count $checks" }

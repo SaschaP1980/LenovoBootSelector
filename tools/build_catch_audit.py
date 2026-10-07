@@ -22,7 +22,7 @@ def classify(rel:str,line:str)->tuple[str,str]:
     return 'lifecycle_race_best_effort','Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.'
 
 def collect(root:Path)->dict:
-    paths=[root/'src/App/LenovoBootMenuTray.template.ps1']+sorted((root/'src/Application').glob('*.ps1'))+sorted((root/'src/Core').glob('*.ps1'))+sorted((root/'src/Infrastructure').glob('*.ps1'))+sorted((root/'src/UI').glob('*.ps1'))
+    paths=[root/'src/App/LenovoBootSelector.template.ps1']+sorted((root/'src/Application').glob('*.ps1'))+sorted((root/'src/Core').glob('*.ps1'))+sorted((root/'src/Infrastructure').glob('*.ps1'))+sorted((root/'src/UI').glob('*.ps1'))
     entries=[]; pat=re.compile(r'catch\s*\{\s*\}')
     for p in paths:
         text=p.read_text(encoding='utf-8-sig'); rel=p.relative_to(root).as_posix()

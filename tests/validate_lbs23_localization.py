@@ -36,7 +36,7 @@ def main() -> int:
     localization_service = txt(root/'src/Application/LocalizationService.ps1')
     startup = txt(root/'src/UI/StartupRecoveryDialog.ps1')
     language_ui = txt(root/'src/UI/LanguagePresentation.ps1')
-    template = txt(root/'src/App/LenovoBootMenuTray.template.ps1')
+    template = txt(root/'src/App/LenovoBootSelector.template.ps1')
     catalog = txt(root/'src/Core/Localization.ps1')
     native = txt(root/'tests/Test-LocalizationRuntime.ps1')
     docs = txt(root/'docs/LOCALIZATION.md')

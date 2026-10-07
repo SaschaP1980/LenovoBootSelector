@@ -15,7 +15,7 @@ def section(root:Path,name:str)->dict:
 def collect(root:Path)->dict:
     tray=(root/'bin/LenovoBootMenuTray.ps1').read_text(encoding='utf-8-sig'); tm=metrics(tray); refs=re.findall(r'\$script:([A-Za-z0-9_]+)',tray,re.I)
     runtime={**tm,'scriptVariables':len({x.lower() for x in refs}),'catchBlocks':len(re.findall(r'\bcatch\s*\{',tray,re.I)),'inlineSilentCatches':len(re.findall(r'catch\s*\{\s*\}',tray,re.I))}
-    return {'version':load_version(root),'runtime':runtime,'core':section(root,'Core'),'application':section(root,'Application'),'infrastructure':section(root,'Infrastructure'),'ui':section(root,'UI'),'appTemplate':metrics((root/'src/App/LenovoBootMenuTray.template.ps1').read_text(encoding='utf-8-sig'))}
+    return {'version':load_version(root),'runtime':runtime,'core':section(root,'Core'),'application':section(root,'Application'),'infrastructure':section(root,'Infrastructure'),'ui':section(root,'UI'),'appTemplate':metrics((root/'src/App/LenovoBootSelector.template.ps1').read_text(encoding='utf-8-sig'))}
 def main()->int:
     ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); ap.add_argument('--check',action='store_true'); args=ap.parse_args(); root=args.root.resolve(); path=root/OUTPUT_REL; data=collect(root); rendered=(json.dumps(data,ensure_ascii=False,indent=2)+'\n').encode()
     if args.check:
