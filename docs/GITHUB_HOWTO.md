@@ -455,14 +455,52 @@ Before implementing an Issue:
 - update/implement only the remaining valid contract;
 - do not resurrect a `wontfix` item without explicit user direction.
 
-Every open Issue should carry exactly one priority label from the repository's canonical priority taxonomy:
+### Canonical Issue label taxonomy
+
+Use labels as independent dimensions. Do not encode priority, development path, and work type into one label.
+
+#### Primary type
+
+For a newly created actionable LBS Issue, normally choose exactly one primary type:
+
+- `bug` — existing/released behavior is incorrect, regressed, or fails its documented contract. A confirmed bug/regression is subject to the project's focused RED-before-fix rule.
+- `enhancement` — new capability, refactoring, architecture work, release/process hardening, documentation/process improvement, or other planned change that is not a defect in existing behavior.
+
+Historical closed Issues that predate this taxonomy do not need retroactive relabeling.
+
+#### Priority
+
+Every **open** Issue must carry exactly one current priority label:
 
 - `priority: critical` — active severe defect or security/safety boundary violation requiring immediate attention; release-blocking when applicable.
 - `priority: high` — high-impact correctness/security/architecture risk that should be addressed ahead of normal enhancements, but is not an active critical failure.
 - `priority: medium` — meaningful product/release/process improvement with clear value but no immediate safety or availability impact.
-- `priority: low` — parked, evidence-dependent, cosmetic, explicitly non-urgent or currently `wontfix` work.
+- `priority: low` — parked, evidence-dependent, cosmetic, explicitly non-urgent or deliberately deferred work.
 
-Priority is independent of type/status labels such as `enhancement` or `wontfix`; preserve those labels. Reassess priority whenever an Issue's evidence, scope, risk or implementation status materially changes.
+Priority is independent of type/status and development-path labels. Reassess it whenever evidence, scope, risk, or implementation status materially changes. Closed Issues may retain their final priority as historical provenance; old closed Issues are not required to be normalized.
+
+#### Development path
+
+The two development-path labels are mutually exclusive:
+
+- `dev-path: fast` — the Issue will use the branchless atomic Patch/Hotfix path.
+- `dev-path: work-branch` — the Issue will use `work/LBS-<issue>` with product checkpoints and the Work-Path heartbeat/recovery standard.
+
+A backlog Issue may intentionally have **no** `dev-path:*` label while the implementation path is still undecided. For Issue-backed work, choose the path during the required pre-implementation effort/risk analysis and set exactly one development-path label before implementation starts:
+
+- Major/Minor work uses `dev-path: work-branch`;
+- Patch/Hotfix defaults to `dev-path: fast`;
+- a Patch/Hotfix uses `dev-path: work-branch` only when the documented escalation criteria are met and the reason is recorded durably.
+
+Preserve the selected development-path label after completion as useful implementation provenance. Do not apply both development-path labels at once. An Issue-less Hotfix has no Issue label to maintain; its path/provenance remains in the release history.
+
+#### Status / special-case label
+
+- `wontfix` — the item is deliberately not planned for implementation. Do not resume it without explicit user direction. It may coexist with a primary type label and may remain on a closed Issue as historical status.
+
+GitHub Issue state reasons such as `completed`, `duplicate`, and `not_planned` are lifecycle state, not replacements for the label dimensions above while an Issue is open.
+
+Do not invent new `priority:*` or `dev-path:*` values without updating this taxonomy and the corresponding process documentation in the same change.
 
 After a successful release that completes an Issue, close it as `completed`.
 

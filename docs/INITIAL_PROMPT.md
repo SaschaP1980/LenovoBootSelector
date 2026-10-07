@@ -105,7 +105,7 @@ When a `work/LBS-*` Work-Path is selected, use the established continuation mode
 
 If a released defect is a direct regression or incomplete implementation of an existing Issue, **reopen the original Issue**, document root cause and Hotfix plan, reassess priority, and close it as `completed` only after the corrective release succeeds.
 
-Open Issues should carry exactly one `priority:*` label.
+Open Issues should carry exactly one `priority:*` label. For Issue-backed implementation, select exactly one `dev-path:*` label during the pre-implementation path decision; backlog Issues may remain without a development-path label until that decision is made. The canonical label taxonomy is defined in `docs/GITHUB_HOWTO.md`.
 
 ## 6. Release profiles
 
