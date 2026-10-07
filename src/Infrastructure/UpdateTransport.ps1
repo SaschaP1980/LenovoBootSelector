@@ -1,5 +1,10 @@
-﻿function Get-LenovoUpdateManifestUri {
+﻿function Get-LenovoUpdateManifestBaseUri {
     return 'https://raw.githubusercontent.com/SaschaP1980/LenovoBootSelector/main/downloads/latest.json'
+}
+
+function Get-LenovoUpdateManifestUri {
+    $cacheBuster = [guid]::NewGuid().ToString('N')
+    return ('{0}?cb={1}' -f (Get-LenovoUpdateManifestBaseUri),$cacheBuster)
 }
 
 function Get-LenovoUpdateDownloadBaseUri {
