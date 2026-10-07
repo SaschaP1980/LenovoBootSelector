@@ -21,7 +21,7 @@ Mandatory order:
    - `tools/candidate_preflight.py`
    - `tools/release_verification.py`
    - the four permanent validators under `tests/`
-8. If resuming an existing `work/LBS-*` task, read that work-branch head and the Issue's rolling recovery comment, then directly verify any referenced GitHub Actions run before continuing. A legacy `.chatgpt-work/LBS-<issue>.md` may exist on older active branches but is not the primary recovery surface.
+8. If resuming an existing `work/LBS-*` task, read that work-branch head and the Issue's rolling recovery comment, then directly verify any referenced GitHub Actions run before continuing. A legacy `.chatgpt-work/LBS-<github-issue-number>.md` may exist on older active branches but is not the primary recovery surface.
 9. Only then determine scope, target version, and implementation/release plan. For Patch/Hotfix, perform the brief effort/risk analysis **before implementation** and default to the branchless atomic path unless the analysis justifies escalation.
 
 ### Authority order
@@ -231,7 +231,7 @@ After the intended Work tree is complete and all release metadata/generated arti
 3. if changed Python validators/release tools/workflow helpers are part of the tree, run/reconfirm a direct focused runtime smoke that reaches each changed execution path; record the exact command/test and PASS result. `py_compile`, AST/source inspection, or import-only success is not enough to catch runtime binding/order failures;
 4. persist the last substantive Work-Branch checkpoint;
 5. create one new commit with **the identical tree** and the exact trailer `Development-Completion: requested`;
-6. advance the same `work/LBS-<issue>` ref to that request commit;
+6. advance the same `work/LBS-<github-issue-number>` ref to that request commit;
 7. observe the resulting `Development Completion` Actions run for that exact SHA;
 8. require terminal PASS, `DEVELOPMENT_COMPLETION_SUMMARY=<json>`, and `development-completion/gate=success`;
 9. require the summary/status Main SHA to remain current and the Work-Branch head to remain the tested SHA;
@@ -492,7 +492,7 @@ Do not declare a release complete until all relevant items are verified:
 10. Previously published ZIPs are unchanged.
 11. The release branch has been deleted.
 12. Only after this should the corresponding implementation Issue be closed as `completed`.
-13. For Issue-backed work, add the final release/version/PR result to the Issue before closing it.
+13. For Issue-backed work, record the final release/version/PR result in the Issue before closing it. For Work-Path work, update the canonical rolling recovery comment to its terminal `COMPLETED` state instead of adding a redundant second completion comment.
 14. If the release is a corrective Hotfix for a reopened Issue, close it only after the Hotfix itself is published and verified.
 15. Candidate branch cleanup is confirmed.
 
@@ -515,6 +515,26 @@ A Major/Minor/Patch release must not be started as issue-less work and must not 
 
 The Hotfix exception exists to keep urgent, narrow corrections fast. Even when a Hotfix has no Issue, the root cause, scope, tests and release result must still be documented in the changelog/PR/release history.
 
+### LBS Issue title and branch naming
+
+`LBS` is this repository's project-specific prefix. For new actionable Issues, use the **GitHub Issue number** as the numeric identity everywhere.
+
+After GitHub creates the Issue and returns its number, immediately normalize the title before implementation:
+
+`[LBS-<github-issue-number>] <descriptive title>`
+
+If the Work-Path is selected, use the same number in:
+
+`work/LBS-<github-issue-number>`
+
+and later in:
+
+`Work-Branch: work/LBS-<github-issue-number>`
+
+Example: GitHub Issue `#90` -> `[LBS-90] ...` -> `work/LBS-90`.
+
+Do not search for or allocate a separate free LBS number. Historical Issues with older independent LBS IDs remain unchanged as historical provenance.
+
 ### Issue-backed implementation lifecycle — best practice
 
 When work is backed by an Issue, keep that Issue as the durable lifecycle record:
@@ -524,7 +544,7 @@ When work is backed by an Issue, keep that Issue as the durable lifecycle record
 3. Preserve the Issue's type/status labels and maintain exactly one current `priority:*` label.
 4. During implementation or corrective work, add concise comments for materially important findings such as confirmed root cause, changed scope, migration impact or the planned Hotfix version.
 5. Close the Issue as `completed` **only after** the implementing release is successfully published and post-release verification is complete.
-6. Before closing, add a final implementation/release comment that records at least the released version and relevant release PR; include important migration/testing notes when applicable.
+6. Before closing, ensure the Issue contains a final implementation/release record with at least the released version and relevant release PR; include important migration/testing notes when applicable. For Work-Path work, the terminal `Agent-State: COMPLETED` update of the canonical rolling recovery comment is this final record; do not duplicate it with a second closure comment unless materially new information is added.
 
 If a released implementation later proves defective and the defect is a **direct regression or incomplete fulfillment of that same Issue**, reopen the original Issue instead of silently fixing around it. Add a comment with the confirmed failure/root cause and Hotfix plan, reassess its priority for the active incident, and keep it open until the corrective release is published and verified. Then add the Hotfix release result and close it again as `completed`.
 
@@ -567,7 +587,7 @@ Priority is independent of type/status and development-path labels. Reassess it 
 The two development-path labels are mutually exclusive:
 
 - `dev-path: fast` — the Issue will use the branchless atomic Patch/Hotfix path.
-- `dev-path: work-branch` — the Issue will use `work/LBS-<issue>` with product checkpoints and the Work-Path rolling-comment recovery standard.
+- `dev-path: work-branch` — the Issue will use `work/LBS-<github-issue-number>` with product checkpoints and the Work-Path rolling-comment recovery standard.
 
 A backlog Issue may intentionally have **no** `dev-path:*` label while the implementation path is still undecided. For Issue-backed **executable/product release work**, choose the path during the required pre-implementation effort/risk analysis and set exactly one development-path label before implementation starts:
 
@@ -643,9 +663,9 @@ The currently available ChatGPT GitHub connector can create/read/move branch ref
 
 Candidate provenance is mandatory:
 
-- Major/Minor Candidates require exactly one unique `Work-Branch: work/LBS-<issue>` trailer;
+- Major/Minor Candidates require exactly one unique `Work-Branch: work/LBS-<github-issue-number>` trailer;
 - Patch/Hotfix Candidates default to exactly one `Work-Branch: none` trailer;
-- a Patch/Hotfix may declare `Work-Branch: work/LBS-<issue>` only after a pre-implementation effort/risk escalation and must then also contain exactly one unique `Work-Branch-Reason: <reason>` trailer;
+- a Patch/Hotfix may declare `Work-Branch: work/LBS-<github-issue-number>` only after a pre-implementation effort/risk escalation and must then also contain exactly one unique `Work-Branch-Reason: <reason>` trailer;
 - same-candidate correction commits may omit the trailers, but they must not introduce conflicting values;
 - Candidate Preflight verifies the release-level policy, the declared branch, and exact Candidate/work-tree equality.
 
@@ -671,16 +691,18 @@ Other consequences remain:
 
 Work-Path development maintains exactly one cumulative recovery comment in the active Issue.
 
+Use [`docs/templates/WORK_PATH_ROLLING_COMMENT.md`](templates/WORK_PATH_ROLLING_COMMENT.md) as the canonical default structure. It is based on the recovery/measurement format validated by LBS-41 / GitHub Issue #88 and must remain cumulative across implementation, Development Completion, Candidate, Release, and retrospective timing.
+
 Operational contract:
 
 1. Prefer the implementation-start comment and update that same comment in place.
 2. While `Agent-State: ACTIVE`, update it often enough that `Last heartbeat` is never more than approximately **3 minutes old**.
 3. Do not overwrite history with only the latest three-minute delta. The comment must cumulatively retain the complete Build & Release lifecycle: SHAs, checkpoints, decisions, successes, failures, test/gate results, timings, Actions runs, Candidate/Release history, open risks and exact next action.
 4. If no new finding exists, a minimal liveness refresh is allowed; otherwise the latest engineering findings belong in the same update.
-5. Use `WAITING_FOR_GITHUB` only with an exact run ID that is independently `queued` or `in_progress`; use `IDLE`/`STOPPED` when no interactive work is continuing.
+5. Use `WAITING_FOR_GITHUB` only with an exact run ID that is independently `queued` or `in_progress`; use `IDLE`/`STOPPED` when no interactive work is continuing; use `COMPLETED` only after the requested lifecycle is complete and final release verification is PASS.
 6. Serialize comment writes and avoid redundant mutative GitHub calls.
 7. Product/checkpoint commits remain source-history events. **Do not create Git commits solely for heartbeat timing.**
-8. Legacy `.chatgpt-work/LBS-<issue>.md` files on already-active branches must be absorbed into the rolling comment and removed before Candidate creation; do not create new ones.
+8. Legacy `.chatgpt-work/LBS-<github-issue-number>.md` files on already-active branches must be absorbed into the rolling comment and removed before Candidate creation; do not create new ones.
 9. After Candidate exposure, Candidate/Actions/Release state is the canonical recovery surface. Continue using the rolling Issue comment for cumulative supervision/timing, but do not mutate the work branch after the exact Candidate tree has been exposed.
 
 A stale `ACTIVE` heartbeat older than roughly three minutes is a missed heartbeat. A heartbeat older than roughly five minutes indicates stopped interactive progress only after any referenced GitHub Actions run has been checked directly.
