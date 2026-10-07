@@ -266,9 +266,24 @@ This mechanism applies **only** to development that already uses a durable `work
 
 Maintain exactly **one rolling recovery comment** in the active GitHub Issue. Prefer the implementation-start comment and update that same comment in place. Do not create a new heartbeat comment every interval.
 
-Use [`docs/templates/WORK_PATH_ROLLING_COMMENT.md`](templates/WORK_PATH_ROLLING_COMMENT.md) as the canonical default layout. Its structure is based on the successful LBS-41 / GitHub Issue #88 performance run: a compact recovery-state header, explicit intended diff and validation plan, one cumulative measurement ledger, counters, phase-specific evidence, final release verification, performance result, and plan-conformance assessment.
+Use [`docs/templates/WORK_PATH_ROLLING_COMMENT.md`](templates/WORK_PATH_ROLLING_COMMENT.md) as the canonical default layout. The format evolved from the successful LBS-41 / GitHub Issue #88 performance run and was formalized and exercised by later GitHub-number Work-Path runs such as #92 and #94: a compact recovery-state header, explicit intended diff and validation plan, one cumulative measurement ledger, counters, phase-specific evidence, final release verification, performance result, and plan-conformance assessment. GitHub Issue #92 is the cleaner reference for final section consolidation; #94 confirms that duplicated or stale lifecycle sections are a ledger-maintenance defect even when the underlying deployment is fully GREEN.
 
 The layout is part of the recovery standard, not merely presentation. Preserve the same major sections unless a task-specific section adds useful recovery information. At successful completion, update this **same** rolling comment to `Agent-State: COMPLETED`, record the authoritative release/PR/main/tag/artifact/cleanup facts, set the next action to Issue closure, and then close the Issue. Do not add a second redundant completion comment when the terminal rolling-comment update already contains the required final implementation/release record.
+
+#### Canonical in-place section updates
+
+Treat the rolling comment as a mutable canonical ledger, not an append-only transcript.
+
+- Keep exactly one unnumbered block for each singleton lifecycle section defined by the template, including `Candidate Entry`, `Release`, `Final Release Verification`, `Performance result`, and `Plan-conformance assessment`.
+- Update a singleton block **in place** as its state changes. For example, when Candidate Entry moves from `BLOCKED` to `PASS`, replace the existing Candidate Entry state/details; do not append a second Candidate Entry block and leave the stale `BLOCKED` block behind.
+- Keep exactly one block per numbered attempt. `Development Completion attempt 1` and `Candidate #1` may transition from queued/in-progress to PASS/FAIL by replacing that attempt's current fields. Create a new numbered block only for an actual new attempt/revision.
+- Keep exactly one `Release` block for the release attempt state. Update `pending` / `in_progress` fields to the terminal run/result instead of appending another `Release` heading.
+- Preserve prior **attempt evidence**, corrections, and failure classifications, but consolidate the current state of the same attempt/phase rather than preserving stale intermediate status text.
+- At terminal completion, no completed phase may still say `pending`, `in progress`, or `not started`. The recovery-state header must also reflect terminal branch state truthfully, including deleted Work/Candidate/Release refs where applicable.
+- Populate every applicable final-verification field from authoritative GitHub evidence, including PR number, merge timestamp, final `main`, source tag/commit, artifact hashes/sizes, status totals, reproducibility/integrity, and branch cleanup. Do not omit a template field merely because the same fact appears elsewhere in the comment.
+- Before closing the Issue, perform one final structural pass over the complete rolling comment: singleton headings occur once, numbered attempts are unique by number, no stale terminal-state contradictions remain, and the header/measurement ledger/final verification agree on the final facts.
+
+These rules govern **ledger maintenance**, not deployment semantics. A malformed or duplicated rolling-comment section does not retroactively invalidate a machine-verified GREEN deployment, but it is a Development Guideline conformance defect and must be corrected before Issue closure when still possible.
 
 The rolling comment and a product checkpoint have different responsibilities:
 
@@ -334,10 +349,17 @@ The rolling comment must preserve both raw wall-clock history and normalized pro
 - user/interactive pause time;
 - chat/runtime timeout and recovery time.
 
-Never subtract external/user/timeout delays from the raw total; retain them as part of the chronology. For process comparisons, also report at least:
+Never subtract external/user/timeout delays from the raw total; retain them as part of the chronology.
 
+Do not invent or normalize away a missing start timestamp. A user-authorized start may be recorded as authoritative only when the interaction/runtime provides an exact observed timestamp. If it is unavailable, mark it unavailable or approximate; **do not substitute `issue.created_at` and label that as the user-authorized start**. For cross-run comparisons that must rely only on durable GitHub evidence, use `Issue created_at → authoritative Release Verification summary` as the normalized end-to-end metric and identify it explicitly as such.
+
+For process comparisons, also report at least:
+
+- Issue creation → authoritative Release Verification summary;
+- first Development Completion request → authoritative Release Verification summary for Work-Path runs;
 - first Candidate creation → authoritative Release Verification summary;
 - final GREEN Candidate creation → authoritative Release Verification summary;
+- Release run creation → authoritative Release Verification summary;
 - number of failed Candidate revisions/correction loops;
 - cause classification for every unexpected Candidate failure.
 
@@ -740,7 +762,9 @@ This is Windows contract-suite evidence only. It is not physical Lenovo/UEFI E2E
 
 #### Candidate Entry block
 
-Immediately before exposing `candidate/v<version>`, the rolling comment must contain one explicit Candidate Entry block for the exact final Work SHA.
+Immediately before exposing `candidate/v<version>`, the rolling comment must contain exactly one explicit Candidate Entry block for the exact final Work SHA.
+
+If that block was previously `Candidate-Entry: BLOCKED`, update the same block in place after the missing evidence is resolved. Do not retain the obsolete BLOCKED block and append a second PASS block. Historical failure/correction evidence belongs in the relevant Development Completion/Candidate attempt entries, not in duplicate singleton Candidate Entry sections.
 
 Minimum fields:
 
