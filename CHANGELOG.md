@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.10.7.4 – Version-only Hotfix
+
+- Version number only; no product source or behavior changes.
+
+
 ## v0.10.7.3 – Version-only Hotfix
 
 - Version number only; no product source or behavior changes.
