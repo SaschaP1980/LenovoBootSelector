@@ -1,5 +1,16 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.10.2.0 – LBS-29 UI responsibility decomposition
+
+- Reduce `New-PopupForm` to popup lifecycle/composition and move header, boot-entry container, settings/default-target, restart/footer, and manage-entry overlay construction into domain-specific popup presentation helpers.
+- Reduce `Update-PopupRows` to boot-entry list refresh orchestration and move row rendering, interaction handlers, alias editor, manage/normal row controls, interaction wiring, and scroll layout into focused boot-entry presentation helpers.
+- Preserve existing WinForms behavior, event-handler semantics, localization/accessibility strings, maintenance/drift gating, keyboard/mouse interaction, and current script-state ownership while LBS-28 remains separate and open.
+- Add native Windows PowerShell 5.1 presentation characterization using real WinForms controls for selected rows, hidden/manage state, alias editing, hover behavior, and scrolling.
+- Keep drag/drop ordering delegated to the existing `Move-ManageEntry` operation and alias application delegated to the existing manage-entry draft operation.
+- Broaden permanent UI validators to protect the aggregate presentation surfaces after code movement rather than requiring behavior to remain in one source file.
+- Introduce no generic control/property-bag factory and no UI redesign, application-state redesign, firmware/BCD mutation, or privilege-boundary change.
+- Release profile: `patch`. Protected fragment intent is exactly `ps:New-PopupForm` and `ps:Update-PopupRows`; repository-delete intent is empty.
+
 ## v0.10.1.0 – LBS-31 pure storage-resolution architecture
 
 - Split Windows-specific disk/partition acquisition from deterministic storage classification.

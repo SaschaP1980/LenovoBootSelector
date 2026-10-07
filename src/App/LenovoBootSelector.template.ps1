@@ -1530,6 +1530,7 @@ function Get-EntryByGuid([string]$Guid) {
     return $script:CurrentEntries | Where-Object { $_.Guid -eq $Guid.ToLowerInvariant() } | Select-Object -First 1
 }
 
+# @include src/UI/BootEntryRows.ps1
 # @include src/UI/BootEntryList.ps1
 
 
@@ -1822,6 +1823,7 @@ function Invoke-BackgroundRefreshWorker {
     return 1
 }
 
+# @include src/UI/PopupComposition.ps1
 # @include src/UI/Popup.ps1
 
 Initialize-RuntimeDiagnostics
