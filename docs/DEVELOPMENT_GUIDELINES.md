@@ -8,6 +8,8 @@ Patch and Hotfix work uses the shortest safe atomic path **without a work branch
 
 Do not use a work branch for a small Patch/Hotfix merely for consistency with Major/Minor releases; the resilience machinery must not become routine overhead for short fixes.
 
+The experimental Work-Path heartbeat journal defined below applies **only after a `work/LBS-*` path has already been selected**. It is not used for the normal branchless Patch/Hotfix fast path.
+
 The release path remains defined by `docs/RELEASE_PROCESS.md`. Connector/GitHub operating details remain defined by `docs/GITHUB_HOWTO.md`.
 
 ## 1. Purpose
@@ -207,6 +209,76 @@ A checkpoint commit should contain at least:
 
 A fresh agent should be able to read the Issue and latest work-branch checkpoint and continue without the previous chat.
 
+### Work-Path heartbeat journal — experimental
+
+This mechanism applies **only** to development that already uses a durable `work/LBS-<issue>` branch. It therefore applies to Major/Minor work and to the exceptional Patch/Hotfix that was explicitly escalated to the Work-Path model. It does **not** apply to the normal branchless Patch/Hotfix fast path.
+
+During active interactive Work-Path development, maintain one temporary tracked continuation journal:
+
+`.chatgpt-work/LBS-<issue>.md`
+
+The journal and a product checkpoint have different responsibilities:
+
+- a **product checkpoint** is a coherent recoverable source state and may include focused validation;
+- a **heartbeat journal commit** is a deliberately lightweight persistence event for recent engineering findings and liveness state.
+
+A heartbeat journal commit must not trigger a build, full test matrix, runtime regeneration, Candidate gate or checkpoint gate merely because the journal changed. When the connector supports a single-file contents update, prefer that lightweight write path rather than reconstructing a full product checkpoint.
+
+The journal records only durable engineering continuation information that could appropriately appear in a normal progress update. It is **not** a private chain-of-thought record. Useful entries include:
+
+- facts and constraints discovered;
+- experiments attempted and their concise result;
+- failed approaches and the technical reason they were rejected;
+- test/validator findings;
+- evidence-based decisions;
+- current phase and next intended action;
+- relevant GitHub workflow/run identifiers.
+
+Keep a compact status header with at least:
+
+```text
+Branch: work/LBS-XX
+Base-Main: <sha>
+Last-Heartbeat-UTC: <timestamp>
+Agent-State: ACTIVE
+GitHub-Run: none | <workflow/run identifier>
+Last-Product-Checkpoint: <sha>
+Current-Phase: <short phase>
+Next-Action: <short next action>
+```
+
+Exact formatting may evolve, but the semantics above must remain recoverable.
+
+#### Heartbeat cadence and stale interpretation
+
+While substantive interactive Work-Path development is actively producing findings or state changes, update the journal approximately every **1–3 minutes**. Also update it before a potentially long/high-risk tool sequence when the intended next action matters for recovery. Do not create meaningless commits merely to satisfy a timer when nothing changed.
+
+Operationally:
+
+- a recent heartbeat means only that the interactive agent was active at that recorded point;
+- when the latest heartbeat is older than roughly **5 minutes** and no referenced GitHub Actions run is currently `queued` or `in_progress`, treat the interactive agent/stream as stopped and resume from durable GitHub state;
+- when a referenced GitHub Actions run is still `queued` or `in_progress`, that GitHub work continues independently even if the chat stream stopped;
+- never describe interactive-agent work as continuing in the background when no independent automation is actually running.
+
+On recovery from an interrupted Work-Path session, a fresh agent must read current `main`, the Issue, the `work/LBS-<issue>` head, the latest product checkpoint context and the journal when it exists before taking further action. Re-check any referenced GitHub run directly rather than trusting a stale journal status.
+
+#### Candidate cleanup and history isolation
+
+The journal is disposable Work-Path state and must never be published.
+
+Before Candidate creation:
+
+1. finish the intended product work and required development-completion checks;
+2. remove `.chatgpt-work/LBS-<issue>.md` from the work branch;
+3. verify the final cleaned work-branch tree contains only intended release content;
+4. re-read current `main` and reconcile it if necessary;
+5. create the release-ready Candidate as a **single clean commit whose parent is current `main` and whose tree exactly equals the final cleaned work-branch tree**;
+6. include the normal `Work-Branch: work/LBS-<issue>` provenance trailer and, for an escalated Patch/Hotfix, the required `Work-Branch-Reason:` trailer.
+
+The Work-Path journal commits therefore remain reachable only through the disposable work branch. They must not become ancestors of the Candidate, source tag, publication PR or `main`. Existing exact Candidate/work-branch tree equality remains the release safety contract, and the Release Orchestrator retains responsibility for deleting the work branch only after rechecking that equality.
+
+This mechanism is an experiment introduced by LBS-36. Evaluate it on the next suitable Work-Path development task. If it does not materially improve liveness visibility and recovery, revert this process rule cleanly rather than preserving ceremony without value.
+
 ## 5. Stream/session resilience
 
 There is no reliable warning before an interactive stream/session stops.
@@ -216,7 +288,8 @@ Therefore:
 - do not hold a large finished change only in tool memory;
 - do not assume work continues between user turns;
 - when asked whether work is still running, verify GitHub refs/commit timestamps and relevant Actions runs instead of inferring activity from conversation text;
-- after any unexpected interruption, re-read `main` and the work-branch head before continuing;
+- after any unexpected interruption, re-read `main`, the work-branch head and the Work-Path heartbeat journal when present before continuing;
+- use the journal heartbeat plus direct GitHub Actions state to distinguish a dead interactive stream from independently running GitHub automation;
 - never claim that background development continued when no automation/workflow was actually running.
 
 LBS-17 had two significant continuity gaps: work stopped after checkpoint 4 and again after checkpoint 7 until the user prompted continuation. The checkpoint model prevented source loss, but the idle wall-clock time was still avoidable.
@@ -381,7 +454,9 @@ Use:
 
 Do not reconstruct fields already covered by a successful aggregate summary through many additional connector calls unless investigating an inconsistency.
 
-For any Candidate derived from a durable work branch, include exactly one unique candidate-history trailer:
+For any Candidate derived from a durable work branch, first remove the temporary Work-Path heartbeat journal, then create a clean current-`main`-parent Candidate commit whose tree exactly matches the cleaned work-branch tree. The work-branch journal/checkpoint history is recovery state and must not become Candidate ancestry.
+
+Include exactly one unique candidate-history trailer:
 
 `Work-Branch: work/LBS-<issue>`
 
