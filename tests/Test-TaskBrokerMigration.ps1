@@ -52,13 +52,13 @@ Assert-True 'Repair deterministically replaces canonical task definitions' ($ins
 $tokens=$null; $errors=$null
 $ast=[System.Management.Automation.Language.Parser]::ParseFile($installerPath,[ref]$tokens,[ref]$errors)
 if (@($errors).Count -ne 0) { throw 'Installer AST parse failed.' }
-function Import-InstallerFunction([string]$Name) {
-    $fn = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $Name },$true))
-    if ($fn.Count -ne 1) { throw "Expected exactly one installer function: $Name" }
-    Invoke-Expression $fn[0].Extent.Text
-}
-Import-InstallerFunction 'Resolve-TaskBrokerInitialDefault'
-Import-InstallerFunction 'Test-LegacyTaskBrokerOwnedTaskName'
+$resolveFunction = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Resolve-TaskBrokerInitialDefault' },$true))
+if ($resolveFunction.Count -ne 1) { throw 'Expected exactly one installer function: Resolve-TaskBrokerInitialDefault' }
+Invoke-Expression $resolveFunction[0].Extent.Text
+
+$legacyOwnershipFunction = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Test-LegacyTaskBrokerOwnedTaskName' },$true))
+if ($legacyOwnershipFunction.Count -ne 1) { throw 'Expected exactly one installer function: Test-LegacyTaskBrokerOwnedTaskName' }
+Invoke-Expression $legacyOwnershipFunction[0].Extent.Text
 
 $g1='{11111111-1111-1111-1111-111111111111}'
 $g2='{22222222-2222-2222-2222-222222222222}'
