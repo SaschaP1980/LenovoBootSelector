@@ -4,7 +4,7 @@
 function Resolve-PartitionBootStructureCore {
     param(
         [Parameter(Mandatory=$true)]$Disk,
-        [Parameter(Mandatory=$true)][object[]]$Partitions
+        [Parameter(Mandatory=$true)][AllowEmptyCollection()][object[]]$Partitions
     )
 
     $hasEfiSystemPartition = $false

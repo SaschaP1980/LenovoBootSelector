@@ -5663,7 +5663,7 @@ function Prompt-TaskBrokerRemove {
 function Resolve-PartitionBootStructureCore {
     param(
         [Parameter(Mandatory=$true)]$Disk,
-        [Parameter(Mandatory=$true)][object[]]$Partitions
+        [Parameter(Mandatory=$true)][AllowEmptyCollection()][object[]]$Partitions
     )
 
     $hasEfiSystemPartition = $false
@@ -5769,7 +5769,7 @@ function Resolve-StorageContextCore {
 function ConvertTo-WindowsStorageDiskSnapshot {
     param(
         [Parameter(Mandatory=$true)]$Disk,
-        [Parameter(Mandatory=$true)][object[]]$Partitions
+        [Parameter(Mandatory=$true)][AllowEmptyCollection()][object[]]$Partitions
     )
 
     $normalizedPartitions = @(
