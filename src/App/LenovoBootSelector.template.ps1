@@ -965,15 +965,13 @@ function Complete-LegacyDefaultMigration {
 
 function Set-DefaultGuid {
     param([AllowNull()][string]$Guid)
-    if (Test-MaintenanceBusy) { throw 'Während der Wartung kann das Standard-Startziel nicht geändert werden.' }
-    if (Test-BootTargetDriftDetected) { throw 'Nach einer Änderung der Startziele müssen die Systemfunktionen zuerst neu initialisiert werden.' }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
+    if ([string]$capabilities.State -eq 'Busy') { throw 'Während der Wartung kann das Standard-Startziel nicht geändert werden.' }
+    if ([string]$capabilities.State -eq 'ReinitializeRequired') { throw 'Nach einer Änderung der Startziele müssen die Systemfunktionen zuerst neu initialisiert werden.' }
+    if (-not $capabilities.CanUseDefaultTarget) { throw 'Das Standard-Startziel ist erst nach Einrichtung der Systemfunktionen verfügbar.' }
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     $operation = if ($Guid) { 'set' } else { 'clear' }
     try {
-        if (-not (Test-TaskBrokerReady)) {
-            throw 'Das Standard-Startziel ist erst nach Einrichtung der Systemfunktionen verfügbar.'
-        }
-
         if ($Guid) {
             $normalized = $Guid.ToLowerInvariant()
             Set-TaskBrokerDefaultTarget -Guid $normalized
@@ -1029,7 +1027,8 @@ function Update-RestartTargetUi {
 }
 
 function Restart-Windows {
-    if (Test-MaintenanceBusy -or (Test-BootTargetDriftDetected)) { return }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    if (-not $capabilities.CanRestart) { return }
     $targetName = Get-NextBootTargetDisplayName
     $choice = Show-LenovoRestartDialog -TargetName $targetName
     if ($choice -ne [System.Windows.Forms.DialogResult]::Yes) {
@@ -1056,6 +1055,7 @@ function Restart-Windows {
 }
 
 # @include src/Infrastructure/TaskBroker.ps1
+# @include src/Application/SystemCapabilities.ps1
 
 function Test-BootTargetDriftDetected {
     return (Test-BootTargetDriftRuntimeDetected -State $script:BootTargetDriftState)
@@ -1113,46 +1113,35 @@ function Show-BootTargetDriftNotificationIfNeeded {
 
 function Update-TaskBrokerUiState {
     param([switch]$Fast)
-    $busy = Test-MaintenanceBusy
-    $ready = if ($busy) {
-        $false
-    }
-    elseif ($Fast) {
-        if ($null -ne $script:TaskBrokerReadyCached) { [bool]$script:TaskBrokerReadyCached } else { $false }
-    }
-    else {
-        Test-TaskBrokerReady
-    }
-    $present = Test-TaskBrokerInstallationPresent
-    $drift = [bool]($ready -and (Test-BootTargetDriftDetected))
-    $interactiveReady = [bool]($ready -and -not $drift)
+    $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness:(-not $Fast)
+    $state = [string]$capabilities.State
 
     if ($script:TaskBrokerSetupMenuItem) {
-        $script:TaskBrokerSetupMenuItem.Enabled = -not $busy
-        if ($busy) {
-            $mode = Get-MaintenanceMode
+        $script:TaskBrokerSetupMenuItem.Enabled = [bool]$capabilities.CanConfigureSystemFunctions
+        if ($state -eq 'Busy') {
+            $mode = [string]$capabilities.MaintenanceMode
             $script:TaskBrokerSetupMenuItem.Text = if ($mode -eq 'Remove') { Get-LocalizedString -Key 'Maintenance.Menu.Generic' } elseif ($mode -eq 'Reinitialize') { Get-LocalizedString -Key 'Maintenance.Menu.Reinitializing' } elseif ($mode -eq 'Repair' -or $mode -eq 'Migrate') { Get-LocalizedString -Key 'Maintenance.Menu.Repairing' } else { Get-LocalizedString -Key 'Maintenance.Menu.SettingUp' }
         }
-        elseif ($drift) {
+        elseif ($state -eq 'ReinitializeRequired') {
             $script:TaskBrokerSetupMenuItem.Text = Get-LocalizedString -Key 'Maintenance.Menu.Reinitialize'
         }
-        elseif ($ready -or $present) {
-            $script:TaskBrokerSetupMenuItem.Text = Get-LocalizedString -Key 'Maintenance.Menu.Repair'
+        elseif ($state -eq 'SetupRequired') {
+            $script:TaskBrokerSetupMenuItem.Text = Get-LocalizedString -Key 'Maintenance.Setup'
         }
         else {
-            $script:TaskBrokerSetupMenuItem.Text = Get-LocalizedString -Key 'Maintenance.Setup'
+            $script:TaskBrokerSetupMenuItem.Text = Get-LocalizedString -Key 'Maintenance.Menu.Repair'
         }
     }
 
     if ($script:TaskBrokerRemoveMenuItem) {
         # Cleanup is intentionally available even when metadata is already gone;
         # it also knows historical/probe task names from pre-TaskBroker builds.
-        $script:TaskBrokerRemoveMenuItem.Enabled = -not $busy
+        $script:TaskBrokerRemoveMenuItem.Enabled = [bool]$capabilities.CanRemoveSystemFunctions
     }
-    if ($script:DefaultContextRoot) { $script:DefaultContextRoot.Enabled = ($interactiveReady -and -not $busy) }
-    if ($script:RestartMenuItem) { $script:RestartMenuItem.Enabled = (-not $busy -and -not $drift) }
+    if ($script:DefaultContextRoot) { $script:DefaultContextRoot.Enabled = [bool]$capabilities.CanUseDefaultTarget }
+    if ($script:RestartMenuItem) { $script:RestartMenuItem.Enabled = [bool]$capabilities.CanRestart }
     Update-MaintenanceUi
-    return $interactiveReady
+    return [bool]$capabilities.IsReady
 }
 
 function Enter-SystemFunctionsMaintenance {
@@ -1295,14 +1284,30 @@ function Start-TaskBrokerInstall {
 }
 
 function Prompt-TaskBrokerInstall {
-    if (Test-MaintenanceBusy) { return }
-    $mode = if (Test-BootTargetDriftDetected) { 'Reinitialize' } elseif (Test-TaskBrokerReady) { 'Repair' } elseif (Test-TaskBrokerInstallationPresent) { 'Migrate' } else { 'Setup' }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
+    if ([string]$capabilities.State -eq 'Busy') { return }
+    $mode = if ([string]$capabilities.State -eq 'ReinitializeRequired') {
+        'Reinitialize'
+    }
+    elseif ([string]$capabilities.State -eq 'Ready') {
+        'Repair'
+    }
+    elseif ([string]$capabilities.State -eq 'SetupRequired') {
+        'Setup'
+    }
+    elseif ($capabilities.InstallationPresent) {
+        'Migrate'
+    }
+    else {
+        'Repair'
+    }
     $choice = Show-LenovoSystemFunctionsDialog -Mode $mode
     if ($choice -eq [System.Windows.Forms.DialogResult]::Yes) { Start-TaskBrokerInstall -Mode $mode }
 }
 
 function Prompt-TaskBrokerReinitialize {
-    if (Test-MaintenanceBusy -or -not (Test-BootTargetDriftDetected)) { return }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    if ([string]$capabilities.State -ne 'ReinitializeRequired') { return }
     $choice = Show-LenovoSystemFunctionsDialog -Mode 'Reinitialize'
     if ($choice -eq [System.Windows.Forms.DialogResult]::Yes) { Start-TaskBrokerInstall -Mode 'Reinitialize' }
 }
@@ -1513,6 +1518,8 @@ function Get-FirmwareBootState {
 
 function Set-BootNextTarget {
     param([Parameter(Mandatory=$true)][string]$Guid)
+    $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
+    if (-not $capabilities.CanSetBootNext) { throw 'Das Startziel ist derzeit nicht verfügbar.' }
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     try {
         $result = Set-BootNextTargetService -Guid $Guid
@@ -1550,7 +1557,8 @@ function Apply-FirmwareBootState {
         $script:LastStatusText = Get-LocalizedString -Key 'Status.NoOneTimeNextBoot'
     }
 
-    if (Get-TaskBrokerInteractiveReady) { [void](Refresh-SystemDefaultState) }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    if ($capabilities.CanUseCachedBootState) { [void](Refresh-SystemDefaultState) }
     Update-PopupRows
 }
 

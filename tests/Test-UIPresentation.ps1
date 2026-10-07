@@ -35,8 +35,11 @@ function Test-ManageEntryHidden {
     param([string]$Guid)
     return (@($script:ManageHiddenEntryGuids) -contains ([string]$Guid).ToLowerInvariant())
 }
-function Test-MaintenanceBusy { return $false }
-function Test-BootTargetDriftDetected { return $false }
+$script:TestCapabilities = [pscustomobject]@{
+    CanManageEntries = $true
+    CanSetBootNext = $true
+}
+function Get-CurrentSystemFunctionsCapabilities { return $script:TestCapabilities }
 function Update-ManageSaveButtonState { }
 function Set-ManageEntryAliasDraft { param([string]$Guid,[AllowEmptyString()][string]$Alias) }
 function Update-PopupRows { }
@@ -45,7 +48,8 @@ function Hide-DarkActionTooltip { }
 function Commit-ActiveManageAliasEditor { }
 function Toggle-ManageEntryVisibility { param([string]$Guid) }
 function Get-EntryByGuid { param([string]$Guid) return $null }
-function Set-BootNextTarget { param([string]$Guid) }
+$script:BootNextCalls = 0
+function Set-BootNextTarget { param([string]$Guid) $script:BootNextCalls++ }
 function Move-ManageEntry { param([string]$MovedGuid,[string]$TargetGuid,[bool]$After) }
 function Show-LenovoNoticeDialog { }
 
@@ -84,6 +88,12 @@ $normalTitle = @($normal.Row.Controls | Where-Object { $_ -is [System.Windows.Fo
 Assert-True ($normalTitle.Count -ge 1) 'UI normal boot row keeps display title'
 Set-RowHoverState -Control $normal.Row -Hover $true
 Assert-Equal $script:ColorSelectedRow.ToArgb() $normal.Row.BackColor.ToArgb() 'UI selected row hover does not replace selected surface'
+& $handlers.Click $normal.Row $null
+Assert-Equal 1 $script:BootNextCalls 'UI boot row consumes enabled canonical BootNext capability'
+$script:TestCapabilities.CanSetBootNext = $false
+& $handlers.Click $normal.Row $null
+Assert-Equal 1 $script:BootNextCalls 'UI boot row blocks interaction when canonical BootNext capability is disabled'
+$script:TestCapabilities.CanSetBootNext = $true
 
 $script:IsManageEntriesMode = $true
 $script:SelectedGuid = $null
@@ -128,5 +138,5 @@ $scroll.Value = 40
 Update-BootEntryScrollLayout -ListPanel $listPanel -ContentPanel $contentPanel -ScrollBar $scroll -ContentBottom 200 -BaseRowHeight 60 -RowGap 4
 Assert-Equal -40 $contentPanel.Top 'UI scroll layout applies scrollbar value to content offset'
 
-Write-Host "UI PRESENTATION TOTAL $script:checks/23"
-if ($script:checks -ne 23) { throw "Unexpected UI presentation test count $script:checks" }
+Write-Host "UI PRESENTATION TOTAL $script:checks/25"
+if ($script:checks -ne 25) { throw "Unexpected UI presentation test count $script:checks" }

@@ -1,5 +1,19 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.10.5.0 – LBS-28 canonical system-function capability model
+
+- Add `src/Application/SystemCapabilities.ps1` as the single Application-level owner for system-function readiness/capability derivation from explicit Maintenance, TaskBroker metadata/readiness, drift, and entry-count facts.
+- Model explicit `SetupRequired`, `RepairRequired`, `Checking`, `Ready`, `ReinitializeRequired`, `Busy`, and fail-closed `Unknown` states without introducing a monolithic global AppContext or service locator.
+- Migrate default-target, maintenance, popup/open, refresh, manage-entry, BootNext, restart, setup/repair/reinitialize, and cached-state consumers away from independently reconstructed readiness rules.
+- Preserve TaskBroker as the Infrastructure authority, maintenance suppression, drift behavior, current-user readiness strength, one-shot BootNext semantics, and fail-closed mutation gating; no privilege-boundary, firmware/BCD, polling, PnP, or automatic-update behavior changes are introduced.
+- Add a 47-assertion native `Test-SystemCapabilities.ps1` contract covering setup, repair, checking, ready, drift, busy, invalid/inconsistent input, entry-count gating, cached-state access, and restart semantics.
+- Extend native UI characterization to 25 assertions so BootEntryRows explicitly proves it consumes the canonical BootNext capability instead of re-proving the business rule.
+- Wire the SystemCapabilities suite into the hosted Windows PowerShell 5.1 aggregate and permanent Release/Regression ownership checks.
+- The LBS-38 Development Completion pilot found and corrected pre-Candidate integration defects on the Work-Branch, including a malformed Windows workflow transformation and stale UI/permanent-validator ownership assumptions; no Candidate had been exposed when these were corrected.
+- Architecture counting on the touched source shows better-scoped implicit coupling: UI `$script:` references 549→543 and app-template references 338→336, while six Application references are concentrated in the focused runtime fact adapter.
+- Release profile: `patch`. Protected fragment intent and repository-delete intent are both empty.
+
+
 ## v0.10.4.0 – LBS-26 update workflow controller extraction
 
 - Move update-check and update-prepare lifecycle orchestration out of `src/UI/UpdatePresentation.ps1` into the focused `src/Application/UpdateController.ps1` application controller.
