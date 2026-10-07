@@ -6434,6 +6434,7 @@ function ConvertFrom-BackgroundRefreshResultText {
     }
     return ($Text | ConvertFrom-Json)
 }
+
 # Background-refresh lifecycle orchestration.
 # Infrastructure owns worker/IO mechanics; UI owns presentation/timer construction.
 
