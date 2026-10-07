@@ -44,6 +44,26 @@ Migration rules:
 
 The launcher filename itself remains a category-C compatibility identifier.
 
+### Privileged TaskBroker migration (v0.10.0.0)
+
+Canonical identifiers:
+
+- `%ProgramData%\Lenovo Boot Selector\TaskBroker`
+- `LenovoBootSelector-RefreshManager`
+- `LenovoBootSelector-RefreshFirmware`
+- `LenovoBootSelector-Default-Clear`
+- `LenovoBootSelector-Default-Restore`
+- `LenovoBootSelector-Set-<GUID>`
+- `LenovoBootSelector-Default-Set-<GUID>`
+
+Pre-v0.10 identifiers are migration-only inputs:
+
+- `%ProgramData%\Lenovo Boot Menu\TaskBroker`
+- the corresponding `LenovoBootMenu-*` TaskBroker names.
+
+An upgraded installation requires one explicit elevated Repair/Migrate operation. The new canonical installation is created and fully verified first. Only then may the installer remove the exact old TaskBroker tasks and legacy ProgramData state. A failed canonical setup before that point leaves the old installation intact. Cleanup accepts only exact old static names or the two old per-GUID patterns with an exact 32-hex suffix.
+
+
 ## C — Stable compatibility identifiers
 
 These identifiers are intentionally retained because changing them would add migration or security risk without proportional user benefit.
@@ -56,27 +76,20 @@ These identifiers are intentionally retained because changing them would add mig
 | `Start-LenovoBootMenuTray.cmd` / `.vbs` | Existing install/autostart/update launch contract. |
 | `Install-LenovoBootMenuTasks.ps1` / `Uninstall-LenovoBootMenuTasks.*` | Existing package, maintenance, update, and repair contract. |
 | `%LOCALAPPDATA%\Lenovo Boot Menu Tray\...` | Existing settings, diagnostics, update, and local TaskBroker state root. It is technical state, not product branding. |
-| `%ProgramData%\Lenovo Boot Menu\TaskBroker` | Hardened TaskBroker state/ACL boundary. |
 | `Local\LenovoBootMenuTray` | Cross-version singleton mutex. Keeping one mutex prevents old and new installed copies from running concurrently. |
-| `LenovoBootMenu-RefreshManager` | Fixed allowlisted SYSTEM Scheduled Task. |
-| `LenovoBootMenu-RefreshFirmware` | Fixed allowlisted SYSTEM Scheduled Task. |
-| `LenovoBootMenu-Default-Clear` | Fixed allowlisted SYSTEM Scheduled Task. |
-| `LenovoBootMenu-Default-Restore` | Fixed AtStartup SYSTEM Scheduled Task. |
-| `LenovoBootMenu-Set-<GUID>` | Deterministically derived fixed BootNext task family. |
-| `LenovoBootMenu-Default-Set-<GUID>` | Deterministically derived fixed default-target task family. |
 | `Lenovo Boot Menu Next` | Cleanup-only legacy task identifier. |
 | `Lenovo Boot Menu Tray Autostart` | Cleanup-only legacy Scheduled Task identifier. |
 | `LenovoBootMenuBroker` | Cleanup-only legacy service identifier. |
 | `LenovoBootMenu-*Probe*` / `LenovoBootMenu-SystemBaseline` | Cleanup-only historical probe task names. |
 | `LenovoBootMenuTrayDefaultRestoreProcessed` | Cleanup-only legacy session marker. |
 
-The stable TaskBroker names remain exact. No free task-name input crosses the unelevated/SYSTEM privilege boundary.
+The canonical TaskBroker names remain exact. Legacy TaskBroker names are migration/cleanup inputs only. No free task-name input crosses the unelevated/SYSTEM privilege boundary.
 
 ### Update compatibility boundary
 
-The v0.8.0.4 updater requires the legacy-compatible release ZIP pattern and the existing flat package filenames. Therefore v0.9.0.0 deliberately keeps those names. The product name visible to users remains **Lenovo Boot Selector**.
+The v0.8.0.4 updater requires the legacy-compatible release ZIP pattern and the existing flat package filenames. Therefore v0.9.0.0 and later releases, including v0.10.0.0, deliberately keep those package identifiers. The product name visible to users remains **Lenovo Boot Selector**.
 
-Future naming cleanup must not change these category-C identifiers unless a separate migration design proves that installations which skip intermediate releases can still update safely.
+Future cleanup of the remaining category-C identifiers must use a separate migration design appropriate to their own lifecycle and failure semantics.
 
 ## D — Historical record
 

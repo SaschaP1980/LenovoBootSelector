@@ -22,31 +22,31 @@ The unelevated runtime may request only these logical operations:
 
 No runtime API accepts a free Scheduled Task name.
 
-`DefaultRestore` exists as the fixed startup task `LenovoBootMenu-Default-Restore`, but it is not exposed as an unelevated runtime operation. It is driven only by its fixed AtStartup trigger.
+`DefaultRestore` exists as the fixed startup task `LenovoBootSelector-Default-Restore`, but it is not exposed as an unelevated runtime operation. It is driven only by its fixed AtStartup trigger.
 
-The `LenovoBootMenu-*` task family and `%ProgramData%\Lenovo Boot Menu\TaskBroker` path are retained technical compatibility/security identifiers. They are not alternate product branding and are intentionally not renamed by LBS-19 because they are part of the fixed allowlist and ACL boundary. See [IDENTIFIER_COMPATIBILITY.md](IDENTIFIER_COMPATIBILITY.md).
+Since v0.10.0.0, the canonical privileged installation uses the `LenovoBootSelector-*` task family and `%ProgramData%\Lenovo Boot Selector\TaskBroker`. Exact pre-v0.10 `LenovoBootMenu-*` tasks and `%ProgramData%\Lenovo Boot Menu\TaskBroker` are recognized only by the elevated migration/cleanup path and are never accepted as runtime authorization. See [IDENTIFIER_COMPATIBILITY.md](IDENTIFIER_COMPATIBILITY.md).
 
 ## Fixed task naming
 
 Static tasks have exact names:
 
-- `LenovoBootMenu-RefreshManager`
-- `LenovoBootMenu-RefreshFirmware`
-- `LenovoBootMenu-Default-Clear`
-- `LenovoBootMenu-Default-Restore`
+- `LenovoBootSelector-RefreshManager`
+- `LenovoBootSelector-RefreshFirmware`
+- `LenovoBootSelector-Default-Clear`
+- `LenovoBootSelector-Default-Restore`
 
 Target-specific task names are deterministically derived from a strictly validated firmware GUID:
 
-- BootNext: `LenovoBootMenu-Set-<32 hex characters>`
-- DefaultSet: `LenovoBootMenu-Default-Set-<32 hex characters>`
+- BootNext: `LenovoBootSelector-Set-<32 hex characters>`
+- DefaultSet: `LenovoBootSelector-Default-Set-<32 hex characters>`
 
 The runtime never accepts a task name supplied by UI state, user input or arbitrary metadata.
 
 ## Metadata contract
 
-TaskBroker schema 0.2.13 introduces the explicit boundary marker:
+TaskBroker schema 0.2.14 introduces the explicit boundary marker:
 
-`boundaryContract = fixed-task-v1`
+`boundaryContract = fixed-task-v2`
 
 Runtime metadata is accepted only when all of the following are true:
 
@@ -63,7 +63,7 @@ Any mismatch is fail-closed and makes the System Functions state require repair/
 
 ## ProgramData state integrity
 
-The elevated installer protects `%ProgramData%\Lenovo Boot Menu\TaskBroker` with a non-inheriting ACL:
+The elevated installer protects `%ProgramData%\Lenovo Boot Selector\TaskBroker` with a non-inheriting ACL:
 
 - SYSTEM: FullControl
 - Administrators: FullControl
@@ -74,6 +74,10 @@ The metadata file is explicitly protected with the same write boundary.
 ACL verification must distinguish concrete mutation rights from composite convenience rights. In particular, `FileSystemRights::Modify` must **not** be used as a forbidden bit mask because it includes read/execute components and therefore overlaps the allowed `ReadAndExecute` set. The verifier checks concrete mutation-capable bits (write/create/append/delete/ACL/ownership changes) instead.
 
 This prevents the normal unelevated user from rewriting task names, target GUIDs or trusted state paths after setup while still accepting the intended Users=ReadAndExecute ACL.
+
+### v0.10 migration rule
+
+An upgraded pre-v0.10 installation is treated as present-but-incompatible and therefore requires the explicit elevated Repair/Migrate path. The installer builds and verifies the complete canonical state, task definitions, SYSTEM principals, task ACLs, metadata, state ACLs and enabled Default Restore before deleting any exact legacy TaskBroker task or legacy ProgramData state. If canonical setup fails before that verification point, the old TaskBroker installation is left intact. Cleanup recognizes only exact static names or the two project-owned per-GUID name patterns with a 32-hex suffix; no generic Lenovo wildcard deletion is allowed.
 
 ## Scheduled Task DACL contract
 

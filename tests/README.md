@@ -24,7 +24,8 @@ These four files are the permanent Python gates used by the GitHub Release Orche
 | `Test-MaintenanceRuntime.ps1` | Runtime | Maintenance state and modes |
 | `Test-SingleInstanceMutex.ps1` | Runtime | Single-instance / mutex lifecycle |
 | `Test-BootTargetDrift.ps1` | Safety | Drift detection and fail-closed states |
-| `Test-TaskBrokerBoundary.ps1` | Safety | LBS-6 fixed-task / metadata boundary without privileged execution |
+| `Test-TaskBrokerBoundary.ps1` | Safety | Fixed-task / metadata privilege boundary without privileged execution |
+| `Test-TaskBrokerMigration.ps1` | Safety / Migration | LBS-33 canonical privileged identifiers, migration ordering, legacy cleanup ownership, and default-state precedence |
 | `Test-IdentifierCompatibility.ps1` | Compatibility | Active naming contract, autostart migration, package compatibility IDs, and cross-version singleton/task invariants |
 | `Test-ArchitectureSoak.ps1` | Soak | Repeated architecture/state stability |
 | `Test-WindowsPowerShell51.ps1` | Compatibility | Windows PowerShell 5.1 parser/encoding gate and native aggregate runner |
@@ -51,7 +52,8 @@ Native PowerShell suites intentionally use different count strategies; one gener
 | --- | --- |
 | `Test-UpdateCore.ps1` | **AST self-audit + fixed coverage guard.** PowerShell counts the `Assert-True` / `Assert-Equal` command ASTs, compares them with the actually executed `$checks`, and additionally requires exactly 79. The permanent release gate validates the same contract statically. |
 | `Test-RefreshRuntime.ps1` | Straight-line: fixed runtime count of 28, including LBS-22 inherited/fresh diagnostics-session coverage for background-refresh, update-check, and update-prepare roles. |
-| `Test-TaskBrokerBoundary.ps1` | Straight-line: fixed runtime count of 23. |
+| `Test-TaskBrokerBoundary.ps1` | Straight-line: fixed runtime count of 25, including rejection of the v1 boundary and legacy fixed task names. |
+| `Test-TaskBrokerMigration.ps1` | Straight-line: fixed runtime count of 28 covering LBS-33 naming, old-install detection, deterministic repair, migration ordering, default precedence, owned legacy cleanup targets, and dual-root uninstall. |
 | `Test-BootTargetDrift.ps1` | Straight-line: fixed runtime count of 13. |
 | `Test-SingleInstanceMutex.ps1` | Explicit manual increments; fixed fail guard of 4. |
 | `Test-IdentifierCompatibility.ps1` | Straight-line: fixed runtime count of 29 covering LBS-19 naming, migration-failure safety, unrelated-value isolation, and retained compatibility roots. |

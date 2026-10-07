@@ -197,9 +197,9 @@ def main():
     taskbroker=txt(root/'src/Infrastructure/TaskBroker.ps1')
     diagnostics=txt(root/'src/Infrastructure/RuntimeDiagnostics.ps1')
     runner=ps_function(taskbroker,'Invoke-AuthorizedTask') or ''
-    s.contains('LBS-6 TaskBroker schema is hardened v0.2.13',tray,"$script:SupportedTaskBrokerVersions = @('0.2.13')")
-    s.contains('LBS-6 installer schema is hardened v0.2.13',install,"$version = '0.2.13'")
-    s.contains('LBS-6 metadata boundary marker is emitted',install,"boundaryContract = 'fixed-task-v1'")
+    s.contains('LBS-6 TaskBroker schema is hardened v0.2.14',tray,"$script:SupportedTaskBrokerVersions = @('0.2.14')")
+    s.contains('LBS-6 installer schema is hardened v0.2.14',install,"$version = '0.2.14'")
+    s.contains('LBS-6 metadata boundary marker is emitted',install,"boundaryContract = 'fixed-task-v2'")
     s.absent('LBS-6 runtime task runner has no free TaskName parameter',runner.lower(),'[string]$taskname')
     s.contains('LBS-6 runtime task runner uses operation ValidateSet',runner,"[ValidateSet('ManagerRefresh','FirmwareRefresh','BootNext','DefaultSet','DefaultClear')]")
     s.eq('Elevation prompts still restricted to setup/remove',tray.count('-Verb RunAs'),2)
@@ -221,6 +221,7 @@ def main():
     s.contains('v0.6.4.1 native boundary covers Modify',native_boundary,'Modify is rejected as mutating')
     s.contains('v0.6.4.1 native boundary covers FullControl',native_boundary,'FullControl is rejected as mutating')
     s.contains('LBS-6 native boundary test is aggregated',txt(root/'tests/Test-WindowsPowerShell51.ps1'),'Test-TaskBrokerBoundary.ps1')
+    s.contains('LBS-33 native migration test is aggregated',txt(root/'tests/Test-WindowsPowerShell51.ps1'),'Test-TaskBrokerMigration.ps1')
 
     update_test=txt(root/'tests/Test-UpdateCore.ps1')
     s.contains('LBS-5 update tests source transport module',update_test,"src\\Infrastructure\\UpdateTransport.ps1")

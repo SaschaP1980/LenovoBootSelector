@@ -129,6 +129,13 @@ def main():
     identifier_test=txt(identifier_test_path) if identifier_test_path.is_file() else ''
     s.has('LBS-19 native identifier test keeps fixed total 29',identifier_test,'Write-Host "IDENTIFIER TOTAL $checks/29"')
     s.has('LBS-19 native aggregate runner invokes identifier suite',windows_wrapper,"Test-IdentifierCompatibility.ps1")
+    taskbroker_migration_path=root/'tests/Test-TaskBrokerMigration.ps1'
+    s.c('LBS-33 native TaskBroker migration test exists',taskbroker_migration_path.is_file())
+    taskbroker_migration=txt(taskbroker_migration_path) if taskbroker_migration_path.is_file() else ''
+    s.has('LBS-33 migration suite keeps fixed total 28',taskbroker_migration,'Write-Host "TASKBROKER MIGRATION TOTAL $checks/28"')
+    s.has('LBS-33 native aggregate runner invokes migration suite',windows_wrapper,'Test-TaskBrokerMigration.ps1')
+
+
     new_template_path=root/'src/App/LenovoBootSelector.template.ps1'
     old_template_path=root/'src/App/LenovoBootMenuTray.template.ps1'
     s.c('LBS-19 canonical app template uses LenovoBootSelector name',new_template_path.is_file())
@@ -140,6 +147,10 @@ def main():
     common_source=txt(root/'tools/release_common.py')
     taskbroker_source=txt(root/'src/Infrastructure/TaskBroker.ps1')
     installer_source=txt(root/'bin/Install-LenovoBootMenuTasks.ps1')
+    s.has('LBS-33 canonical ProgramData root is used',identifier_template,"Join-Path $env:ProgramData 'Lenovo Boot Selector\\TaskBroker'")
+    s.has('LBS-33 legacy ProgramData root remains detection-only migration input',identifier_template,"LegacyTaskBrokerStateDir = Join-Path $env:ProgramData 'Lenovo Boot Menu\\TaskBroker'")
+    s.has('LBS-33 runtime metadata contract is fixed-task-v2',taskbroker_source,"boundaryContract -ne 'fixed-task-v2'")
+    s.no('LBS-33 runtime resolver no longer returns legacy TaskBroker names',taskbroker_source,"return 'LenovoBootMenu-RefreshManager'")
     s.has('LBS-19 internal console class uses canonical name',identifier_template,'LenovoBootSelectorConsoleWindow')
     s.no('LBS-19 legacy internal console class removed',identifier_template,'LenovoBootMenuConsoleWindow')
     s.has('LBS-19 popup internal name uses canonical name',popup_source,"$form.Name = 'LenovoBootSelectorPopup'")
@@ -148,7 +159,7 @@ def main():
     s.has('LBS-19 legacy HKCU Run value remains explicit migration input',identifier_template,"$script:LegacyAutostartRunValueName = 'Lenovo Boot Menu Tray'")
     s.has('LBS-19 autostart migration reads legacy registration',autostart_source,'LegacyAutostartRunValueName')
     s.has('LBS-19 release ZIP keeps pre-migration compatibility name',common_source,"return f'LenovoBootMenuTray-v{version}.zip'")
-    s.has('LBS-19 hardened TaskBroker fixed name remains stable',taskbroker_source,"return 'LenovoBootMenu-RefreshManager'")
+    s.has('LBS-33 canonical TaskBroker fixed name is used',taskbroker_source,"return 'LenovoBootSelector-RefreshManager'")
     s.has('LBS-19 cross-version singleton mutex remains stable',identifier_template,"'Local\LenovoBootMenuTray'")
     s.has('LBS-19 installer workspace uses canonical internal prefix',installer_source,'LenovoBootSelectorTaskInstall-')
     s.no('LBS-19 legacy installer workspace prefix removed',installer_source,'LenovoBootMenuTaskInstall-')
@@ -475,9 +486,9 @@ def main():
     s.c('LBS-6 canonical security boundary document exists',(root/'docs/SECURITY_BOUNDARY.md').is_file())
     s.has('LBS-6 security document forbids free task names',boundary_doc,'No runtime API accepts a free Scheduled Task name.')
     s.has('LBS-6 security document preserves one-shot semantics',boundary_doc,'One-Shot Next Boot')
-    s.has('LBS-6 runtime supports hardened TaskBroker schema',template,"$script:SupportedTaskBrokerVersions = @('0.2.13')")
-    s.has('LBS-6 installer emits hardened TaskBroker schema',installer,"$version = '0.2.13'")
-    s.has('LBS-6 installer emits fixed boundary marker',installer,"boundaryContract = 'fixed-task-v1'")
+    s.has('LBS-6 runtime supports hardened TaskBroker schema',template,"$script:SupportedTaskBrokerVersions = @('0.2.14')")
+    s.has('LBS-6 installer emits hardened TaskBroker schema',installer,"$version = '0.2.14'")
+    s.has('LBS-6 installer emits fixed boundary marker',installer,"boundaryContract = 'fixed-task-v2'")
     s.no('LBS-6 runtime has no TaskName-based authorized invocation',taskbroker.lower(),'invoke-authorizedtask -taskname')
     s.has('LBS-6 runtime authorized runner is operation-only',taskbroker,"[ValidateSet('ManagerRefresh','FirmwareRefresh','BootNext','DefaultSet','DefaultClear')]")
     s.has('LBS-6 metadata contract is enforced',taskbroker,'function Test-TaskBrokerMetadataContract')
