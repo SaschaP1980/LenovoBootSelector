@@ -7016,6 +7016,7 @@ if ($ScrollBar) {
     $ContentPanel.Top = -1 * $ScrollBar.Value
 }
 }
+
 function New-Label {
     param(
         [string]$Text,
@@ -7810,6 +7811,7 @@ function Add-PopupManageEntriesSection {
     $managePanel.Controls.Add($manageFooter)
     $Root.Controls.Add($managePanel)
 }
+
 function New-PopupForm {
     if (-not $script:BootTypeToolTip) {
         $script:BootTypeToolTip = New-Object System.Windows.Forms.ToolTip
