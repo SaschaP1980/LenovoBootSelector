@@ -89,6 +89,7 @@ function Move-ManageEntry {
 
 function Update-ManageEntriesUiState {
     if (-not $script:Popup -or $script:Popup.IsDisposed) { return }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
     $sectionLabel = $script:Popup.Controls.Find('SectionLabel', $true) | Select-Object -First 1
     $manageButton = $script:Popup.Controls.Find('ManageEntriesButton', $true) | Select-Object -First 1
     $managePanel = $script:Popup.Controls.Find('ManageEntriesPanel', $true) | Select-Object -First 1
@@ -102,7 +103,7 @@ function Update-ManageEntriesUiState {
     if ($sectionLabel) { $sectionLabel.Text = if ($script:IsManageEntriesMode) { Get-LocalizedString -Key 'Manage.Section' } else { Get-LocalizedString -Key 'Popup.NextBootSection' } }
     if ($manageButton) {
         $manageButton.Visible = -not $script:IsManageEntriesMode
-        $manageButton.Enabled = (-not $script:IsManageEntriesMode -and -not (Test-BootTargetDriftDetected) -and $script:CurrentEntries.Count -gt 0)
+        $manageButton.Enabled = (-not $script:IsManageEntriesMode -and [bool]$capabilities.CanManageEntries)
     }
     if ($managePanel) {
         $managePanel.Visible = $script:IsManageEntriesMode
@@ -113,14 +114,14 @@ function Update-ManageEntriesUiState {
     }
 
     if ($script:ManageEntriesMenuItem) {
-        $script:ManageEntriesMenuItem.Enabled = (-not $script:IsManageEntriesMode -and -not (Test-BootTargetDriftDetected) -and $script:CurrentEntries.Count -gt 0)
+        $script:ManageEntriesMenuItem.Enabled = (-not $script:IsManageEntriesMode -and [bool]$capabilities.CanManageEntries)
     }
 }
 
 function Start-ManageEntriesMode {
-    if (Test-MaintenanceBusy -or (Test-BootTargetDriftDetected)) { return }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    if (-not $capabilities.CanManageEntries) { return }
     if ($script:IsManageEntriesMode) { return }
-    if ($script:CurrentEntries.Count -eq 0) { return }
 
     $script:ManageEntryOrder = @((Get-OrderedEntriesForUi -IncludeHidden) | ForEach-Object { $_.Guid })
     $script:ManageHiddenEntryGuids = @($script:HiddenEntryGuids)

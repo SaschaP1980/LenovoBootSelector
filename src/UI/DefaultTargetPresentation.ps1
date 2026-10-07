@@ -7,11 +7,9 @@
 
 function Update-DefaultUi {
     if ($script:DefaultButton -and -not $script:DefaultButton.IsDisposed) {
-        $meta = Get-TaskBrokerMetadata
-        $schemaReady = ($meta -and ($script:SupportedTaskBrokerVersions -contains [string]$meta.version))
-        $checking = ($schemaReady -and $null -eq $script:TaskBrokerReadyCached)
-        $sessionReady = ($script:TaskBrokerReadyCached -eq $true)
-        $enabled = ($schemaReady -and $sessionReady -and -not (Test-BootTargetDriftDetected) -and $script:CurrentEntries.Count -gt 0)
+        $capabilities = Get-CurrentSystemFunctionsCapabilities
+        $checking = [bool]$capabilities.IsChecking
+        $enabled = [bool]$capabilities.CanSetDefaultTarget
         $visualEnabled = ($enabled -or $checking)
         $script:DefaultInteractionEnabled = $enabled
         $script:DefaultButton.Enabled = $visualEnabled

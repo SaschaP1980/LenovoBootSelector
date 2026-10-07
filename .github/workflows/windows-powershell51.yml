@@ -151,6 +151,7 @@ jobs:
               mutex = Get-TestTotal $logText '^MUTEX TOTAL\s+(\d+)/(\d+)\s*$'
               architectureSoak = Get-TestTotal $logText '^SOAK TOTAL\s+(\d+)/(\d+)\s*$'
               maintenance = Get-TestTotal $logText '^MAINTENANCE TOTAL\s+(\d+)/(\d+)\s*$'
+              systemCapabilities = Get-TestTotal $logText '^SYSTEM CAPABILITIES TOTAL\s+(\d+)/(\d+)\s*$'
               bootTargetDrift = Get-TestTotal $logText '^DRIFT TOTAL\s+(\d+)/(\d+)\s*$'
               taskBrokerBoundary = Get-TestTotal $logText '^TASKBROKER BOUNDARY TOTAL\s+(\d+)/(\d+)\s*$'
               taskBrokerMigration = Get-TestTotal $logText '^TASKBROKER MIGRATION TOTAL\s+(\d+)/(\d+)\s*$'
@@ -171,6 +172,7 @@ jobs:
               'mutex',
               'architectureSoak',
               'maintenance',
+              'systemCapabilities',
               'bootTargetDrift',
               'taskBrokerBoundary',
               'taskBrokerMigration',
@@ -197,6 +199,7 @@ jobs:
               $totals.mutex.passed +
               $totals.architectureSoak.passed +
               $totals.maintenance.passed +
+              $totals.systemCapabilities.passed +
               $totals.bootTargetDrift.passed +
               $totals.taskBrokerBoundary.passed +
               $totals.taskBrokerMigration.passed +
@@ -214,6 +217,7 @@ jobs:
               $totals.mutex.expected +
               $totals.architectureSoak.expected +
               $totals.maintenance.expected +
+              $totals.systemCapabilities.expected +
               $totals.bootTargetDrift.expected +
               $totals.taskBrokerBoundary.expected +
               $totals.taskBrokerMigration.expected +

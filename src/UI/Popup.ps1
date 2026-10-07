@@ -39,7 +39,8 @@
     # v0.2.28: no window region is applied; the popup stays rectangular.
 
     $form.Add_Deactivate({
-        if (-not $script:ExitRequested -and -not (Test-MaintenanceBusy)) { $this.Hide() }
+        $capabilities = Get-CurrentSystemFunctionsCapabilities
+        if (-not $script:ExitRequested -and [string]$capabilities.State -ne 'Busy') { $this.Hide() }
     })
 
     return $form
@@ -65,9 +66,10 @@ function Show-OrTogglePopup {
         return
     }
 
-    $maintenanceBusy = Test-MaintenanceBusy
-    $brokerReady = if ($maintenanceBusy) { $false } else { ((Get-SystemFunctionsPresentationState) -eq 'Ready') }
-    if ($brokerReady) {
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    $maintenanceBusy = ([string]$capabilities.State -eq 'Busy')
+    $canUseSystemState = [bool]$capabilities.CanUseCachedBootState
+    if ($canUseSystemState) {
         if ($script:CurrentEntries.Count -eq 0) { [void](Load-BootStateFromExistingCache) }
         try { [void](Refresh-SystemDefaultState) } catch { }
     }
@@ -75,14 +77,14 @@ function Show-OrTogglePopup {
         if (-not $maintenanceBusy) {
             $script:CurrentEntries = @()
             $script:SelectedGuid = $null
-            if (Test-BootTargetDriftDetected) {
+            if ([string]$capabilities.State -eq 'ReinitializeRequired') {
                 $script:LastStatusText = if (Test-BootTargetDriftHasNewTargets) { Get-LocalizedString -Key 'Status.NewBootTargetDetected' } else { Get-LocalizedString -Key 'Status.BootTargetsChanged' }
             }
-            elseif (Test-TaskBrokerInstallationPresent) {
-                $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsRepairRequired'
+            elseif ([string]$capabilities.State -eq 'SetupRequired') {
+                $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsSetupRequired'
             }
             else {
-                $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsSetupRequired'
+                $script:LastStatusText = Get-LocalizedString -Key 'Status.SystemFunctionsRepairRequired'
             }
         }
         Update-PopupRows
@@ -101,7 +103,7 @@ function Show-OrTogglePopup {
     # Critical latency path: the form is visible before any fresh Scheduled-Task
     # refresh begins. Maintenance/missing-system-function states never launch a
     # competing worker; slow firmware/storage work stays in the hidden child.
-    if ($brokerReady -and -not $maintenanceBusy) {
+    if ($canUseSystemState -and -not $maintenanceBusy) {
         Start-BackgroundBootRefresh -RefreshStorage:($null -eq $script:StorageContext)
     }
 }

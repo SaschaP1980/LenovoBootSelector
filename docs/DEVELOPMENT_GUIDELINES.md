@@ -4,11 +4,31 @@ This document defines the durable development workflow for substantial Lenovo Bo
 
 It applies **by default to Major and Minor releases**.
 
+### Scope classification comes before development-path selection
+
+First decide whether the requested repository change is an executable/product change or a documentation-only/process-guidance change.
+
+A change is **documentation-only** when its complete repository diff is limited to Markdown/process documentation and it does not change product source, tests, workflows, validators, build/release tooling, machine-consumed release inputs, or package contents.
+
+Documentation-only work:
+
+- does not receive a product version or release profile;
+- does not create a Candidate or Release;
+- does not use `work/LBS-*` merely because the document being edited describes Work-Path behavior;
+- does not require a `dev-path:*` Issue label;
+- should be prepared as one atomic documentation commit directly on freshly verified `main`, with the exact diff inspected before the ref moves.
+
+The **subject of the documentation is not implementation complexity**. Editing Work-Branch or release guidance does not itself make a small documentation correction a Work-Branch change.
+
+> **Hard rule: no executable source/code change → no Work-Branch.**
+
+For this rule, **source/code** means any executable or machine-enforced repository implementation artifact: product source under `src/**`, tests, GitHub Actions workflows, validators, build/release tooling, scripts, or equivalent executable contracts. Markdown/documentation and GitHub Issue metadata do **not** count as source/code. If the complete intended change contains none of those executable/machine-enforced changes, `work/LBS-*` is forbidden regardless of topic, Issue priority, perceived importance, or the fact that the edited documentation governs the Work-Path itself.
+
 Patch and Hotfix work uses the shortest safe atomic path **without a work branch by default**. Before implementation begins, perform a brief effort/risk analysis. Escalate a Patch or Hotfix to the work-branch/checkpoint model only when that analysis indicates that the work is likely to be substantial, cross-cutting, migration-heavy, interruption-prone, or otherwise unlikely to fit safely into one short implementation cycle. Record the reason durably and carry it into the Candidate as exactly one `Work-Branch-Reason:` trailer.
 
 Do not use a work branch for a small Patch/Hotfix merely for consistency with Major/Minor releases; the resilience machinery must not become routine overhead for short fixes.
 
-The Work-Path heartbeat journal defined below is the established resilience standard **only after a `work/LBS-*` path has already been selected**. It is not used for the normal branchless Patch/Hotfix fast path.
+The Work-Path rolling recovery comment defined below is the established resilience standard **only after a `work/LBS-*` path has already been selected**. It is not used for the normal branchless Patch/Hotfix fast path.
 
 The release path remains defined by `docs/RELEASE_PROCESS.md`. Connector/GitHub operating details remain defined by `docs/GITHUB_HOWTO.md`.
 
@@ -76,6 +96,8 @@ Clean Code/SOLID/DRY refactoring must not weaken the project's explicit safety b
 
 ### Selection gate
 
+This gate applies only after the scope has been classified as executable/product release work. Documentation-only changes use the documentation policy above and never enter this selection gate.
+
 Use a work branch when:
 
 - the release is **Major or Minor**; or
@@ -83,7 +105,7 @@ Use a work branch when:
 
 For Patch/Hotfix analysis, indicators for escalation include multiple independently risky phases, settings/data migration, broad cross-module behavior changes, expected work substantially beyond a short atomic patch cycle, or a realistic need for several recoverable checkpoints. A narrow bug fix, text/UI correction, small validator change, or isolated behavior patch should normally remain branchless.
 
-For Issue-backed work, record the selected development model before implementation using exactly one mutually exclusive label from the canonical taxonomy in `docs/GITHUB_HOWTO.md`: `dev-path: work-branch` for this Work-Path model, or `dev-path: fast` for the branchless atomic Patch/Hotfix path. A backlog Issue may remain without a development-path label until this selection gate is actually performed.
+For Issue-backed executable/product work, record the selected development model before implementation using exactly one mutually exclusive label from the canonical taxonomy in `docs/GITHUB_HOWTO.md`: `dev-path: work-branch` for this Work-Path model, or `dev-path: fast` for the branchless atomic Patch/Hotfix path. A backlog Issue may remain without a development-path label until this selection gate is actually performed. Documentation-only/process-guidance Issues remain outside this label dimension.
 
 When a Patch/Hotfix is escalated, record the concise reason in the Issue when Issue-backed (or equivalent durable release history for an Issue-less Hotfix) and later include the same decision as `Work-Branch-Reason: <reason>` in the Candidate history.
 
@@ -211,72 +233,62 @@ A checkpoint commit should contain at least:
 
 A fresh agent should be able to read the Issue and latest work-branch checkpoint and continue without the previous chat.
 
-### Work-Path heartbeat journal
+### Work-Path rolling recovery comment
 
-This mechanism applies **only** to development that already uses a durable `work/LBS-<issue>` branch. It therefore applies to Major/Minor work and to the exceptional Patch/Hotfix that was explicitly escalated to the Work-Path model. It does **not** apply to the normal branchless Patch/Hotfix fast path.
+This mechanism applies **only** to development that already uses a durable `work/LBS-<issue>` branch. Major/Minor work and explicitly escalated Patch/Hotfix work use it; the normal branchless Patch/Hotfix fast path does not.
 
-During active interactive Work-Path development, maintain one temporary tracked continuation journal:
+Maintain exactly **one rolling recovery comment** in the active GitHub Issue. Prefer the implementation-start comment and update that same comment in place. Do not create a new heartbeat comment every interval.
 
-`.chatgpt-work/LBS-<issue>.md`
+The rolling comment and a product checkpoint have different responsibilities:
 
-The journal and a product checkpoint have different responsibilities:
+- a **product checkpoint** is a coherent recoverable source state on `work/LBS-<issue>` and may include focused validation;
+- the **rolling recovery comment** is the cumulative operational handover state for the complete Build & Release lifecycle.
 
-- a **product checkpoint** is a coherent recoverable source state and may include focused validation;
-- a **heartbeat journal commit** is a deliberately lightweight persistence event for recent engineering findings and liveness state.
+The rolling comment must remain sufficient for a fresh session to continue without reconstructing prior chat. It is not private chain-of-thought. Keep concise but complete durable facts such as:
 
-A heartbeat journal commit must not trigger a build, full test matrix, runtime regeneration, Candidate gate or checkpoint gate merely because the journal changed. When the connector supports a single-file contents update, prefer that lightweight write path rather than reconstructing a full product checkpoint.
-
-The journal records only durable engineering continuation information that could appropriately appear in a normal progress update. It is **not** a private chain-of-thought record. Useful entries include:
-
-- facts and constraints discovered;
-- experiments attempted and their concise result;
-- failed approaches and the technical reason they were rejected;
-- test/validator findings;
-- evidence-based decisions;
-- current phase and next intended action;
-- relevant GitHub workflow/run identifiers.
-
-Keep a compact status header with at least:
-
-```text
-Branch: work/LBS-XX
-Base-Main: <sha>
-Last-Heartbeat-UTC: <timestamp>
-Agent-State: ACTIVE | WAITING_FOR_GITHUB | IDLE | STOPPED
-GitHub-Run: none | <workflow/run identifier>
-Last-Product-Checkpoint: <sha>
-Current-Phase: <short phase>
-Next-Action: <short next action>
-```
-
-Exact formatting may evolve, but the semantics above must remain recoverable.
+- base `main`, current work head and last product checkpoint SHA;
+- target version, release profile and development-path reason;
+- current phase, `Agent-State`, exact next action and open risks;
+- architecture decisions and safety constraints;
+- every product checkpoint with purpose/result;
+- experiments attempted, failures and why approaches were rejected;
+- test/validator findings and corrections;
+- Development Completion evidence and unavailable-capability/tooling gaps;
+- exact GitHub Actions run IDs, tested SHA, totals and timings;
+- Candidate history, including every PASS/FAIL and correction cause;
+- Release/PR/tag/artifact verification;
+- wall-clock and gate timing measurements used for pilot comparisons.
 
 #### Heartbeat cadence and stale interpretation
 
-While the interactive agent is actively working on a Work-Path task, heartbeat cadence is **time-based, not event-based**.
+While the interactive agent is actively working on a Work-Path task, cadence is **time-based, not event-based**.
 
-- With `Agent-State: ACTIVE`, the latest journal commit must not become more than approximately **3 minutes old**, even when no new technical conclusion has been reached.
-- A finding, decision, failed experiment, checkpoint, or other substantive journal update may serve as the heartbeat for that interval.
-- If no new finding exists when the interval expires, write a minimal truthful heartbeat such as `still investigating <phase>; no new conclusion yet`. A timer-only heartbeat is valid and intentional because liveness is itself durable information.
-- Also write a heartbeat immediately before a potentially long/high-risk tool sequence when the intended next action matters for recovery.
-- Use concise commit subjects that distinguish liveness from findings, for example `worklog(LBS-XX): heartbeat`, `worklog(LBS-XX): record <finding>`, or `worklog(LBS-XX): record <failure>`.
+- With `Agent-State: ACTIVE`, the rolling comment's `Last heartbeat` must not become more than approximately **3 minutes old**.
+- Every update is cumulative: retain prior Build & Release evidence and add/refresh the newest recovery-relevant information.
+- A finding, decision, failed experiment, checkpoint or gate result is the preferred heartbeat payload.
+- If no new recovery-relevant information exists when the interval expires, update the same comment with a minimal truthful liveness statement; do not create a Git commit merely for the timer.
+- Update immediately before a potentially long/high-risk tool sequence when the next action matters for recovery.
+- Serialize mutative GitHub writes; do not parallelize heartbeat/comment mutations.
 
-The active-agent cadence may pause only in two cases:
+The active cadence may pause only when:
 
-1. the interactive agent is genuinely no longer working, represented as `IDLE` or `STOPPED`; or
-2. execution is intentionally waiting on independent GitHub Actions work. Before pausing, set `Agent-State: WAITING_FOR_GITHUB` and persist the exact workflow/run identifier in `GitHub-Run`.
+- `Agent-State: WAITING_FOR_GITHUB` names an exact independently running Actions run, or
+- `Agent-State: IDLE` / `STOPPED` truthfully states that interactive work is not continuing.
 
-When the referenced GitHub run completes or fails and interactive work resumes, set `Agent-State: ACTIVE` again and immediately resume the maximum-three-minute heartbeat cadence.
+When a referenced workflow completes and interactive work resumes, set `Agent-State: ACTIVE` and immediately resume the maximum-three-minute cadence.
 
-Operationally:
+Interpretation:
 
-- a recent `ACTIVE` heartbeat means only that the interactive agent was active at that recorded point;
-- an `ACTIVE` heartbeat older than roughly **3 minutes** is a missed heartbeat and should be treated as suspicious;
-- when the latest heartbeat is older than roughly **5 minutes** and no referenced GitHub Actions run is currently `queued` or `in_progress`, treat the interactive agent/stream as stopped and resume from durable GitHub state;
-- when `Agent-State: WAITING_FOR_GITHUB` references a workflow that is still `queued` or `in_progress`, GitHub continues independently even if the chat stream stopped;
-- never describe interactive-agent work as continuing in the background when no independent automation is actually running.
+- a recent `ACTIVE` timestamp means the interactive agent was active at that recorded point;
+- an `ACTIVE` heartbeat older than roughly **3 minutes** is a missed heartbeat;
+- when the latest heartbeat is older than roughly **5 minutes** and no referenced Actions run is `queued` or `in_progress`, treat the interactive stream as stopped and resume from durable GitHub state;
+- when `WAITING_FOR_GITHUB` references a live run, GitHub automation may continue independently even if the chat stream stops.
 
-On recovery from an interrupted Work-Path session, a fresh agent must read current `main`, the Issue, the `work/LBS-<issue>` head, the latest product checkpoint context and the journal when it exists before taking further action. Re-check any referenced GitHub run directly rather than trusting a stale journal status.
+On recovery, re-read current `main`, the Issue including the rolling recovery comment, the `work/LBS-<issue>` head and the latest product checkpoint before continuing. Re-check referenced Actions runs directly.
+
+Tracked `.chatgpt-work/LBS-<issue>.md` heartbeat files are now **legacy only**. Do not create them for new work. If an already-active branch contains one from the previous standard, keep it only until the rolling Issue comment has absorbed all recovery-relevant information, then remove it before Candidate creation. Timer-only Git commits are prohibited under the rolling-comment model.
+
+Historical measurements from LBS-29/LBS-27 remain useful evidence for why the three-minute recovery objective exists, but their journal-commit write overhead is not the target architecture anymore. The rolling-comment model preserves the recovery objective while removing heartbeat churn from Git history.
 
 #### Candidate cleanup and history isolation
 
@@ -285,7 +297,7 @@ The journal is disposable Work-Path state and must never be published.
 Before Candidate creation:
 
 1. finish the intended product work and required development-completion checks;
-2. remove `.chatgpt-work/LBS-<issue>.md` from the work branch;
+2. if a legacy `.chatgpt-work/LBS-<issue>.md` exists, first ensure its relevant state is already present in the rolling Issue comment, then remove it;
 3. verify the final cleaned work-branch tree contains only intended release content;
 4. re-read current `main` and reconcile it if necessary;
 5. create the release-ready Candidate as a **single clean commit whose parent is current `main` and whose tree exactly equals the final cleaned work-branch tree**;
@@ -314,8 +326,8 @@ Therefore:
 - do not hold a large finished change only in tool memory;
 - do not assume work continues between user turns;
 - when asked whether work is still running, verify GitHub refs/commit timestamps and relevant Actions runs instead of inferring activity from conversation text;
-- after any unexpected interruption, re-read `main`, the work-branch head and the Work-Path heartbeat journal when present before continuing;
-- use the journal heartbeat plus direct GitHub Actions state to distinguish a dead interactive stream from independently running GitHub automation;
+- after any unexpected interruption, re-read `main`, the work-branch head and the rolling Issue recovery comment before continuing;
+- use the rolling-comment heartbeat plus direct GitHub Actions state to distinguish a dead interactive stream from independently running GitHub automation;
 - never claim that background development continued when no automation/workflow was actually running.
 
 LBS-17 had two significant continuity gaps: work stopped after checkpoint 4 and again after checkpoint 7 until the user prompted continuation. The checkpoint model prevented source loss, but the idle wall-clock time was still avoidable.
@@ -449,15 +461,22 @@ A new permanent regression should normally encode behavior or a stable architect
 
 Hand-written structural checks are useful focused prechecks, but they must not be mistaken for the actual repository validators.
 
-Before Candidate creation, the final development-completion gate should execute the closest available equivalent of the real Candidate checks:
+Before Candidate creation, every Work-Path release must perform one deliberate **Development Completion review** against the final intended Work-Branch state.
 
-- deterministic runtime build/check;
-- Release/Core/Boundary/Regression validators;
-- protected-fragment intent;
-- repository-delete intent;
-- relevant native Windows PowerShell 5.1 coverage when an available hosted work-branch path exists.
+The review is a development discipline, not a new publication gate. It must:
 
-If the current environment cannot execute the real full-worktree checks, record that limitation explicitly. Do not manufacture dozens of approximate checks as a substitute.
+- run deterministic runtime generation/check on the final work-tree;
+- run all four permanent Python validators — Release, Core, Boundary, and Regression — whenever a complete local/full worktree is available;
+- execute independent permanent validators in one pass before correction where technically safe, so multiple actionable findings are collected instead of discovered through repeated Candidate loops;
+- run the relevant focused product/native tests already owned by the changed behavior;
+- apply the cheapest relevant PowerShell parser/encoding smoke checks to changed PowerShell runtime or test sources before Candidate exposure;
+- perform an **ownership/integration sweep** whenever responsibilities move: review affected permanent validators, regression contracts, native aggregate wiring, and workflow-facing references for assumptions about the old owner;
+- manually dispatch the existing `.github/workflows/windows-powershell51.yml` against the exact final `work/LBS-<issue>` revision and require its hosted Windows PowerShell 5.1 contract suite to pass before Candidate creation;
+- after that hosted Windows run, re-read the work-branch head and require it still to be the exact revision that was tested; rerun if the branch advanced.
+
+If a complete worktree or another required pre-Candidate capability is unavailable, record the exact tooling limitation in the Issue rolling comment. Do **not** replace missing permanent validators with dozens of approximate connector-side assertions and do not claim unavailable checks passed.
+
+All executable Development Completion checks must be green and all known deterministic integration findings must be resolved before the Candidate is exposed. Candidate Preflight remains authoritative and reruns its mandatory Linux and hosted Windows gates; Development Completion evidence never substitutes for it.
 
 LBS-17's first Candidate failed because a regression assertion was too broad. The product behavior was correct; the exact permanent validator had not been executed against the work branch before Candidate exposure. A hosted work-branch preflight would have caught this earlier.
 
@@ -480,7 +499,7 @@ Use:
 
 Do not reconstruct fields already covered by a successful aggregate summary through many additional connector calls unless investigating an inconsistency.
 
-For any Candidate derived from a durable work branch, first remove the temporary Work-Path heartbeat journal, then create a clean current-`main`-parent Candidate commit whose tree exactly matches the cleaned work-branch tree. The work-branch journal/checkpoint history is recovery state and must not become Candidate ancestry.
+For any Candidate derived from a durable work branch, first ensure no legacy `.chatgpt-work/LBS-<issue>.md` remains, then create a clean current-`main`-parent Candidate commit whose tree exactly matches the cleaned work-branch tree. The work-branch journal/checkpoint history is recovery state and must not become Candidate ancestry.
 
 Include exactly one unique candidate-history trailer:
 
@@ -540,128 +559,113 @@ For a comparable feature, aim for:
 6. bounded connector operations;
 7. no clone/ZIP detours after the environment limitation is known;
 8. no manual incremental generated-runtime reconstruction;
-9. use the Work Checkpoint Gate for deterministic runtime synchronization and standardized checkpoint validation as soon as that hosted path exists;
-10. one development-completion validation gate using the real validators as closely as the environment permits;
-11. one release-ready Candidate carrying the exact `Work-Branch:` provenance trailer;
+9. perform one final Development Completion review on the exact intended Work-Branch state, including the permanent validators that can run in the available full worktree, the ownership/parser sweep, and an exact-revision manual hosted Windows PowerShell 5.1 run;
+10. record any unavailable pre-Candidate capability explicitly instead of inventing substitute evidence;
+11. create one release-ready Candidate only after all executable Development Completion checks are green, carrying the exact `Work-Branch:` provenance trailer;
 12. normal Candidate/Release automation;
 13. automatic, tree-verified work-branch cleanup after successful publication.
 
 Never optimize by weakening validation, safety boundaries, reproducibility, or release verification.
 
-## 14. Work Checkpoint Gate — target architecture
+## 14. Development Completion guideline pilot
 
 ### Purpose
 
-The Work Checkpoint Gate exists to make **frequent durable checkpoints cheap enough to use as the primary defense against unavoidable interactive-session failure**.
+LBS-38 establishes a **guideline-first pilot** for the gap between final Work-Branch implementation and Candidate exposure.
 
-The project must assume that a chat, response stream, agent runtime, connector call, or local execution environment can stop without warning. That condition cannot be eliminated by asking one interactive prompt to run until an entire feature and release are complete. The durable engineering response is therefore:
+It deliberately does **not** add a new GitHub Actions workflow, validator, test, build tool, or release status. The next real Work-Branch Issue is the empirical pilot.
+
+The immediate rule is:
 
 ```text
-agent work
-  -> durable work-branch checkpoint
-  -> GitHub-hosted checkpoint build/validation
-  -> continue automatically
+final intended work-branch state
+  -> Development Completion review
+  -> all executable pre-Candidate checks GREEN
+  -> release-ready Candidate
+  -> authoritative Candidate Preflight
 ```
 
-A fresh session must be able to recover from the latest work-branch head and its GitHub validation evidence without needing the interrupted conversation.
+The Candidate must remain expected GREEN. It is not the normal place to discover stale validator ownership, parser errors, incomplete aggregate wiring, or other deterministic integration defects that could have been found on the final Work-Branch state.
 
-### Non-goals and release separation
+### Required Development Completion evidence
 
-The Work Checkpoint Gate is **not** Candidate Preflight and is **not** a publication path.
+Before Candidate creation, record enough durable evidence in the active Issue's rolling recovery comment for a fresh session to reconstruct what was actually checked.
+
+At minimum record:
+
+- exact final Work-Branch SHA used for Development Completion;
+- deterministic runtime build/check result;
+- Release/Core/Boundary/Regression results when a complete worktree was available;
+- focused/native tests relevant to the implementation;
+- ownership/integration sweep result when responsibilities moved;
+- PowerShell parser/encoding checks performed for changed PowerShell sources;
+- hosted Windows PowerShell 5.1 workflow run ID, exact tested SHA, machine-readable summary/totals, and timing;
+- any pre-Candidate check that could not be executed and the concrete tooling reason.
+
+Do not convert missing evidence into a claimed PASS.
+
+### Multiple-finding discipline
+
+Where checks are independent and safe to continue after one failure, run all of them before starting the correction cycle.
+
+For example, if Release, Core, Boundary, and Regression can all execute against the same complete worktree, collect all four results even if Release fails first. This reduces repeated development feedback loops without weakening any validator.
+
+The same principle applies to an ownership move: inspect the product change together with the validators, regression contracts, native aggregate wrapper, and workflow-facing references that encode the old responsibility boundary.
+
+### Hosted Windows PowerShell 5.1 before Candidate
+
+The existing `.github/workflows/windows-powershell51.yml` already supports manual dispatch.
+
+For the final Development Completion state:
+
+1. pin the final `work/LBS-<issue>` head SHA;
+2. manually dispatch the Windows PowerShell 5.1 workflow for that work-branch ref;
+3. require the run to execute on hosted Windows PowerShell 5.1 and complete GREEN;
+4. consume `WINDOWS_POWERSHELL51_SUMMARY=<json>` and retain the run ID/totals/timings;
+5. re-read the work branch after the run;
+6. if the branch head differs from the tested SHA, the Windows evidence is stale and must be rerun.
+
+This is Windows contract-suite evidence only. It is not physical Lenovo/UEFI E2E.
+
+### Current Linux/full-worktree limitation
+
+LBS-38 does not invent a new hosted Linux Work-Branch workflow.
+
+If the active environment has a complete worktree, run the four permanent Python validators there against the final Work-Branch state before Candidate exposure. If the environment cannot obtain a complete worktree, record that exact limitation and continue only with checks that can be executed truthfully.
+
+Do not repeatedly probe unavailable clone/archive routes and do not rebuild permanent validator logic by hand through many connector reads.
+
+The next Work-Branch pilot must tell us whether this remaining limitation materially causes Candidate-only findings. If it does, open a separate automation Issue with the pilot evidence rather than silently expanding LBS-38 after the fact.
+
+### Pilot measurement
+
+The next real Work-Branch Issue must record:
+
+- final Development Completion SHA;
+- which prescribed checks executed and which could not;
+- hosted Windows pre-Candidate run and summary;
+- first Candidate run result;
+- number and causes of any Candidate correction revisions;
+- Development Completion effort/timing where measurable;
+- Candidate-to-release timing;
+- classification of each unexpected Candidate failure as:
+  - a missed check that the new guidelines already required;
+  - a tooling gap that prevented the required pre-Candidate check;
+  - or a genuinely Candidate-only integration condition.
+
+The pilot succeeds if the revised discipline materially reduces avoidable Candidate correction loops without weakening Candidate or Release safety.
+
+### Release separation
+
+Development Completion is never publication authorization.
 
 It must not:
 
-- create `candidate/**`, `release/**`, version tags, publication PRs, or release ZIPs;
-- weaken or replace Linux Candidate Preflight;
-- weaken or replace the mandatory Windows PowerShell 5.1 Candidate gate;
-- weaken or replace the Release Orchestrator or its eight final release contexts;
-- convert an intermediate development checkpoint into a release-ready Candidate merely because a subset of checks is GREEN.
+- create or promote `candidate/**` or `release/**` branches;
+- create version tags, release ZIPs, or publication PRs;
+- replace Candidate Preflight;
+- replace the hosted Windows Candidate gate;
+- replace Release Orchestrator verification;
+- be reported as physical hardware/UEFI acceptance.
 
-Candidate Preflight remains the release-entry authority. The Work Checkpoint Gate exists only to make development state recoverable and to catch integration defects earlier.
-
-### Trigger and exact-SHA discipline
-
-The intended hosted workflow should operate on `work/LBS-*` checkpoints and validate an exact commit SHA.
-
-At minimum it should:
-
-1. check out the exact work-branch checkpoint on a full GitHub-hosted worktree;
-2. verify that the work branch still points to the expected source checkpoint before applying any generated follow-up;
-3. regenerate the single-file runtime through the repository's authoritative deterministic build tooling;
-4. verify runtime closure/determinism;
-5. run the relevant focused and permanent validators that are appropriate for that checkpoint;
-6. publish a clear exact-SHA PASS/FAIL result and machine-readable summary;
-7. leave the work branch in a recoverable state even when validation fails.
-
-A failed checkpoint gate is development evidence, not a reason to create a Candidate or release branch. Correct the smallest problem on the same work branch and continue.
-
-### Generated runtime canonicalization
-
-The agent should normally modify **canonical modular source**, not manually splice the 350–450 KB generated single-file runtime through connector string operations.
-
-If deterministic regeneration changes tracked generated files, the preferred hosted behavior is:
-
-1. preserve the original source checkpoint as a durable recoverable commit;
-2. generate the tracked runtime/audit outputs in the full GitHub worktree;
-3. if generated files differ, create **at most one** deterministic follow-up canonicalization commit on the same work branch;
-4. allow only the explicitly expected generated paths in that follow-up;
-5. validate the resulting exact follow-up SHA;
-6. make that validated SHA the effective checkpoint head.
-
-If no generated file changes, no follow-up commit is created.
-
-The workflow must prevent self-trigger loops and must not create unreferenced or repeated staging-commit chains. Automated canonicalization is acceptable because it removes expensive and error-prone connector reconstruction; manual incremental runtime staging is not.
-
-### Checkpoint validation levels
-
-Not every development checkpoint needs the full publication matrix. The gate should support validation proportional to the checkpoint while keeping the final development-completion gate strong.
-
-A normal checkpoint should prioritize:
-
-- deterministic runtime generation/check;
-- runtime closure;
-- relevant focused regression tests;
-- permanent static Release/Core/Boundary/Regression checks that are valid for the current intermediate state;
-- protected-fragment and repository-delete intent checks when those contracts are already meaningful.
-
-A checkpoint that touches Windows-specific runtime behavior, PowerShell parsing/encoding, localization runtime, TaskBroker boundaries, or other Windows-only contracts should run the relevant hosted Windows PowerShell 5.1 coverage when practical.
-
-Before Candidate creation, the **development-completion checkpoint** should run the closest available equivalent of the real Candidate validation, including hosted Windows PowerShell 5.1 coverage when the work-branch workflow provides it. Candidate Preflight still reruns its mandatory authoritative gates afterward.
-
-### Validator ownership and remote-read budget
-
-Once an invariant has a permanent executable validator, the Work Checkpoint Gate should execute that validator instead of having the agent reconstruct the same assertion through multiple GitHub fetches.
-
-Examples include:
-
-- localization catalog parity;
-- runtime include/closure checks;
-- uncontrolled visible-literal checks;
-- architecture/boundary invariants;
-- protected-fragment intent;
-- repository deletion intent;
-- deterministic generated-runtime checks.
-
-Connector reads remain appropriate for understanding code, reviewing exact diffs, diagnosing a failed gate, and making implementation decisions. They should not become a second hand-built validation framework beside the repository's validators.
-
-### Continuation behavior
-
-After a checkpoint is durably persisted and its required checkpoint gate is GREEN, continue the already authorized task automatically. Do not stop merely to announce that a checkpoint exists.
-
-If the checkpoint gate is still running when the interactive session ends, the work branch remains the recovery anchor. A later session must read the branch head and GitHub gate result before continuing.
-
-If the gate is RED, resume from that exact checkpoint, read the failure evidence, make the smallest correction, and rerun the gate. Do not discard the branch and do not start an unrelated parallel implementation path.
-
-### Performance objective
-
-The performance target is not fewer checkpoints. It is **cheap checkpoints**.
-
-For a normal checkpoint, aim for roughly:
-
-- no more than **1–2 minutes of agent/connector orchestration overhead** after substantive implementation, excluding test execution and external runner queues;
-- one durable source/checkpoint commit;
-- zero manual large-runtime reconstruction;
-- zero duplicated ad-hoc checks for invariants already owned by permanent validators;
-- at most one automated deterministic generated-output follow-up commit when required.
-
-The LBS-17 pilot showed that the final persistence overhead itself was usually acceptable; the dominant avoidable cost was manual generated-runtime synchronization and repeated connector-side revalidation. The Work Checkpoint Gate is specifically intended to remove that cost while preserving or increasing checkpoint frequency.
+Candidate Preflight and Release remain fail-closed and unchanged.

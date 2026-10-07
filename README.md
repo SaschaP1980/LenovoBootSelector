@@ -8,7 +8,7 @@
 
 **Lenovo Boot Selector** is a Windows tray application for Lenovo systems with two complementary boot-selection modes: choose any existing firmware target as the **one-time target for the next boot**, or configure a **persistent default boot target** that is automatically prepared again for the following boot after every Windows system start.
 
-The persistent default is restored by a fixed SYSTEM Scheduled Task and therefore does **not require a user to log on**. When every participating Windows installation is configured this way, a target such as the Lenovo Boot Menu can effectively become the recurring hand-off point for subsequent boots—without permanently rewriting the UEFI boot order.
+The persistent default is restored by a fixed SYSTEM Scheduled Task and therefore does **not require a user to log on**. When every participating Windows installation is configured this way, a target such as the Lenovo Boot Menu can effectively become the recurring hand-off point for subsequent boots, without permanently rewriting the UEFI boot order.
 
 ## Motivation
 
@@ -73,7 +73,7 @@ Starting with v0.10.0.0, the privileged TaskBroker installation uses `LenovoBoot
 
 Historical migration and repair details for v0.6.4.0/v0.6.4.1 are retained in [CHANGELOG.md](CHANGELOG.md) rather than presented as current maintenance instructions.
 
-**Current development version:** v0.10.4.0  
+**Current development version:** v0.10.5.0  
 **Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads and revision history
