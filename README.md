@@ -159,7 +159,7 @@ This presentation makes **no claim of direct 1:1 addressability** of the physica
 | `docs/architecture/` | canonical and historical architecture baselines |
 | `docs/LOCALIZATION.md` | localization architecture, migration, contribution rules, and gates |
 | `docs/IDENTIFIER_COMPATIBILITY.md` | canonical product naming, retained compatibility IDs, and migration rules |
-| `docs/DEVELOPMENT_GUIDELINES.md` | work-branch/checkpoint, session-resilience, connector, and Major/Minor development rules |
+| `docs/DEVELOPMENT_GUIDELINES.md` | Work-Path/checkpoint/heartbeat resilience, connector, and development-path rules |
 | `audits/` | canonical and historical catch audits |
 | `tools/` | build, packaging, audit, and transition scripts |
 | `downloads/` | historical versioned release ZIPs and update manifests |
@@ -172,7 +172,7 @@ The central native Windows PowerShell 5.1 test wrapper is:
 .\tests\Test-WindowsPowerShell51.ps1
 ~~~
 
-Build and packaging helpers live under `tools/`. Detailed version history is in [CHANGELOG.md](CHANGELOG.md). Localization development rules are in [docs/LOCALIZATION.md](docs/LOCALIZATION.md). Long-running Major/Minor feature work follows [docs/DEVELOPMENT_GUIDELINES.md](docs/DEVELOPMENT_GUIDELINES.md).
+Build and packaging helpers live under `tools/`. Detailed version history is in [CHANGELOG.md](CHANGELOG.md). Localization development rules are in [docs/LOCALIZATION.md](docs/LOCALIZATION.md). Work-Path development—mandatory for Major/Minor work and used for an explicitly escalated Patch/Hotfix—follows [docs/DEVELOPMENT_GUIDELINES.md](docs/DEVELOPMENT_GUIDELINES.md).
 
 The project's engineering baseline favors Clean Code and SOLID with explicit responsibility boundaries. DRY is applied to genuinely shared rules and knowledge, not mechanically to similar-looking code; limited duplication is preferred over coupling responsibilities that have different reasons to change. The detailed rule is canonical in [docs/DEVELOPMENT_GUIDELINES.md](docs/DEVELOPMENT_GUIDELINES.md).
 
@@ -181,6 +181,10 @@ The project's engineering baseline favors Clean Code and SOLID with explicit res
 Lenovo Boot Selector is developed as an **agentic software engineering** project. GitHub is the project's **single durable point of truth and continuity**: a fresh engineering agent must be able to reconstruct the complete current project state from the current repository, GitHub Issues/comments, workflows, tests, release metadata, and other tracked GitHub evidence alone.
 
 No previous chat, chat summary, handover document or ZIP, model memory, stale local checkout, previous source ZIP, or other unpublished context is required or authoritative for continuing the project. Interactive chats are transient working sessions only. When a durable finding, decision, constraint, acceptance result, or operating rule emerges during a session, it must be captured in the appropriate GitHub artifact before future work depends on it.
+
+Development deliberately uses two persistence models. Small Patch/Hotfix work defaults to one short branchless atomic cycle. Major/Minor work, and any Patch/Hotfix explicitly escalated because it is substantial or interruption-prone, uses a durable `work/LBS-<issue>` Work-Path with coherent product checkpoints plus the temporary `.chatgpt-work/LBS-<issue>.md` continuation journal. While the interactive agent is `ACTIVE`, the journal is updated often enough that its latest heartbeat is no more than approximately three minutes old; `WAITING_FOR_GITHUB` is used only with a concrete independently running Actions run. A roughly five-minute stale heartbeat with no such run is treated as a stopped interactive stream.
+
+Before Candidate creation the Work-Path journal is removed. The Candidate is then created as a clean commit on current `main` whose tree exactly matches the cleaned work branch, so temporary journal/checkpoint history never becomes Candidate, source-tag, PR, or `main` ancestry. After that phase transition, Candidate/Actions/Release state becomes the durable recovery surface. LBS-31 and LBS-29 validated this model in real development; LBS-29 included an actual interactive-stream interruption after Candidate publication and was recovered directly from GitHub state. The canonical details are in [docs/DEVELOPMENT_GUIDELINES.md](docs/DEVELOPMENT_GUIDELINES.md), with GitHub operations in [docs/GITHUB_HOWTO.md](docs/GITHUB_HOWTO.md) and release semantics in [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md).
 
 Agentic work is constrained by the same engineering controls as any other contribution: Issue-backed scope where required, test-first regression handling, explicit safety boundaries, atomic candidate commits, deterministic builds, Linux and Windows PowerShell 5.1 gates, reproducibility checks, post-release verification, and native acceptance where hardware-specific behavior must be proven. Human direction remains authoritative for product intent, safety-sensitive decisions, and final acceptance.
 

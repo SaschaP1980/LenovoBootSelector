@@ -96,6 +96,8 @@ For **PATCH and HOTFIX**, default to the shortest safe branchless atomic path. B
 
 For a normal branchless Patch/Hotfix, do not create a chain of intermediate commits: establish focused RED evidence against the unfixed basis, prepare the complete fix atomically, require focused GREEN plus directly relevant syntax/encoding/determinism checks, then expose one release-ready Candidate. Do not run the full test matrix before every commit; full authoritative validation belongs at the Candidate/Release gates. Reuse permanent validators instead of duplicating their assertions with ad-hoc connector checks.
 
+When a `work/LBS-*` Work-Path is selected, use the established continuation model in `docs/DEVELOPMENT_GUIDELINES.md`: maintain coherent product checkpoints plus `.chatgpt-work/LBS-<issue>.md`; keep an `ACTIVE` heartbeat no more than approximately three minutes old; use `WAITING_FOR_GITHUB` only with an exact independently running Actions run; and treat a roughly five-minute stale heartbeat with no running workflow as a stopped interactive stream. A fresh session must re-read current `main`, the Issue, work-branch head, latest product checkpoint and journal before continuing, then directly verify any referenced Actions run.
+
 - **MAJOR:** a relevant GitHub Issue is mandatory.
 - **MINOR:** a relevant GitHub Issue is mandatory.
 - **PATCH:** a relevant GitHub Issue is mandatory.
@@ -197,6 +199,8 @@ Before exposing a visible branch ref:
 7. only then create `candidate/v<version>` at that exact SHA.
 
 Do not publish partially assembled intermediate states. The exact Candidate must already be release-ready: all intended implementation, regression coverage, focused RED→GREEN evidence, release metadata and applicable prechecks are complete before the Candidate ref is exposed.
+
+For a Work-Path Candidate, first remove `.chatgpt-work/LBS-<issue>.md`, verify the cleaned work-branch tree, re-read current `main`, and create the Candidate as a clean current-`main`-parent commit whose tree exactly equals that cleaned work tree. Temporary journal/checkpoint history must not become Candidate ancestry. After the Candidate is exposed, Candidate/Actions/Release state—not a recreated journal—is the canonical recovery surface.
 
 For normal releases, **never create `release/v<version>` manually**. Only a successful Candidate Preflight may create it.
 

@@ -546,7 +546,7 @@ Other consequences remain:
 
 ### Work-Path heartbeat journal
 
-LBS-36 adds an experimental lightweight continuation journal **only for development that already uses `work/LBS-*`**. The normal branchless Patch/Hotfix fast path is unaffected.
+LBS-36 established a lightweight continuation journal **only for development that already uses `work/LBS-*`**. The normal branchless Patch/Hotfix fast path is unaffected.
 
 The active work branch may temporarily track:
 
@@ -564,9 +564,11 @@ Treat an `ACTIVE` heartbeat older than roughly **3 minutes** as a missed heartbe
 
 Before Candidate creation, delete the journal from the work branch and ensure the final work tree contains only intended release content. Build the Candidate as one clean commit with current `main` as parent and the exact cleaned work-branch tree. This deliberately prevents temporary journal commits from becoming Candidate/`main` ancestry while preserving the existing Candidate/work-tree equality check and release-owned work-branch cleanup.
 
-A fresh session resuming a Work-Path task must read the journal when present, then verify branch/run state directly before acting. The journal is a continuation record, not private chain-of-thought.
+A fresh session resuming a Work-Path task **before Candidate exposure** must read the journal when present, then verify branch/run state directly before acting. The journal is a continuation record, not private chain-of-thought.
 
-This process is experimental. LBS-31 confirmed useful recovery behavior but also showed that event-driven updates were too sparse. The refined maximum-three-minute ACTIVE cadence must therefore be exercised on another suitable Work-Path development task; keep it only if that stricter heartbeat provides material recovery/liveness value without disproportionate overhead.
+After Candidate exposure, the recovery surface changes deliberately. The journal has already been removed; do not recreate it just to represent Candidate/Release supervision. Recover by reading the Candidate SHA/ref and its Actions run. If the Candidate ref is already absent, check whether promotion succeeded and continue through the release branch/run, PR, tag and current `main`. This exact case occurred during LBS-29: the interactive stream terminated after Candidate publication, GitHub completed Candidate Preflight and the Release Orchestrator independently, and a later session recovered the completed state without reconstructing unpublished work.
+
+The standard is retained after two real Work-Path trials. LBS-31 established that event-driven updates were too sparse; LBS-29 verified the refined maximum-three-minute `ACTIVE` cadence with 15 worklog commits over 21m48s, a maximum interval of 165 seconds, zero missed three-minute heartbeats, and 40.53 seconds of measured connector write latency across 14 journal updates. Journal-only commits did not trigger product builds, runtime regeneration, test matrices or checkpoint gates.
 
 ### Bounded connector orchestration
 
@@ -574,7 +576,7 @@ Do not compose dozens of GitHub reads/writes into one connector/code-mode call. 
 
 After any orchestration error, re-read the branch ref and `main` before retrying. Partial Git-object side effects may exist even when the visible branch did not move.
 
-For long-running Major/Minor work, the complete checkpoint/session-resilience rules are defined in `docs/DEVELOPMENT_GUIDELINES.md`.
+For any Work-Path development, the complete checkpoint/session-resilience rules are defined in `docs/DEVELOPMENT_GUIDELINES.md`.
 
 ### Atomic Git-object preparation
 

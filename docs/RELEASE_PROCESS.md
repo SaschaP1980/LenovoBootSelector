@@ -41,6 +41,7 @@ Work-branch policy is intentionally asymmetric:
 - Before Patch/Hotfix implementation, perform a brief effort/risk analysis. Use a work branch only as an exception when the change is likely to be substantial, cross-cutting, migration-heavy, interruption-prone, or otherwise likely to require several recoverable checkpoints.
 - A Patch/Hotfix exception must be recorded durably before implementation and the Candidate must contain exactly one `Work-Branch-Reason: <reason>` trailer.
 - Do not escalate a small Patch/Hotfix merely to reuse the Major/Minor process.
+- The Work-Path heartbeat journal is development/recovery state governed by `docs/DEVELOPMENT_GUIDELINES.md`; it is never release content. Before Candidate creation it must be removed, and the cleaned work-branch tree becomes the exact release-ready tree.
 
 ## Test-first bug/regression preparation
 
@@ -73,13 +74,14 @@ The Candidate branch is **release-ready**, not a RED-test vehicle. Do not intent
 5. Set `repositoryDeleteIntent` to exactly the repository paths intentionally deleted by this version; normally `[]`.
 6. For a bug/regression, complete the focused RED→GREEN proof described above and run applicable broader prechecks.
 7. For a normal Patch/Hotfix without a work branch, assemble the complete intended change as one atomic candidate tree/commit rather than persisting file-by-file implementation commits.
-8. Prepare one exact **release-ready** candidate commit based on current `main`.
-9. The candidate-only commit range must contain exactly one unique `Work-Branch:` trailer:
+8. When a Work-Path branch is used, remove `.chatgpt-work/LBS-<issue>.md`, verify that the final cleaned work tree contains only intended release content, and re-read current `main` before Candidate creation.
+9. Prepare one exact **release-ready** candidate commit based on current `main`. For a Work-Path release, this must be a clean current-`main`-parent commit whose tree exactly equals the final cleaned work-branch tree; temporary worklog/checkpoint history must not become Candidate ancestry.
+10. The candidate-only commit range must contain exactly one unique `Work-Branch:` trailer:
    - Major/Minor: `Work-Branch: work/LBS-<issue>` is mandatory;
    - Patch/Hotfix normal path: `Work-Branch: none`;
    - Patch/Hotfix exception: `Work-Branch: work/LBS-<issue>` plus exactly one `Work-Branch-Reason: <reason>` from the pre-implementation effort/risk analysis.
    Same-candidate correction commits may omit these trailers, but must not introduce conflicting values. When a work branch is declared, its current tree must exactly match the Candidate tree.
-10. Push that commit only as `candidate/v<version>`. Do **not** manually create `release/v<version>`.
+11. Push that commit only as `candidate/v<version>`. Do **not** manually create `release/v<version>`.
 
 ### Version-only minimum diff
 

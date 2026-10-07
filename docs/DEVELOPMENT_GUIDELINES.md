@@ -8,7 +8,7 @@ Patch and Hotfix work uses the shortest safe atomic path **without a work branch
 
 Do not use a work branch for a small Patch/Hotfix merely for consistency with Major/Minor releases; the resilience machinery must not become routine overhead for short fixes.
 
-The experimental Work-Path heartbeat journal defined below applies **only after a `work/LBS-*` path has already been selected**. It is not used for the normal branchless Patch/Hotfix fast path.
+The Work-Path heartbeat journal defined below is the established resilience standard **only after a `work/LBS-*` path has already been selected**. It is not used for the normal branchless Patch/Hotfix fast path.
 
 The release path remains defined by `docs/RELEASE_PROCESS.md`. Connector/GitHub operating details remain defined by `docs/GITHUB_HOWTO.md`.
 
@@ -209,7 +209,7 @@ A checkpoint commit should contain at least:
 
 A fresh agent should be able to read the Issue and latest work-branch checkpoint and continue without the previous chat.
 
-### Work-Path heartbeat journal — experimental
+### Work-Path heartbeat journal
 
 This mechanism applies **only** to development that already uses a durable `work/LBS-<issue>` branch. It therefore applies to Major/Minor work and to the exceptional Patch/Hotfix that was explicitly escalated to the Work-Path model. It does **not** apply to the normal branchless Patch/Hotfix fast path.
 
@@ -291,7 +291,9 @@ Before Candidate creation:
 
 The Work-Path journal commits therefore remain reachable only through the disposable work branch. They must not become ancestors of the Candidate, source tag, publication PR or `main`. Existing exact Candidate/work-branch tree equality remains the release safety contract, and the Release Orchestrator retains responsibility for deleting the work branch only after rechecking that equality.
 
-This mechanism is an experiment introduced by LBS-36. The first LBS-31 trial validated the recovery model but showed that an event-driven interpretation produced too few heartbeat commits; the time-based maximum-three-minute ACTIVE cadence above is the refined contract. Evaluate the refined cadence on the next suitable Work-Path development task. If it does not materially improve liveness visibility and recovery, revert this process rule cleanly rather than preserving ceremony without value.
+Once the journal has been intentionally removed and the Candidate has been exposed, do **not** recreate the journal merely because the interactive stream stops. At that point the Candidate ref, exact Candidate SHA, GitHub Actions runs, release ref/PR, tag and current `main` are the durable recovery surface. A missing Candidate branch after interruption may be normal evidence that promotion already succeeded; verify the Actions run and downstream release state before treating the missing ref as a failure.
+
+LBS-36 introduced this mechanism. LBS-31 validated the recovery model but showed that event-driven updates were too sparse, which led to the current time-based maximum-three-minute `ACTIVE` cadence. LBS-29 then validated the refined rule end to end: 15 journal commits covered a 21m48s active Work-Path window, the maximum heartbeat interval was 165 seconds, no `ACTIVE` heartbeat exceeded three minutes, and 14 measured journal writes accumulated 40.53 seconds of connector write latency without triggering product builds or test gates. The interactive stream later terminated after Candidate publication; recovery succeeded directly from the Candidate/Actions/Release state and the release completed normally. The heartbeat journal is therefore a **retained, established Work-Path standard**, not an experiment.
 
 ## 5. Stream/session resilience
 
