@@ -64,7 +64,7 @@ def main():
         s.eq('Uninstaller byte-identical to basis outside declared migrations',sha(root/'bin/Uninstall-LenovoBootMenuTasks.ps1'),sha(basis_runtime_path(basis,'Uninstall-LenovoBootMenuTasks.ps1')))
     if profile=='version-only':
         s.eq('Installer byte-identical for non-product release',sha(root/'bin/Install-LenovoBootMenuTasks.ps1'),sha(basis_runtime_path(basis,'Install-LenovoBootMenuTasks.ps1')))
-    ui=txt(root/'src/UI/UpdatePresentation.ps1'); infra=txt(root/'src/Infrastructure/UpdateClient.ps1'); transport=txt(root/'src/Infrastructure/UpdateTransport.ps1')
+    ui=txt(root/'src/UI/UpdatePresentation.ps1'); infra=txt(root/'src/Infrastructure/UpdateClient.ps1'); transport=txt(root/'src/Infrastructure/UpdateTransport.ps1'); update_controller=txt(root/'src/Application/UpdateController.ps1')
     refresh_ui=txt(root/'src/UI/RefreshPresentation.ps1'); popup_ui=txt(root/'src/UI/Popup.ps1')
     popup_composition=txt(root/'src/UI/PopupComposition.ps1') if (root/'src/UI/PopupComposition.ps1').is_file() else ''
     popup_surface=popup_ui+'\n'+popup_composition
