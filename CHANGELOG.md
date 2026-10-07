@@ -1,5 +1,18 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.10.7.0 – LBS-37 verified public update-pointer activation
+
+- Treat the existing release PR merge as the single atomic public activation switch for `downloads/latest.json`; no second activation PR and no direct push to `main` are introduced.
+- Add `tools/release_pre_activation.py` to verify immediately before merge that public `main` still advertises the previous version while the staged release PR head already contains the new internally consistent `latest.json` and versioned release ZIP.
+- Require the pre-activation gate to prove exact Base Main stability, one open/unmerged publication PR, 3/3 Candidate statuses, 8/8 release statuses, exact source tag/source commit, ZIP-/cache-free source tree, reproducibility evidence, and staged ZIP SHA-256/size.
+- Emit `RELEASE_PREACTIVATION_SUMMARY=<json>`; only a successful helper invocation may reach `gh pr merge`.
+- Chain the exact pre-activation PASS JSON into `tools/release_verification.py`, so final post-merge `RELEASE_VERIFICATION_SUMMARY=PASS` proves both that activation was gated and that the now-live `latest.json`, release ZIP, source tag and cleanup are consistent.
+- Preserve the existing one candidate SHA → one release branch → one PR → one merge publication model, deterministic release/source builds, historical ZIP immutability and all existing 3/3 Candidate + 8/8 release status semantics.
+- Preserve LBS-25 updater cache busting and all user-controlled update-installation behavior; no `src/**`, privilege, TaskBroker, firmware/BCD, polling, PnP or UI behavior changes are introduced.
+- This deliberately bounded Patch is run through `work/LBS-37` as an explicit process-verification exception for the LBS-40 Development Completion workflow.
+- Release profile: `version-only`. Protected-fragment intent and repository-delete intent are both empty.
+
+
 ## v0.10.6.0 – LBS-40 executable Work-Branch Development Completion gate
 
 - Add `.github/workflows/development-completion.yml` as an exact-SHA pre-Candidate qualification gate for `work/LBS-*` development.

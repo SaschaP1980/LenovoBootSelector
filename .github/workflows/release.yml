@@ -38,6 +38,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main --tags --force
+          BASE_MAIN_SHA=$(git rev-parse origin/main)
 
           if git cat-file -e origin/main:bin/version.json 2>/dev/null; then
             PREVIOUS_VERSION=$(git show origin/main:bin/version.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
@@ -306,6 +307,22 @@ jobs:
           test "$(git rev-parse "v$VERSION^{commit}")" = "$SOURCE_COMMIT"
           status_ok 'release/tag' 'Annotated ZIP-free source tag verified'
 
+          # LBS-37: the release PR merge is the public activation switch because it exposes
+          # downloads/latest.json on main. Prove every pre-activation invariant first.
+          python3 -B tools/release_pre_activation.py \
+            --root . \
+            --version "$VERSION" \
+            --previous-version "$PREVIOUS_VERSION" \
+            --base-main-sha "$BASE_MAIN_SHA" \
+            --candidate-sha "$CANDIDATE_SHA" \
+            --final-sha "$FINAL_SHA" \
+            --source-commit "$SOURCE_COMMIT" \
+            --pr-url "$PR_URL" \
+            --published-utc "$PUBLISHED_UTC" \
+            --release-build-json /tmp/lbs-release/release-build.json \
+            --reproducibility-marker /tmp/lbs-release/reproducible.ok \
+            --output /tmp/lbs-release/release-pre-activation.json
+
           gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --merge --delete-branch
 
           # Work branches are durable recovery state during development, but they are
@@ -337,4 +354,5 @@ jobs:
             --published-utc "$PUBLISHED_UTC" \
             --release-build-json /tmp/lbs-release/release-build.json \
             --reproducibility-marker /tmp/lbs-release/reproducible.ok \
+            --pre-activation-json /tmp/lbs-release/release-pre-activation.json \
             --output /tmp/lbs-release/release-verification.json
