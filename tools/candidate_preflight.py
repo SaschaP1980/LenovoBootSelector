@@ -19,14 +19,17 @@ def run(cmd:list[str],cwd:Path|None=None,capture:bool=False)->subprocess.Complet
 def git(root:Path,*args:str)->str:
     return run(['git','-C',str(root),*args],capture=True).stdout.strip()
 
-def verify_repository_delta(root:Path,main_ref:str,cfg:dict)->dict:
+def verify_repository_delta(root:Path,main_ref:str,cfg:dict,mode:str='candidate')->dict:
     if git(root,'status','--porcelain','--untracked-files=all'):
-        raise RuntimeError('candidate working tree is not clean')
+        raise RuntimeError('validation working tree is not clean')
     candidate_sha=git(root,'rev-parse','HEAD')
     main_sha=git(root,'rev-parse',main_ref)
-    cp=subprocess.run(['git','-C',str(root),'merge-base','--is-ancestor',main_ref,'HEAD'])
-    if cp.returncode:
-        raise RuntimeError(f'candidate is not based on current canonical main {main_sha}')
+    if mode=='candidate':
+        cp=subprocess.run(['git','-C',str(root),'merge-base','--is-ancestor',main_ref,'HEAD'])
+        if cp.returncode:
+            raise RuntimeError(f'candidate is not based on current canonical main {main_sha}')
+    elif mode!='development-completion':
+        raise RuntimeError(f'unsupported preflight mode: {mode}')
 
     rows=[x for x in git(root,'diff','--name-status','--no-renames',main_ref,'HEAD').splitlines() if x]
     deleted=sorted(row.split('\t',1)[1] for row in rows if row.startswith('D\t'))
@@ -52,12 +55,13 @@ def main()->int:
     ap.add_argument('--basis-root',type=Path,required=True)
     ap.add_argument('--main-ref',default='origin/main')
     ap.add_argument('--published-utc',default='2000-01-01T00:00:00Z')
+    ap.add_argument('--mode',choices=['candidate','development-completion'],default='candidate')
     args=ap.parse_args()
     root=args.root.resolve()
     basis=args.basis_root.resolve()
     try:
         cfg=load_release_config(root)
-        delta=verify_repository_delta(root,args.main_ref,cfg)
+        delta=verify_repository_delta(root,args.main_ref,cfg,args.mode)
 
         with tempfile.TemporaryDirectory(prefix='lbs-candidate-preflight-') as td:
             temp=Path(td)
@@ -82,6 +86,7 @@ def main()->int:
             if actual!=declared:
                 raise RuntimeError(f'protectedFragmentIntent mismatch: actual={actual!r} declared={declared!r}')
 
+            run([sys.executable,'-B',str(work/'tools/validate_test_contracts.py'),'--root',str(work)])
             run([sys.executable,'-B',str(work/'tests/validate_release.py'),'--root',str(work)])
             run([sys.executable,'-B',str(work/'tests/validate_core.py'),'--root',str(work),'--basis-root',str(basis)])
             run([sys.executable,'-B',str(work/'tests/validate_boundary.py'),'--root',str(work)])
@@ -89,10 +94,13 @@ def main()->int:
 
             report={
                 'version':version,
+                'mode':args.mode,
                 'candidateSha':delta['candidateSha'],
+                'testedSha':delta['candidateSha'],
                 'mainSha':delta['mainSha'],
                 'protectedFragmentIntent':declared,
                 'repositoryDeleteIntent':delta['deletedPaths'],
+                'contractPropagation':'PASS',
                 'releasePackage':release_name,
                 'sourcePackage':source_name,
                 'result':'PASS',

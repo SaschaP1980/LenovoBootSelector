@@ -171,23 +171,76 @@ The first v0.6.3.0 publication attempt (GitHub Actions run #17) failed because `
 
 ## Pre-publication validation
 
-Before pushing the release branch, perform as much of the same preparation as GitHub will perform.
+Validation before Candidate exposure is **development-path specific**.
 
-At minimum:
+### Branchless Patch/Hotfix fast path
 
-1. Verify runtime generation/closure.
-2. Run `tools/prepare_release.py` with a **provisional** UTC timestamp for local validation only.
-3. Run the four permanent validators:
-   - `tests/validate_release.py`
-   - `tests/validate_core.py`
-   - `tests/validate_boundary.py`
-   - `tests/validate_regression.py`
-4. Check the intended diff against the previous canonical basis.
-5. Check that unrelated runtime assets/security boundaries did not change.
+Use the lightweight atomic contract defined in `docs/RELEASE_PROCESS.md` and `docs/DEVELOPMENT_GUIDELINES.md`:
 
-GitHub owns the canonical `publishedUtc`; a local timestamp is never the publication timestamp.
+- prove the focused bug/regression RED→GREEN when applicable;
+- run directly relevant syntax/parser/encoding/determinism smoke checks;
+- verify version/changelog/release metadata and inspect the complete Candidate diff;
+- do not create a chain of local/full-matrix commits merely to imitate Candidate Preflight.
+
+For this deliberately lightweight path, Candidate Preflight is the first authoritative full repository integration matrix unless another explicit release contract makes a pre-Candidate check mandatory.
+
+### Work-Path
+
+For `work/LBS-*`, the final exact Work SHA must satisfy the mandatory Candidate Entry contract below. That contract includes deterministic runtime/audit/baseline, all four permanent validators, intent equality, relevant focused/native/source-type checks, propagation/ownership sweeps when applicable, and hosted Windows exact-SHA evidence.
+
+A missing mandatory Work-Path capability is `BLOCKED`; it is not permission to fall back to Candidate as the first runner.
+
+### Common release facts
+
+GitHub owns the canonical `publishedUtc`; any local timestamp is provisional only.
 
 If Windows/PowerShell tests have not actually been executed on Windows, never report them as passed. Static/source-contract coverage is not a substitute for a Windows pass. A GitHub-hosted Windows PowerShell 5.1 run is a real Windows test run for the contract suite, but it is **not** Lenovo hardware/UEFI E2E and must be reported separately from physical-machine acceptance.
+
+### Work-Path Candidate Entry operational rule
+
+For any `work/LBS-*` release, the detailed Candidate-entry contract in `docs/DEVELOPMENT_GUIDELINES.md` is mandatory.
+
+Operationally:
+
+1. freeze the intended final Work-Branch SHA;
+2. produce all mandatory Candidate-entry evidence on that exact SHA;
+3. run the Contract Propagation Sweep when test/validator/workflow contracts changed;
+4. run the Ownership/Change-Impact Matrix when responsibility ownership moved;
+5. derive and verify protected/delete intent from the exact final reconciled diff;
+6. require hosted Windows PowerShell 5.1 evidence on the exact final Work SHA;
+7. re-read `main` and Work-Branch head after the checks;
+8. update the Issue rolling comment with an explicit `Candidate-Entry: PASS|BLOCKED` block;
+9. expose Candidate only when the block is PASS.
+
+For mandatory evidence, unavailable tooling is **BLOCKED**, not `N/A`. `N/A` is valid only when a check is genuinely not applicable to the change and the reason is recorded.
+
+Do not use Candidate Preflight as the first executor of a missing mandatory Development Completion check.
+
+#### Starting Development Completion from a connector-only session
+
+The canonical implementation is `.github/workflows/development-completion.yml`.
+
+After the intended Work tree is complete and all release metadata/generated artifacts are synchronized:
+
+1. re-read current `main` and reconcile the Work tree;
+2. persist the last substantive Work-Branch checkpoint;
+3. create one new commit with **the identical tree** and the exact trailer `Development-Completion: requested`;
+4. advance the same `work/LBS-<issue>` ref to that request commit;
+5. observe the resulting `Development Completion` Actions run for that exact SHA;
+6. require terminal PASS, `DEVELOPMENT_COMPLETION_SUMMARY=<json>`, and `development-completion/gate=success`;
+7. require the summary/status Main SHA to remain current and the Work-Branch head to remain the tested SHA;
+8. record the run ID, summaries, totals, timings and Candidate Entry block in the rolling Issue ledger.
+
+No direct `workflow_dispatch` action is required. Ordinary checkpoint pushes intentionally produce only a skipped Development Completion run because they lack the request trailer.
+
+If any correction changes the Work tree or moves the Work head after a gate attempt, previous evidence is stale. Persist the correction, create a fresh tree-identical request commit, and rerun.
+
+Candidate Preflight independently enforces the successful exact Work-SHA status plus its bound Main SHA and exact Work/Candidate tree equality.
+
+When a test contract changes, explicitly search active repository contracts for stale suite names, total markers, expected counts, aggregate keys, wrappers, hosted parsers, permanent validators and test inventory references before declaring Candidate Entry PASS.
+
+When an automated transformation touches executable/machine-consumed files, inspect the exact diff and per-file change volume before checkpointing. An unexpectedly large or structurally unrelated delta is a hard stop; rebuild the affected file from a verified basis instead of incrementally repairing an untrusted transformation.
+
 
 ### Test-first bug/regression rule: failing test first, not failing candidate first
 
@@ -248,21 +301,39 @@ Based on that measured critical-path impact and the additional Windows-specific 
 
 If either candidate gate fails unexpectedly, **no release branch exists yet**. Keep the same `candidate/v<version>` branch, apply the minimal fast-forward correction, and let the normal push rerun both mandatory paths. Do not create a parallel candidate or release branch. Do not manufacture such a failure as part of normal test-first evidence.
 
+For every unexpected Candidate failure, update the rolling Issue ledger with exactly one primary classification:
+
+- `Development Guideline miss`;
+- `Tooling gap`;
+- `Genuinely Candidate-only`;
+- `External infrastructure failure`.
+
+Then record the corrective action. Guideline misses require a process/permanent-contract hardening action; tooling gaps require a linked tooling/automation Issue; genuinely Candidate-only findings require a reason why no pre-Candidate check could evaluate them; external failures must not be counted as repository correctness failures.
+
+
 ### Protected-fragment intent is release-specific
 
 `bin/version.json` carries `protectedFragmentIntent`, an explicit list of protected fragment keys intentionally changed by that version.
 
-The protection inventory still comes from the canonical characterization baseline, but change detection compares the prepared candidate with the **immediately previous canonical source tag**. The required invariant is exact set equality:
+For Work-Path Candidate entry, derive the declaration from the **exact final reconciled diff** before Candidate exposure. Re-read current `main`, compute the actual protected-fragment change set for the final Work-Branch state, and require exact set equality:
 
 `actual protected changes == protectedFragmentIntent`
 
-Undeclared protected changes fail. Stale/extra declarations fail. If no protected fragment changes, the list is empty.
+Undeclared protected changes fail. Stale/extra declarations fail. An empty list is valid only after the exact final diff proves the actual set is empty.
+
+Any later executable/source/workflow/test change that can affect the protected diff, or any later `main` reconciliation, invalidates the evidence and requires recomputation before Candidate entry.
+
+Candidate Preflight independently repeats the authoritative release-entry calculation against the immediately previous canonical source tag.
 
 The former permanent `INTENTIONALLY_CHANGED_FROZEN` bypass is removed. A function that was intentionally changed in an earlier release is fully protected again in the next release.
 
 ### Repository deletion intent
 
-`bin/version.json` also carries `repositoryDeleteIntent`. Candidate Preflight compares all repository deletions against this exact list and rejects undeclared or stale deletion intent. Historical release ZIPs may not be changed by the candidate at all.
+`bin/version.json` also carries `repositoryDeleteIntent`.
+
+For Work-Path Candidate entry, derive it from the same exact final reconciled diff used for protected-fragment intent and require exact set equality. Any later repository-path change or `main` reconciliation makes the evidence stale and requires recomputation.
+
+Candidate Preflight independently compares all repository deletions against this exact list and rejects undeclared or stale deletion intent. Historical release ZIPs may not be changed by the candidate at all.
 
 The GitHub Release Orchestrator remains the authoritative second backstop and reruns the server-side release gates; Candidate Preflight reduces avoidable publication attempts but never replaces final GitHub verification.
 
@@ -367,6 +438,9 @@ If after 60 seconds the run is still `queued` with no runner:
 - let GitHub continue autonomously.
 
 A later **Github Status** check must verify the terminal result.
+
+For broader GitHub/service write outages, use `Agent-State: BLOCKED_EXTERNAL` in the rolling ledger when the comment path remains writable. Preserve the last confirmed SHA/state, avoid rapid retries/no-op writes, and resume only after write capability is independently confirmed. If Issue-comment writes are also unavailable, do not claim a heartbeat was persisted; record the outage immediately when writes recover. Retain outage duration in raw wall-clock history but exclude it from normalized repository-process performance metrics.
+
 
 ## Recovery after a failed release run
 

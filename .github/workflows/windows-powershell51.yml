@@ -2,6 +2,12 @@ name: Windows PowerShell 5.1 Gate
 
 on:
   workflow_call:
+    inputs:
+      mode:
+        description: 'Caller mode: candidate or development-completion.'
+        required: false
+        type: string
+        default: candidate
     outputs:
       summary:
         description: Machine-readable Windows PowerShell 5.1 result summary.
@@ -13,6 +19,14 @@ on:
         description: UTC timestamp captured after the Windows test suite completes.
         value: ${{ jobs.windows.outputs.completed_utc }}
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Manual execution mode.
+        required: false
+        type: choice
+        default: manual-benchmark
+        options:
+          - manual-benchmark
 
 permissions:
   contents: read
@@ -22,6 +36,8 @@ jobs:
   windows:
     name: Windows PowerShell 5.1
     runs-on: windows-2025
+    env:
+      LBS_GATE_MODE: ${{ inputs.mode || 'manual-benchmark' }}
     outputs:
       summary: ${{ steps.run.outputs.summary }}
       started_utc: ${{ steps.start.outputs.started_utc }}
@@ -39,7 +55,7 @@ jobs:
           [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "started_utc=$started`n", $utf8)
           Write-Host "WINDOWS_RUNNER_STARTED_UTC=$started"
 
-          if ($env:GITHUB_EVENT_NAME -eq 'push') {
+          if ($env:LBS_GATE_MODE -eq 'candidate') {
               gh api --method POST "repos/$env:GITHUB_REPOSITORY/statuses/$env:GITHUB_SHA" -f "state=pending" -f "context=preflight/windows-powershell51" -f "description=Windows PowerShell 5.1 candidate gate is running" | Out-Null
               if ($LASTEXITCODE -ne 0) { throw 'Unable to publish Windows preflight pending status.' }
           }
@@ -93,11 +109,20 @@ jobs:
 
           $versionConfig = Get-Content -LiteralPath '.\bin\version.json' -Raw | ConvertFrom-Json
           $version = [string]$versionConfig.version
-          if ($env:GITHUB_EVENT_NAME -eq 'push') {
-              $expectedRef = "candidate/v$version"
-              if ($env:GITHUB_REF_NAME -ne $expectedRef) {
-                  throw "Windows candidate ref mismatch: $($env:GITHUB_REF_NAME) != $expectedRef"
+          switch ($env:LBS_GATE_MODE) {
+              'candidate' {
+                  $expectedRef = "candidate/v$version"
+                  if ($env:GITHUB_REF_NAME -ne $expectedRef) {
+                      throw "Windows candidate ref mismatch: $($env:GITHUB_REF_NAME) != $expectedRef"
+                  }
               }
+              'development-completion' {
+                  if ($env:GITHUB_REF_NAME -notmatch '^work/LBS-[0-9]+$') {
+                      throw "Windows Development Completion requires work/LBS-* ref, got $($env:GITHUB_REF_NAME)"
+                  }
+              }
+              'manual-benchmark' { }
+              default { throw "Unsupported Windows gate mode: $($env:LBS_GATE_MODE)" }
           }
 
           $psVersion = $PSVersionTable.PSVersion.ToString()
@@ -227,13 +252,18 @@ jobs:
           )
 
           $completed = [DateTimeOffset]::UtcNow
-          $mode = if ($env:GITHUB_EVENT_NAME -eq 'push') { 'required-candidate-gate' } else { 'manual-benchmark' }
+          $mode = switch ($env:LBS_GATE_MODE) {
+              'candidate' { 'required-candidate-gate' }
+              'development-completion' { 'development-completion' }
+              default { 'manual-benchmark' }
+          }
           $result = if ($testFailure) { 'FAIL' } else { 'PASS' }
           $summary = [ordered]@{
               schemaVersion = 1
               result = $result
               mode = $mode
               candidateSha = $env:GITHUB_SHA
+              testedSha = $env:GITHUB_SHA
               version = $version
               powerShellVersion = $psVersion
               runner = [ordered]@{
@@ -269,7 +299,7 @@ jobs:
           Write-Host "WINDOWS_POWERSHELL51_SUMMARY=$json"
 
           if ($testFailure) {
-              throw "Windows PowerShell 5.1 candidate gate failed: $testFailure"
+              throw "Windows PowerShell 5.1 gate failed: $testFailure"
           }
 
       - name: Upload Windows test log
@@ -282,7 +312,7 @@ jobs:
           retention-days: 14
 
       - name: Publish Windows candidate status
-        if: ${{ always() && github.event_name == 'push' }}
+        if: ${{ always() && inputs.mode == 'candidate' }}
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
