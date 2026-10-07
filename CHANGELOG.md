@@ -1,5 +1,17 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.10.3.0 – LBS-27 background-refresh controller extraction
+
+- Move background-refresh request admission, coalescing, completion, maintenance cancellation, pending continuation, result interpretation, application-state updates, and diagnostics coordination out of the app template into the focused `src/Application/RefreshController.ps1` controller.
+- Keep `RefreshRuntime.ps1` as the explicit active/pending request and timing state model used by the controller.
+- Move `Invoke-BackgroundRefreshWorker` and result serialization into `src/Infrastructure/BackgroundRefreshWorker.ps1`; TaskBroker/Storage access and result-file IO remain Infrastructure responsibilities.
+- Keep WinForms completion-timer construction and refresh visual behavior in `src/UI/RefreshPresentation.ps1`.
+- Preserve existing popup/maintenance entry points, request escalation/coalescing, maintenance suppression, ready-stage failure behavior, storage-result application, diagnostics parent-session correlation, cleanup ownership, and pending-request continuation.
+- Add a 38-check native Windows PowerShell 5.1 `Test-RefreshController.ps1` suite using faked process/timer/UI/diagnostic boundaries plus direct Infrastructure worker success/failure coverage.
+- Extend the permanent Boundary/Release validators and Windows aggregate to enforce the new responsibility split without introducing a generic controller shared with the updater.
+- Deterministic runtime behavior remains single-file and PowerShell 5.1 compatible; no polling, PnP/device-arrival handler, privilege-boundary change, BootNext change, or permanent firmware-order mutation is introduced.
+- Release profile: `patch`. Protected fragment intent is exactly `ps:Start-BackgroundBootRefresh`; repository-delete intent is empty.
+
 ## v0.10.2.0 – LBS-29 UI responsibility decomposition
 
 - Reduce `New-PopupForm` to popup lifecycle/composition and move header, boot-entry container, settings/default-target, restart/footer, and manage-entry overlay construction into domain-specific popup presentation helpers.
