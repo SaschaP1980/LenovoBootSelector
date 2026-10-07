@@ -1756,7 +1756,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.8.0.3'
+$script:AppVersion = '0.8.0.4'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -2752,8 +2752,13 @@ function Show-DiagnosticPackageInExplorer {
     }
 }
 
-function Get-LenovoUpdateManifestUri {
+function Get-LenovoUpdateManifestBaseUri {
     return 'https://raw.githubusercontent.com/SaschaP1980/LenovoBootSelector/main/downloads/latest.json'
+}
+
+function Get-LenovoUpdateManifestUri {
+    $cacheBuster = [guid]::NewGuid().ToString('N')
+    return ('{0}?cb={1}' -f (Get-LenovoUpdateManifestBaseUri),$cacheBuster)
 }
 
 function Get-LenovoUpdateDownloadBaseUri {
@@ -2903,8 +2908,12 @@ function Write-LenovoUpdateWorkerResult {
 
 function Invoke-UpdateCheckWorker {
     $result = [ordered]@{ Success=$false; UpdateAvailable=$false; Manifest=$null; Error=''; ErrorCategory=''; FailureStage=''; ErrorClass=''; NetworkStatus='' }
+    $manifestVersion = ''
+    $manifestPublishedUtc = ''
     try {
         $raw = Get-LenovoUpdateManifestRemote
+        $manifestVersion = ([string]$raw.version).Trim()
+        $manifestPublishedUtc = ([string]$raw.publishedUtc).Trim()
         $validated = Test-LenovoUpdateManifestCore -Manifest $raw
         if (-not $validated.IsValid) { throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-validation' -Message $validated.Error) }
         $comparison = Compare-LenovoAppVersionCore -Current $script:AppVersion -Candidate $validated.Version
@@ -2914,7 +2923,7 @@ function Invoke-UpdateCheckWorker {
         $failure = Get-LenovoUpdateFailureInfo -ErrorRecord $_ -DefaultCategory 'runtime' -DefaultStage 'update-check'
         $result.Error=$failure.Message; $result.ErrorCategory=$failure.Category; $result.FailureStage=$failure.Stage; $result.ErrorClass=$failure.ErrorClass; $result.NetworkStatus=$failure.NetworkStatus
     }
-    Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_WORKER_COMPLETED' -Stage $(if ($result.FailureStage) { [string]$result.FailureStage } else { 'update-check' }) -Success ([bool]$result.Success) -Data (New-RuntimeDiagnosticData @{ updateAvailable=[bool]$result.UpdateAvailable; errorCategory=[string]$result.ErrorCategory; failureStage=[string]$result.FailureStage; errorClass=[string]$result.ErrorClass; networkStatus=[string]$result.NetworkStatus; workerError=[string]$result.Error }) -Level $(if ($result.Success) { 'info' } else { 'warning' })
+    Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_WORKER_COMPLETED' -Stage $(if ($result.FailureStage) { [string]$result.FailureStage } else { 'update-check' }) -Success ([bool]$result.Success) -Data (New-RuntimeDiagnosticData @{ runningVersion=[string]$script:AppVersion; manifestVersion=[string]$manifestVersion; manifestPublishedUtc=[string]$manifestPublishedUtc; updateAvailable=[bool]$result.UpdateAvailable; errorCategory=[string]$result.ErrorCategory; failureStage=[string]$result.FailureStage; errorClass=[string]$result.ErrorClass; networkStatus=[string]$result.NetworkStatus; workerError=[string]$result.Error }) -Level $(if ($result.Success) { 'info' } else { 'warning' })
     if ($UpdateResultPath) { Write-LenovoUpdateWorkerResult -Path $UpdateResultPath -Value ([pscustomobject]$result) }
     return $(if ($result.Success) { 0 } else { 1 })
 }

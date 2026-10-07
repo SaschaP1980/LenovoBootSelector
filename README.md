@@ -69,7 +69,7 @@ The TaskBroker boundary is hardened fail-closed: the runtime accepts only fixed 
 
 Historical migration and repair details for v0.6.4.0/v0.6.4.1 are retained in [CHANGELOG.md](CHANGELOG.md) rather than presented as current maintenance instructions.
 
-**Current development version:** v0.8.0.3  
+**Current development version:** v0.8.0.4  
 **Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads and revision history
@@ -168,6 +168,8 @@ The central native Windows PowerShell 5.1 test wrapper is:
 ~~~
 
 Build and packaging helpers live under `tools/`. Detailed version history is in [CHANGELOG.md](CHANGELOG.md). Localization development rules are in [docs/LOCALIZATION.md](docs/LOCALIZATION.md). Long-running Major/Minor feature work follows [docs/DEVELOPMENT_GUIDELINES.md](docs/DEVELOPMENT_GUIDELINES.md).
+
+The project's engineering baseline favors Clean Code and SOLID with explicit responsibility boundaries. DRY is applied to genuinely shared rules and knowledge, not mechanically to similar-looking code; limited duplication is preferred over coupling responsibilities that have different reasons to change. The detailed rule is canonical in [docs/DEVELOPMENT_GUIDELINES.md](docs/DEVELOPMENT_GUIDELINES.md).
 
 ### Agentic software engineering
 

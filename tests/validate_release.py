@@ -98,13 +98,13 @@ def main():
         if re.match(r'\s*function\s+Assert-(?:True|Equal)\b',line,re.I):
             continue
         update_assertion_calls += len(re.findall(r'(?:^|;\s*)Assert-(?:True|Equal)\b',line))
-    s.eq('Update native test has exact 62 assertion call sites',update_assertion_calls,62)
+    s.eq('Update native test has exact 75 assertion call sites',update_assertion_calls,75)
     s.has('Update native test self-audits source via PowerShell AST',update_test,'[System.Management.Automation.Language.Parser]::ParseFile')
     s.has('Update native test derives command names from AST',update_test,'$node.GetCommandName()')
     s.has('Update native test compares executed and source assertion counts',update_test,'if ($checks -ne $sourceAssertionCount)')
-    s.has('Update native test keeps explicit source coverage guard 62',update_test,'if ($sourceAssertionCount -ne 62) { throw "Unexpected update assertion source count $sourceAssertionCount" }')
-    s.has('Update native test keeps explicit runtime coverage output 62',update_test,'Write-Host "UPDATE TOTAL $checks/62"')
-    s.has('Update native test keeps explicit runtime coverage guard 62',update_test,'if ($checks -ne 62) { throw "Unexpected update test count $checks" }')
+    s.has('Update native test keeps explicit source coverage guard 75',update_test,'if ($sourceAssertionCount -ne 75) { throw "Unexpected update assertion source count $sourceAssertionCount" }')
+    s.has('Update native test keeps explicit runtime coverage output 75',update_test,'Write-Host "UPDATE TOTAL $checks/75"')
+    s.has('Update native test keeps explicit runtime coverage guard 75',update_test,'if ($checks -ne 75) { throw "Unexpected update test count $checks" }')
     localization_native=txt(root/'tests/Test-LocalizationRuntime.ps1') if (root/'tests/Test-LocalizationRuntime.ps1').is_file() else ''
     windows_wrapper=txt(root/'tests/Test-WindowsPowerShell51.ps1')
     s.c('LBS-17 native localization test exists',bool(localization_native))

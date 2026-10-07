@@ -3,6 +3,27 @@
   "releases": [
     {
       "schemaVersion": 1,
+      "version": "0.8.0.4",
+      "tag": "v0.8.0.4",
+      "file": "LenovoBootMenuTray-v0.8.0.4.zip",
+      "sha256": "afe69362eead2ff771d8798cf548b07ae19e9bd6d65e8430668440487a5d7023",
+      "size": 106697,
+      "publishedUtc": "2026-10-07T03:54:37Z",
+      "packageFiles": [
+        "BUILD_INTEGRITY.txt",
+        "icon-preview.png",
+        "Install-LenovoBootMenuTasks.ps1",
+        "LenovoBootMenuTray.ico",
+        "LenovoBootMenuTray.ps1",
+        "README.md",
+        "Start-LenovoBootMenuTray.cmd",
+        "Start-LenovoBootMenuTray.vbs",
+        "Uninstall-LenovoBootMenuTasks.cmd",
+        "Uninstall-LenovoBootMenuTasks.ps1"
+      ]
+    },
+    {
+      "schemaVersion": 1,
       "version": "0.8.0.3",
       "tag": "v0.8.0.3",
       "file": "LenovoBootMenuTray-v0.8.0.3.zip",

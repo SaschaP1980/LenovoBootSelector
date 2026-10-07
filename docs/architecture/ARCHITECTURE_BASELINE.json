@@ -1,9 +1,9 @@
 {
-  "version": "0.8.0.3",
+  "version": "0.8.0.4",
   "runtime": {
-    "lines": 8001,
-    "functions": 241,
-    "scriptReferences": 1101,
+    "lines": 8010,
+    "functions": 242,
+    "scriptReferences": 1102,
     "scriptVariables": 122,
     "catchBlocks": 185,
     "inlineSilentCatches": 112
@@ -22,9 +22,9 @@
   },
   "infrastructure": {
     "files": 8,
-    "lines": 1449,
-    "functions": 72,
-    "scriptReferences": 104
+    "lines": 1458,
+    "functions": 73,
+    "scriptReferences": 105
   },
   "ui": {
     "files": 15,

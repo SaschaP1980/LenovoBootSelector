@@ -1,5 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.8.0.4 – LBS-25 fresh update-manifest hotfix
+
+- Prevent a just-published release from being hidden behind a stale mutable `downloads/latest.json` response by adding a unique cache-busting query parameter to every manifest check.
+- Keep versioned release ZIP download URLs unchanged and query-free so immutable packages remain normally cacheable.
+- Extend `UPDATE_CHECK_WORKER_COMPLETED` diagnostics with the running app version, received manifest version, and manifest `publishedUtc` when present.
+- Expand the native Update Core suite from 62 to 75 assertions, covering distinct manifest cache-busters, stable package URLs, newer/equal/older manifest decisions, and the new diagnostic metadata.
+- Preserve HTTPS/TLS behavior, manifest/package/hash validation, user-controlled unelevated installation, and all BootService/TaskBroker/Storage/firmware safety boundaries.
+- Release profile: `patch`. `protectedFragmentIntent` and `repositoryDeleteIntent` remain empty.
+
 ## v0.8.0.3 – Work-Branch Hotfix path performance measurement
 
 - Pure version-only Hotfix used to benchmark the optimized Work-Branch exception path against the immediately preceding branchless v0.8.0.2 measurement.
