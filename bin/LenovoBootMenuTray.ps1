@@ -1756,7 +1756,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.10.0.2'
+$script:AppVersion = '0.10.1.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -5657,16 +5657,19 @@ function Prompt-TaskBrokerRemove {
     if ($choice -eq [System.Windows.Forms.DialogResult]::Yes) { Start-TaskBrokerRemove }
 }
 
-function Test-PartitionBootStructure {
+# Lenovo Boot Selector - pure storage-resolution model.
+# No Windows storage cmdlets or hardware IO belong in this module.
+
+function Resolve-PartitionBootStructureCore {
     param(
         [Parameter(Mandatory=$true)]$Disk,
-        [Parameter(Mandatory=$true)][object[]]$Partitions
+        [Parameter(Mandatory=$true)][AllowEmptyCollection()][object[]]$Partitions
     )
 
     $hasEfiSystemPartition = $false
     $hasActiveFatPartition = $false
 
-    foreach ($partition in $Partitions) {
+    foreach ($partition in @($Partitions)) {
         $gptType = ([string]$partition.GptType).Trim().Trim([char[]]'{}').ToLowerInvariant()
         if ($gptType -eq 'c12a7328-f81f-11d2-ba4b-00a0c93ec93b') {
             $hasEfiSystemPartition = $true
@@ -5681,24 +5684,17 @@ function Test-PartitionBootStructure {
         }
     }
 
-    [pscustomobject]@{
+    return [pscustomobject]@{
         HasEfiSystemPartition = $hasEfiSystemPartition
         HasActiveFatPartition = $hasActiveFatPartition
         HasBootStructure = ($hasEfiSystemPartition -or $hasActiveFatPartition)
     }
 }
-function Get-StorageContextCore {
-    # Performance-critical path: resolve storage from Get-Disk/Get-Partition only.
-    # v0.2.0 queried every present DiskDrive PnP node plus Parent/LocationPaths
-    # synchronously on the WinForms UI thread. On the target ThinkPad this could
-    # take ~20 seconds and blocked both left-click and the tray context menu.
-    # PnP enrichment is intentionally not part of the interactive refresh path.
-    $inventory = @()
 
-    try {
-        $disks = @(Get-Disk -ErrorAction Stop)
-    }
-    catch {
+function Resolve-StorageContextCore {
+    param($Snapshot)
+
+    if (-not $Snapshot -or $Snapshot.Available -ne $true) {
         return [pscustomobject]@{
             Disks = @()
             UsbDisks = @()
@@ -5709,16 +5705,12 @@ function Get-StorageContextCore {
         }
     }
 
-    foreach ($disk in $disks) {
-        $partitions = @()
-        try {
-            $partitions = @(Get-Partition -DiskNumber $disk.Number -ErrorAction Stop)
-        }
-        catch { }
+    $inventory = @()
+    foreach ($disk in @($Snapshot.Disks)) {
+        $partitions = @($disk.Partitions)
+        $bootStructure = Resolve-PartitionBootStructureCore -Disk $disk -Partitions $partitions
 
-        $bootStructure = Test-PartitionBootStructure -Disk $disk -Partitions $partitions
-
-        $model = ([string]$disk.FriendlyName).Trim()
+        $model = ([string]$disk.Model).Trim()
         if (-not $model) { $model = "Datenträger $($disk.Number)" }
 
         $inventory += [pscustomobject]@{
@@ -5762,7 +5754,7 @@ function Get-StorageContextCore {
         $reason = 'Kein aktuelles USB-Speicherlaufwerk erkannt.'
     }
 
-    [pscustomobject]@{
+    return [pscustomobject]@{
         Disks = @($inventory)
         UsbDisks = @($usbDisks)
         UsbBootCandidates = @($usbBootCandidates)
@@ -5771,10 +5763,73 @@ function Get-StorageContextCore {
         UsbResolutionReason = $reason
     }
 }
+
+# Windows-specific storage acquisition and normalization.
+# Classification and product-facing storage resolution live in Core/StorageResolution.ps1.
+
+function ConvertTo-WindowsStorageDiskSnapshot {
+    param(
+        [Parameter(Mandatory=$true)]$Disk,
+        [Parameter(Mandatory=$true)][AllowEmptyCollection()][object[]]$Partitions
+    )
+
+    $normalizedPartitions = @(
+        foreach ($partition in @($Partitions)) {
+            [pscustomobject]@{
+                GptType = [string]$partition.GptType
+                IsActive = [bool]$partition.IsActive
+                Type = [string]$partition.Type
+                MbrType = [string]$partition.MbrType
+            }
+        }
+    )
+
+    return [pscustomobject]@{
+        Number = $Disk.Number
+        Model = ([string]$Disk.FriendlyName).Trim()
+        SerialNumber = ([string]$Disk.SerialNumber).Trim()
+        BusType = [string]$Disk.BusType
+        PartitionStyle = [string]$Disk.PartitionStyle
+        Path = [string]$Disk.Path
+        Partitions = @($normalizedPartitions)
+    }
+}
+
+function Get-WindowsStorageSnapshot {
+    # Performance-critical Windows IO path. PnP enrichment remains intentionally
+    # excluded from interactive refresh; only Get-Disk/Get-Partition are queried.
+    try {
+        $disks = @(Get-Disk -ErrorAction Stop)
+    }
+    catch {
+        return [pscustomobject]@{
+            Available = $false
+            Disks = @()
+        }
+    }
+
+    $inventory = @()
+    foreach ($disk in $disks) {
+        $partitions = @()
+        try {
+            $partitions = @(Get-Partition -DiskNumber $disk.Number -ErrorAction Stop)
+        }
+        catch { }
+
+        $inventory += ConvertTo-WindowsStorageDiskSnapshot -Disk $disk -Partitions $partitions
+    }
+
+    return [pscustomobject]@{
+        Available = $true
+        Disks = @($inventory)
+    }
+}
+
 function Get-StorageContext {
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     try {
-        $result = Get-StorageContextCore
+        $snapshot = Get-WindowsStorageSnapshot
+        $result = Resolve-StorageContextCore -Snapshot $snapshot
         $sw.Stop()
         $storageSuccess = ([string]$result.UsbResolution -ne 'Unavailable')
         Write-RuntimeDiagnosticEvent -Event 'STORAGE_RESOLUTION' -Stage 'storage' -Success $storageSuccess -DurationMs $sw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{

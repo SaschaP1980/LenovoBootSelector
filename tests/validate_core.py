@@ -8,6 +8,7 @@ CORE_FILES=[
     'src/Core/Localization.ps1',
     'src/Core/EntryPreferences.ps1',
     'src/Core/FirmwareParsing.ps1',
+    'src/Core/StorageResolution.ps1',
     'src/Core/BootTargetModel.ps1',
     'src/Core/UpdateModel.ps1',
 ]
@@ -84,7 +85,7 @@ def main():
     s.eq('App version declaration exactly once',tray.count(expected),1)
 
     # Modular source ownership and pure-core boundary.
-    forbidden=['$script:','System.Windows.Forms','Drawing.Color','Test-Path','ReadAllText','WriteAllText','Get-ItemProperty','Set-ItemProperty','Start-ScheduledTask','Get-ScheduledTask','Schedule.Service','ProcessStartInfo','Invoke-BcdEdit','TaskBroker']
+    forbidden=['$script:','System.Windows.Forms','Drawing.Color','Test-Path','ReadAllText','WriteAllText','Get-ItemProperty','Set-ItemProperty','Start-ScheduledTask','Get-ScheduledTask','Schedule.Service','ProcessStartInfo','Invoke-BcdEdit','TaskBroker','Get-Disk','Get-Partition']
     core_text={}
     for rel in CORE_FILES:
         p=root/rel; s.check(f'Core module exists: {rel}',p.is_file())
@@ -113,6 +114,16 @@ def main():
     for fn in ['Parse-GuidFromLine','ConvertFrom-FirmwareEntriesText','ConvertFrom-FirmwareManagerText']:
         s.eq(f'Firmware core function once in module: {fn}',len(re.findall(rf'(?m)^function\s+{re.escape(fn)}\b',firmware)),1)
         s.eq(f'Firmware core function once in bundle: {fn}',len(re.findall(rf'(?m)^function\s+{re.escape(fn)}\b',tray)),1)
+    storage_resolution=core_text.get('src/Core/StorageResolution.ps1','')
+    for fn in ['Resolve-PartitionBootStructureCore','Resolve-StorageContextCore']:
+        s.eq(f'Storage core function once in module: {fn}',len(re.findall(rf'(?m)^function\s+{re.escape(fn)}\b',storage_resolution)),1)
+        s.eq(f'Storage core function once in bundle: {fn}',len(re.findall(rf'(?m)^function\s+{re.escape(fn)}\b',tray)),1)
+    storage_infra=txt(root/'src/Infrastructure/Storage.ps1')
+    s.contains('Storage infrastructure owns Windows snapshot acquisition',storage_infra,'function Get-WindowsStorageSnapshot')
+    s.contains('Storage infrastructure owns Get-Disk IO',storage_infra,'Get-Disk -ErrorAction Stop')
+    s.contains('Storage infrastructure owns Get-Partition IO',storage_infra,'Get-Partition -DiskNumber $disk.Number -ErrorAction Stop')
+    s.contains('Storage infrastructure delegates deterministic resolution to Core',storage_infra,'Resolve-StorageContextCore -Snapshot $snapshot')
+    s.absent('Storage infrastructure has no misleading Get-StorageContextCore IO function',storage_infra,'function Get-StorageContextCore')
     s.eq('Friendly core function once in module',len(re.findall(r'(?m)^function\s+Get-FriendlyBootEntryCore\b',boot)),1)
     s.eq('Friendly core function once in bundle',len(re.findall(r'(?m)^function\s+Get-FriendlyBootEntryCore\b',tray)),1)
 

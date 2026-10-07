@@ -1412,6 +1412,7 @@ function Prompt-TaskBrokerRemove {
     if ($choice -eq [System.Windows.Forms.DialogResult]::Yes) { Start-TaskBrokerRemove }
 }
 
+# @include src/Core/StorageResolution.ps1
 # @include src/Infrastructure/Storage.ps1
 
 # @include src/Core/BootTargetModel.ps1

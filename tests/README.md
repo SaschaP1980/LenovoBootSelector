@@ -17,7 +17,8 @@ These four files are the permanent Python gates used by the GitHub Release Orche
 
 | File | Category | Purpose |
 | --- | --- | --- |
-| `Test-FunctionalCore.ps1` | Core | Parsers, settings, localization resolution/formatting, and functional core behavior |
+| `Test-FunctionalCore.ps1` | Core | Parsers, settings, localization resolution/formatting, pure storage resolution, and functional core behavior |
+| `Test-StorageInfrastructure.ps1` | Infrastructure | Windows storage snapshot normalization and acquisition-failure behavior without duplicating pure classification cases |
 | `Test-LocalizationRuntime.ps1` | Runtime | Native PS5.1 language selection, persistence, migration, and central lookup |
 | `Test-UpdateCore.ps1` | Core | Update model, transport failure contract, and update contracts |
 | `Test-RefreshRuntime.ps1` | Runtime | Background refresh state/request lifecycle and child-worker diagnostics-session correlation |
@@ -59,7 +60,8 @@ Native PowerShell suites intentionally use different count strategies; one gener
 | `Test-IdentifierCompatibility.ps1` | Straight-line: fixed runtime count of 29 covering LBS-19 naming, migration-failure safety, unrelated-value isolation, and retained compatibility roots. |
 | `Test-MaintenanceRuntime.ps1` | Loop-derived: 15 runtime checks from static assertions plus assertions repeated per mode. |
 | `Test-ArchitectureSoak.ps1` | Four aggregate soak assertions; each assertion covers many iterations. |
-| `Test-FunctionalCore.ps1` | Dynamic PASS counting; currently no separate coverage target count. |
+| `Test-FunctionalCore.ps1` | Dynamic PASS counting; includes deterministic LBS-31 storage-resolution cases with no hardware dependency. |
+| `Test-StorageInfrastructure.ps1` | Straight-line: fixed runtime count of 17 covering Windows disk/partition normalization, per-disk partition-query failure, and unavailable inventory. |
 | `Test-LocalizationRuntime.ps1` | Straight-line: fixed runtime count of 32 covering native locale selection, explicit-preference persistence, v0.8.0.0 ambiguity resolution, startup-recovery migration, reload, parity, and lookup. |
 | `Test-WindowsPowerShell51.ps1` | Aggregate runner/parser gate; file count is dynamic and is not an assertion-coverage count. |
 

@@ -1,5 +1,16 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.10.1.0 – LBS-31 pure storage-resolution architecture
+
+- Split Windows-specific disk/partition acquisition from deterministic storage classification.
+- Add `src/Core/StorageResolution.ps1` for pure EFI/active-FAT boot-structure detection and the existing resolved StorageContext contract.
+- Keep `src/Infrastructure/Storage.ps1` responsible only for normalized `Get-Disk` / `Get-Partition` snapshot acquisition plus diagnostics.
+- Preserve existing `USB HDD` firmware-target semantics and read-only evidence limits; no physical USB-to-firmware mapping claim, polling, PnP handler, firmware mutation, or privilege-boundary change is introduced.
+- Add direct deterministic coverage for GPT EFI, MBR active FAT, no boot structure, zero/single/multiple USB cases, unavailable inventory, one candidate among multiple media, and NVMe inventory preservation.
+- Add a dedicated 17-check Windows storage-infrastructure normalization suite and include it in the hosted Windows PowerShell 5.1 aggregate summary.
+- Extend permanent Core/Release validation so Core modules reject Windows storage IO tokens and the Infrastructure-to-Core delegation remains explicit.
+- Release profile: `patch`. `protectedFragmentIntent` and `repositoryDeleteIntent` are empty.
+
 
 ## v0.10.0.2 – LBS-35 TaskBroker Repair performance hotfix
 

@@ -21,7 +21,8 @@ Mandatory order:
    - `tools/candidate_preflight.py`
    - `tools/release_verification.py`
    - the four permanent validators under `tests/`
-8. Only then determine scope, target version, and implementation/release plan. For Patch/Hotfix, perform the brief effort/risk analysis **before implementation** and default to the branchless atomic path unless the analysis justifies escalation.
+8. If resuming an existing `work/LBS-*` task, read that work-branch head and its temporary `.chatgpt-work/LBS-<issue>.md` continuation journal when present, then directly verify any referenced GitHub Actions run before continuing.
+9. Only then determine scope, target version, and implementation/release plan. For Patch/Hotfix, perform the brief effort/risk analysis **before implementation** and default to the branchless atomic path unless the analysis justifies escalation.
 
 ### Authority order
 
@@ -542,6 +543,26 @@ Other consequences remain:
 - Temporary `release/**` branches are deleted by the publication merge path.
 - A branch push made by a GitHub Actions job with `GITHUB_TOKEN` does not normally trigger another workflow. Cross-workflow promotion therefore uses explicit `workflow_dispatch`; do not rely on recursive push triggering.
 - A stale branch must never be reused merely to avoid creating a new branch.
+
+### Work-Path heartbeat journal
+
+LBS-36 adds an experimental lightweight continuation journal **only for development that already uses `work/LBS-*`**. The normal branchless Patch/Hotfix fast path is unaffected.
+
+The active work branch may temporarily track:
+
+`.chatgpt-work/LBS-<issue>.md`
+
+Use it to persist the same concise engineering information that would normally appear in progress updates: findings, failed approaches and reasons, validator/test evidence, current phase, next action, last product checkpoint and any independently running GitHub workflow.
+
+During substantive interactive work, update it approximately every **1–3 minutes** when meaningful state changes. Prefer a single-file contents update/commit when available. A journal-only commit is intentionally cheap and must not trigger product builds, runtime regeneration, test matrices or checkpoint gates merely because the journal changed.
+
+Treat a heartbeat older than roughly **5 minutes** as evidence that the interactive stream is no longer progressing **only after** checking whether the journal references a GitHub Actions run that is still `queued` or `in_progress`. GitHub automation can continue independently; the interactive agent cannot.
+
+Before Candidate creation, delete the journal from the work branch and ensure the final work tree contains only intended release content. Build the Candidate as one clean commit with current `main` as parent and the exact cleaned work-branch tree. This deliberately prevents temporary journal commits from becoming Candidate/`main` ancestry while preserving the existing Candidate/work-tree equality check and release-owned work-branch cleanup.
+
+A fresh session resuming a Work-Path task must read the journal when present, then verify branch/run state directly before acting. The journal is a continuation record, not private chain-of-thought.
+
+This process is experimental. After the next suitable Work-Path development task, keep it only if it provides material recovery/liveness value; otherwise revert the LBS-36 process change cleanly.
 
 ### Bounded connector orchestration
 
