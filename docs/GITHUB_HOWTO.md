@@ -214,7 +214,28 @@ Operationally:
 
 For mandatory evidence, unavailable tooling is **BLOCKED**, not `N/A`. `N/A` is valid only when a check is genuinely not applicable to the change and the reason is recorded.
 
-Do not use Candidate Preflight as the first executor of a missing mandatory Development Completion check. LBS-40 / #85 tracks the hosted/full-worktree automation needed to make this path agentically executable.
+Do not use Candidate Preflight as the first executor of a missing mandatory Development Completion check.
+
+#### Starting Development Completion from a connector-only session
+
+The canonical implementation is `.github/workflows/development-completion.yml`.
+
+After the intended Work tree is complete and all release metadata/generated artifacts are synchronized:
+
+1. re-read current `main` and reconcile the Work tree;
+2. persist the last substantive Work-Branch checkpoint;
+3. create one new commit with **the identical tree** and the exact trailer `Development-Completion: requested`;
+4. advance the same `work/LBS-<issue>` ref to that request commit;
+5. observe the resulting `Development Completion` Actions run for that exact SHA;
+6. require terminal PASS, `DEVELOPMENT_COMPLETION_SUMMARY=<json>`, and `development-completion/gate=success`;
+7. require the summary/status Main SHA to remain current and the Work-Branch head to remain the tested SHA;
+8. record the run ID, summaries, totals, timings and Candidate Entry block in the rolling Issue ledger.
+
+No direct `workflow_dispatch` action is required. Ordinary checkpoint pushes intentionally produce only a skipped Development Completion run because they lack the request trailer.
+
+If any correction changes the Work tree or moves the Work head after a gate attempt, previous evidence is stale. Persist the correction, create a fresh tree-identical request commit, and rerun.
+
+Candidate Preflight independently enforces the successful exact Work-SHA status plus its bound Main SHA and exact Work/Candidate tree equality.
 
 When a test contract changes, explicitly search active repository contracts for stale suite names, total markers, expected counts, aggregate keys, wrappers, hosted parsers, permanent validators and test inventory references before declaring Candidate Entry PASS.
 

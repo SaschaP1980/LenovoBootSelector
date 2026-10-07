@@ -1,0 +1,207 @@
+name: Development Completion
+
+on:
+  push:
+    branches:
+      - 'work/LBS-*'
+
+concurrency:
+  group: development-completion-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  linux-full-worktree:
+    name: Linux Full-Worktree Development Completion
+    if: "${{ contains(github.event.head_commit.message, 'Development-Completion: requested') }}"
+    runs-on: ubuntu-latest
+    outputs:
+      summary: ${{ steps.gate.outputs.summary }}
+      started_utc: ${{ steps.start.outputs.started_utc }}
+      completed_utc: ${{ steps.gate.outputs.completed_utc }}
+    steps:
+      - name: Record Linux start and pending status
+        id: start
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          STARTED_UTC=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          echo "started_utc=$STARTED_UTC" >> "$GITHUB_OUTPUT"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            -f state=pending \
+            -f context='development-completion/gate' \
+            -f description='Exact-SHA Development Completion is running' >/dev/null
+
+      - name: Checkout exact Work-Branch revision
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Run reusable Linux release-entry validation
+        id: gate
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF_NAME" =~ ^work/LBS-[0-9]+$ ]]
+          REQUEST_COUNT=$(git log -1 --format='%B' | grep -Fx 'Development-Completion: requested' | wc -l | tr -d ' ')
+          test "$REQUEST_COUNT" = "1" || {
+            echo 'Development Completion requires exactly one request trailer on HEAD.' >&2
+            exit 1
+          }
+
+          git fetch origin main --tags --force
+
+          python3 -B tools/build_runtime.py --root . --check
+          python3 -B tools/build_catch_audit.py --root . --check
+          python3 -B tools/build_architecture_baseline.py --root . --check
+
+          PREVIOUS_VERSION=$(git show origin/main:bin/version.json | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+          rm -rf /tmp/lbs-development-completion-basis
+          git worktree add --detach /tmp/lbs-development-completion-basis "v$PREVIOUS_VERSION^{commit}"
+
+          LOG="$RUNNER_TEMP/development-completion-linux.log"
+          set +e
+          python3 -B tools/candidate_preflight.py \
+            --root . \
+            --basis-root /tmp/lbs-development-completion-basis \
+            --main-ref origin/main \
+            --published-utc '2000-01-01T00:00:00Z' \
+            --mode development-completion 2>&1 | tee "$LOG"
+          RC=${PIPESTATUS[0]}
+          set -e
+
+          COMPLETED_UTC=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          echo "completed_utc=$COMPLETED_UTC" >> "$GITHUB_OUTPUT"
+
+          SUMMARY_LINE=$(grep '^CANDIDATE_PREFLIGHT_SUMMARY=' "$LOG" | tail -n 1 || true)
+          if [ "$RC" -ne 0 ]; then
+            exit "$RC"
+          fi
+          if [ -z "$SUMMARY_LINE" ]; then
+            echo 'Reusable Linux validation did not emit CANDIDATE_PREFLIGHT_SUMMARY.' >&2
+            exit 1
+          fi
+          SUMMARY=${SUMMARY_LINE#CANDIDATE_PREFLIGHT_SUMMARY=}
+          echo "summary=$SUMMARY" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Linux Development Completion log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: development-completion-linux-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/development-completion-linux.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+  windows-powershell51:
+    name: Windows PowerShell 5.1 Development Completion
+    if: "${{ contains(github.event.head_commit.message, 'Development-Completion: requested') }}"
+    uses: ./.github/workflows/windows-powershell51.yml
+    with:
+      mode: development-completion
+
+  summarize:
+    name: Summarize exact-SHA Development Completion
+    if: "${{ always() && contains(github.event.head_commit.message, 'Development-Completion: requested') }}"
+    needs:
+      - linux-full-worktree
+      - windows-powershell51
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify frozen Work SHA and publish result
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINUX_RESULT: ${{ needs.linux-full-worktree.result }}
+          WINDOWS_RESULT: ${{ needs.windows-powershell51.result }}
+          LINUX_SUMMARY: ${{ needs.linux-full-worktree.outputs.summary }}
+          WINDOWS_SUMMARY: ${{ needs.windows-powershell51.outputs.summary }}
+          LINUX_STARTED_UTC: ${{ needs.linux-full-worktree.outputs.started_utc }}
+          LINUX_COMPLETED_UTC: ${{ needs.linux-full-worktree.outputs.completed_utc }}
+          WINDOWS_STARTED_UTC: ${{ needs.windows-powershell51.outputs.started_utc }}
+          WINDOWS_COMPLETED_UTC: ${{ needs.windows-powershell51.outputs.completed_utc }}
+        run: |
+          set -euo pipefail
+
+          status_gate() {
+            gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+              -f state="$1" \
+              -f context='development-completion/gate' \
+              -f description="$2" >/dev/null
+          }
+
+          REMOTE_WORK_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/heads/$GITHUB_REF_NAME" \
+            --jq ".[] | select(.ref==\"refs/heads/$GITHUB_REF_NAME\") | .object.sha" | head -n 1)
+          CURRENT_MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')
+          LINUX_MAIN_SHA=$(printf '%s' "$LINUX_SUMMARY" | jq -r '.mainSha // ""' 2>/dev/null || true)
+
+          RESULT=PASS
+          FAILURE=''
+          if [ "$LINUX_RESULT" != "success" ] || [ "$WINDOWS_RESULT" != "success" ]; then
+            RESULT=FAIL
+            FAILURE="gate job failure: linux=$LINUX_RESULT windows=$WINDOWS_RESULT"
+          elif [ "$REMOTE_WORK_SHA" != "$GITHUB_SHA" ]; then
+            RESULT=BLOCKED
+            FAILURE="work branch advanced: remote=$REMOTE_WORK_SHA tested=$GITHUB_SHA"
+          elif [ -z "$LINUX_MAIN_SHA" ] || [ "$CURRENT_MAIN_SHA" != "$LINUX_MAIN_SHA" ]; then
+            RESULT=BLOCKED
+            FAILURE="main advanced during gate: current=$CURRENT_MAIN_SHA tested=$LINUX_MAIN_SHA"
+          fi
+
+          export RESULT FAILURE CURRENT_MAIN_SHA REMOTE_WORK_SHA
+          export LINUX_RESULT WINDOWS_RESULT LINUX_SUMMARY WINDOWS_SUMMARY
+          export LINUX_STARTED_UTC LINUX_COMPLETED_UTC WINDOWS_STARTED_UTC WINDOWS_COMPLETED_UTC
+          SUMMARY=$(python3 - <<'PY'
+          import json, os
+          def maybe_json(value):
+              try:
+                  return json.loads(value) if value else None
+              except Exception:
+                  return None
+          summary = {
+              'schemaVersion': 1,
+              'result': os.environ['RESULT'],
+              'workBranch': os.environ.get('GITHUB_REF_NAME',''),
+              'workSha': os.environ.get('GITHUB_SHA',''),
+              'mainSha': os.environ.get('CURRENT_MAIN_SHA',''),
+              'runId': int(os.environ.get('GITHUB_RUN_ID','0') or 0),
+              'runAttempt': int(os.environ.get('GITHUB_RUN_ATTEMPT','0') or 0),
+              'linux': {
+                  'result': os.environ.get('LINUX_RESULT',''),
+                  'startedUtc': os.environ.get('LINUX_STARTED_UTC',''),
+                  'completedUtc': os.environ.get('LINUX_COMPLETED_UTC',''),
+                  'summary': maybe_json(os.environ.get('LINUX_SUMMARY','')),
+              },
+              'windows': {
+                  'result': os.environ.get('WINDOWS_RESULT',''),
+                  'startedUtc': os.environ.get('WINDOWS_STARTED_UTC',''),
+                  'completedUtc': os.environ.get('WINDOWS_COMPLETED_UTC',''),
+                  'summary': maybe_json(os.environ.get('WINDOWS_SUMMARY','')),
+              },
+              'failure': os.environ.get('FAILURE',''),
+          }
+          print(json.dumps(summary,separators=(',',':'),sort_keys=True))
+          PY
+          )
+          echo "DEVELOPMENT_COMPLETION_SUMMARY=$SUMMARY"
+          {
+            echo '## Development Completion'
+            echo
+            echo '```json'
+            echo "$SUMMARY" | jq .
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$RESULT" = "PASS" ]; then
+            status_gate success "PASS main=$CURRENT_MAIN_SHA"
+          else
+            status_gate failure "Development Completion $RESULT"
+            exit 1
+          fi

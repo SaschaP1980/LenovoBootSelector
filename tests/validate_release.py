@@ -251,6 +251,26 @@ def main():
     s.c('Persistent release workflow exists',(root/'.github/workflows/release.yml').is_file())
     s.c('LBS-15 persistent candidate preflight workflow exists',(root/'.github/workflows/candidate-preflight.yml').is_file())
     s.c('LBS-20 Windows PowerShell 5.1 workflow exists',(root/'.github/workflows/windows-powershell51.yml').is_file())
+    development_completion_path=root/'.github/workflows/development-completion.yml'
+    contract_propagation_path=root/'tools/validate_test_contracts.py'
+    s.c('LBS-40 Development Completion workflow exists',development_completion_path.is_file())
+    s.c('LBS-40 contract propagation validator exists',contract_propagation_path.is_file())
+    development_completion=txt(development_completion_path) if development_completion_path.is_file() else ''
+    contract_propagation=txt(contract_propagation_path) if contract_propagation_path.is_file() else ''
+    candidate_workflow_text=txt(root/'.github/workflows/candidate-preflight.yml') if (root/'.github/workflows/candidate-preflight.yml').is_file() else ''
+    windows_workflow_text=txt(root/'.github/workflows/windows-powershell51.yml') if (root/'.github/workflows/windows-powershell51.yml').is_file() else ''
+    s.has('LBS-40 Development Completion targets Work-Branch family',development_completion,"'work/LBS-*'")
+    s.has('LBS-40 Development Completion requires explicit request trailer',development_completion,'Development-Completion: requested')
+    s.has('LBS-40 Development Completion reuses candidate preflight tool',development_completion,'tools/candidate_preflight.py')
+    s.has('LBS-40 Development Completion reuses hosted Windows workflow',development_completion,'windows-powershell51.yml')
+    s.has('LBS-40 Development Completion emits machine-readable summary',development_completion,'DEVELOPMENT_COMPLETION_SUMMARY=')
+    s.has('LBS-40 Development Completion publishes exact-SHA status',development_completion,"context='development-completion/gate'")
+    s.has('LBS-40 propagation validator scans permanent validator literals',contract_propagation,'permanent_validator_literals')
+    s.has('LBS-40 Candidate preflight runs propagation validator',candidate_preflight,'tools/validate_test_contracts.py')
+    s.has('LBS-40 Windows reusable workflow exposes caller mode',windows_workflow_text,'mode:')
+    s.has('LBS-40 Windows workflow supports Development Completion mode',windows_workflow_text,'development-completion')
+    s.has('LBS-40 Candidate workflow requires Development Completion status',candidate_workflow_text,'development-completion/gate')
+    s.has('LBS-40 Candidate workflow rejects Work-Branch stale against main',candidate_workflow_text,'Development Completion is stale against current main')
     s.c('No redundant PR verification workflow exists',not (root/'.github/workflows/release-pr.yml').exists())
     if (root/'.github/workflows/candidate-preflight.yml').is_file():
         cw=txt(root/'.github/workflows/candidate-preflight.yml')

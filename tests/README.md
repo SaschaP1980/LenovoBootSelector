@@ -13,6 +13,8 @@
 
 These four files are the permanent Python gates used by the GitHub Release Orchestrator.
 
+LBS-40 adds `../tools/validate_test_contracts.py` as a shared preflight contract-propagation validator. It is not a fifth permanent Release/Core/Boundary/Regression gate. Instead, Candidate Preflight and Work-Branch Development Completion both execute it before the four permanent validators. It derives active fixed TOTAL values from the PowerShell test sources and rejects stale fixed-total literals in permanent validators, mismatched fixed runtime counts in this README, and Windows aggregate TOTAL markers that no active PowerShell test emits.
+
 ## Native Windows / PowerShell tests
 
 | File | Category | Purpose |

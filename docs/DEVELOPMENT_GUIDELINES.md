@@ -598,6 +598,28 @@ For a Work-Path release:
 
 An empty intent list is a valid PASS only after the exact final diff proves that the actual set is empty.
 
+#### Executable Development Completion workflow
+
+LBS-40 implements the mandatory hosted/full-worktree path as `.github/workflows/development-completion.yml`.
+
+Operational contract:
+
+1. stabilize the complete intended Work-Branch tree, including release metadata and all tracked deterministic generated artifacts required by the Candidate-entry contract;
+2. persist the last substantive product/tooling checkpoint;
+3. create exactly one **tree-identical qualification request commit** on the same `work/LBS-<issue>` branch with exactly one trailer line:
+   `Development-Completion: requested`;
+4. that request commit becomes the frozen Work-SHA for Development Completion;
+5. the Work-Branch push automatically triggers the workflow; ordinary Work-Branch pushes without the trailer are recognized but skip the expensive gate;
+6. Linux first checks tracked runtime, catch audit, and architecture baseline directly on the exact Work-SHA, then reuses `tools/candidate_preflight.py --mode development-completion` for reproducible preparation, protected/delete intent, contract propagation, and Release/Core/Boundary/Regression;
+7. hosted Windows PowerShell 5.1 runs in parallel through the reusable Windows workflow's `development-completion` mode on the same exact Work-SHA;
+8. the final job emits `DEVELOPMENT_COMPLETION_SUMMARY=<json>` and writes `development-completion/gate` on the exact Work-SHA;
+9. a successful status description records the exact tested Main SHA as `PASS main=<sha>`;
+10. Candidate Preflight later requires both that exact Work-SHA success status and the same current Main SHA before accepting the Work-Branch provenance.
+
+The tree-identical qualification request commit is an explicit gate-orchestration commit, not a product checkpoint and not heartbeat churn. It is permitted only for a final Development Completion attempt. If the Work-Branch tree changes after the request, the old status is irrelevant; persist the correction and create a new tree-identical request commit for the new exact SHA.
+
+Connector-only agents start the gate by creating that final request commit and advancing `work/LBS-<issue>` to it. No direct `workflow_dispatch`, local clone, temporary Candidate branch, or publication ref is required.
+
 #### Hosted Windows exact-SHA evidence
 
 Hosted Windows PowerShell 5.1 evidence must test the exact final Work-Branch SHA.
@@ -766,11 +788,11 @@ Each classification requires a follow-up action:
 - Candidate-only → document why Candidate is the correct first evaluation point;
 - External infrastructure → preserve exact repository state, avoid retry storms, and keep outage time separate in benchmark metrics.
 
-### Executable-gate follow-up
+### Executable gate
 
-LBS-40 / #85 is the dedicated executable follow-up for a hosted/full-worktree Development Completion gate on the exact final Work-Branch SHA.
+LBS-40 / #85 implements the hosted/full-worktree Development Completion workflow described above.
 
-Until that automation exists, the mandatory Candidate-entry contract still applies. A developer may satisfy it through another truthful exact-SHA execution path, but an agent/environment that cannot produce the mandatory evidence is **BLOCKED** and must not expose a Candidate merely to obtain the missing result.
+The repository-supported Work-Path route is now the preferred execution path for mandatory Candidate-entry evidence. If that workflow cannot run or cannot produce exact-SHA PASS evidence, the Work-Path remains **BLOCKED**; Candidate Preflight must not be used as a substitute first runner.
 
 ### Release separation
 
