@@ -830,6 +830,10 @@ Follow-up is mandatory:
 - Candidate-only → document why Candidate is the correct first evaluation point;
 - External infrastructure → preserve exact repository state, avoid retry storms, and keep outage time separate from normalized repository-process timing.
 
+## User-facing Build & Deployment reports
+
+For build, deployment, release, and performance-benchmark instructions, follow [Build & Deployment – Chat Report Presentation Standard](BUILD_DEPLOYMENT_REPORTING.md) when presenting status, timing, validation outcomes, findings, publication identifiers and the final result to the user. This is a presentation contract only; the executable release contracts and the canonical GitHub Issue rolling recovery ledger remain authoritative. Apply it only to work that actually reaches the corresponding stages, and never invent missing metrics or imply physical hardware testing occurred.
+
 ## 14. Development Completion and release separation
 
 The repository-supported Work-Path route through `.github/workflows/development-completion.yml` is the **required** execution path for mandatory hosted/full-worktree Candidate-entry evidence. If it cannot run or cannot produce exact-SHA PASS evidence, Work-Path remains `BLOCKED`; Candidate Preflight must not be used as a substitute first runner.
