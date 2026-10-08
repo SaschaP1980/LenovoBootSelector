@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.10.7.7 – Version-only Hotfix
+
+- Version number only; no product source or behavior changes.
+- Normal branchless fast-path build and deployment performance benchmark (LBS-101).
+
 ## v0.10.7.6 – Version-only Hotfix
 
 - Version number only; no product source or behavior changes.
