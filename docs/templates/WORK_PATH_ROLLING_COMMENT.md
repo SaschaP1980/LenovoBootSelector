@@ -4,7 +4,11 @@ Use this template as the default structure for the **single cumulative GitHub Is
 
 For new work, `LBS-<github-issue-number>` uses the GitHub Issue number directly. Example: Issue `#90` -> `LBS-90` -> `work/LBS-90`.
 
-Do not create a new comment for each heartbeat or phase. Update the same comment in place and retain previous evidence. Singleton lifecycle sections (`Benchmark configuration`, `Candidate Entry`, `Release`, `Final Release Verification`, `Performance result`, `Evidence audit`, `Plan-conformance assessment`) occur exactly once and are updated in place; numbered attempt sections occur once per actual attempt/revision. Replace placeholders only with verified facts; do not invent unavailable values. Detailed validator totals and error evidence must survive the terminal update; do not shorten them to generic PASS claims.
+Do not create a new comment for each heartbeat or phase. Update the same comment in place and retain previous evidence. Singleton lifecycle sections (`Chat origin`, `Benchmark configuration`, `Candidate Entry`, `Release`, `Final Release Verification`, `Performance result`, `Evidence audit`, `Plan-conformance assessment`) occur exactly once and are updated in place; numbered attempt sections occur once per actual attempt/revision. Replace placeholders only with verified facts; do not invent unavailable values. Detailed validator totals and error evidence must survive the terminal update; do not shorten them to generic PASS claims.
+
+For every Issue-bearing Work-Path conversation, create a new **searchable Work-Chat-ID** after the GitHub Issue number is known and before substantive Issue work. Use `LBS<issue-number>CHAT<12 uppercase random hexadecimal characters>` (for example, generated using six securely random bytes), with no whitespace or punctuation inside the marker. Generate a fresh identifier for each execution chat, not for each heartbeat or Issue update. Emit the **literal ID verbatim in a normal, user-visible assistant chat message** (not only in a tool call, repository file, or Issue comment), then copy that same ID into the single rolling Issue comment. This is a search marker, **not** ChatGPT's internal conversation ID, a chat URL, a GitHub Issue author identity, or proof of conversation ownership. Never derive or assert any inaccessible ChatGPT conversation ID. Do not publish the private chat URL as a substitute.
+
+ChatGPT search may find messages containing this marker, but indexing/availability is account-dependent and not guaranteed; the user can test search manually. Do not claim successful discovery without user confirmation. Preserve the originating marker unchanged when updating the comment; on transfer to a different chat, emit a new Work-Chat-ID in that new chat and append it chronologically under `Additional execution chats`. Never replace the originating marker, never generate or invent an ID for an earlier chat, and record `not issued` or `unverified` when evidence is missing. The marker is public Issue metadata, not an authentication credential; it must carry no private data.
 
 ~~~markdown
 ## LBS-<github-issue-number> — Rolling Build & Release Recovery State
@@ -21,6 +25,14 @@ Do not create a new comment for each heartbeat or phase. Update the same comment
 **Release level:** <Major | Minor | Patch | Hotfix>  
 **Current phase:** <phase>  
 **Next action:** <exact next action>
+
+### Chat origin
+
+- **Execution platform:** <ChatGPT | other | unknown>
+- **Originating Work-Chat-ID:** `<LBS<issue-number>CHAT<12 random uppercase hex digits> | not issued>`
+- **Originating marker posted in chat:** <yes | no | unverified>
+- **Additional execution chats:** <none | chronological list of new Work-Chat-IDs, each visibly posted in its corresponding chat>
+- **Search confirmation:** <user-confirmed | unverified | unavailable>
 
 ### Explicit Work-Path decision / exception
 
@@ -212,6 +224,7 @@ Final Release Verification summary: <UTC>
 - Every documented error, limitation, retry and failure: <short claim -> observed tool call/output or Actions run/job/step/log reference -> primary classification>. If evidence is not reproducible in GitHub, quote only the minimally necessary observed non-secret diagnostic and explicitly label the source as interactive tool output.
 - Unverified or incorrectly attributed claims: <correct/remove, or flag explicitly unverified; never present an assumed local/network error as observed>
 - Model and reasoning-effort provenance: <assistant-declared vs UI user-reported vs independently verified vs unknown; no unverifiable automatic setting claims>
+- Work-Chat-ID provenance: <originating ID retains literal chat-posted spelling; any handoff IDs separately listed; search success only user-confirmed; mark missing/unverified evidence truthfully>
 - Time-anchor audit: <Issue creation distinct from user authorization; Candidate commit/ref distinct from Candidate run creation; Candidate GREEN gate distinct from promotion complete; Release Verification summary distinct from workflow completion>
 - Final structural consistency: <each singleton heading exactly once; numbered attempts unique; no stale BLOCKED/pending/active content in completed phases; source tag/PR/main/ZIP/cleanup agree with summaries>
 - Unresolved evidence concerns: <none, or list with consequence for reporting/closure>
@@ -233,5 +246,5 @@ At successful completion update this same comment to:
 - **Current phase:** Release Verification complete
 - **Next action:** close #<github-issue-number> as completed
 
-Before Issue closure, perform the explicit Evidence audit and structural consistency pass: singleton headings occur once, numbered attempts are unique, every failure/error assertion has an observed source, validator totals remain available or are clearly marked unavailable, benchmark model/effort sources are correctly qualified, timing anchors are not conflated, no terminal section still says pending/in progress/not started, and the header/measurement/final-verification facts agree. Correct or clearly mark unsupported historical claims before completion. The terminal update of this same rolling comment is the final Work-Path implementation/release record. Do not add a second redundant completion comment unless it contains materially new information.
+Before Issue closure, perform the explicit Evidence audit and structural consistency pass: Chat origin is a single preserved section (a real chat-posted marker or an honest `not issued`), singleton headings occur once, numbered attempts are unique, every failure/error assertion has an observed source, validator totals remain available or are clearly marked unavailable, benchmark model/effort sources are correctly qualified, timing anchors are not conflated, no terminal section still says pending/in progress/not started, and the header/measurement/final-verification facts agree. Correct or clearly mark unsupported historical claims before completion. The terminal update of this same rolling comment is the final Work-Path implementation/release record. Do not add a second redundant completion comment unless it contains materially new information.
 ~~~
