@@ -25,7 +25,7 @@ The repository and durable GitHub prose remain **English**; the interactive user
 - Prefer actual UI components when available, but do **not** rely on them for critical meaning. A plain Markdown equivalent is always acceptable.
 - Do not promise a pixel-identical or component-identical layout across different clients/models. Avoid decorative images, unnecessary badges, and excessive visual density.
 - Keep the response readable on narrow/mobile screens; no oversized table or uncropped hash that obscures other details.
-- No speculative percentages, scores, statuses, or timestamps.
+- No speculative percentages, scores, statuses, or timestamps. Display benchmark model/reasoning-effort configuration only with clear provenance labels (assistant-declared, user-reported, runtime-exposed or unknown). The assistant cannot assume it can inspect the user's thinking-effort setting.
 
 ## Measurement semantics
 
@@ -35,6 +35,7 @@ The repository and durable GitHub prose remain **English**; the interactive user
 - Distinguish Candidate gate elapsed from end-to-end Candidate workflow promotion duration, and Release workflow completion from the timestamp of `RELEASE_VERIFICATION_SUMMARY=PASS`.
 - Derive facts from current GitHub/Actions evidence. Prefer machine-readable `DEVELOPMENT_COMPLETION_SUMMARY`, `CANDIDATE_TIMING_SUMMARY`, `RELEASE_PREACTIVATION_SUMMARY` and `RELEASE_VERIFICATION_SUMMARY`; inspect underlying jobs when investigating a failure.
 - Clearly separate GitHub-hosted Windows PowerShell 5.1 contract-suite execution from **physical Lenovo hardware/UEFI end-to-end testing**. Never infer the latter from the former.
+- For comparisons, include workload signature and the configured/claimed model and thinking-effort metadata with explicit origin. Do not treat wall-time gaps between GitHub runs as a direct observation of model thinking time, nor attribute speedups to Medium versus High without controlled evidence. Detailed validator totals and error citations belong in the Issue rolling ledger, even when the interactive dashboard stays concise.
 
 ## Short report skeleton
 
