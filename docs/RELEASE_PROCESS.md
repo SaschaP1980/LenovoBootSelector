@@ -56,10 +56,10 @@ For executable/product release work, Work-branch policy is intentionally asymmet
 
 - **Major / Minor:** `work/LBS-<github-issue-number>` is mandatory. The numeric component is the backing GitHub Issue number; `LBS` is the Lenovo Boot Selector project prefix.
 - **Patch / Hotfix:** default to **no work branch** and the shortest safe atomic implementation path.
-- Before Patch/Hotfix implementation, perform a brief effort/risk analysis. Use a work branch only as an exception when the change is likely to be substantial, cross-cutting, migration-heavy, interruption-prone, or otherwise likely to require several recoverable checkpoints.
-- A Patch/Hotfix exception must be recorded durably before implementation and the Candidate must contain exactly one `Work-Branch-Reason: <reason>` trailer.
-- Do not escalate a small Patch/Hotfix merely to reuse the Major/Minor process.
-- Work-Path recovery state is maintained in the Issue's single rolling recovery comment and is never release content. New Work-Path tasks do not create timer heartbeat commits. If a legacy `.chatgpt-work/LBS-<github-issue-number>.md` exists, absorb its relevant state into the rolling comment and remove the file before Candidate creation; the cleaned work-branch tree becomes the exact release-ready tree.
+- Before Patch/Hotfix implementation, perform a brief development-path decision. Work-Path is an exception only when effort/risk makes the change substantial/interruption-prone **or** the user explicitly authorizes a process-validation/benchmark exercise of the complete Work-Path.
+- A Patch/Hotfix Work-Path exception must be recorded durably before implementation and the Candidate must contain exactly one `Work-Branch-Reason: <reason>` trailer that distinguishes effort/risk escalation from process-validation/benchmark intent.
+- Do not escalate a small Patch/Hotfix merely to reuse the Major/Minor process outside an explicit process-validation/benchmark exercise.
+- Work-Path recovery state is maintained in the Issue's single rolling recovery comment and is never release content. New Work-Path tasks do not create timer heartbeat commits. If a legacy `.chatgpt-work/LBS-<github-issue-number>.md` exists, absorb its relevant state into the rolling comment and remove the file **before the final release-ready Work tree is frozen and qualified by Development Completion**; the cleaned work-branch tree becomes the exact release-ready tree.
 
 ## Test-first bug/regression preparation
 
@@ -111,9 +111,9 @@ Mandatory Candidate-entry coverage includes:
 
 Any later executable/source/workflow/test/repository-path change, any Work-Branch head movement, or a later `main` reconciliation invalidates affected Candidate-entry evidence. Recompute/re-run it before Candidate exposure.
 
-The Issue rolling recovery comment must contain an explicit `Candidate-Entry: PASS|BLOCKED` block for the exact SHA. Candidate creation is permitted only when every mandatory applicable item is PASS and every genuine `N/A` has a reason.
+The Issue rolling recovery comment must contain exactly one canonical `Candidate-Entry: PASS|BLOCKED` block for the exact SHA; update that block in place as evidence changes. Candidate creation is permitted only when every mandatory applicable item is PASS and every genuine `N/A` has a reason.
 
-LBS-40 / #85 implements the reusable hosted/full-worktree Development Completion automation in `.github/workflows/development-completion.yml`.
+The reusable hosted/full-worktree Development Completion automation is `.github/workflows/development-completion.yml`.
 
 For the repository-supported Work-Path flow, freeze the final tree by creating one tree-identical Work-Branch request commit containing exactly one `Development-Completion: requested` trailer. Require its workflow to finish PASS and publish `development-completion/gate=success` for that exact Work SHA and current Main SHA. Any subsequent Work-Branch or relevant Main change makes the evidence stale and requires another request run.
 
@@ -128,12 +128,12 @@ Candidate Preflight remains the authoritative release-entry gate and reruns the 
 5. Set `repositoryDeleteIntent` to exactly the repository paths intentionally deleted by this version; normally `[]`.
 6. For a bug/regression, complete the focused RED→GREEN proof described above and run applicable broader prechecks.
 7. For a normal Patch/Hotfix without a work branch, assemble the complete intended change as one atomic candidate tree/commit rather than persisting file-by-file implementation commits.
-8. When a Work-Path branch is used, require the rolling Issue ledger to record `Candidate-Entry: PASS` for the exact final Work SHA under the Development Completion contract above. Any mandatory BLOCKED/FAIL/stale item prohibits Candidate creation. Remove any legacy `.chatgpt-work/LBS-<github-issue-number>.md`, verify that the final cleaned work tree contains only intended release content, re-read current `main`, and if that reconciliation changes the basis, invalidate/recompute affected Candidate-entry evidence before Candidate creation.
-9. Prepare one exact **release-ready** candidate commit based on current `main`. For a Work-Path release, this must be a clean current-`main`-parent commit whose tree exactly equals the final cleaned work-branch tree; temporary worklog/checkpoint history must not become Candidate ancestry.
+8. When a Work-Path branch is used, absorb/remove any legacy `.chatgpt-work/LBS-<github-issue-number>.md` **before** freezing the final Work tree; verify the cleaned tree contains only intended release content, re-read/reconcile current `main`, then run Development Completion and require the rolling Issue ledger to record `Candidate-Entry: PASS` for that exact cleaned Work SHA. Any mandatory BLOCKED/FAIL/stale item prohibits Candidate creation. After PASS, do not mutate the Work tree; any mutation invalidates the exact-SHA evidence and requires a new Development Completion decision.
+9. Prepare one exact **release-ready** candidate commit based on current `main`. For a Work-Path release, this must be a clean current-`main`-parent commit whose tree exactly equals the frozen, cleaned Work tree qualified by Development Completion; temporary worklog/checkpoint history must not become Candidate ancestry.
 10. The candidate-only commit range must contain exactly one unique `Work-Branch:` trailer:
    - Major/Minor: `Work-Branch: work/LBS-<github-issue-number>` is mandatory;
    - Patch/Hotfix normal path: `Work-Branch: none`;
-   - Patch/Hotfix exception: `Work-Branch: work/LBS-<github-issue-number>` plus exactly one `Work-Branch-Reason: <reason>` from the pre-implementation effort/risk analysis.
+   - Patch/Hotfix exception: `Work-Branch: work/LBS-<github-issue-number>` plus exactly one `Work-Branch-Reason: <reason>` from the documented Work-Path exception decision.
    Same-candidate correction commits may omit these trailers, but must not introduce conflicting values. When a work branch is declared, its current tree must exactly match the Candidate tree.
 11. Push that commit only as `candidate/v<version>`. Do **not** manually create `release/v<version>`.
 
@@ -168,7 +168,7 @@ An unexpected Candidate failure must be classified in the Issue rolling ledger a
 
 The Windows workflow also supports manual `workflow_dispatch` benchmark/retest runs. Those runs are Windows contract-suite evidence only; they are not physical Lenovo firmware/UEFI E2E.
 
-The permanent LBS-20 execution policy is **always mandatory** for Major, Minor, Patch, and Hotfix releases.
+The hosted Windows Candidate execution policy is **always mandatory** for Major, Minor, Patch, and Hotfix releases.
 
 The v0.6.9.0 production benchmark measured the Windows job at about 25.0 seconds total (12.7 seconds setup, 1.3 seconds runtime preparation, 10.9 seconds tests), with 46/46 parser and 174/174 functional checks. Linux Candidate Preflight completed in about 4 seconds. The Windows path extended the candidate critical path by about 27.8 seconds, while the complete candidate-to-release cycle finished in about 90 seconds. This remains well within the project's 2–3 minute orchestration target, so the Windows gate is retained for every version level. Timing remains machine-readable through `CANDIDATE_TIMING_SUMMARY` for ongoing observation.
 
@@ -180,7 +180,7 @@ The v0.6.9.0 production benchmark measured the Windows job at about 25.0 seconds
 
 The single permanent `release.yml` workflow runs the full release/core/boundary/regression gates itself before PR creation, writes the successful gate states directly onto the final PR-head commit, and creates the annotated ZIP-free source tag only after successful PR creation.
 
-Before the PR may merge, LBS-37 requires `tools/release_pre_activation.py` to emit `RELEASE_PREACTIVATION_SUMMARY=PASS`. The helper fails closed unless current `main` is still the exact captured Base Main, public `origin/main:downloads/latest.json` still advertises the previous version, the open/unmerged PR head is exact, the staged `latest.json` and versioned ZIP match the new release build, all 3/3 Candidate and 8/8 release statuses are GREEN, and the source tag/source tree are exact. Therefore the existing PR merge is the **single atomic public activation switch** for the mutable update pointer. There is no second activation PR or direct push to `main`.
+Before the PR may merge, the pre-activation contract requires `tools/release_pre_activation.py` to emit `RELEASE_PREACTIVATION_SUMMARY=PASS`. The helper fails closed unless current `main` is still the exact captured Base Main, public `origin/main:downloads/latest.json` still advertises the previous version, the open/unmerged PR head is exact, the staged `latest.json` and versioned ZIP match the new release build, all 3/3 Candidate and 8/8 release statuses are GREEN, and the source tag/source tree are exact. Therefore the existing PR merge is the **single atomic public activation switch** for the mutable update pointer. There is no second activation PR or direct push to `main`.
 
 Only after pre-activation PASS does the workflow merge the PR and delete the release branch. A separate `pull_request` workflow is intentionally not used: pull requests created with the repository `GITHUB_TOKEN` do not recursively start another workflow.
 

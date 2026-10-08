@@ -299,7 +299,7 @@ The Release Orchestrator independently requires successful `preflight/candidate`
 
 The Windows workflow also supports manual `workflow_dispatch` runs for benchmark/retest purposes. Manual runs do not count as a candidate gate and must not be reported as firmware/hardware E2E.
 
-The permanent LBS-20 policy is **always mandatory** for Major, Minor, Patch, and Hotfix releases.
+The hosted Windows Candidate policy is **always mandatory** for Major, Minor, Patch, and Hotfix releases.
 
 The first production benchmark was v0.6.9.0. Its Windows runner reported Windows PowerShell 5.1.26100.33438 with 46/46 parser checks and 174/174 functional contract checks. The Windows job took about 25.0 seconds total (about 12.7 seconds setup, 1.3 seconds runtime preparation, and 10.9 seconds test execution). Linux Candidate Preflight completed in about 4 seconds. Because both ran in parallel, the Windows gate owned the candidate critical path and added about 27.8 seconds relative to Linux completion. The complete candidate-start-to-release-complete cycle was about 90 seconds, still comfortably inside the project's roughly 2–3 minute orchestration target.
 
@@ -384,7 +384,7 @@ A successful release run should, in substance:
 17. Verify the merged `main` publication metadata.
 18. Run the integrated post-release verifier with the exact pre-activation evidence and emit one `RELEASE_VERIFICATION_SUMMARY=<json>` line plus the GitHub Job Summary.
 
-## LBS-16 orchestration efficiency
+## Orchestration efficiency
 
 For connector-supervised releases, optimize the **number of orchestration roundtrips**, not the depth of validation.
 
@@ -415,8 +415,6 @@ In particular:
 - avoid exact prose/punctuation assertions for human documentation unless tooling genuinely consumes that exact text;
 - do not manually repeat catalog parity, runtime closure, protected-fragment or other checks already owned by permanent validators;
 - do not re-verify fields individually after a successful aggregate Candidate/Release summary unless investigating an inconsistency.
-
-LBS-23/v0.8.0.1 demonstrated the cost of violating this rule: duplicated structural checks and an issue-specific validator created extra quote/prose-literal corrections without adding equivalent product protection.
 
 ## The eight release status gates
 
@@ -593,7 +591,7 @@ A backlog Issue may intentionally have **no** `dev-path:*` label while the imple
 
 - Major/Minor work uses `dev-path: work-branch`;
 - Patch/Hotfix defaults to `dev-path: fast`;
-- a Patch/Hotfix uses `dev-path: work-branch` only when the documented escalation criteria are met and the reason is recorded durably.
+- a Patch/Hotfix uses `dev-path: work-branch` only when either the documented effort/risk escalation criteria are met **or** the user explicitly authorizes a process-validation/benchmark exercise of the complete Work-Path; record the exact exception reason durably.
 
 A documentation-only/process-guidance Issue that changes no executable or package input is outside this development-path dimension and needs no `dev-path:*` label. In particular, documentation about Work-Path behavior does not itself justify `dev-path: work-branch`.
 
@@ -655,8 +653,6 @@ If repository-archive materialization is unavailable and direct container GitHub
 - prefer a GitHub-hosted workflow for operations that genuinely need a full worktree;
 - record any resulting precheck limitation rather than compensating with increasingly elaborate ad-hoc reconstruction.
 
-LBS-17/v0.8.0.0 established this rule: the connector had no general archive action and the container could not resolve `github.com`; neither condition was caused by `work/LBS-17`.
-
 ### Branch deletion and release-owned work-branch cleanup
 
 The currently available ChatGPT GitHub connector can create/read/move branch refs but does not expose a general delete-branch/delete-ref action. **Normal release cleanup must therefore be owned by GitHub Actions, not by the interactive connector.**
@@ -665,7 +661,7 @@ Candidate provenance is mandatory:
 
 - Major/Minor Candidates require exactly one unique `Work-Branch: work/LBS-<github-issue-number>` trailer;
 - Patch/Hotfix Candidates default to exactly one `Work-Branch: none` trailer;
-- a Patch/Hotfix may declare `Work-Branch: work/LBS-<github-issue-number>` only after a pre-implementation effort/risk escalation and must then also contain exactly one unique `Work-Branch-Reason: <reason>` trailer;
+- a Patch/Hotfix may declare `Work-Branch: work/LBS-<github-issue-number>` only for a documented Work-Path exception (effort/risk escalation or explicit user-authorized process-validation/benchmark) and must then also contain exactly one unique `Work-Branch-Reason: <reason>` trailer;
 - same-candidate correction commits may omit the trailers, but they must not introduce conflicting values;
 - Candidate Preflight verifies the release-level policy, the declared branch, and exact Candidate/work-tree equality.
 
@@ -691,7 +687,7 @@ Other consequences remain:
 
 Work-Path development maintains exactly one cumulative recovery comment in the active Issue.
 
-Use [`docs/templates/WORK_PATH_ROLLING_COMMENT.md`](templates/WORK_PATH_ROLLING_COMMENT.md) as the canonical default structure. It is based on the recovery/measurement format validated by LBS-41 / GitHub Issue #88 and must remain cumulative across implementation, Development Completion, Candidate, Release, and retrospective timing.
+Use [`docs/templates/WORK_PATH_ROLLING_COMMENT.md`](templates/WORK_PATH_ROLLING_COMMENT.md) as the canonical default structure. Historical Issue comments are evidence rather than templates; the tracked template must remain cumulative across implementation, Development Completion, Candidate, Release, and retrospective timing.
 
 Operational contract:
 
@@ -701,9 +697,9 @@ Operational contract:
 4. If no new finding exists, a minimal liveness refresh is allowed; otherwise the latest engineering findings belong in the same update.
 5. Use `WAITING_FOR_GITHUB` only with an exact run ID that is independently `queued` or `in_progress`; use `IDLE`/`STOPPED` when no interactive work is continuing; use `COMPLETED` only after the requested lifecycle is complete and final release verification is PASS.
 6. Serialize comment writes and avoid redundant mutative GitHub calls.
-7. Product/checkpoint commits remain source-history events. **Do not create Git commits solely for heartbeat timing.**
-8. Legacy `.chatgpt-work/LBS-<github-issue-number>.md` files on already-active branches must be absorbed into the rolling comment and removed before Candidate creation; do not create new ones.
-9. After Candidate exposure, Candidate/Actions/Release state is the canonical recovery surface. Continue using the rolling Issue comment for cumulative supervision/timing, but do not mutate the work branch after the exact Candidate tree has been exposed.
+7. Product/checkpoint commits remain source-history events. **Do not create Git commits solely for heartbeat timing.** Treat singleton template sections such as Candidate Entry and Release as canonical in-place state: replace their current status instead of appending duplicate stale sections.
+8. Legacy `.chatgpt-work/LBS-<github-issue-number>.md` files on already-active branches must be absorbed into the rolling comment and removed **before the final Work tree is frozen for Development Completion**; do not create new ones. If the Work tree changes after exact-SHA qualification for any reason, Candidate-entry evidence is stale until rerun/recomputed.
+9. After `Candidate-Entry: PASS`, do not mutate the Work branch before Candidate creation. After Candidate exposure, Candidate/Actions/Release state is the canonical recovery surface. Continue using the rolling Issue comment for cumulative supervision/timing, but do not mutate the work branch after the exact Candidate tree has been exposed.
 
 A stale `ACTIVE` heartbeat older than roughly three minutes is a missed heartbeat. A heartbeat older than roughly five minutes indicates stopped interactive progress only after any referenced GitHub Actions run has been checked directly.
 
