@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.10.7.5 – Version-only Hotfix
+
+- Version number only; no product source or behavior changes.
+- Explicit user-authorized Work-Path process-validation and deployment performance benchmark (LBS-97).
+
 ## v0.10.7.4 – Version-only Hotfix
 
 - Version number only; no product source or behavior changes.
