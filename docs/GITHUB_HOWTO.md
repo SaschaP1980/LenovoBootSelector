@@ -653,6 +653,21 @@ If repository-archive materialization is unavailable and direct container GitHub
 - prefer a GitHub-hosted workflow for operations that genuinely need a full worktree;
 - record any resulting precheck limitation rather than compensating with increasingly elaborate ad-hoc reconstruction.
 
+### GitHub Actions run discovery through the connected GitHub integration
+
+For the GitHub connector capabilities observed in the LBS-94 and LBS-97 process benchmarks (2026-10-07/08), calling the connector's generic fetch operation on a workflow-specific runs collection such as `https://api.github.com/repos/SaschaP1980/LenovoBootSelector/actions/workflows/development-completion.yml/runs` returned HTTP 400 / `GitHub Fetch URL is not an allowed ... endpoint`. This is a **connector URL-allowlist/observation-path limitation**, not a GitHub Actions workflow failure. Avoid repeated trial calls to that endpoint when the connector offers no matching specific supported action.
+
+Use the confirmed supported GitHub connector operations instead:
+
+1. Fetch `https://api.github.com/repos/SaschaP1980/LenovoBootSelector/actions/runs` (the general run collection). Filter returned runs by exact `head_sha`, workflow name and creation time; do not rely only on result order.
+2. Fetch an individual run with `https://api.github.com/repos/SaschaP1980/LenovoBootSelector/actions/runs/<run-id>`.
+3. Fetch its hosted jobs/steps/logs using the connector's workflow-run-job and workflow-job-log operations; read exact-SHA statuses at `https://api.github.com/repos/SaschaP1980/LenovoBootSelector/commits/<sha>/status` when relevant.
+4. Prefer machine-readable `DEVELOPMENT_COMPLETION_SUMMARY`, `CANDIDATE_TIMING_SUMMARY`, `RELEASE_PREACTIVATION_SUMMARY`, and `RELEASE_VERIFICATION_SUMMARY` for authoritative aggregates.
+
+Connector capabilities can change; if future tool discovery explicitly exposes a supported workflow-specific run-lookup action, that action may be used. Never generalize this particular connected integration's rejected URL to all GitHub API clients. Record a repeated connector error as observed only when its current output or linked Issue evidence supports the claim, and keep connector observation failures separate from repository/build/release failures.
+
+Evidence: [LBS-94](https://github.com/SaschaP1980/LenovoBootSelector/issues/94), [LBS-97](https://github.com/SaschaP1980/LenovoBootSelector/issues/97).
+
 ### Branch deletion and release-owned work-branch cleanup
 
 The currently available ChatGPT GitHub connector can create/read/move branch refs but does not expose a general delete-branch/delete-ref action. **Normal release cleanup must therefore be owned by GitHub Actions, not by the interactive connector.**
@@ -775,4 +790,4 @@ A release report should distinguish:
 
 Prefer the verified `RELEASE_VERIFICATION_SUMMARY` as the single source for aggregated post-release facts instead of reconstructing them through multiple connector calls.
 
-Never claim a test, branch deletion, release artifact or workflow state that was not directly verified.
+Never claim a test, branch deletion, release artifact, workflow state, connector failure, or environment limitation that was not directly verified. For Work-Path, the pre-closure Evidence audit in [`docs/templates/WORK_PATH_ROLLING_COMMENT.md`](templates/WORK_PATH_ROLLING_COMMENT.md) must retain exact validator totals, link every error/failure to actual evidence, and distinguish Candidate gate GREEN from Candidate promotion GREEN. Benchmark model/effort metadata must include its provenance; a user-reported thinking-effort selection is not an independently observed model setting.

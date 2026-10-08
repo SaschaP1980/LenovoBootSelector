@@ -267,7 +267,7 @@ This mechanism applies **only** to development that already uses a durable `work
 
 Maintain exactly **one rolling recovery comment** in the active GitHub Issue. Prefer the implementation-start comment and update that same comment in place. Do not create a new heartbeat comment every interval.
 
-Use [`docs/templates/WORK_PATH_ROLLING_COMMENT.md`](templates/WORK_PATH_ROLLING_COMMENT.md) as the canonical default layout: a compact recovery-state header, explicit intended diff and validation plan, one cumulative measurement ledger, counters, phase-specific evidence, final release verification, performance result, and plan-conformance assessment. Historical Issue comments are evidence, not normative templates; the tracked template and current process documents define the standard.
+Use [`docs/templates/WORK_PATH_ROLLING_COMMENT.md`](templates/WORK_PATH_ROLLING_COMMENT.md) as the canonical default layout: a compact recovery-state header, explicit intended diff and validation plan, benchmark configuration with provenance, one cumulative measurement ledger, counters, phase-specific evidence including exact validator totals, final release verification, performance result, explicit Evidence audit, and plan-conformance assessment. Historical Issue comments are evidence, not normative templates; the tracked template and current process documents define the standard.
 
 The layout is part of the recovery standard, not merely presentation. Preserve the same major sections unless a task-specific section adds useful recovery information. At successful completion, update this **same** rolling comment to `Agent-State: COMPLETED`, record the authoritative release/PR/main/tag/artifact/cleanup facts, set the next action to Issue closure, and then close the Issue. Do not add a second redundant completion comment when the terminal rolling-comment update already contains the required final implementation/release record.
 
@@ -282,7 +282,7 @@ Treat the rolling comment as a mutable canonical ledger, not an append-only tran
 - Preserve prior **attempt evidence**, corrections, and failure classifications, but consolidate the current state of the same attempt/phase rather than preserving stale intermediate status text.
 - At terminal completion, no completed phase may still say `pending`, `in progress`, or `not started`. The recovery-state header must also reflect terminal branch state truthfully, including deleted Work/Candidate/Release refs where applicable.
 - Populate every applicable final-verification field from authoritative GitHub evidence, including PR number, merge timestamp, final `main`, source tag/commit, artifact hashes/sizes, status totals, reproducibility/integrity, and branch cleanup. Do not omit a template field merely because the same fact appears elsewhere in the comment.
-- Before closing the Issue, perform one final structural pass over the complete rolling comment: singleton headings occur once, numbered attempts are unique by number, no stale terminal-state contradictions remain, and the header/measurement ledger/final verification agree on the final facts.
+- Before closing the Issue, perform one final structural and evidence audit over the complete rolling comment: singleton headings occur once, numbered attempts are unique by number, all documented failures, errors and environment/tool limitations have an actual observed tool output or GitHub Actions run/job/log reference, exact validator counts remain recorded (or unavailable with reason), no stale terminal-state contradictions remain, and the header/measurement ledger/final verification agree on the final facts. Correct or explicitly qualify any inherited unsupported claims; never turn a hypothetical infrastructure failure into an observed finding.
 
 These rules govern **ledger maintenance**, not deployment semantics. A malformed or duplicated rolling-comment section does not retroactively invalidate a machine-verified GREEN deployment, but it is a Development Guideline conformance defect and must be corrected before Issue closure when still possible.
 
@@ -301,7 +301,7 @@ The rolling comment must remain sufficient for a fresh session to continue witho
 - experiments attempted, failures and why approaches were rejected;
 - test/validator findings and corrections;
 - Development Completion evidence and unavailable-capability/tooling gaps;
-- exact GitHub Actions run IDs, tested SHA, totals and timings;
+- exact GitHub Actions run IDs, tested SHA, detailed Contract Propagation / Release / Core / Boundary / Regression and Windows parser/functional passed-versus-expected totals, and timings, sourced to their owning job logs or machine-readable summaries; retain these values across every subsequent rolling-comment update;
 - Candidate history, including every PASS/FAIL and correction cause;
 - Release/PR/tag/artifact verification;
 - wall-clock and gate timing measurements used for pilot comparisons.
@@ -371,6 +371,12 @@ For process comparisons, also report at least:
 - cause classification for every unexpected Candidate failure.
 
 This separation prevents external outages or session interruptions from being misreported as repository-development performance.
+
+#### Comparable benchmarks: model provenance and orchestration
+
+Record a consistent benchmark configuration in the rolling comment for each performance run: assistant-identifiable model family, user-selected model where reliably provided, thinking/reasoning effort, and an exact workload signature (version-only versus functional change, Work-Path versus fast path, five-file version-only scope where applicable, GitHub gate policy). Every model/effort field must carry its evidence level: `assistant-declared`, `user-reported`, `runtime-exposed`, or `unknown`. The assistant may identify itself as GPT-6 when applicable but cannot treat this as independent proof of the user's model-menu selection. The selected Medium/High reasoning-effort setting is normally **not independently visible to the assistant**; capture a user's statement as `user-reported`, not runtime-confirmed, and never infer effort from speed.
+
+Keep ChatGPT/connector orchestration intervals separate from hosted GitHub Actions queue/execution and from the raw end-to-end clock. Explicitly distinguish Candidate commit/ref timestamps from Candidate workflow creation, and exact-SHA gate GREEN from promotion completion. Time between GitHub runs is not a direct measurement of internal model thinking; it includes tool/API latencies and human/interactive orchestration. Without controlled comparable workloads and verified effort settings, describe a reasoning-effort influence as a hypothesis, not a causal result.
 
 Tracked `.chatgpt-work/LBS-<github-issue-number>.md` files are **legacy only**. Do not create them for new work. If an already-active branch contains one, first absorb all recovery-relevant state into the rolling Issue comment, then remove the legacy file **before the final release-ready Work tree is frozen for Development Completion**.
 
@@ -829,6 +835,10 @@ Follow-up is mandatory:
 - Tooling gap → add/fix the executable path before future equivalent Candidate entry;
 - Candidate-only → document why Candidate is the correct first evaluation point;
 - External infrastructure → preserve exact repository state, avoid retry storms, and keep outage time separate from normalized repository-process timing.
+
+## User-facing Build & Deployment reports
+
+For build, deployment, release, and performance-benchmark instructions, follow [Build & Deployment – Chat Report Presentation Standard](BUILD_DEPLOYMENT_REPORTING.md) when presenting status, timing, validation outcomes, findings, publication identifiers and the final result to the user. This is a presentation contract only; the executable release contracts and the canonical GitHub Issue rolling recovery ledger remain authoritative. Apply it only to work that actually reaches the corresponding stages, and never invent missing metrics or imply physical hardware testing occurred.
 
 ## 14. Development Completion and release separation
 
