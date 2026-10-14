@@ -68,17 +68,18 @@ export class ArchiveIngestion {
     const existing = this.ledger.archives();
     const plan = planArchiveAdmission(existing,
       { uuid: normalizedUuid, sizeBytes }, nowMillis);
-    const { key, receivedAtMillis } = this.nextArchiveKey(normalizedUuid, nowMillis);
+    // Filename collision suffixes never extend the report's 90-day lifetime.
+    const { key } = this.nextArchiveKey(normalizedUuid, nowMillis);
 
     // SQL journal is persisted *before* the external KV write.
     const record = { key, uuid: normalizedUuid, sizeBytes,
-      receivedAtMillis, sha256: sha256.toLowerCase(), diagnosisId: this.nextDiagnosisId() };
+      receivedAtMillis: nowMillis, sha256: sha256.toLowerCase(), diagnosisId: this.nextDiagnosisId() };
     const ref = diagnosisReference(record);
     this.ledger.prepare(record);
     try {
-      await this.kv.put(key, zipBytes);
+      await this.kv.put(key, zipBytes, { expiration: Math.ceil(ref.expiresAtMillis / 1000) });
       await this.kv.put(diagnosisReferenceKey(record.diagnosisId),JSON.stringify(ref),
-        {expiration:Math.floor(ref.expiresAtMillis/1000)});
+        {expiration:Math.ceil(ref.expiresAtMillis/1000)});
     } catch (err) {
       // A timeout may mean KV accepted the write. Leave the intent for a
       // later retry to delete it; do not accidentally discard an old ZIP.
@@ -105,7 +106,8 @@ export class ArchiveIngestion {
       throw new Error("invalid_listing_limit");
     }
     return this.ledger.archives()
-      .filter(item => item.uuid === normalized)
+      .filter(item => item.uuid === normalized &&
+        item.receivedAtMillis > this.now() - LIMITS.retentionMillis)
       .sort((a,b) => b.receivedAtMillis-a.receivedAtMillis ||
         b.key.localeCompare(a.key))
       .slice(0,limit);
@@ -121,6 +123,7 @@ export class ArchiveIngestion {
     const match = projectKey.exec(key) || legacyKey.exec(key);
     if (!match) throw new Error("invalid_archive_key");
     const record = this.ledger.archives().find(item => item.key === key);
-    return record && record.uuid === match[1].toLowerCase() ? record : null;
+    return record && record.uuid === match[1].toLowerCase() &&
+      record.receivedAtMillis > this.now() - LIMITS.retentionMillis ? record : null;
   }
 }
