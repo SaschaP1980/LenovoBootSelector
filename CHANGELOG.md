@@ -1,5 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.11.0.1 – Project-scoped diagnostic archive keys
+
+- Store new private Cloudflare LBS archives as `Diagnose/LBS/<installation-UUID>/<UTC_TIMESTAMP>.zip`; the UUID no longer repeats in the ZIP basename.
+- Preserve existing `Diagnose/<UUID>/<UUID>_<UTC_TIMESTAMP>.zip` archives in place and allow owner-authorized listing/text/ZIP readback for both layouts, with a shared per-installation 20-slot rotation.
+- Keep the upload payload, Windows manual-upload workflow, 2 MiB ceiling, 90-day expiry, global 500 MiB limit and server-side upload throttles unchanged.
+- Preserve dashboard-managed Cloudflare configuration across future Wrangler deployments; never store private read credentials in source control.
+- Add regression tests for project-prefix validation, mixed layouts, collisions, legacy readback and deploy configuration.
+- Release profile: `version-only` because the modular Windows tray source is unchanged; the private Cloudflare service is modified functionally. Activation of new storage paths requires a separately confirmed manual Worker deployment.
+
 ## v0.11.0.0 – LBS-103 private diagnostics uploads
 
 - Add `Maintenance → Upload Diagnostics` immediately below `Save Diagnostics`; existing manual ZIP export remains unchanged.

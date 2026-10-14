@@ -23,5 +23,6 @@
       "type": "durable-object",
       "storage": "sqlite"
     }
-  }
+  },
+  "keep_vars": true
 }
