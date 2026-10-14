@@ -131,7 +131,7 @@ test("end-to-end upload, UUID index, private text and complete ZIP readback",asy
     assert.equal(uploadResponse.status,201);
     const created=await uploadResponse.json();
     assert.equal(created.status,"stored");
-    assert.match(created.key,new RegExp("^Diagnose/"+UUID_A+"/"+UUID_A+"_\\d{8}T\\d{9}Z\\.zip$"));
+    assert.match(created.key,new RegExp("^Diagnose/LBS/"+UUID_A+"/\\d{8}T\\d{9}Z\\.zip$"));
     assert.equal(data.size,1);
 
     const list=await read(env,"/v1/archives?uuid="+UUID_A);
@@ -215,4 +215,33 @@ test("HTTP rotation retains newest 20 ZIPs and removes oldest KV blob",async()=>
     assert.equal(data.has(names[20]),true,"latest blob must remain");
     assert.deepEqual(body.archives.map(x=>x.key),names.slice(1).reverse());
   } finally { db.close(); }
+});
+
+test("private owner can read old LBS ZIP and new project-scoped ZIP via same UUID list",async()=>{
+  const {db,env,data,owner}=environment();
+  try{
+    const zip=fixtureZip();
+    const key=`Diagnose/${UUID_A}/${UUID_A}_20261014T085500000Z.zip`;
+    const old={key,uuid:UUID_A,sizeBytes:zip.length,
+      receivedAtMillis:Date.UTC(2026,9,14,8,55),sha256:"f".repeat(64)};
+    owner.ledger.prepare(old);
+    owner.ledger.commit(old,[]);
+    data.set(key,Uint8Array.from(zip));
+    const response=await upload.call(env,zip);
+    assert.equal(response.status,201);
+    const newKey=(await response.json()).key;
+    assert.match(newKey,new RegExp("^Diagnose/LBS/"+UUID_A+"/\\d{8}T\\d{9}Z\\.zip$"));
+    const list=await read(env,"/v1/archives?uuid="+UUID_A);
+    const keys=(await list.json()).archives.map(x=>x.key);
+    assert.deepEqual(new Set(keys),new Set([key,newKey]));
+    for (const k of keys){
+      const encoded=encodeURIComponent(k);
+      const entries=await read(env,"/v1/archives/entries?key="+encoded);
+      assert.equal(entries.status,200);
+      assert.deepEqual((await entries.json()).files,files);
+      const raw=await read(env,"/v1/archives/zip?key="+encoded);
+      assert.equal(raw.status,200);
+      assert.deepEqual(Buffer.from(await raw.arrayBuffer()),zip);
+    }
+  }finally{db.close();}
 });
