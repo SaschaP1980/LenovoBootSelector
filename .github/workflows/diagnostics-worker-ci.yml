@@ -3,13 +3,15 @@ name: Diagnostics Worker CI
 on:
   push:
     branches:
-      - 'work/LBS-103'
+      - 'work/LBS-*'
     paths:
       - 'cloudflare/diagnostics-worker/**'
       - 'src/**'
       - 'tests/Test-DiagnosticsIdentity.ps1'
       - 'tests/Test-DiagnosticsUploadTransport.ps1'
       - '.github/workflows/diagnostics-worker-ci.yml'
+      - '.github/workflows/deploy-diagnostics-worker.yml'
+      - '.github/workflows/release.yml'
   pull_request:
     paths:
       - 'cloudflare/diagnostics-worker/**'
@@ -17,6 +19,8 @@ on:
       - 'tests/Test-DiagnosticsIdentity.ps1'
       - 'tests/Test-DiagnosticsUploadTransport.ps1'
       - '.github/workflows/diagnostics-worker-ci.yml'
+      - '.github/workflows/deploy-diagnostics-worker.yml'
+      - '.github/workflows/release.yml'
 
 permissions:
   contents: read

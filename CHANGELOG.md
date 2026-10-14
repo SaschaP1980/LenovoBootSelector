@@ -1,5 +1,13 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.11.1.2 – Release-gated automatic Cloudflare Worker deployment
+
+- Remove recurring manual GitHub Actions dispatch for production Worker updates. The verified Release Orchestrator now launches the separate secret-isolated deployment workflow after final Release Verification PASS, passing the exact released main commit and version through a protected `workflow_dispatch`.
+- The deployment worker rechecks the canonical main SHA, source tag, published version, package size and SHA-256 **before** accessing existing GitHub Cloudflare secrets; Node tests and Wrangler dry-run precede the production deployment; pre/post health must preserve the diagnostic upload enablement state.
+- Keep explicit manual `workflow_dispatch` only as an emergency recovery option. Failed dispatch/deployment remains visible in Actions; no migration, archive delete, extra paid service or ChatGPT write permission is introduced.
+- The first release of this automation also bootstraps deployment of the already released v0.11.1.1 90-day KV expiration Worker. Existing stored archives remain untouched pending the separately authorized legacy retention backfill.
+- Release profile: `version-only`; Windows product sources in `src/**` are unchanged.
+
 ## v0.11.1.1 – Automatic 90-day archive expiry and safe historical backfill
 
 - Expire both stored diagnosis ZIP bytes and their private Diagnosis-ID reference after 90 days, without a later upload; round Cloudflare's whole-second physical deadline upwards, reject owner reads at the precise lifetime cutoff, and prevent filename collision suffixes from shifting expiry.
