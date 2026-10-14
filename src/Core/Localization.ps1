@@ -212,6 +212,11 @@ function Get-LocalizationCatalogCore {
             'Diagnostics.UploadedTitle' = 'Diagnostics uploaded'
             'Diagnostics.UploadedHeading' = 'The diagnostic package was transmitted.'
             'Diagnostics.UploadedMessage' = 'The ZIP was stored privately for troubleshooting.'
+            'Diagnostics.UploadedWithId' = "The ZIP was stored privately.`r`nDiagnosis ID: {DiagnosisId}`r`nUse this ID in ChatGPT for analysis."
+            'Diagnostics.CopyId' = 'Copy Diagnosis ID'
+            'Diagnostics.ReferenceMissingTitle' = 'Upload accepted - ID unavailable'
+            'Diagnostics.ReferenceMissingHeading' = 'The server accepted the upload.'
+            'Diagnostics.ReferenceMissingMessage' = 'The reference could not be verified. The ZIP may be stored. Do not immediately upload again.'
             'Diagnostics.UploadFailedTitle' = 'Upload unsuccessful'
             'Diagnostics.UploadFailedHeading' = 'The diagnostics could not be uploaded.'
             'Diagnostics.UploadFailedMessage' = 'The package remains saved locally. Please try again later.'
@@ -473,6 +478,11 @@ function Get-LocalizationCatalogCore {
             'Diagnostics.UploadedTitle' = 'Diagnose hochgeladen'
             'Diagnostics.UploadedHeading' = 'Das Diagnosepaket wurde übertragen.'
             'Diagnostics.UploadedMessage' = 'Das ZIP wurde privat zur Fehleranalyse gespeichert.'
+            'Diagnostics.UploadedWithId' = "Das ZIP wurde privat gespeichert.`r`nDiagnose-ID: {DiagnosisId}`r`nDiese ID für die Analyse in ChatGPT verwenden."
+            'Diagnostics.CopyId' = 'Diagnose-ID kopieren'
+            'Diagnostics.ReferenceMissingTitle' = 'Upload bestätigt - ID fehlt'
+            'Diagnostics.ReferenceMissingHeading' = 'Der Server hat den Upload angenommen.'
+            'Diagnostics.ReferenceMissingMessage' = 'Die Referenz konnte nicht geprüft werden. Das ZIP könnte gespeichert sein. Bitte nicht sofort erneut hochladen.'
             'Diagnostics.UploadFailedTitle' = 'Hochladen fehlgeschlagen'
             'Diagnostics.UploadFailedHeading' = 'Die Diagnose konnte nicht hochgeladen werden.'
             'Diagnostics.UploadFailedMessage' = 'Das Paket bleibt lokal gespeichert. Bitte später erneut versuchen.'

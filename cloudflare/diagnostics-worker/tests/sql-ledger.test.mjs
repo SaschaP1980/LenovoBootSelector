@@ -101,3 +101,36 @@ test("durable global rate limit enforces thirty uploads per UTC day",()=>{
     assert.equal(ledger.consumeUploadRate("f".repeat(64),midnight+86400000),true);
   }finally{database.close();}
 });
+
+test("additive diagnosis reference migration preserves historical archive rows", () => {
+  const {storage,database}=createStorage();
+  try {
+    database.exec("CREATE TABLE archives (key TEXT PRIMARY KEY, uuid TEXT NOT NULL, size_bytes INTEGER NOT NULL, received_at_ms INTEGER NOT NULL, sha256 TEXT NOT NULL)");
+    database.prepare("INSERT INTO archives VALUES(?,?,?,?,?)").run("legacy",uuid,100,123456789,"f".repeat(64));
+    const ledger=new SqlArchiveLedger(storage);
+    assert.equal(ledger.archives().length,1);
+    assert.equal(ledger.archives()[0].diagnosisId,null);
+    const current={...record("current"),diagnosisId:"LBS-00000-00000-00000-00000"};
+    ledger.prepare(current);ledger.commit(current,[]);
+    assert.equal(ledger.archives().length,2);
+    assert.equal(ledger.hasDiagnosisId(current.diagnosisId),true);
+    assert.equal(ledger.archives().find(x=>x.key==="legacy").diagnosisId,null);
+  } finally {database.close();}
+});
+
+test("SQLite link state stays atomic with archive retirement and garbage cleanup", () => {
+  const {storage,database}=createStorage();
+  try {
+    const ledger=new SqlArchiveLedger(storage);
+    const a={...record("a"),diagnosisId:"LBS-11111-11111-11111-11111"};
+    const b={...record("b"),diagnosisId:"LBS-22222-22222-22222-22222"};
+    ledger.prepare(a);ledger.commit(a,[]);
+    ledger.prepare(b);ledger.commit(b,["a"]);
+    assert.equal(ledger.garbage()[0].diagnosisId,a.diagnosisId);
+    assert.equal(ledger.archives()[0].diagnosisId,b.diagnosisId);
+    assert.equal(ledger.hasDiagnosisId(a.diagnosisId),true);
+    ledger.forgetGarbage("a");
+    assert.equal(ledger.hasDiagnosisId(a.diagnosisId),false);
+    assert.equal(ledger.hasDiagnosisId(b.diagnosisId),true);
+  } finally {database.close();}
+});

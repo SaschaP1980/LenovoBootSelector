@@ -45,10 +45,22 @@ function Complete-DiagnosticsUploadFromUi {
     $context = $script:DiagnosticsUploadState
     if (-not $context -or -not $context.Task -or -not $context.Task.IsCompleted) { return }
     $success = $false
+    $receiptUncertain = $false
+    $receipt = $null
     try {
         $response = $context.Task.GetAwaiter().GetResult()
-        $success = ($response.IsSuccessStatusCode -and [int]$response.StatusCode -eq 201)
-        if (-not $success) {
+        if ($response.IsSuccessStatusCode -and [int]$response.StatusCode -eq 201) {
+            try {
+                $receipt = Read-DiagnosticsUploadReceipt -Response $response
+                $success = $true
+            } catch {
+                # HTTP 201 can mean the ZIP was stored even if its receipt is malformed.
+                # Do not tell the user to re-upload blindly or invent an ID.
+                $receiptUncertain = $true
+                Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_UPLOAD_RECEIPT_UNAVAILABLE' -Stage 'diagnostics' -Success $false -Level warning
+            }
+        }
+        if (-not $success -and -not $receiptUncertain) {
             Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_UPLOAD_HTTP_FAILURE' -Stage 'diagnostics' -Success $false -Level warning -Data (New-RuntimeDiagnosticData @{ statusCode = [int]$response.StatusCode })
         }
     }
@@ -67,8 +79,13 @@ function Complete-DiagnosticsUploadFromUi {
         Dispose-DiagnosticsUploadTransport -Context $context
     }
     if ($success) {
-        Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_UPLOAD_COMPLETED' -Stage 'diagnostics' -Success $true
-        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.UploadedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.UploadedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.UploadedMessage') -Kind Info
+        $copyId = [string]$receipt.DiagnosisId
+        $copyAction = { [System.Windows.Forms.Clipboard]::SetText($copyId) }.GetNewClosure()
+        Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_UPLOAD_COMPLETED' -Stage 'diagnostics' -Success $true -Data (New-RuntimeDiagnosticData @{ diagnosisId = $copyId })
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.UploadedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.UploadedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.UploadedWithId' -Values @{ DiagnosisId=$copyId }) -Kind Info -SecondaryButtonText (Get-LocalizedString -Key 'Diagnostics.CopyId') -SecondaryAction $copyAction
+    }
+    elseif ($receiptUncertain) {
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.ReferenceMissingTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.ReferenceMissingHeading') -Message (Get-LocalizedString -Key 'Diagnostics.ReferenceMissingMessage') -Kind Warning
     }
     else {
         Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.UploadFailedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.UploadFailedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.UploadFailedMessage') -Kind Warning

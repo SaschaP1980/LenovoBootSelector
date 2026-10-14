@@ -1,5 +1,15 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.11.1.0 – Copyable Diagnosis ID and private ChatGPT lookup
+
+- Give each successful manual diagnostic ZIP upload a new opaque, 100-bit server-generated, human-readable Diagnosis ID (`LBS-XXXXX-XXXXX-XXXXX-XXXXX`). The Windows success notice shows the ID and offers a copy-to-clipboard button; never pretend that malformed/unconfirmed HTTP 201 receipts provide a reliable ID.
+- Keep the existing canonical `Diagnose/LBS/<installation-UUID>/<UTC_TIMESTAMP>.zip` ZIP path and unchanged four-file diagnostic content. Preserve all historical LBS keys, installation correlation and authorization rules.
+- Add an additive SQLite link ledger and a small private `Diagnose/Refs/LBS/<DIAGNOSIS_ID>` Workers KV JSON reference for direct read-only Cloudflare/ChatGPT lookup. The existing stored ZIP bytes remain the single source of diagnostic content.
+- Stage and recover archive plus reference writes before reporting success; clean up reference keys when 20-per-installation rotation, 90-day retention or global-capacity eviction removes a ZIP. Protect old records and fail closed on Cloudflare/SQLite uncertainty.
+- Extend Node/SQLite/HTTP regression tests and Windows PowerShell 5.1 upload-receipt tests. No secrets in source and no automatic diagnostic upload.
+- Release profile: `patch` for changed product source. The separately controlled Cloudflare production deployment remains manual and requires independent synthetic Diagnosis ID roundtrip verification.
+
+
 ## v0.11.0.1 – Project-scoped diagnostic archive keys
 
 - Store new private Cloudflare LBS archives as `Diagnose/LBS/<installation-UUID>/<UTC_TIMESTAMP>.zip`; the UUID no longer repeats in the ZIP basename.
