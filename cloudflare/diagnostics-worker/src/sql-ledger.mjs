@@ -15,6 +15,7 @@ const SCHEMA = [
     received_at_ms INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS rate_buckets (
     key TEXT PRIMARY KEY, expires_at_ms INTEGER NOT NULL, events INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS diagnosis_links (diagnosis_id TEXT PRIMARY KEY, archive_key TEXT NOT NULL UNIQUE, state TEXT NOT NULL CHECK(state IN ('pending','active','garbage')))`,
 ];
 const COLUMNS = "key, uuid, size_bytes AS sizeBytes, received_at_ms AS receivedAtMillis, sha256";
 
@@ -28,18 +29,17 @@ export class SqlArchiveLedger {
     for (const query of SCHEMA) this.sql.exec(query);
   }
 
-  archives() {
-    return this.sql.exec(`SELECT ${COLUMNS} FROM archives`).toArray();
+  rowsWithId(table, columns = COLUMNS, suffix = "") {
+    const idColumn = "(SELECT diagnosis_id FROM diagnosis_links WHERE archive_key = " + table + ".key) AS diagnosisId";
+    return this.sql.exec("SELECT " + columns + ", " + idColumn + " FROM " + table + suffix).toArray();
   }
-
-  pending() {
-    return this.sql.exec(`SELECT ${COLUMNS} FROM pending_uploads`).toArray();
-  }
-
+  archives() { return this.rowsWithId("archives"); }
+  pending() { return this.rowsWithId("pending_uploads"); }
   garbage() {
-    return this.sql.exec(
-      "SELECT key, size_bytes AS sizeBytes, received_at_ms AS receivedAtMillis FROM garbage ORDER BY received_at_ms, key"
-    ).toArray();
+    return this.rowsWithId("garbage", "key, size_bytes AS sizeBytes, received_at_ms AS receivedAtMillis", " ORDER BY received_at_ms, key");
+  }
+  hasDiagnosisId(id) {
+    return Boolean(this.sql.exec("SELECT 1 AS found FROM diagnosis_links WHERE diagnosis_id = ? LIMIT 1", id).toArray().length);
   }
 
   isCommitted(key) {
@@ -56,20 +56,26 @@ export class SqlArchiveLedger {
   }
 
   prepare(record) {
-    this.sql.exec(
-      "INSERT INTO pending_uploads(key,uuid,size_bytes,received_at_ms,sha256) VALUES(?,?,?,?,?)",
-      record.key, record.uuid, record.sizeBytes, record.receivedAtMillis, record.sha256
-    );
+    this.storage.transactionSync(() => {
+      this.sql.exec("INSERT INTO pending_uploads(key,uuid,size_bytes,received_at_ms,sha256) VALUES(?,?,?,?,?)",
+        record.key, record.uuid, record.sizeBytes, record.receivedAtMillis, record.sha256);
+      if (record.diagnosisId) this.sql.exec(
+        "INSERT INTO diagnosis_links(diagnosis_id,archive_key,state) VALUES(?,?,'pending')",
+        record.diagnosisId, record.key);
+    });
   }
-
   forgetPending(key) {
-    this.sql.exec("DELETE FROM pending_uploads WHERE key = ?", key);
+    this.storage.transactionSync(() => {
+      this.sql.exec("DELETE FROM pending_uploads WHERE key = ?", key);
+      this.sql.exec("DELETE FROM diagnosis_links WHERE archive_key = ? AND state = 'pending'", key);
+    });
   }
-
   forgetGarbage(key) {
-    this.sql.exec("DELETE FROM garbage WHERE key = ?", key);
+    this.storage.transactionSync(() => {
+      this.sql.exec("DELETE FROM garbage WHERE key = ?", key);
+      this.sql.exec("DELETE FROM diagnosis_links WHERE archive_key = ? AND state = 'garbage'", key);
+    });
   }
-
 
   consumeUploadRate(ipHash, nowMillis) {
     if (!/^[a-f0-9]{64}$/.test(ipHash) || !Number.isSafeInteger(nowMillis)) {
@@ -112,6 +118,14 @@ export class SqlArchiveLedger {
           intent.sizeBytes !== record.sizeBytes || intent.sha256 !== record.sha256) {
         throw new Error("missing_or_mismatched_upload_intent");
       }
+      if (record.diagnosisId) {
+        const [link] = this.sql.exec(
+          "SELECT archive_key AS archiveKey, state FROM diagnosis_links WHERE diagnosis_id = ? LIMIT 1",
+          record.diagnosisId).toArray();
+        if (!link || link.archiveKey !== record.key || link.state !== 'pending') {
+          throw Error("missing_or_mismatched_diagnosis_intent");
+        }
+      }
       for (const key of deleteKeys) {
         const [old] = this.sql.exec(
           "SELECT size_bytes AS sizeBytes, received_at_ms AS receivedAtMillis FROM archives WHERE key = ? LIMIT 1",
@@ -123,11 +137,15 @@ export class SqlArchiveLedger {
           key, old.sizeBytes, old.receivedAtMillis
         );
         this.sql.exec("DELETE FROM archives WHERE key = ?", key);
+        this.sql.exec("UPDATE diagnosis_links SET state = 'garbage' WHERE archive_key = ? AND state = 'active'", key);
       }
       this.sql.exec(
         "INSERT INTO archives(key,uuid,size_bytes,received_at_ms,sha256) VALUES(?,?,?,?,?)",
         record.key, record.uuid, record.sizeBytes, record.receivedAtMillis, record.sha256
       );
+      if (record.diagnosisId) this.sql.exec(
+        "UPDATE diagnosis_links SET state = 'active' WHERE diagnosis_id = ? AND archive_key = ? AND state = 'pending'",
+        record.diagnosisId, record.key);
       this.sql.exec("DELETE FROM pending_uploads WHERE key = ?", record.key);
     });
   }

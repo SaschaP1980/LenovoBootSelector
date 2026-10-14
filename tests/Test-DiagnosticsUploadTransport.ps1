@@ -52,6 +52,33 @@ try {
     Assert-DiagnosticUpload (Test-ExpectedUploadRejection { Start-DiagnosticsUploadTransport -ZipPath (Join-Path $folder 'missing.zip') -InstallationUuid $valid }) 'Missing local ZIP must reject.'
     Assert-DiagnosticUpload (Test-ExpectedUploadRejection { Start-DiagnosticsUploadTransport -ZipPath $zero -InstallationUuid $valid }) 'Empty ZIP must reject.'
     Assert-DiagnosticUpload (Test-ExpectedUploadRejection { Start-DiagnosticsUploadTransport -ZipPath $huge -InstallationUuid $valid }) 'Oversize ZIP must reject.'
+    # LBS-103: read a synthetic HTTP 201 response without network access.
+    Add-Type -AssemblyName System.Net.Http
+    $validDiagnosisId = 'LBS-7K2MP-9Q4V6-TR3X8-AB123'
+    $validKey = 'Diagnose/LBS/' + $valid + '/20261014T110851797Z.zip'
+    $json = '{"status":"stored","diagnosisId":"' + $validDiagnosisId +
+        '","key":"' + $validKey + '","sha256":"' + ('a' * 64) +
+        '","sizeBytes":547}'
+    $created = New-Object System.Net.Http.HttpResponseMessage ([System.Net.HttpStatusCode]::Created)
+    try {
+        $created.Content = New-Object System.Net.Http.StringContent ($json)
+        $receipt = Read-DiagnosticsUploadReceipt -Response $created
+        Assert-DiagnosticUpload ($receipt.DiagnosisId -ceq $validDiagnosisId) 'Receipt must preserve the server-issued Diagnosis ID.'
+        Assert-DiagnosticUpload ($receipt.Key -ceq $validKey) 'Receipt must preserve the project-scoped archive key.'
+    } finally { $created.Dispose() }
+
+    foreach ($badJson in @(
+        '{"status":"stored","diagnosisId":"","key":"' + $validKey + '"}',
+        '{"status":"stored","diagnosisId":"LBS-INVALID","key":"' + $validKey + '"}',
+        '{"status":"stored","diagnosisId":"' + $validDiagnosisId + '","key":"Diagnose/FAE/not-lfs.zip"}',
+        'not-json'
+    )) {
+        $created = New-Object System.Net.Http.HttpResponseMessage ([System.Net.HttpStatusCode]::Created)
+        try {
+            $created.Content = New-Object System.Net.Http.StringContent ($badJson)
+            Assert-DiagnosticUpload (Test-ExpectedUploadRejection { Read-DiagnosticsUploadReceipt -Response $created }) 'Malformed or untrusted HTTP 201 receipt must be rejected.'
+        } finally { $created.Dispose() }
+    }
 } finally {
     Remove-Item -LiteralPath $folder -Recurse -Force -ErrorAction SilentlyContinue
 }

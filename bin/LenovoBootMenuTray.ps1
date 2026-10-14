@@ -250,6 +250,11 @@ function Get-LocalizationCatalogCore {
             'Diagnostics.UploadedTitle' = 'Diagnostics uploaded'
             'Diagnostics.UploadedHeading' = 'The diagnostic package was transmitted.'
             'Diagnostics.UploadedMessage' = 'The ZIP was stored privately for troubleshooting.'
+            'Diagnostics.UploadedWithId' = "The ZIP was stored privately.`r`nDiagnosis ID: {DiagnosisId}`r`nUse this ID in ChatGPT for analysis."
+            'Diagnostics.CopyId' = 'Copy Diagnosis ID'
+            'Diagnostics.ReferenceMissingTitle' = 'Upload accepted - ID unavailable'
+            'Diagnostics.ReferenceMissingHeading' = 'The server accepted the upload.'
+            'Diagnostics.ReferenceMissingMessage' = 'The reference could not be verified. The ZIP may be stored. Do not immediately upload again.'
             'Diagnostics.UploadFailedTitle' = 'Upload unsuccessful'
             'Diagnostics.UploadFailedHeading' = 'The diagnostics could not be uploaded.'
             'Diagnostics.UploadFailedMessage' = 'The package remains saved locally. Please try again later.'
@@ -511,6 +516,11 @@ function Get-LocalizationCatalogCore {
             'Diagnostics.UploadedTitle' = 'Diagnose hochgeladen'
             'Diagnostics.UploadedHeading' = 'Das Diagnosepaket wurde übertragen.'
             'Diagnostics.UploadedMessage' = 'Das ZIP wurde privat zur Fehleranalyse gespeichert.'
+            'Diagnostics.UploadedWithId' = "Das ZIP wurde privat gespeichert.`r`nDiagnose-ID: {DiagnosisId}`r`nDiese ID für die Analyse in ChatGPT verwenden."
+            'Diagnostics.CopyId' = 'Diagnose-ID kopieren'
+            'Diagnostics.ReferenceMissingTitle' = 'Upload bestätigt - ID fehlt'
+            'Diagnostics.ReferenceMissingHeading' = 'Der Server hat den Upload angenommen.'
+            'Diagnostics.ReferenceMissingMessage' = 'Die Referenz konnte nicht geprüft werden. Das ZIP könnte gespeichert sein. Bitte nicht sofort erneut hochladen.'
             'Diagnostics.UploadFailedTitle' = 'Hochladen fehlgeschlagen'
             'Diagnostics.UploadFailedHeading' = 'Die Diagnose konnte nicht hochgeladen werden.'
             'Diagnostics.UploadFailedMessage' = 'Das Paket bleibt lokal gespeichert. Bitte später erneut versuchen.'
@@ -1772,7 +1782,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.11.0.1'
+$script:AppVersion = '0.11.1.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -2551,6 +2561,32 @@ function Get-DiagnosticsInstallationId {
 # Never add GitHub write credentials or privileged TaskBroker operations here.
 function Get-DiagnosticsUploadUri {
     return [uri]'https://lenovo-boot-selector-diagnostics.sascha-petrovitsch.workers.dev/v1/diagnostics'
+}
+
+# A valid HTTP 201 may store an archive even if the response body is malformed.
+function Read-DiagnosticsUploadReceipt {
+    param([Parameter(Mandatory=$true)]$Response)
+    if ([int]$Response.StatusCode -ne 201 -or -not $Response.IsSuccessStatusCode -or -not $Response.Content) {
+        throw 'The upload has no confirmed stored receipt.'
+    }
+    $body = [string]$Response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+    if ([string]::IsNullOrWhiteSpace($body) -or $body.Length -gt 4096) {
+        throw 'The upload receipt is missing or too large.'
+    }
+    try { $data = ConvertFrom-Json -InputObject $body -ErrorAction Stop }
+    catch { throw 'The upload receipt is not valid JSON.' }
+    $id = [string]$data.diagnosisId
+    $key = [string]$data.key
+    $sha = [string]$data.sha256
+    if ([string]$data.status -cne 'stored' -or
+        $id -cnotmatch '^LBS-(?:[0-9A-HJKMNP-TV-Z]{5}-){3}[0-9A-HJKMNP-TV-Z]{5}$' -or
+        $key -cnotmatch '^Diagnose/LBS/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/[0-9]{8}T[0-9]{9}Z\.zip$' -or
+        $sha -cnotmatch '^[0-9a-f]{64}$' -or
+        -not ($data.sizeBytes -is [ValueType]) -or
+        [long]$data.sizeBytes -le 0 -or [long]$data.sizeBytes -gt (2 * 1024 * 1024)) {
+        throw 'The upload receipt is missing trusted archive fields.'
+    }
+    return [pscustomobject]@{ DiagnosisId=$id; Key=$key; Sha256=$sha; SizeBytes=[long]$data.sizeBytes }
 }
 
 function New-DiagnosticsUploadHttpHandler {
@@ -3828,10 +3864,22 @@ function Complete-DiagnosticsUploadFromUi {
     $context = $script:DiagnosticsUploadState
     if (-not $context -or -not $context.Task -or -not $context.Task.IsCompleted) { return }
     $success = $false
+    $receiptUncertain = $false
+    $receipt = $null
     try {
         $response = $context.Task.GetAwaiter().GetResult()
-        $success = ($response.IsSuccessStatusCode -and [int]$response.StatusCode -eq 201)
-        if (-not $success) {
+        if ($response.IsSuccessStatusCode -and [int]$response.StatusCode -eq 201) {
+            try {
+                $receipt = Read-DiagnosticsUploadReceipt -Response $response
+                $success = $true
+            } catch {
+                # HTTP 201 can mean the ZIP was stored even if its receipt is malformed.
+                # Do not tell the user to re-upload blindly or invent an ID.
+                $receiptUncertain = $true
+                Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_UPLOAD_RECEIPT_UNAVAILABLE' -Stage 'diagnostics' -Success $false -Level warning
+            }
+        }
+        if (-not $success -and -not $receiptUncertain) {
             Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_UPLOAD_HTTP_FAILURE' -Stage 'diagnostics' -Success $false -Level warning -Data (New-RuntimeDiagnosticData @{ statusCode = [int]$response.StatusCode })
         }
     }
@@ -3850,8 +3898,13 @@ function Complete-DiagnosticsUploadFromUi {
         Dispose-DiagnosticsUploadTransport -Context $context
     }
     if ($success) {
-        Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_UPLOAD_COMPLETED' -Stage 'diagnostics' -Success $true
-        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.UploadedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.UploadedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.UploadedMessage') -Kind Info
+        $copyId = [string]$receipt.DiagnosisId
+        $copyAction = { [System.Windows.Forms.Clipboard]::SetText($copyId) }.GetNewClosure()
+        Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_UPLOAD_COMPLETED' -Stage 'diagnostics' -Success $true -Data (New-RuntimeDiagnosticData @{ diagnosisId = $copyId })
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.UploadedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.UploadedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.UploadedWithId' -Values @{ DiagnosisId=$copyId }) -Kind Info -SecondaryButtonText (Get-LocalizedString -Key 'Diagnostics.CopyId') -SecondaryAction $copyAction
+    }
+    elseif ($receiptUncertain) {
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.ReferenceMissingTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.ReferenceMissingHeading') -Message (Get-LocalizedString -Key 'Diagnostics.ReferenceMissingMessage') -Kind Warning
     }
     else {
         Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.UploadFailedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.UploadFailedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.UploadFailedMessage') -Kind Warning

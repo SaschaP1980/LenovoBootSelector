@@ -4,7 +4,7 @@
 
 ## Implementation state
 
-- The Worker/KV/SQLite Durable Object service was released in v0.11.0.0 and deployed successfully. This follow-up revision introduces a project-specific archive key prefix in source and tests.
+- The Worker/KV/SQLite Durable Object service and project-scoped archive keys were released/deployed in v0.11.0.1. v0.11.1.0 adds server-generated copyable Diagnosis IDs and a private KV reference for ChatGPT lookup; source publication and live Worker deployment are separate steps.
 - The owner verified live anonymous ZIP upload, owner-authorized listing, complete four-file text/ZIP readback with SHA-256 integrity, and a native LBS upload. No automatic deployment is performed when GitHub source changes.
 - `GET /health` is public and contains **no archive contents or secrets**.
 - `POST /v1/diagnostics` is **disabled by default**. It returns HTTP 503 until `ENABLE_DIAGNOSTIC_UPLOAD` is exactly `true` **and** a valid `DIAGNOSTICS_READ_TOKEN` is provisioned.
@@ -25,7 +25,7 @@
 | Privileged operations | **None**. This service must not affect boot selection, TaskBroker, firmware, updates or app startup. |
 | Monetary policy | **Workers Free / KV Free / SQLite Durable Objects Free only**; do not upgrade to a paid account to make tests pass |
 
-Cloudflare Workers KV has eventual-consistency limitations; the SQLite Durable Object is the source of truth for history and serialized admission. Live owner-side tests proved the basic round trip; full quota/retention stress tests and direct ChatGPT connector access remain unverified.
+Cloudflare Workers KV has eventual-consistency limitations; the SQLite Durable Object is the source of truth for history and serialized admission. The owner verified direct private ChatGPT retrieval of a synthetic archive using the official Cloudflare OAuth plugin in v0.11.0.1. New Diagnosis-ID lookup and live stress/rotation remain pending until the v0.11.1.0 Worker is manually deployed and checked.
 
 ## Credentials and private access
 
@@ -39,15 +39,17 @@ Cloudflare Workers KV has eventual-consistency limitations; the SQLite Durable O
 - `DIAGNOSTICS_READ_TOKEN`: strong random secret, minimum 32 characters, used only to authorize private listing and downloads.
 - `ENABLE_DIAGNOSTIC_UPLOAD`: optional `"true"` flag. **Leave absent/false** until all tests, review, abuse-risk assessment and real readback gate succeed.
 
-Never send any token into ChatGPT, screenshots, GitHub Issues, PR comments, CI logs or the Lenovo client. The browser UI does not currently support a one-click owner session. **ChatGPT direct private retrieval remains a separate acceptance gate**: an authenticated connector or equally secure text/ZIP access mechanism must be demonstrably usable in the real ChatGPT runtime before Issue closure. Do not mistake a Bearer-protected HTTP URL alone for an installed ChatGPT connector.
+Never send any token into ChatGPT, screenshots, GitHub Issues, PR comments, CI logs or the Lenovo client. The browser UI does not currently support a one-click owner session. **ChatGPT private direct ZIP read is verified for the original synthetic fixture** using the official Cloudflare OAuth plugin; the new ID lookup needs its own post-deployment readback. Do not mistake a Bearer-protected HTTP URL alone for an installed ChatGPT connector.
 
 ## HTTP contract
 
-- `POST /v1/diagnostics`: `Content-Type: application/zip`, `x-installation-uuid: <uuid-v4>`, ZIP body; success `201` returns `status`, `key`, `sha256`, `sizeBytes`. Other responses include `400` (invalid ZIP/UUID), `413` (oversized), `415` (media type), `429` (rate limit), `503` (disabled/storage fault).
+- `POST /v1/diagnostics`: `Content-Type: application/zip`, `x-installation-uuid: <uuid-v4>`, ZIP body; success `201` returns `status`, `key`, `diagnosisId`, `sha256`, `sizeBytes`. Other responses include `400` (invalid ZIP/UUID), `413` (oversized), `415` (media type), `429` (rate limit), `503` (disabled/storage fault).
 - `GET /v1/archives?uuid=<uuid-v4>`: owner-authenticated list.
 - `GET /v1/archives/entries?key=<encoded-key>`: owner-authenticated JSON containing `metadata` and all four decoded UTF-8 diagnostic file contents.
 - `GET /v1/archives/zip?key=<encoded-key>`: owner-authenticated, unmodified ZIP binary.
 - **New uploads:** `Diagnose/LBS/<uuid>/<UTC_TIMESTAMP>.zip`, UTC with milliseconds (e.g. `20261014T102339852Z`), with the UUID only in its parent folder. The `LBS` project is fixed server-side; client-supplied arbitrary project paths are forbidden. **Legacy objects:** `Diagnose/<uuid>/<uuid>_<UTC_TIMESTAMP>.zip` remain in KV with their original keys, and can still be listed, read and rotated alongside new objects under the same 20-record LBS installation quota. This change does not physically relocate or delete old ZIPs. Other future project prefixes require explicit server-owned project registration and segregated per-project identity/quota handling.
+- **Diagnosis ID (new in v0.11.1.0):** Each committed upload receives a server-generated `LBS-XXXXX-XXXXX-XXXXX-XXXXX` identifier. Its private JSON lookup object is stored at `Diagnose/Refs/LBS/<DIAGNOSIS_ID>` with project, immutable archive key, SHA-256 and expiry metadata. The same existing KV namespace is reused; no new public endpoint is created. Authorized ChatGPT users with Workers KV Storage Read resolve the exact reference key, verify its fields/expiry, retrieve the referenced original ZIP bytes privately and analyze the canonical four files. A Diagnosis ID is not a password; existing Cloudflare OAuth permissions still apply. Archive keys are **never renamed** for the new feature; historical archives without a reference remain accessible by their existing owner UUID/key routes. On rotation, expiry or global eviction, reference and original ZIP are retired together with durable cleanup. The source archive remains authoritative in SQLite; the reference is a read-only lookup convenience.
+- **Capacity impact:** One small additional KV write per accepted upload plus matching deletion/expiry. The Cloudflare Workers KV Free budget is currently 1,000 writes/day, 1,000 deletes/day, 1,000 list operations/day, 100,000 reads/day and 1 GiB storage (https://developers.cloudflare.com/workers/platform/pricing/). Stay on Free; quota exhaustion must not create fake success or billable upgrades.
 
 **Important:** Do not activate upload merely to test a path from ChatGPT. First use a private, scoped connection and a synthetic fixture ZIP. Avoid sending real diagnostic data to any tool not covered by the chosen authorized read path.
 
@@ -66,4 +68,4 @@ cd cloudflare/diagnostics-worker
 npx --yes wrangler@4 deploy --dry-run
 ```
 
-The v0.11.0.0 product and Cloudflare service were released and tested with real Windows uploads and owner private readback. This new key layout is staged in a Work-Branch and not live until a separately verified source release and manual deployment. Owner-authorized direct ChatGPT integration remains pending.
+The v0.11.0.0 product and Cloudflare service were released and tested with real Windows uploads and owner private readback. v0.11.0.1's project-scoped key layout is live. The v0.11.1.0 Diagnosis ID extension remains a source/deployment change until separately released and manually deployed; direct private ChatGPT reads already work for historical synthetic ZIPs.

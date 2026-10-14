@@ -84,7 +84,7 @@ function environment() {
   };
   const data = new Map();
   const kv = {
-    async put(key,bytes) { data.set(key,Uint8Array.from(bytes)); },
+    async put(key,bytes) { data.set(key,typeof bytes==="string" ? bytes : Uint8Array.from(bytes)); },
     async delete(key) { data.delete(key); },
     async get(key,format) {
       if(format!=="arrayBuffer")throw Error("unexpected KV format");
@@ -131,8 +131,12 @@ test("end-to-end upload, UUID index, private text and complete ZIP readback",asy
     assert.equal(uploadResponse.status,201);
     const created=await uploadResponse.json();
     assert.equal(created.status,"stored");
+    assert.match(created.diagnosisId,/^LBS-(?:[0-9A-HJKMNP-TV-Z]{5}-){3}[0-9A-HJKMNP-TV-Z]{5}$/);
+    const reference=JSON.parse(data.get("Diagnose/Refs/LBS/"+created.diagnosisId));
+    assert.equal(reference.key,created.key);
+    assert.equal(reference.sha256,created.sha256);
     assert.match(created.key,new RegExp("^Diagnose/LBS/"+UUID_A+"/\\d{8}T\\d{9}Z\\.zip$"));
-    assert.equal(data.size,1);
+    assert.equal(data.size,2);
 
     const list=await read(env,"/v1/archives?uuid="+UUID_A);
     assert.equal(list.status,200);
@@ -168,7 +172,7 @@ test("parallel requests are serialized to unique keys with no archive overwritte
     assert.equal(b.status,201);
     const x=await a.json(),y=await b.json();
     assert.notEqual(x.key,y.key);
-    assert.equal(data.size,2);
+    assert.equal(data.size,4);
     const r=await read(env,"/v1/archives?uuid="+UUID_A);
     assert.equal((await r.json()).archives.length,2);
   }finally{db.close();}
@@ -210,8 +214,9 @@ test("HTTP rotation retains newest 20 ZIPs and removes oldest KV blob",async()=>
     assert.equal(listed.status,200);
     const body=await listed.json();
     assert.equal(body.archives.length,20);
-    assert.equal(data.size,20);
+    assert.equal(data.size,40);
     assert.equal(data.has(names[0]),false,"oldest blob must be deleted");
+    assert.equal([...data.keys()].filter(k=>k.startsWith("Diagnose/Refs/LBS/")).length,20);
     assert.equal(data.has(names[20]),true,"latest blob must remain");
     assert.deepEqual(body.archives.map(x=>x.key),names.slice(1).reverse());
   } finally { db.close(); }

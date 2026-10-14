@@ -206,7 +206,7 @@ export class DiagnosticsCoordinator {
       const bytes=new Uint8Array(await request.arrayBuffer());
       const record=await this.store.ingest({uuid,zipBytes:bytes,sha256:hash});
       return jsonResponse(201,{status:"stored",key:record.key,
-        sha256:record.sha256,sizeBytes:record.sizeBytes});
+        diagnosisId:record.diagnosisId,sha256:record.sha256,sizeBytes:record.sizeBytes});
     }catch(err){
       const code=String(err?.message||"");
       if(code==="invalid_archive_size"||code==="invalid_installation_uuid"){

@@ -1,5 +1,5 @@
 {
-  "version": "0.11.0.1",
+  "version": "0.11.1.0",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
@@ -396,7 +396,7 @@
     },
     {
       "source": "src/Core/Localization.ps1",
-      "line": 598,
+      "line": 608,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { $text = $text -f @($Arguments) } catch { }"
@@ -424,35 +424,35 @@
     },
     {
       "source": "src/Infrastructure/DiagnosticsUploadTransport.ps1",
-      "line": 62,
+      "line": 88,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "} catch { }"
     },
     {
       "source": "src/Infrastructure/DiagnosticsUploadTransport.ps1",
-      "line": 97,
+      "line": 123,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { if ($Context.Task -and $Context.Task.IsCompleted -and -not $Context.Task.IsFaulted) { $Context.Task.Result.Dispose() } } catch { }"
     },
     {
       "source": "src/Infrastructure/DiagnosticsUploadTransport.ps1",
-      "line": 98,
+      "line": 124,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { if ($Context.Request) { $Context.Request.Dispose() } } catch { }"
     },
     {
       "source": "src/Infrastructure/DiagnosticsUploadTransport.ps1",
-      "line": 99,
+      "line": 125,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { if ($Context.Content) { $Context.Content.Dispose() } } catch { }"
     },
     {
       "source": "src/Infrastructure/DiagnosticsUploadTransport.ps1",
-      "line": 100,
+      "line": 126,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { if ($Context.Client) { $Context.Client.Dispose() } } catch { }"
@@ -690,7 +690,7 @@
     },
     {
       "source": "src/UI/DiagnosticsPresentation.ps1",
-      "line": 62,
+      "line": 74,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $script:DiagnosticsUploadTimer.Stop(); $script:DiagnosticsUploadTimer.Dispose() } catch { }"
