@@ -113,3 +113,48 @@ test("read-side listing is bounded and includes only one UUID",async()=>{
   assert.deepEqual(client.list(uuid).map(x=>x.key),["a"]);
   assert.throws(()=>client.list(uuid,100),/invalid_listing_limit/);
 });
+
+test("project-scoped LBS keys carry UUID once and UTC milliseconds",()=>{
+  const {client}=service();
+  const key=client.nextArchiveKey(uuid,now).key;
+  const ts=new Date(now).toISOString().replace(/[-:]/g,"").replace(".","");
+  assert.equal(key,`Diagnose/LBS/${uuid}/${ts}.zip`);
+  assert.equal(key.split(uuid).length-1,1);
+});
+test("same-millisecond collision increments key, not archive contents",()=>{
+  const {client,ledger}=service();
+  const first=client.nextArchiveKey(uuid,now);
+  ledger.prepare(old(first.key));
+  const next=client.nextArchiveKey(uuid,now);
+  assert.notEqual(first.key,next.key);
+  assert.equal(next.receivedAtMillis,now+1);
+});
+test("old and new LBS archives both read, foreign project and malformed IDs rejected",()=>{
+  const time="20261014T085500000Z";
+  const legacy=`Diagnose/${uuid}/${uuid}_${time}.zip`;
+  const current=`Diagnose/LBS/${uuid}/${time}.zip`;
+  const {client}=service([old(legacy),old(current)]);
+  assert.equal(client.get(legacy).key,legacy);
+  assert.equal(client.get(current).key,current);
+  for (const invalid of [
+    `Diagnose/FAE/${uuid}/${time}.zip`,
+    `Diagnose/KR/${uuid}/${time}.zip`,
+    `Diagnose/LBS/../${time}.zip`,
+    `Diagnose/LBS/${uuid}/${uuid}_${time}.zip`,
+    `Diagnose/${uuid}/123e4567-e89b-42d3-a456-426614174001_${time}.zip`
+  ]) assert.throws(()=>client.get(invalid),/invalid_archive_key/);
+  assert.equal(client.get(`Diagnose/LBS/${uuid}/20261014T085500001Z.zip`),null);
+  const wrong=service([{...old(current),uuid:"123e4567-e89b-42d3-a456-426614174001"}]);
+  assert.equal(wrong.client.get(current),null);
+});
+test("legacy keys and new LBS keys share 20-item oldest-first quota",async()=>{
+  const legacy=Array.from({length:20},(_,i)=>
+    old(`Diagnose/${uuid}/${uuid}_20261014T0854${String(i).padStart(2,"0")}000Z.zip`,now-(21-i)*1000));
+  const {client,ledger}=service(legacy);
+  const response=await client.ingest(upload());
+  assert.equal(response.deletedArchiveCount,1);
+  assert.match(response.key,/^Diagnose\/LBS\//);
+  assert.equal(ledger.archives().length,20);
+  assert.equal(ledger.archives().some(x=>x.key===legacy[0].key),false);
+  assert.equal(ledger.archives().some(x=>x.key===legacy[1].key),true);
+});

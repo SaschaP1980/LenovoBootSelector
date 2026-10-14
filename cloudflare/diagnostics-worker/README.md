@@ -4,8 +4,8 @@
 
 ## Implementation state
 
-- A Cloudflare Worker + Workers KV + SQLite-backed Durable Object service is implemented on `work/LBS-103`, using the owner's existing KV namespace and the declarative Durable Object binding.
-- The **production Cloudflare Worker is still the user's original Hello World scaffold**, not this implementation. A successful Wrangler `--dry-run` does not deploy anything.
+- The Worker/KV/SQLite Durable Object service was released in v0.11.0.0 and deployed successfully. This follow-up revision introduces a project-specific archive key prefix in source and tests.
+- The owner verified live anonymous ZIP upload, owner-authorized listing, complete four-file text/ZIP readback with SHA-256 integrity, and a native LBS upload. No automatic deployment is performed when GitHub source changes.
 - `GET /health` is public and contains **no archive contents or secrets**.
 - `POST /v1/diagnostics` is **disabled by default**. It returns HTTP 503 until `ENABLE_DIAGNOSTIC_UPLOAD` is exactly `true` **and** a valid `DIAGNOSTICS_READ_TOKEN` is provisioned.
 - `GET /v1/archives`, `GET /v1/archives/entries` and `GET /v1/archives/zip` require `Authorization: Bearer <owner secret>`. The list filters on installation UUID; the entries endpoint returns all four canonical decoded diagnostic files; ZIP returns the unchanged stored binary.
@@ -25,7 +25,7 @@
 | Privileged operations | **None**. This service must not affect boot selection, TaskBroker, firmware, updates or app startup. |
 | Monetary policy | **Workers Free / KV Free / SQLite Durable Objects Free only**; do not upgrade to a paid account to make tests pass |
 
-Cloudflare Workers KV has eventual-consistency limitations; the SQLite Durable Object is the source of truth for history and serialized admission. **No cloud runtime end-to-end acceptance has occurred yet**, so operational assumptions must be checked before enabling uploads.
+Cloudflare Workers KV has eventual-consistency limitations; the SQLite Durable Object is the source of truth for history and serialized admission. Live owner-side tests proved the basic round trip; full quota/retention stress tests and direct ChatGPT connector access remain unverified.
 
 ## Credentials and private access
 
@@ -47,7 +47,7 @@ Never send any token into ChatGPT, screenshots, GitHub Issues, PR comments, CI l
 - `GET /v1/archives?uuid=<uuid-v4>`: owner-authenticated list.
 - `GET /v1/archives/entries?key=<encoded-key>`: owner-authenticated JSON containing `metadata` and all four decoded UTF-8 diagnostic file contents.
 - `GET /v1/archives/zip?key=<encoded-key>`: owner-authenticated, unmodified ZIP binary.
-- URLs/keys always refer to the `Diagnose/<uuid>/<uuid>_<UTC_TIMESTAMP>.zip` storage namespace; key names are never accepted directly from untrusted upload headers.
+- **New uploads:** `Diagnose/LBS/<uuid>/<UTC_TIMESTAMP>.zip`, UTC with milliseconds (e.g. `20261014T102339852Z`), with the UUID only in its parent folder. The `LBS` project is fixed server-side; client-supplied arbitrary project paths are forbidden. **Legacy objects:** `Diagnose/<uuid>/<uuid>_<UTC_TIMESTAMP>.zip` remain in KV with their original keys, and can still be listed, read and rotated alongside new objects under the same 20-record LBS installation quota. This change does not physically relocate or delete old ZIPs. Other future project prefixes require explicit server-owned project registration and segregated per-project identity/quota handling.
 
 **Important:** Do not activate upload merely to test a path from ChatGPT. First use a private, scoped connection and a synthetic fixture ZIP. Avoid sending real diagnostic data to any tool not covered by the chosen authorized read path.
 
@@ -66,4 +66,4 @@ cd cloudflare/diagnostics-worker
 npx --yes wrangler@4 deploy --dry-run
 ```
 
-Product smoke and owner ChatGPT readback are required before Issue #103 is closed. There is no production deployment or verified private ChatGPT integration yet.
+The v0.11.0.0 product and Cloudflare service were released and tested with real Windows uploads and owner private readback. This new key layout is staged in a Work-Branch and not live until a separately verified source release and manual deployment. Owner-authorized direct ChatGPT integration remains pending.

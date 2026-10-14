@@ -34,7 +34,8 @@ export class ArchiveIngestion {
     for (let attempt = 0; attempt < 100; attempt++, timestamp++) {
       const suffix = new Date(timestamp).toISOString()
         .replace(/[-:]/g, "").replace(".","").replace("Z","Z");
-      const key = `Diagnose/${uuid}/${uuid}_${suffix}.zip`;
+      // The project is fixed by the backend; clients cannot select folders.
+      const key = `Diagnose/LBS/${uuid}/${suffix}.zip`;
       if (!this.ledger.hasKey(key)) return { key, receivedAtMillis: timestamp };
     }
     throw new Error("archive_filename_collision");
@@ -97,11 +98,15 @@ export class ArchiveIngestion {
   }
 
   get(key) {
-    if (typeof key !== "string" || key.length > 256 ||
-        !/^Diagnose\/[0-9a-f-]{36}\/[0-9a-f-]{36}_[0-9TZ]+\.zip$/.test(key)) {
+    if (typeof key !== "string" || key.length > 256) {
       throw new Error("invalid_archive_key");
     }
-    const archived = this.ledger.archives().find(item => item.key === key);
-    return archived || null;
+    const uuid = "[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
+    const projectKey = new RegExp("^Diagnose/LBS/(" + uuid + ")/\\d{8}T\\d{9}Z\\.zip$", "i");
+    const legacyKey = new RegExp("^Diagnose/(" + uuid + ")/\\1_\\d{8}T\\d{9}Z\\.zip$", "i");
+    const match = projectKey.exec(key) || legacyKey.exec(key);
+    if (!match) throw new Error("invalid_archive_key");
+    const record = this.ledger.archives().find(item => item.key === key);
+    return record && record.uuid === match[1].toLowerCase() ? record : null;
   }
 }
