@@ -38,6 +38,23 @@ export class SqlArchiveLedger {
   garbage() {
     return this.rowsWithId("garbage", "key, size_bytes AS sizeBytes, received_at_ms AS receivedAtMillis", " ORDER BY received_at_ms, key");
   }
+  // Read-only full membership inventory for an operator-controlled retention migration.
+  // Includes expired rows and old layouts; never includes pending or garbage blobs.
+  inventory(cursor = "", limit = 100) {
+    if (typeof cursor !== "string" || cursor.length > 256 ||
+        !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      throw new Error("invalid_inventory_query");
+    }
+    const rows = this.sql.exec(
+      "SELECT key, uuid, size_bytes AS sizeBytes, received_at_ms AS receivedAtMillis, sha256, " +
+      "(SELECT diagnosis_id FROM diagnosis_links WHERE archive_key = archives.key) AS diagnosisId " +
+      "FROM archives WHERE key > ? ORDER BY key LIMIT ?",
+      cursor, limit + 1
+    ).toArray();
+    const archives = rows.slice(0, limit);
+    return {archives, nextCursor: rows.length > limit ? archives[archives.length-1].key : null};
+  }
+
   hasDiagnosisId(id) {
     return Boolean(this.sql.exec("SELECT 1 AS found FROM diagnosis_links WHERE diagnosis_id = ? LIMIT 1", id).toArray().length);
   }

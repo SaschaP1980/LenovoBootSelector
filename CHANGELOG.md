@@ -1,5 +1,13 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.11.1.1 – Automatic 90-day archive expiry and safe historical backfill
+
+- Expire both stored diagnosis ZIP bytes and their private Diagnosis-ID reference after 90 days, without a later upload; round Cloudflare's whole-second physical deadline upwards, reject owner reads at the precise lifetime cutoff, and prevent filename collision suffixes from shifting expiry.
+- Introduce a Bearer-protected, read-only, paginated SQLite inventory for owner validation of historical archives.
+- Supply a manual-only, dry-run-first, quota-bounded, restartable historical ZIP backfill tool. Require disabled uploads, private ledger membership and SHA-256 matching; never change existing ZIPs, create public archives, or modify production during publication.
+- Extend permanent Node/SQLite/HTTP/fake-clock tests and preserve the existing Windows application code and diagnostic clipboard behavior. No cron, extra paid service, automatic Cloudflare deployment or ChatGPT write scope.
+- Release profile: `version-only` (product `src/**` unchanged). Owner must explicitly authorize Worker production deployment and subsequent private backfill independently.
+
 ## v0.11.1.0 – Copyable Diagnosis ID and private ChatGPT lookup
 
 - Give each successful manual diagnostic ZIP upload a new opaque, 100-bit server-generated, human-readable Diagnosis ID (`LBS-XXXXX-XXXXX-XXXXX-XXXXX`). The Windows success notice shows the ID and offers a copy-to-clipboard button; never pretend that malformed/unconfirmed HTTP 201 receipts provide a reliable ID.
