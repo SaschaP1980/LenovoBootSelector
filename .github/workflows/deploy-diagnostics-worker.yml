@@ -1,14 +1,25 @@
 name: Deploy diagnostics Worker
+run-name: Deploy diagnostics Worker (${{ inputs.expected_version || 'manual recovery' }})
 
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Confirm explicit manual production deployment'
+        description: 'Confirm Worker deployment (automatic on successful release; manual recovery fallback)'
         required: true
         type: choice
         options:
           - deploy-diagnostics-worker
+      expected_main_sha:
+        description: 'Exact main SHA supplied by the Release Orchestrator (empty only for manual recovery)'
+        required: false
+        type: string
+        default: ''
+      expected_version:
+        description: 'Exact released version supplied by Release Orchestrator (empty only for manual recovery)'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -23,9 +34,48 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout only canonical released main
+        uses: actions/checkout@v4
         with:
+          ref: main
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Validate released main and immutable package before using secrets
+        shell: bash
+        env:
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: |
+          set -euo pipefail
+          actual_sha=$(git rev-parse HEAD)
+          actual_version=$(python3 -c 'import json; print(json.load(open("bin/version.json",encoding="utf-8"))["version"])')
+          latest_version=$(jq -r '.version' downloads/latest.json)
+          latest_tag=$(jq -r '.tag' downloads/latest.json)
+          latest_file=$(jq -r '.file' downloads/latest.json)
+          latest_sha=$(jq -r '.sha256' downloads/latest.json)
+          latest_size=$(jq -r '.size' downloads/latest.json)
+          [[ "$actual_sha" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$actual_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$actual_version" = "$latest_version"
+          test "$latest_tag" = "v$actual_version"
+          test "$latest_file" = "LenovoBootMenuTray-v$actual_version.zip"
+          [[ "$latest_sha" =~ ^[a-f0-9]{64}$ ]]
+          [[ "$latest_size" =~ ^[0-9]+$ ]]
+          test -f "downloads/$latest_file"
+          test "$(stat -c%s "downloads/$latest_file")" = "$latest_size"
+          printf '%s  %s\n' "$latest_sha" "downloads/$latest_file" | sha256sum --check --status
+          test "$(git show "refs/tags/v$actual_version:bin/version.json" | jq -r '.version')" = "$actual_version"
+          # Both fields must be populated together by the verified release flow.
+          if [[ -n "$EXPECTED_MAIN_SHA" || -n "$EXPECTED_VERSION" ]]; then
+            [[ "$EXPECTED_MAIN_SHA" =~ ^[a-f0-9]{40}$ ]]
+            [[ "$EXPECTED_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+            test "$actual_sha" = "$EXPECTED_MAIN_SHA"
+            test "$actual_version" = "$EXPECTED_VERSION"
+            echo "AUTO_DEPLOY_PRECHECK=PASS version=$actual_version main_sha=$actual_sha"
+          else
+            echo "MANUAL_RECOVERY_PRECHECK=PASS version=$actual_version main_sha=$actual_sha"
+          fi
 
       - name: Validate Worker source
         uses: actions/setup-node@v4
@@ -35,6 +85,20 @@ jobs:
       - name: Run fail-closed Worker tests
         run: node --test cloudflare/diagnostics-worker/tests/*.test.mjs
 
+      - name: Check Wrangler bundle without deployment
+        working-directory: cloudflare/diagnostics-worker
+        run: npx --yes wrangler@4 deploy --dry-run --outdir /tmp/lbs-diagnostics-worker-bundle
+
+      - name: Capture baseline live Worker health
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 --max-time 20 \
+            'https://lenovo-boot-selector-diagnostics.sascha-petrovitsch.workers.dev/health' \
+            > "$RUNNER_TEMP/diagnostics-health-before.json"
+          jq -e '(.service=="lenovo-boot-selector-diagnostics") and ((.ingestionEnabled|type)=="boolean")' \
+            "$RUNNER_TEMP/diagnostics-health-before.json" >/dev/null
+
       - name: Check deployment credentials
         env:
           HAS_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
@@ -43,7 +107,7 @@ jobs:
           test "$HAS_API_TOKEN" = "true"
           test "$HAS_ACCOUNT_ID" = "true"
 
-      - name: Deploy manually to Cloudflare
+      - name: Deploy verified main to Cloudflare
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -51,3 +115,16 @@ jobs:
           workingDirectory: cloudflare/diagnostics-worker
           wranglerVersion: '4'
           command: deploy
+
+      - name: Verify health and preserved upload configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 --max-time 20 \
+            'https://lenovo-boot-selector-diagnostics.sascha-petrovitsch.workers.dev/health' \
+            > "$RUNNER_TEMP/diagnostics-health-after.json"
+          jq -e '(.service=="lenovo-boot-selector-diagnostics") and ((.ingestionEnabled|type)=="boolean")' \
+            "$RUNNER_TEMP/diagnostics-health-after.json" >/dev/null
+          jq -e -s '.[0].ingestionEnabled == .[1].ingestionEnabled' \
+            "$RUNNER_TEMP/diagnostics-health-before.json" "$RUNNER_TEMP/diagnostics-health-after.json" >/dev/null
+          echo "WORKER_DEPLOY_HEALTH=PASS"

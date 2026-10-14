@@ -4,8 +4,8 @@
 
 ## Implementation state
 
-- The Worker/KV/SQLite Durable Object service and project-scoped archive keys were released/deployed in v0.11.0.1. v0.11.1.0 adds server-generated copyable Diagnosis IDs and a private KV reference for ChatGPT lookup. Target v0.11.1.1 adds automatic ZIP expiration and separately authorized historical migration. Publishing source, deploying the Worker and mutating historical KV are separate operator actions.
-- The owner verified live anonymous ZIP upload, owner-authorized listing, complete four-file text/ZIP readback with SHA-256 integrity, and a native LBS upload. No automatic deployment is performed when GitHub source changes.
+- The Worker/KV/SQLite Durable Object service and project-scoped archive keys were released/deployed in v0.11.0.1. v0.11.1.0 introduced server-generated copyable Diagnosis IDs and private references; v0.11.1.1 introduced native ZIP expiration and an **explicit owner-only** historical backfill. v0.11.1.2 integrates **automatic production Worker dispatch following successful verified GitHub release**; historical KV mutation remains a separate owner-authorized maintenance operation.
+- The owner verified live anonymous ZIP upload, owner-authorized listing, complete four-file text/ZIP readback with SHA-256 integrity, and a native LBS upload. Starting with v0.11.1.2, **successful verified GitHub source releases automatically dispatch the separate Cloudflare production deploy job**. A generic source branch or unverified merge never deploys.
 - `GET /health` is public and contains **no archive contents or secrets**.
 - `POST /v1/diagnostics` is **disabled by default**. It returns HTTP 503 until `ENABLE_DIAGNOSTIC_UPLOAD` is exactly `true` **and** a valid `DIAGNOSTICS_READ_TOKEN` is provisioned.
 - `GET /v1/archives`, `GET /v1/archives/entries` and `GET /v1/archives/zip` require `Authorization: Bearer <owner secret>`. The list filters on installation UUID; the entries endpoint returns all four canonical decoded diagnostic files; ZIP returns the unchanged stored binary.
@@ -73,6 +73,16 @@ Historical ZIPs that predate native expiry require an **explicit one-time, dry-r
 Cloudflare uses whole-second expiry and enforces at least 60 seconds of remaining lifetime when a new expiry is set. Do **not** backdate, reset expiry relative to migration time, or rewrite keys during an active upload. No paid service, cron, new namespace, public ZIP endpoint or elevated ChatGPT rights are required.
 
 Sources: [Cloudflare KV expiration](https://developers.cloudflare.com/kv/api/write-key-value-pairs/#expiring-keys), [Cloudflare KV Free limits](https://developers.cloudflare.com/kv/platform/limits/).
+
+## Continuous deployment after a verified release (v0.11.1.2+)
+
+The source Release Orchestrator in `.github/workflows/release.yml` runs pre-activation and final post-merge release verification as before, then **dispatches `deploy-diagnostics-worker.yml` automatically** using its scoped GitHub Actions token with `actions: write`. GitHub's special `workflow_dispatch` event is deliberately used because `GITHUB_TOKEN`-generated `push` events do not ordinarily trigger downstream workflows. No ChatGPT GitHub-connector workflow-dispatch capability or additional Cloudflare OAuth permission is needed.
+
+The deployment workflow runs exclusively from canonical `main`, with `confirm=deploy-diagnostics-worker`, the exact pinned `expected_main_sha` and `expected_version` from the just-published release. It verifies the release manifest, source tag, version, exact tracked ZIP size and SHA-256 before any Cloudflare credentials are accessed. Node regression tests and Wrangler dry-run must pass. The production-only Wrangler action then uses the **existing GitHub Secrets** and verifies public `/health` still returns the same `ingestionEnabled` Boolean as before deployment; `wrangler.jsonc` preserves existing settings through `keep_vars: true`.
+
+A failed release check prevents dispatch. A failed GitHub dispatch makes the Release Orchestrator job fail visibly, even if GitHub has already published the product source. A later Worker deploy failure appears **in the separate deployment workflow**; never claim successful production activation from source publication alone. The old manual `Run workflow` confirmation is retained **only as an emergency recovery tool**, not the normal operator task.
+
+**Release auto-deployment never runs `scripts/retention-backfill.mjs`**, never deletes/recreates historical ZIPs, and never temporarily changes `ENABLE_DIAGNOSTIC_UPLOAD`. The manual, separately authorized 90-day legacy backfill remains unchanged and is not bundled with CI or the automatic Worker rollout.
 
 ## Build and deployment
 
