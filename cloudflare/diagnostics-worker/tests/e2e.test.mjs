@@ -250,3 +250,67 @@ test("private owner can read old LBS ZIP and new project-scoped ZIP via same UUI
     }
   }finally{db.close();}
 });
+
+test("private paginated retention inventory exposes ledger metadata but never to anonymous callers",async()=>{
+  const {db,env,owner}=environment();
+  try {
+    owner.store.now=()=>Date.UTC(2026,9,14,9);
+    const zip=fixtureZip();
+    const a=await upload.call(env,zip,UUID_A),b=await upload.call(env,zip,UUID_B);
+    assert.equal(a.status,201);
+    assert.equal(b.status,201);
+    const privatePath="/v1/maintenance/inventory?limit=1";
+    assert.equal((await read(env,privatePath,null)).status,401);
+    const first=await read(env,privatePath);
+    assert.equal(first.status,200);
+    const result=await first.json();
+    assert.equal(result.archives.length,1);
+    assert.ok(result.nextCursor);
+    assert.equal(result.archives[0].sizeBytes,zip.length);
+    const next=await read(env,privatePath+"&cursor="+encodeURIComponent(result.nextCursor));
+    assert.equal(next.status,200);
+    const second=await next.json();
+    assert.equal(second.archives.length,1);
+    assert.notEqual(second.archives[0].key,result.archives[0].key);
+  }finally{db.close();}
+});
+
+test("expired owner lists and ZIP/entries routes are blocked, with no next upload",async()=>{
+  const {db,env,owner}=environment();
+  try{
+    const base=Date.UTC(2026,9,14,9),day=24*60*60*1000;
+    owner.store.now=()=>base;
+    const incoming=await upload.call(env,fixtureZip());
+    assert.equal(incoming.status,201);
+    const stored=await incoming.json(),path=encodeURIComponent(stored.key);
+    owner.store.now=()=>base+90*day;
+    const list=await read(env,"/v1/archives?uuid="+UUID_A);
+    assert.equal((await list.json()).archives.length,0);
+    assert.equal((await read(env,"/v1/archives/zip?key="+path)).status,404);
+    assert.equal((await read(env,"/v1/archives/entries?key="+path)).status,404);
+    const audit=await read(env,"/v1/maintenance/inventory?limit=100");
+    assert.equal((await audit.json()).archives.length,1,"migration must enumerate expired ledger rows privately");
+  }finally{db.close();}
+});
+
+test("private download cannot cross the exact 90-day boundary while KV.get is pending",async()=>{
+  const {db,env,owner}=environment();
+  try{
+    const begin=Date.UTC(2026,9,14,9,0,0,321),expiry=begin+90*86400000;
+    owner.store.now=()=>begin;
+    const uploaded=await upload.call(env,fixtureZip());
+    assert.equal(uploaded.status,201);
+    const created=await uploaded.json();
+    const baseGet=env.DIAGNOSTICS_KV.get;
+    env.DIAGNOSTICS_KV.get=async (...args)=>{
+      const raw=await baseGet(...args);
+      owner.store.now=()=>expiry;
+      return raw;
+    };
+    const zip=await read(env,"/v1/archives/zip?key="+encodeURIComponent(created.key));
+    assert.equal(zip.status,404);
+    owner.store.now=()=>begin;
+    const text=await read(env,"/v1/archives/entries?key="+encodeURIComponent(created.key));
+    assert.equal(text.status,404);
+  }finally{db.close();}
+});

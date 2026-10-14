@@ -128,6 +128,21 @@ export default {
         return jsonResponse(503,{error:"upload_unavailable"});
       }
     }
+    // Strictly read-only, owner-authorized ledger snapshot for explicit
+    // offline retention backfill. No administrative mutation endpoint exists.
+    if(url.pathname==="/v1/maintenance/inventory") {
+      if(request.method!=="GET")return jsonResponse(405,{error:"method_not_allowed"});
+      if(!await readAuthorized(request,env))return forbidden();
+      const cursor=url.searchParams.get("cursor")||"";
+      const rawLimit=url.searchParams.get("limit")||"100";
+      if(cursor.length>256||!/^(?:[1-9]|[1-9][0-9]|100)$/.test(rawLimit))
+        return jsonResponse(400,{error:"invalid_query"});
+      try{
+        return await coordinator(env).fetch(new URL(
+          "https://internal/inventory?cursor="+encodeURIComponent(cursor)+
+          "&limit="+encodeURIComponent(rawLimit)).toString());
+      }catch{return jsonResponse(503,{error:"read_unavailable"});}
+    }
     if(url.pathname==="/v1/archives" ||
        url.pathname==="/v1/archives/entries" ||
        url.pathname==="/v1/archives/zip"){
@@ -166,6 +181,13 @@ export class DiagnosticsCoordinator {
       this.tail=operation.then(()=>{},()=>{});
       return operation;
     }
+    if(request.method==="GET" && url.pathname==="/inventory"){
+      try {
+        const data=this.ledger.inventory(url.searchParams.get("cursor")||"",
+          Number(url.searchParams.get("limit")||"100"));
+        return jsonResponse(200,data);
+      }catch{return jsonResponse(400,{error:"invalid_query"});}
+    }
     if(request.method==="GET" && url.pathname==="/list"){
       try{
         const uuid=url.searchParams.get("uuid")||"";
@@ -179,9 +201,14 @@ export class DiagnosticsCoordinator {
         const meta=this.store.get(key);
         if(!meta)return jsonResponse(404,{error:"not_found"});
         const bytes=await this.env.DIAGNOSTICS_KV.get(key,"arrayBuffer");
+        // Read may await a remote KV fetch: re-check expiry before returning bytes.
+        if(meta.receivedAtMillis <= this.store.now() - LIMITS.retentionMillis)
+          return jsonResponse(404,{error:"not_found"});
         if(!bytes)return jsonResponse(503,{error:"temporarily_unavailable"});
         if(url.pathname==="/entries"){
           const contents=await extractDiagnosticText(new Uint8Array(bytes));
+          if(meta.receivedAtMillis <= this.store.now() - LIMITS.retentionMillis)
+            return jsonResponse(404,{error:"not_found"});
           return jsonResponse(200,{metadata:meta,files:contents});
         }
         return new Response(bytes,{status:200,headers:{
