@@ -1,12 +1,14 @@
 import { LIMITS, requireUploadIdentity, planArchiveAdmission } from "./policy.mjs";
+import { newDiagnosisId, diagnosisReferenceKey, diagnosisReference } from "./diagnosis-id.mjs";
 
 // All mutating calls are serialized by one Durable Object. The SQL ledger is
 // authoritative; KV holds immutable ZIP bytes only. Never KV.list for admission.
 export class ArchiveIngestion {
-  constructor({ ledger, kv, now = () => Date.now() }) {
+  constructor({ ledger, kv, now = () => Date.now(), randomBytes }) {
     this.ledger = ledger;
     this.kv = kv;
     this.now = now;
+    this.randomBytes = randomBytes;
   }
 
   async repairPending() {
@@ -14,6 +16,7 @@ export class ArchiveIngestion {
     // survive restarts. Never delete an object that was actually committed.
     for (const item of this.ledger.pending()) {
       if (!this.ledger.isCommitted(item.key)) {
+        if(item.diagnosisId) await this.kv.delete(diagnosisReferenceKey(item.diagnosisId));
         await this.kv.delete(item.key);
       }
       this.ledger.forgetPending(item.key);
@@ -24,6 +27,7 @@ export class ArchiveIngestion {
     // Tombstoned keys cannot be served to readers. Failed KV deletions remain
     // in this durable queue, and their bytes count against physical headroom.
     for (const item of this.ledger.garbage()) {
+      if(item.diagnosisId) await this.kv.delete(diagnosisReferenceKey(item.diagnosisId));
       await this.kv.delete(item.key);
       this.ledger.forgetGarbage(item.key);
     }
@@ -41,6 +45,13 @@ export class ArchiveIngestion {
     throw new Error("archive_filename_collision");
   }
 
+  nextDiagnosisId() {
+    for(let i=0;i<8;i++){
+      const id=newDiagnosisId(this.randomBytes);
+      if(!this.ledger.hasDiagnosisId(id))return id;
+    }
+    throw Error("diagnosis_id_collision");
+  }
   async ingest({ uuid, zipBytes, sha256 }) {
     // Validate before touching retained data (including before expiry cleanup).
     const sizeBytes = zipBytes?.byteLength;
@@ -61,10 +72,13 @@ export class ArchiveIngestion {
 
     // SQL journal is persisted *before* the external KV write.
     const record = { key, uuid: normalizedUuid, sizeBytes,
-      receivedAtMillis, sha256: sha256.toLowerCase() };
+      receivedAtMillis, sha256: sha256.toLowerCase(), diagnosisId: this.nextDiagnosisId() };
+    const ref = diagnosisReference(record);
     this.ledger.prepare(record);
     try {
       await this.kv.put(key, zipBytes);
+      await this.kv.put(diagnosisReferenceKey(record.diagnosisId),JSON.stringify(ref),
+        {expiration:Math.floor(ref.expiresAtMillis/1000)});
     } catch (err) {
       // A timeout may mean KV accepted the write. Leave the intent for a
       // later retry to delete it; do not accidentally discard an old ZIP.
@@ -81,7 +95,7 @@ export class ArchiveIngestion {
       // Existing records were retired in the SQL commit; failed physical
       // cleanup stays journaled and blocks the next write until repaired.
     }
-    return { key, sha256: record.sha256, sizeBytes,
+    return { key, sha256: record.sha256, sizeBytes, diagnosisId: record.diagnosisId,
       deletedArchiveCount: plan.deleteKeys.length };
   }
 

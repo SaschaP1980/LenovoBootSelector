@@ -19,6 +19,7 @@ class MemoryLedger {
   pending() { return this.intents.map(x=>({...x})); }
   garbage() { return this.tombstones.map(x=>({...x})); }
   hasKey(key) { return [...this.live,...this.intents,...this.tombstones].some(x=>x.key===key); }
+  hasDiagnosisId(id) { return [...this.live,...this.intents,...this.tombstones].some(x=>x.diagnosisId===id); }
   isCommitted(key) { return this.live.some(x=>x.key===key); }
   prepare(record) { this.intents.push({...record}); }
   forgetPending(key) { this.intents=this.intents.filter(x=>x.key!==key); }
@@ -85,7 +86,7 @@ test("SQL commit failure preserves old archives, and recovery removes uncommitte
   ledger.failCommit=true;
   await assert.rejects(client.ingest(upload()),/simulated_transaction_rollback/);
   assert.equal(ledger.archives().length,1);
-  assert.equal(kv.objects.size,1);
+  assert.equal(kv.objects.size,2);
   assert.equal(ledger.pending().length,1);
   ledger.failCommit=false;
   await client.repairPending();
