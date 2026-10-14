@@ -1,0 +1,64 @@
+name: Diagnostics Worker CI
+
+on:
+  push:
+    branches:
+      - 'work/LBS-103'
+    paths:
+      - 'cloudflare/diagnostics-worker/**'
+      - 'src/**'
+      - 'tests/Test-DiagnosticsIdentity.ps1'
+      - 'tests/Test-DiagnosticsUploadTransport.ps1'
+      - '.github/workflows/diagnostics-worker-ci.yml'
+  pull_request:
+    paths:
+      - 'cloudflare/diagnostics-worker/**'
+      - 'src/**'
+      - 'tests/Test-DiagnosticsIdentity.ps1'
+      - 'tests/Test-DiagnosticsUploadTransport.ps1'
+      - '.github/workflows/diagnostics-worker-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: diagnostics-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Node contract tests
+        run: node --test cloudflare/diagnostics-worker/tests/*.test.mjs
+      - name: Cloudflare Wrangler dry-run build
+        working-directory: cloudflare/diagnostics-worker
+        run: npx --yes wrangler@4 deploy --dry-run --outdir /tmp/diagnostics-worker-build
+
+  windows-identity:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Build runtime from includes (test workspace only)
+        run: python -B tools/build_runtime.py --root .
+      - name: Windows PowerShell 5.1 diagnosis identity and baseline runtime
+        shell: powershell
+        run: |
+          if ($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1) {
+            throw 'Windows PowerShell 5.1 is required for this test.'
+          }
+          $ErrorActionPreference = 'Stop'
+          & .\tests\Test-WindowsPowerShell51.ps1
