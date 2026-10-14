@@ -14,6 +14,7 @@ permissions:
   contents: write
   pull-requests: write
   statuses: write
+  actions: write
 
 jobs:
   release:
@@ -356,3 +357,27 @@ jobs:
             --reproducibility-marker /tmp/lbs-release/reproducible.ok \
             --pre-activation-json /tmp/lbs-release/release-pre-activation.json \
             --output /tmp/lbs-release/release-verification.json
+
+          # Automatic production handoff only AFTER final release verification is PASS.
+          # GITHUB_TOKEN can create workflow_dispatch events, unlike ordinary push
+          # events caused by Actions. Secrets remain only in the deployment workflow.
+          RELEASED_MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')
+          [[ "$RELEASED_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
+          git fetch origin main --force
+          test "$(git rev-parse origin/main)" = "$RELEASED_MAIN_SHA" || {
+            echo "Main advanced while verifying post-release deployment handoff." >&2
+            exit 1
+          }
+          RELEASED_VERSION=$(git show "origin/main:bin/version.json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')
+          test "$RELEASED_VERSION" = "$VERSION" || {
+            echo "Current main/version changed since verified release. Refusing automatic production deployment." >&2
+            exit 1
+          }
+          gh workflow run deploy-diagnostics-worker.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f confirm=deploy-diagnostics-worker \
+            -f expected_main_sha="$RELEASED_MAIN_SHA" \
+            -f expected_version="$VERSION"
+          echo "WORKER_DEPLOY_DISPATCH=QUEUED version=$VERSION main_sha=$RELEASED_MAIN_SHA"
+
