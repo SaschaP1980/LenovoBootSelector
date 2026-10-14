@@ -26,6 +26,8 @@ LBS-40 adds `../tools/validate_test_contracts.py` as a shared preflight contract
 | `Test-UpdateCore.ps1` | Core | Update model, transport failure contract, and update contracts |
 | `Test-UpdateController.ps1` | Application / Infrastructure | Update check/prepare lifecycle, busy gating, result classification, resource cleanup, explicit installer handoff, and restart-result consumption with faked boundaries |
 | `Test-RefreshRuntime.ps1` | Runtime | Background refresh state/request lifecycle and child-worker diagnostics-session correlation |
+| `Test-DiagnosticsIdentity.ps1` | Infrastructure / Privacy | Persistent random installation UUID, restart stability, independent installations, fail-closed handling of corrupted identity data |
+| `Test-DiagnosticsUploadTransport.ps1` | Infrastructure / Safety | Approved HTTPS origin, blocked redirects, in-memory POST request ZIP/UUID byte parity, and refusal of invalid/oversized local inputs without network I/O |
 | `Test-RefreshController.ps1` | Application / Infrastructure | Background-refresh admission, coalescing, completion, maintenance cancellation, result application, worker success/failure, and cleanup ownership with faked boundaries |
 | `Test-MaintenanceRuntime.ps1` | Runtime | Maintenance state and modes |
 | `Test-SystemCapabilities.ps1` | Application | Canonical system-function readiness/capability derivation from explicit facts |

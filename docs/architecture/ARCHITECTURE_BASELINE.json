@@ -1,16 +1,16 @@
 {
-  "version": "0.10.7.7",
+  "version": "0.11.0.0",
   "runtime": {
-    "lines": 8632,
-    "functions": 269,
-    "scriptReferences": 1066,
-    "scriptVariables": 125,
-    "catchBlocks": 185,
-    "inlineSilentCatches": 110
+    "lines": 8887,
+    "functions": 278,
+    "scriptReferences": 1103,
+    "scriptVariables": 128,
+    "catchBlocks": 201,
+    "inlineSilentCatches": 119
   },
   "core": {
     "files": 7,
-    "lines": 1393,
+    "lines": 1409,
     "functions": 29,
     "scriptReferences": 0
   },
@@ -21,20 +21,20 @@
     "scriptReferences": 72
   },
   "infrastructure": {
-    "files": 8,
-    "lines": 1526,
-    "functions": 79,
+    "files": 10,
+    "lines": 1676,
+    "functions": 86,
     "scriptReferences": 115
   },
   "ui": {
     "files": 17,
-    "lines": 2734,
-    "functions": 77,
-    "scriptReferences": 543
+    "lines": 2798,
+    "functions": 79,
+    "scriptReferences": 567
   },
   "appTemplate": {
-    "lines": 1900,
+    "lines": 1925,
     "functions": 30,
-    "scriptReferences": 336
+    "scriptReferences": 349
   }
 }
