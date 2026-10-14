@@ -1,5 +1,16 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.11.0.0 – LBS-103 private diagnostics uploads
+
+- Add `Maintenance → Upload Diagnostics` immediately below `Save Diagnostics`; existing manual ZIP export remains unchanged.
+- Persist a random installation UUID across normal app restarts and updates; do not treat the ID as a permanent physical-device fingerprint.
+- Transmit the unchanged canonical diagnostic ZIP only after an explicit menu click using bounded HTTPS transport (2 MiB file limit, 25-second timeout, no cross-origin redirects). Users do not need GitHub accounts.
+- Add a private Cloudflare Workers/KV/SQLite Durable Objects service with strict canonical ZIP checking, durable admission/recovery, 20 rolling archives per UUID, 90-day cleanup, 500 MiB global cap, oldest-first global eviction and bounded upload rate.
+- Add owner-authenticated read-only API for UUID history, original ZIP bytes and all canonical diagnostic text files; never embed a storage-write token in the Windows client.
+- Add focused Node/SQLite/ZIP/HTTP integration and Windows PowerShell 5.1 regression tests; provide an explicit, manual-only, fail-closed GitHub Actions deployment workflow.
+- Live Cloudflare deployment and direct authenticated ChatGPT readback remain independent acceptance gates and must be verified before Issue #103 is closed.
+- Release profile: `patch`; protected-fragment and repository-delete intent are empty pending final exact-diff verification.
+
 ## v0.10.7.7 – Version-only Hotfix
 
 - Version number only; no product source or behavior changes.

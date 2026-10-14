@@ -113,6 +113,7 @@ function Get-LocalizationCatalogCore {
             'Update.Check' = 'Check for new version…'
             'Update.Install' = 'Update app…'
             'Diagnostics.Save' = 'Save diagnostics…'
+            'Diagnostics.Upload' = 'Upload Diagnostics…'
             'Boot.OtherTarget' = 'Other boot target'
             'Boot.OtherTargetTooltip' = 'Gray: other boot target'
             'Boot.MenuTitle' = 'Lenovo Boot Menu'
@@ -245,6 +246,13 @@ function Get-LocalizationCatalogCore {
             'Diagnostics.ShowFolder' = 'Show in folder'
             'Diagnostics.NotSavedTitle' = 'Diagnostics not saved'
             'Diagnostics.NotSavedHeading' = 'The diagnostic package could not be created.'
+            'Diagnostics.Uploading' = 'Uploading diagnostics…'
+            'Diagnostics.UploadedTitle' = 'Diagnostics uploaded'
+            'Diagnostics.UploadedHeading' = 'The diagnostic package was transmitted.'
+            'Diagnostics.UploadedMessage' = 'The ZIP was stored privately for troubleshooting.'
+            'Diagnostics.UploadFailedTitle' = 'Upload unsuccessful'
+            'Diagnostics.UploadFailedHeading' = 'The diagnostics could not be uploaded.'
+            'Diagnostics.UploadFailedMessage' = 'The package remains saved locally. Please try again later.'
             'Startup.AlreadyRunningTitle' = 'Lenovo Boot Selector is already running'
             'Startup.FailedTitle' = 'Lenovo Boot Selector could not be started'
             'Startup.AlreadyRunningBody' = 'The app is already open. Close this window and use the existing tray icon.'
@@ -366,6 +374,7 @@ function Get-LocalizationCatalogCore {
             'Update.Check' = 'Auf neue Version prüfen…'
             'Update.Install' = 'App aktualisieren…'
             'Diagnostics.Save' = 'Diagnose speichern…'
+            'Diagnostics.Upload' = 'Diagnose hochladen…'
             'Boot.OtherTarget' = 'Weiteres Startziel'
             'Boot.OtherTargetTooltip' = 'Grau: weiteres Startziel'
             'Boot.MenuTitle' = 'Lenovo Boot-Menü'
@@ -498,6 +507,13 @@ function Get-LocalizationCatalogCore {
             'Diagnostics.ShowFolder' = 'Im Ordner anzeigen'
             'Diagnostics.NotSavedTitle' = 'Diagnose nicht gespeichert'
             'Diagnostics.NotSavedHeading' = 'Das Diagnosepaket konnte nicht erstellt werden.'
+            'Diagnostics.Uploading' = 'Diagnose wird hochgeladen…'
+            'Diagnostics.UploadedTitle' = 'Diagnose hochgeladen'
+            'Diagnostics.UploadedHeading' = 'Das Diagnosepaket wurde übertragen.'
+            'Diagnostics.UploadedMessage' = 'Das ZIP wurde privat zur Fehleranalyse gespeichert.'
+            'Diagnostics.UploadFailedTitle' = 'Hochladen fehlgeschlagen'
+            'Diagnostics.UploadFailedHeading' = 'Die Diagnose konnte nicht hochgeladen werden.'
+            'Diagnostics.UploadFailedMessage' = 'Das Paket bleibt lokal gespeichert. Bitte später erneut versuchen.'
             'Startup.AlreadyRunningTitle' = 'Lenovo Boot Selector läuft bereits'
             'Startup.FailedTitle' = 'Lenovo Boot Selector konnte nicht gestartet werden'
             'Startup.AlreadyRunningBody' = 'Die App ist bereits geöffnet. Schließe dieses Fenster und verwende das vorhandene Tray-Symbol.'
@@ -1756,7 +1772,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.10.7.7'
+$script:AppVersion = '0.11.0.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -1783,6 +1799,9 @@ $script:RuntimeDiagnosticsAvailable = $false
 $script:RuntimeDiagnosticsErrorCount = 0
 $script:LastRuntimeDiagnosticPackage = $null
 $script:RuntimeDiagnosticMenuItem = $null
+$script:DiagnosticsUploadMenuItem = $null
+$script:DiagnosticsUploadState = $null
+$script:DiagnosticsUploadTimer = $null
 
 $script:SupportedTaskBrokerVersions = @('0.2.14')
 $script:TaskBrokerStateDir = Join-Path $env:ProgramData 'Lenovo Boot Selector\TaskBroker'
@@ -2477,6 +2496,158 @@ function New-BackgroundRefreshCompletionTimer {
     return $timer
 }
 
+
+# Persistent pseudonymous UUID for this Windows user's Lenovo Boot Selector
+# installation. It is not a physical-device fingerprint or a runtime session ID.
+function Test-DiagnosticsInstallationIdFormat {
+    param([AllowNull()][string]$Value)
+    return [bool]($Value -match '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
+}
+
+function Get-DiagnosticsInstallationId {
+    param([Parameter(Mandatory=$true)][string]$SettingsDirectory)
+
+    $path = Join-Path $SettingsDirectory 'installation-id.txt'
+    if (Test-Path -LiteralPath $path -PathType Leaf) {
+        $current = ([System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8)).Trim().ToLowerInvariant()
+        if (-not (Test-DiagnosticsInstallationIdFormat -Value $current)) {
+            throw 'The persisted diagnostics installation UUID is invalid; it will not be silently replaced.'
+        }
+        return $current
+    }
+
+    if (-not (Test-Path -LiteralPath $SettingsDirectory -PathType Container)) {
+        [void](New-Item -ItemType Directory -Path $SettingsDirectory -Force)
+    }
+    $newId = [guid]::NewGuid().ToString('D').ToLowerInvariant()
+    $handle = $null
+    try {
+        # Atomic CreateNew prevents two competing initial launches overwriting
+        # each other's IDs. An existing file is never overwritten by a reset.
+        $handle = New-Object System.IO.FileStream($path, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        $content = [System.Text.Encoding]::UTF8.GetBytes($newId + "`r`n")
+        $handle.Write($content, 0, $content.Length)
+        $handle.Flush($true)
+        return $newId
+    }
+    catch [System.IO.IOException] {
+        # Another process may have created the file; await its final flush.
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw }
+    }
+    finally {
+        if ($handle) { $handle.Dispose() }
+    }
+    for ($attempt = 0; $attempt -lt 8; $attempt++) {
+        Start-Sleep -Milliseconds 25
+        try {
+            $read = ([System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8)).Trim().ToLowerInvariant()
+            if (Test-DiagnosticsInstallationIdFormat -Value $read) { return $read }
+        } catch [System.IO.IOException] { }
+    }
+    throw 'The diagnostics installation UUID could not be persisted safely.'
+}
+
+# LBS-103: explicit manual upload only. This module never runs on startup.
+# Never add GitHub write credentials or privileged TaskBroker operations here.
+function Get-DiagnosticsUploadUri {
+    return [uri]'https://lenovo-boot-selector-diagnostics.sascha-petrovitsch.workers.dev/v1/diagnostics'
+}
+
+function New-DiagnosticsUploadHttpHandler {
+    Add-Type -AssemblyName System.Net.Http
+    $handler = New-Object System.Net.Http.HttpClientHandler
+    # Automatic 30x redirects could forward private ZIPs to a third-party host.
+    # Pinning only the initial URI is not enough.
+    $handler.AllowAutoRedirect = $false
+    return $handler
+}
+
+function New-DiagnosticsUploadRequest {
+    param(
+        [Parameter(Mandatory=$true)][byte[]]$Bytes,
+        [Parameter(Mandatory=$true)][string]$InstallationUuid,
+        [Parameter(Mandatory=$true)][uri]$Uri
+    )
+    Add-Type -AssemblyName System.Net.Http
+    $request = New-Object System.Net.Http.HttpRequestMessage([System.Net.Http.HttpMethod]::Post, $Uri)
+    try {
+        $payload = New-Object System.Net.Http.ByteArrayContent(,$Bytes)
+        $payload.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue('application/zip')
+        $request.Headers.Add('x-installation-uuid', $InstallationUuid)
+        $request.Content = $payload
+        return $request
+    }
+    catch {
+        $request.Dispose()
+        throw
+    }
+}
+
+function Start-DiagnosticsUploadTransport {
+    param(
+        [Parameter(Mandatory=$true)][string]$ZipPath,
+        [Parameter(Mandatory=$true)][string]$InstallationUuid
+    )
+
+    if (-not (Test-DiagnosticsInstallationIdFormat -Value $InstallationUuid)) {
+        throw 'The installation UUID is not valid.'
+    }
+    if (-not (Test-Path -LiteralPath $ZipPath -PathType Leaf)) {
+        throw 'The diagnostics ZIP does not exist.'
+    }
+    $maxBytes = 2 * 1024 * 1024
+    $size = (Get-Item -LiteralPath $ZipPath).Length
+    if ($size -le 0 -or $size -gt $maxBytes) {
+        throw 'The diagnostics ZIP exceeds the 2 MB upload limit or is empty.'
+    }
+
+    $uri = Get-DiagnosticsUploadUri
+    if ($uri.Scheme -ne 'https' -or $uri.Host -ne 'lenovo-boot-selector-diagnostics.sascha-petrovitsch.workers.dev' -or $uri.AbsolutePath -ne '/v1/diagnostics') {
+        throw 'The diagnostics upload destination is not approved.'
+    }
+    try {
+        $existing = [System.Net.ServicePointManager]::SecurityProtocol
+        [System.Net.ServicePointManager]::SecurityProtocol = $existing -bor [System.Net.SecurityProtocolType]::Tls12
+    } catch { }
+
+    $httpHandler = New-DiagnosticsUploadHttpHandler
+    try {
+        $client = New-Object System.Net.Http.HttpClient -ArgumentList (,$httpHandler)
+    } catch {
+        $httpHandler.Dispose()
+        throw
+    }
+    $client.Timeout = [TimeSpan]::FromSeconds(25)
+    $content = $null
+    try {
+        $bytes = [System.IO.File]::ReadAllBytes($ZipPath)
+        if ($bytes.Length -ne $size) { throw 'The diagnostics ZIP changed during preparation.' }
+        $request = New-DiagnosticsUploadRequest -Bytes $bytes -InstallationUuid $InstallationUuid -Uri $uri
+        $content = $request.Content
+        try {
+            $task = $client.SendAsync($request, [System.Net.Http.HttpCompletionOption]::ResponseContentRead)
+            return [pscustomobject]@{ Client = $client; Task = $task; Content = $content; Request = $request; ZipPath = $ZipPath }
+        }
+        catch {
+            $request.Dispose()
+            throw
+        }
+    }
+    catch {
+        if ($content) { $content.Dispose() }
+        $client.Dispose()
+        throw
+    }
+}
+
+function Dispose-DiagnosticsUploadTransport {
+    param([AllowNull()]$Context)
+    if (-not $Context) { return }
+    try { if ($Context.Task -and $Context.Task.IsCompleted -and -not $Context.Task.IsFaulted) { $Context.Task.Result.Dispose() } } catch { }
+    try { if ($Context.Request) { $Context.Request.Dispose() } } catch { }
+    try { if ($Context.Content) { $Context.Content.Dispose() } } catch { }
+    try { if ($Context.Client) { $Context.Client.Dispose() } } catch { }
+}
 
 function Get-RuntimeDiagnosticRole {
     if ($BackgroundRefresh) { return 'background-refresh' }
@@ -3620,6 +3791,70 @@ function Save-RuntimeDiagnosticsFromUi {
     catch {
         Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_EXPORT_FAILED' -Stage 'diagnostics' -Success $false -ErrorRecord $_ -Level error
         Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.NotSavedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.NotSavedHeading') -Message (Get-LocalizedString -Key 'Common.TryAgain') -Kind Error
+    }
+}
+
+function Start-DiagnosticsUploadFromUi {
+    # A deliberate menu click is the only upload trigger. Never call this
+    # during startup, refresh, diagnostics export, or error handling.
+    if ($script:DiagnosticsUploadState) { return }
+    try {
+        $installationId = Get-DiagnosticsInstallationId -SettingsDirectory $script:SettingsDir
+        $path = Export-RuntimeDiagnosticPackage -Reason 'manual-upload'
+        $context = Start-DiagnosticsUploadTransport -ZipPath $path -InstallationUuid $installationId
+        $script:DiagnosticsUploadState = $context
+        if ($script:DiagnosticsUploadMenuItem) { $script:DiagnosticsUploadMenuItem.Enabled = $false }
+        $timer = New-Object System.Windows.Forms.Timer
+        $timer.Interval = 180
+        $timer.Add_Tick({ Complete-DiagnosticsUploadFromUi })
+        $script:DiagnosticsUploadTimer = $timer
+        $timer.Start()
+        $script:LastStatusText = Get-LocalizedString -Key 'Diagnostics.Uploading'
+        Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_UPLOAD_STARTED' -Stage 'diagnostics' -Success $true -Data (New-RuntimeDiagnosticData @{ outputName = [IO.Path]::GetFileName($path) })
+    }
+    catch {
+        Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_UPLOAD_FAILED' -Stage 'diagnostics' -Success $false -ErrorRecord $_ -Level warning
+        if ($script:DiagnosticsUploadTimer) {
+            try { $script:DiagnosticsUploadTimer.Stop(); $script:DiagnosticsUploadTimer.Dispose() } catch { }
+            $script:DiagnosticsUploadTimer = $null
+        }
+        if ($script:DiagnosticsUploadState) { Dispose-DiagnosticsUploadTransport -Context $script:DiagnosticsUploadState; $script:DiagnosticsUploadState = $null }
+        if ($script:DiagnosticsUploadMenuItem) { $script:DiagnosticsUploadMenuItem.Enabled = $true }
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.UploadFailedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.UploadFailedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.UploadFailedMessage') -Kind Warning
+    }
+}
+
+function Complete-DiagnosticsUploadFromUi {
+    $context = $script:DiagnosticsUploadState
+    if (-not $context -or -not $context.Task -or -not $context.Task.IsCompleted) { return }
+    $success = $false
+    try {
+        $response = $context.Task.GetAwaiter().GetResult()
+        $success = ($response.IsSuccessStatusCode -and [int]$response.StatusCode -eq 201)
+        if (-not $success) {
+            Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_UPLOAD_HTTP_FAILURE' -Stage 'diagnostics' -Success $false -Level warning -Data (New-RuntimeDiagnosticData @{ statusCode = [int]$response.StatusCode })
+        }
+    }
+    catch {
+        Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_UPLOAD_FAILED' -Stage 'diagnostics' -Success $false -ErrorRecord $_ -Level warning
+    }
+    finally {
+        # Release timer and state before displaying any modal dialog; dialogs
+        # pump Windows messages and could otherwise double-complete a request.
+        if ($script:DiagnosticsUploadTimer) {
+            try { $script:DiagnosticsUploadTimer.Stop(); $script:DiagnosticsUploadTimer.Dispose() } catch { }
+            $script:DiagnosticsUploadTimer = $null
+        }
+        $script:DiagnosticsUploadState = $null
+        if ($script:DiagnosticsUploadMenuItem) { $script:DiagnosticsUploadMenuItem.Enabled = $true }
+        Dispose-DiagnosticsUploadTransport -Context $context
+    }
+    if ($success) {
+        Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_UPLOAD_COMPLETED' -Stage 'diagnostics' -Success $true
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.UploadedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.UploadedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.UploadedMessage') -Kind Info
+    }
+    else {
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.UploadFailedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.UploadFailedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.UploadFailedMessage') -Kind Warning
     }
 }
 
@@ -8336,6 +8571,10 @@ function Load-TrayIcon {
 
 
 Initialize-RuntimeDiagnostics
+if (-not ($BackgroundRefresh -or $UpdateCheck -or $UpdatePrepare)) {
+    try { [void](Get-DiagnosticsInstallationId -SettingsDirectory $script:SettingsDir) }
+    catch { Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_INSTALLATION_ID_UNAVAILABLE' -Stage 'startup' -Success $false -ErrorRecord $_ -Level warning }
+}
 if (-not $BackgroundRefresh) {
     if ($singleInstanceMutexState -eq 'abandoned-recovered') {
         Write-RuntimeDiagnosticEvent -Event 'SINGLE_INSTANCE_MUTEX_ABANDONED_RECOVERED' -Stage 'startup' -Success $true -Data (New-RuntimeDiagnosticData @{ state = $singleInstanceMutexState; graceMs = $singleInstanceGraceMs }) -Level warning
@@ -8487,6 +8726,13 @@ try {
     $script:RuntimeDiagnosticMenuItem = $diagnosticItem
     [void]$maintenanceRoot.DropDownItems.Add($diagnosticItem)
 
+    $diagnosticUploadItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $diagnosticUploadItem.Text = Get-LocalizedString -Key 'Diagnostics.Upload'
+    $diagnosticUploadItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $diagnosticUploadItem.Add_Click({ Start-DiagnosticsUploadFromUi })
+    $script:DiagnosticsUploadMenuItem = $diagnosticUploadItem
+    [void]$maintenanceRoot.DropDownItems.Add($diagnosticUploadItem)
+
     [void]$context.Items.Add($maintenanceRoot)
 
     [void]$context.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
@@ -8612,6 +8858,15 @@ finally {
     }
     if ($backgroundRefreshContext) {
         Remove-BackgroundRefreshResultFile -Path ([string]$backgroundRefreshContext.ResultPath)
+    }
+    if ($script:DiagnosticsUploadTimer) {
+        try { $script:DiagnosticsUploadTimer.Stop(); $script:DiagnosticsUploadTimer.Dispose() } catch { }
+        $script:DiagnosticsUploadTimer = $null
+    }
+    if ($script:DiagnosticsUploadState) {
+        try { $script:DiagnosticsUploadState.Client.CancelPendingRequests() } catch { }
+        Dispose-DiagnosticsUploadTransport -Context $script:DiagnosticsUploadState
+        $script:DiagnosticsUploadState = $null
     }
     if ($script:TrayIcon) {
         $script:TrayIcon.Visible = $false

@@ -779,6 +779,9 @@ $script:RuntimeDiagnosticsAvailable = $false
 $script:RuntimeDiagnosticsErrorCount = 0
 $script:LastRuntimeDiagnosticPackage = $null
 $script:RuntimeDiagnosticMenuItem = $null
+$script:DiagnosticsUploadMenuItem = $null
+$script:DiagnosticsUploadState = $null
+$script:DiagnosticsUploadTimer = $null
 
 $script:SupportedTaskBrokerVersions = @('0.2.14')
 $script:TaskBrokerStateDir = Join-Path $env:ProgramData 'Lenovo Boot Selector\TaskBroker'
@@ -890,6 +893,8 @@ $script:UpdateState = New-UpdateRuntimeState
 
 # @include src/UI/RefreshPresentation.ps1
 
+# @include src/Infrastructure/DiagnosticsIdentity.ps1
+# @include src/Infrastructure/DiagnosticsUploadTransport.ps1
 # @include src/Infrastructure/RuntimeDiagnostics.ps1
 # @include src/Infrastructure/UpdateTransport.ps1
 # @include src/Infrastructure/UpdateClient.ps1
@@ -1604,6 +1609,10 @@ function Load-BootStateFromExistingCache {
 # @include src/UI/Popup.ps1
 
 Initialize-RuntimeDiagnostics
+if (-not ($BackgroundRefresh -or $UpdateCheck -or $UpdatePrepare)) {
+    try { [void](Get-DiagnosticsInstallationId -SettingsDirectory $script:SettingsDir) }
+    catch { Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_INSTALLATION_ID_UNAVAILABLE' -Stage 'startup' -Success $false -ErrorRecord $_ -Level warning }
+}
 if (-not $BackgroundRefresh) {
     if ($singleInstanceMutexState -eq 'abandoned-recovered') {
         Write-RuntimeDiagnosticEvent -Event 'SINGLE_INSTANCE_MUTEX_ABANDONED_RECOVERED' -Stage 'startup' -Success $true -Data (New-RuntimeDiagnosticData @{ state = $singleInstanceMutexState; graceMs = $singleInstanceGraceMs }) -Level warning
@@ -1755,6 +1764,13 @@ try {
     $script:RuntimeDiagnosticMenuItem = $diagnosticItem
     [void]$maintenanceRoot.DropDownItems.Add($diagnosticItem)
 
+    $diagnosticUploadItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $diagnosticUploadItem.Text = Get-LocalizedString -Key 'Diagnostics.Upload'
+    $diagnosticUploadItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $diagnosticUploadItem.Add_Click({ Start-DiagnosticsUploadFromUi })
+    $script:DiagnosticsUploadMenuItem = $diagnosticUploadItem
+    [void]$maintenanceRoot.DropDownItems.Add($diagnosticUploadItem)
+
     [void]$context.Items.Add($maintenanceRoot)
 
     [void]$context.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
@@ -1880,6 +1896,15 @@ finally {
     }
     if ($backgroundRefreshContext) {
         Remove-BackgroundRefreshResultFile -Path ([string]$backgroundRefreshContext.ResultPath)
+    }
+    if ($script:DiagnosticsUploadTimer) {
+        try { $script:DiagnosticsUploadTimer.Stop(); $script:DiagnosticsUploadTimer.Dispose() } catch { }
+        $script:DiagnosticsUploadTimer = $null
+    }
+    if ($script:DiagnosticsUploadState) {
+        try { $script:DiagnosticsUploadState.Client.CancelPendingRequests() } catch { }
+        Dispose-DiagnosticsUploadTransport -Context $script:DiagnosticsUploadState
+        $script:DiagnosticsUploadState = $null
     }
     if ($script:TrayIcon) {
         $script:TrayIcon.Visible = $false

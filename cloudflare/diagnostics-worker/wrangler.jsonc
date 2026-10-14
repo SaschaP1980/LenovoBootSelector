@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lenovo-boot-selector-diagnostics",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "kv_namespaces": [
+    {
+      "binding": "DIAGNOSTICS_KV",
+      "id": "26be3acc56454e47919ff5ad28ac23d3"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "DIAGNOSTICS_COORDINATOR",
+        "class_name": "DiagnosticsCoordinator"
+      }
+    ]
+  },
+  "exports": {
+    "DiagnosticsCoordinator": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  }
+}
