@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.0.1.1 – Restore complete language labels (hotfix)
+
+- Fix the v1.0.1.0 tray Language submenu regression that clipped `English` and `Deutsch` after the new flag icons. Use a fresh, item-local text rectangle across the full available language row rather than narrowing the precomputed WinForms text rectangle.
+- Keep the flag/text separation and the reserved right-side checkmark, preserve the existing dark owner-rendered menu and leave non-language menu items untouched.
+- Improve the 13-stripe US miniature rasterization at 16x12 and scaled sizes: the authentic topmost and bottommost stripes remain red at the fly end; the German flag is unchanged.
+- Add native Windows PowerShell 5.1 bitmap-rendered text-width and stripe-order regression coverage. No new languages, settings migrations, privileged actions, firmware behavior, dependencies or Cloudflare Worker changes.
+
 ## v1.0.1.0 – Add country flags to language submenu
 
 - Add small locally drawn US and German flags to the left of the corresponding `en-US` English and `de-DE` Deutsch tray submenu choices, without changing the supported language set.

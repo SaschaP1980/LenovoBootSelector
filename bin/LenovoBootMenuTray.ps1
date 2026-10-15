@@ -1154,6 +1154,17 @@ public static class LenovoLocaleFlags
         return row.Left + Scale(34, dpi);
     }
 
+    public static Rectangle GetTextBounds(ToolStripItem item, Rectangle row, float dpi)
+    {
+        if (GetLocale(item) == null) return Rectangle.Empty;
+        int left = TextLeft(item, row, dpi);
+        // Reserve the right-side checkmark independently of WinForms' original
+        // TextRectangle. The native rectangle may be only a few pixels wide
+        // because the menu deliberately suppresses the image/check gutters.
+        int right = row.Right - Scale(32, dpi);
+        return new Rectangle(left, row.Top, Math.Max(0, right - left), row.Height);
+    }
+
     public static void Draw(Graphics g, ToolStripItem item, Rectangle row)
     {
         string locale = GetLocale(item);
@@ -1178,10 +1189,16 @@ public static class LenovoLocaleFlags
             {
                 using (Brush white = new SolidBrush(Color.White))
                     g.FillRectangle(white, flag);
+                // Rasterize all thirteen official stripes onto the available pixels.
+                // Pixel-center sampling keeps the first and last stripes red,
+                // including at 16x12 where one logical stripe cannot get a row.
                 using (Brush red = new SolidBrush(Color.FromArgb(178, 34, 52)))
-                    for (int i = 0; i < 13; i += 2)
-                        g.FillRectangle(red, new RectangleF(flag.Left, flag.Top + i * flag.Height / 13f,
-                            flag.Width, flag.Height / 13f + 0.2f));
+                    for (int y = 0; y < flag.Height; y++)
+                    {
+                        int stripe = Math.Min(12, (int)Math.Floor((y + 0.5) * 13.0 / flag.Height));
+                        if ((stripe % 2) == 0)
+                            g.FillRectangle(red, flag.Left, flag.Top + y, flag.Width, 1);
+                    }
                 RectangleF canton = new RectangleF(flag.Left, flag.Top,
                     flag.Width * 0.47f, flag.Height * 7f / 13f);
                 using (Brush blue = new SolidBrush(Color.FromArgb(60, 59, 110)))
@@ -1376,13 +1393,26 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
 
     protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
     {
-        if (LenovoLocaleFlags.GetLocale(e.Item) != null)
+        ToolStripDropDown owner = e.ToolStrip as ToolStripDropDown;
+        if (owner != null && LenovoLocaleFlags.GetLocale(e.Item) != null)
         {
-            Rectangle text = e.TextRectangle;
-            int left = Math.Max(text.Left,
-                LenovoLocaleFlags.TextLeft(e.Item, new Rectangle(0, 0, e.Item.Width, e.Item.Height), e.Graphics.DpiX));
-            if (left < text.Right)
-                e.TextRectangle = new Rectangle(left, text.Top, text.Right - left, text.Height);
+            // The native TextRectangle has already reserved a hidden image gutter.
+            // Moving only its left edge clipped "English" and "Deutsch" in 1.0.1.0.
+            // Rebuild the complete item-local rectangle from the real menu row.
+            Rectangle row = FullRowBounds(owner, e.Item);
+            Rectangle text = LenovoLocaleFlags.GetTextBounds(e.Item, row, e.Graphics.DpiX);
+            if (text.Width > 0)
+            {
+                GraphicsState state = e.Graphics.Save();
+                try
+                {
+                    e.Graphics.ResetClip();
+                    e.TextRectangle = text;
+                    base.OnRenderItemText(e);
+                }
+                finally { e.Graphics.Restore(state); }
+            }
+            return;
         }
         base.OnRenderItemText(e);
     }
@@ -1877,7 +1907,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '1.0.1.0'
+$script:AppVersion = '1.0.1.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
