@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.1.1.1 – Version-only Hotfix (Work-Path timing benchmark)
+
+- Increase the application version from v1.1.1.0 to v1.1.1.1 without changing any product behavior, security boundaries, diagnostics Worker, firmware/UEFI, settings, updater, or TaskBroker logic.
+- Exercise and measure the user-authorized Work-Branch, Development Completion, Candidate, Release and independent Worker health verification workflow against the same-day v1.1.0.1 Work-Path benchmark (LBS-121). No new functionality.
+
 ## v1.1.1.0 – Conditional Cloudflare Diagnostics Worker deployment (LBS-123)
 
 - Only redeploy the Diagnostics Worker after a verified release when its tracked Worker code, Wrangler configuration, deployment workflow or diagnostics-upload contract has changed since the last verified healthy production rollout.
