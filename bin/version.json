@@ -1,9 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "1.0.1.0",
+  "version": "1.0.1.1",
   "releaseProfile": "patch",
-  "protectedFragmentIntent": [
-    "cs:protected override void OnRenderMenuItemBackground"
-  ],
+  "protectedFragmentIntent": [],
   "repositoryDeleteIntent": []
 }

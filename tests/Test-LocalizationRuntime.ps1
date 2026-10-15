@@ -224,6 +224,10 @@ try {
                 $usRed.ToArgb() -eq ([Drawing.Color]::FromArgb(178,34,52)).ToArgb() -and
                 $usBlue.ToArgb() -eq ([Drawing.Color]::FromArgb(60,59,110)).ToArgb()
             )
+            Assert-Localization 'LBS-117 hotfix US fly-end first and final stripes are red' (
+                $bitmap.GetPixel(($usBounds.Right - 2),$usBounds.Top).ToArgb() -eq ([Drawing.Color]::FromArgb(178,34,52)).ToArgb() -and
+                $bitmap.GetPixel(($usBounds.Right - 2),($usBounds.Bottom - 1)).ToArgb() -eq ([Drawing.Color]::FromArgb(178,34,52)).ToArgb()
+            )
             $g.Clear([Drawing.Color]::Transparent)
             [LenovoLocaleFlags]::Draw($g,$deFlagItem,$row)
             Assert-Localization 'LBS-117 German flag draws black red gold bands' (
@@ -233,6 +237,86 @@ try {
             )
         }
         finally { $g.Dispose(); $bitmap.Dispose() }
+
+        # Native regression: a hidden WinForms image gutter used to give the
+        # renderer a precomputed 12px text box, clipping both entire labels.
+        $textBoundsEn = [LenovoLocaleFlags]::GetTextBounds($usFlagItem,$row,[single]96)
+        Assert-Localization 'LBS-117 hotfix English text area independent of native narrow bounds' (
+            $textBoundsEn.Left -ge ($usBounds.Right + 5) -and
+            $textBoundsEn.Width -gt 125 -and $textBoundsEn.Right -le 190
+        )
+        $textBoundsDe150 = [LenovoLocaleFlags]::GetTextBounds($deFlagItem,$row,[single]144)
+        Assert-Localization 'LBS-117 hotfix German text fits at 150 percent DPI' (
+            $textBoundsDe150.Left -gt ($scaled.Right + 4) -and
+            $textBoundsDe150.Width -ge 110 -and $textBoundsDe150.Right -le 172
+        )
+        $flagsMenu.AutoSize = $false
+        $flagsMenu.Size = New-Object System.Drawing.Size(220,90)
+        $usFlagItem.AutoSize = $false
+        $deFlagItem.AutoSize = $false
+        $usFlagItem.Size = New-Object System.Drawing.Size(220,28)
+        $deFlagItem.Size = New-Object System.Drawing.Size(220,28)
+        $otherMenu.AutoSize = $false
+        $otherMenu.Size = New-Object System.Drawing.Size(220,40)
+        $wrongOwner.AutoSize = $false
+        $wrongOwner.Size = New-Object System.Drawing.Size(220,28)
+        $renderer = New-Object LenovoMenuRenderer
+        $font = New-Object System.Drawing.Font('Segoe UI',9.0)
+        $textBitmap = New-Object System.Drawing.Bitmap(220,28)
+        $tg = [Drawing.Graphics]::FromImage($textBitmap)
+        $nativeNarrow = New-Object Drawing.Rectangle(0,0,12,28)
+        try {
+            $tg.Clear([Drawing.Color]::Black)
+            $enArgs = [System.Windows.Forms.ToolStripItemTextRenderEventArgs]::new(
+                $tg,$usFlagItem,'English',$nativeNarrow,[Drawing.Color]::White,$font,
+                [System.Windows.Forms.TextFormatFlags]::SingleLine)
+            $renderer.DrawItemText($enArgs)
+            Assert-Localization 'LBS-117 hotfix real English renderer expands clipped text rectangle' (
+                $enArgs.TextRectangle.Left -ge $textBoundsEn.Left -and
+                $enArgs.TextRectangle.Width -ge 100 -and $enArgs.TextRectangle.Right -le 190
+            )
+            $paintedEnglish = $false
+            for ($px=60; $px -lt 115; $px++) {
+                for ($py=3; $py -lt 25; $py++) {
+                    if ($textBitmap.GetPixel($px,$py).ToArgb() -ne [Drawing.Color]::Black.ToArgb()) {
+                        $paintedEnglish = $true
+                        break
+                    }
+                }
+                if ($paintedEnglish) { break }
+            }
+            Assert-Localization 'LBS-117 hotfix English letters paint past old 12px clip' $paintedEnglish
+
+            $tg.Clear([Drawing.Color]::Black)
+            $deArgs = [System.Windows.Forms.ToolStripItemTextRenderEventArgs]::new(
+                $tg,$deFlagItem,'Deutsch',$nativeNarrow,[Drawing.Color]::White,$font,
+                [System.Windows.Forms.TextFormatFlags]::SingleLine)
+            $renderer.DrawItemText($deArgs)
+            Assert-Localization 'LBS-117 hotfix real German renderer expands clipped text rectangle' (
+                $deArgs.TextRectangle.Left -ge $textBoundsEn.Left -and
+                $deArgs.TextRectangle.Width -ge 100 -and $deArgs.TextRectangle.Right -le 190
+            )
+            $paintedGerman = $false
+            for ($px=60; $px -lt 115; $px++) {
+                for ($py=3; $py -lt 25; $py++) {
+                    if ($textBitmap.GetPixel($px,$py).ToArgb() -ne [Drawing.Color]::Black.ToArgb()) {
+                        $paintedGerman = $true
+                        break
+                    }
+                }
+                if ($paintedGerman) { break }
+            }
+            Assert-Localization 'LBS-117 hotfix German letters paint past old 12px clip' $paintedGerman
+
+            $otherArgs = [System.Windows.Forms.ToolStripItemTextRenderEventArgs]::new(
+                $tg,$wrongOwner,'Maintenance',$nativeNarrow,[Drawing.Color]::White,$font,
+                [System.Windows.Forms.TextFormatFlags]::SingleLine)
+            $renderer.DrawItemText($otherArgs)
+            Assert-Localization 'LBS-117 hotfix non-language renderer retains native rectangle' (
+                $otherArgs.TextRectangle.Equals($nativeNarrow)
+            )
+        }
+        finally { $tg.Dispose(); $textBitmap.Dispose(); $font.Dispose() }
         $script:LanguageEnglishMenuItem = $usFlagItem
         $script:LanguageGermanMenuItem = $deFlagItem
         [void](Set-ActiveLocale -Locale 'en-US' -Persist)
@@ -264,5 +348,5 @@ finally {
     try { if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force } } catch { }
 }
 
-Write-Host "LOCALIZATION TOTAL $checks/55"
-if ($checks -ne 55) { throw "Expected 55 localization checks, got $checks" }
+Write-Host "LOCALIZATION TOTAL $checks/63"
+if ($checks -ne 63) { throw "Expected 63 localization checks, got $checks" }
