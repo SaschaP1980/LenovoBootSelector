@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.1.0.1 – Version-only Hotfix (Work-Path benchmark)
+
+- Increase the application version from v1.1.0.0 to v1.1.0.1 without any product behavior, settings, UI, TaskBroker, firmware, diagnostics, dependency or Cloudflare Worker change.
+- Exercise and measure the user-authorized Work-Branch, Development Completion, Candidate, Release and automated deployment verification path. No new functionality.
+
 ## v1.1.0.0 – Explicit settings-load recovery states (LBS-32)
 
 - Distinguish first-run missing settings (`Missing`) from normalized persisted settings (`Loaded`), malformed/invalid settings (`Invalid`), and settings that cannot be probed/read (`Unreadable`), preserving safe runtime defaults without hiding the failure.
