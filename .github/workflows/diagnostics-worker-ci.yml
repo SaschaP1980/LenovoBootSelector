@@ -1,18 +1,11 @@
 name: Diagnostics Worker CI
 
+# LBS-110: only matching work-branch pushes run these extra Diagnostics tests.
+# PRs (including bot-created release PRs) are intentionally excluded.
 on:
   push:
     branches:
       - 'work/LBS-*'
-    paths:
-      - 'cloudflare/diagnostics-worker/**'
-      - 'src/**'
-      - 'tests/Test-DiagnosticsIdentity.ps1'
-      - 'tests/Test-DiagnosticsUploadTransport.ps1'
-      - '.github/workflows/diagnostics-worker-ci.yml'
-      - '.github/workflows/deploy-diagnostics-worker.yml'
-      - '.github/workflows/release.yml'
-  pull_request:
     paths:
       - 'cloudflare/diagnostics-worker/**'
       - 'src/**'
