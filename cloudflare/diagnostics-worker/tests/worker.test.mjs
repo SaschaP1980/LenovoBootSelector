@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import handler, { SERVICE_NAME } from "../src/index.mjs";
+import { DEPLOYMENT_FINGERPRINT } from "../src/deployment-identity.mjs";
 
 test("health exposes no secrets and upload stays disabled by default", async () => {
   const response=await handler.fetch(new Request("https://test.invalid/health"),{});
   assert.equal(response.status,200);
-  assert.deepEqual(await response.json(),{service:SERVICE_NAME,ingestionEnabled:false});
+  assert.deepEqual(await response.json(),{service:SERVICE_NAME,ingestionEnabled:false,deploymentFingerprint:DEPLOYMENT_FINGERPRINT});
   assert.equal(response.headers.get("cache-control"),"no-store");
 });
 

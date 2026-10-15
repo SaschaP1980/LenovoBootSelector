@@ -2,6 +2,10 @@
 
 `tests/` contains only the **active canonical tests** and the baseline data they require. Version-specific historical validators are stored separately under [`../tests-history/`](../tests-history/).
 
+## Diagnostics Worker conditional-deployment tests
+
+`cloudflare/diagnostics-worker/tests/conditional-deploy.test.mjs` validates LBS-123 deployment fingerprints, successful-production-receipt guards, health-only versus deployment decisions, source/runtime workflow invariants and the pinned Windows upload contract. The trusted Worker job runs it through the existing complete Node test suite only when a new Worker deployment is required; hosted Work-Branch Diagnostics Worker CI runs it for changed backend sources. A version-only release with a verified matching live fingerprint instead takes the secret-free health-only path.
+
 ## Permanent Python gates
 
 | File | Category | Purpose |

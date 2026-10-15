@@ -2,7 +2,19 @@
 
 From v0.5.10.0 onward the canonical release model is **1 build = 1 release branch = 1 pull request = 1 merge**.
 
-### Post-release Cloudflare Worker deployment (LBS-108, v0.11.1.2+)
+### Conditional post-release Cloudflare Worker verification (LBS-108 / LBS-123, v1.1.1.0+)
+
+Every successfully verified source release still dispatches the trusted Worker job from canonical `main` with exact released SHA, version, tag and ZIP hashes. The Worker job now reads the **most recent production deployment receipt** from the GitHub Deployments API and compares its deterministic Worker/configuration/upload-contract fingerprint against both the released source and the live Worker health response.
+
+- `HEALTH_ONLY_PASS`: previous production receipt is successful and internally valid, live service identity/fingerprint/upload setting match that receipt, and released Worker fingerprint is identical. Only a read-only health check; **no Worker deployment or Cloudflare deployment secrets**.
+- `DEPLOYED_AND_HEALTHY`: first bootstrap, previously failed/incomplete deployment, or genuinely changed Worker fingerprint. Execute Node tests and ZIP/API compatibility contracts, Wrangler dry-run, existing credential checks, a GitHub pending deployment receipt, Wrangler deploy, post-health/fingerprint/upload-setting checks and a successful GitHub deployment receipt.
+- `BLOCKED`: missing/malformed successful receipt, unhealthy live Worker, unexpected previously successful receipt/live fingerprint mismatch or upload-setting change. Such a state is never silently called unchanged. Manual break-glass remains a deliberately authorized full deployment.
+- A content fingerprint includes Worker source, deployment workflow, Wrangler configuration, Worker tests and the pinned Windows diagnostics upload contract; product-only version/menu/UEFI changes are excluded. The generated source fingerprint is stamped only in the trusted deployment checkout and exposed without secrets via `GET /health`.
+- GitHub production receipts and the public health fingerprint attest to this tracked build and the exposed upload setting; they cannot prove arbitrary provider-side configuration changes that are invisible to `/health`. Such changes need separate Cloudflare-authenticated reconciliation. No general provider-secret reads on health-only runs.
+
+The independent Worker job must conclude successfully even when no redeployment was required. Product Release Verification and separate Worker outcome are never conflated. The Release Orchestrator never invokes an untrusted branch or relaxes its Candidate/Release gates.
+
+### Earlier unconditional Cloudflare Worker deployment (LBS-108, v0.11.1.2–v1.1.0.1)
 
 **Automatic by default:** A verified Release Orchestrator completion on GitHub triggers a separate production Worker workflow using GitHub's native `workflow_dispatch` (not an implicit `main` push). The release job dispatches only after final post-merge release verification reports PASS. It hands over immutable `main` SHA and version, while the deployment job re-verifies tag, `downloads/latest.json` ZIP SHA and size, runs Node/Wrangler prechecks, uses the existing GitHub Secrets, and checks the public Worker health status after deployment. Production deployment is not considered successful without the separate GitHub deployment job success, even if the source Release succeeded.
 

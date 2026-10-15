@@ -1,4 +1,5 @@
 import { ArchiveIngestion } from "./ingestion.mjs";
+import { DEPLOYMENT_FINGERPRINT } from "./deployment-identity.mjs";
 import { SqlArchiveLedger } from "./sql-ledger.mjs";
 import { requireUploadIdentity, LIMITS } from "./policy.mjs";
 import { inspectDiagnosticZip, extractDiagnosticText } from "./zip-format.mjs";
@@ -78,6 +79,7 @@ export default {
     if(request.method==="GET" && url.pathname==="/health"){
       return jsonResponse(200,{
         service:SERVICE_NAME,
+        deploymentFingerprint: DEPLOYMENT_FINGERPRINT,
         ingestionEnabled: env.ENABLE_DIAGNOSTIC_UPLOAD==="true" &&
           typeof env.DIAGNOSTICS_READ_TOKEN==="string" &&
           env.DIAGNOSTICS_READ_TOKEN.length>=32

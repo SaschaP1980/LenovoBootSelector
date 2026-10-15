@@ -2,6 +2,16 @@
 
 [Issue #103](https://github.com/SaschaP1980/LenovoBootSelector/issues/103) governs the implementation. The source lives in the existing product repository, but **diagnostic archives never belong in its public Git tree**.
 
+## Conditional deployment policy (LBS-123, v1.1.1.0+)
+
+The Release Orchestrator continues to dispatch a separate trusted Worker job after final release verification. That job uses the GitHub Deployments API environment `diagnostics-worker-production` as an auditable production receipt, not the preceding Windows product tag. A SHA-256 fingerprint covers Worker modules, Wrangler config, deployment pipeline, tests and pinned diagnostics-upload contract; the value is embedded in the deployed bundle and exposed on public `GET /health` without any secrets.
+
+**Unchanged and verified:** a successful latest deployment receipt must have the same fingerprint as both the current checkout and the live `/health`, with unchanged `ingestionEnabled`. Then the job reports `WORKER_DEPLOY_RESULT=HEALTH_ONLY_PASS`; the Worker is *not redeployed*, and no Cloudflare deployment credentials are accessed.
+
+**Changed, first bootstrap, or failed previous rollout:** run Node and upload-contract tests, Wrangler dry-run, scoped production deploy, compare health/fingerprint/upload setting and record a successful GitHub production receipt. Report `WORKER_DEPLOY_RESULT=DEPLOYED_AND_HEALTHY`. A mismatched prior successful receipt versus live Worker or an unhealthy Worker blocks automatic health-only verification; never invent a previous-success receipt. The first release containing this mechanism must deploy once to establish the public fingerprint and receipt. Manual recovery remains explicit.
+
+**Scope:** Windows-only version/UI/boot releases do not change the deployment fingerprint. A shared diagnostics upload API/ZIP-schema change does, and is checked against the native Windows upload contract and Worker Node E2E tests. Provider-side modifications invisible to the public health fields are not cryptographically detectable without Cloudflare-authenticated provider reconciliation; the health-only check must not be described as a complete configuration audit. No automatic KV/history mutation or upload-enable change is performed.
+
 ## Implementation state
 
 - The Worker/KV/SQLite Durable Object service and project-scoped archive keys were released/deployed in v0.11.0.1. v0.11.1.0 introduced server-generated copyable Diagnosis IDs and private references; v0.11.1.1 introduced native ZIP expiration and an **explicit owner-only** historical backfill. v0.11.1.2 integrates **automatic production Worker dispatch following successful verified GitHub release**; historical KV mutation remains a separate owner-authorized maintenance operation.
