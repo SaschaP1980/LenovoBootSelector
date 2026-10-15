@@ -44,6 +44,25 @@ The original LBS-23 validator has **32 assertions** and is archived byte-identic
 
 **Deferred:** P2 owns UI/update/workflow Release–Regression duplicates. P3 owns authorization, ACL/schema and boot-security invariants across different trust surfaces. P1 does **not** consolidate them. A future cleanup may not reintroduce duplicate name-greps instead of using this single contract.
 
+## LBS-130 / P2 — UI, update and pipeline assertion ownership (v1.1.5.0)
+
+**Phase P2 only; P3 remains open.** A pre-change lexical/target audit on v1.1.4.0 identified **26 same-source, same-polarity duplicate assertions** between Release and Regression in the UI, update, localization, capability and workflow sources. An additional **five weaker or broad-scope Regression assertions** repeated stronger scoped Release invariants. P2 eliminates exactly **31 Regression assertions**, and no security/TaskBroker assertion, native test, release workflow or product-source file. The independent Regression baseline/intent logic remains, along with four separately executed Python gates.
+
+| Domain / previous Regression evidence | Removed | Permanent owner and remaining enforcement |
+| --- | ---: | --- |
+| Popup header, focus, hover, gated dialog invocation and single-dialog count | 9 | Release scoped composition and event-handler checks, including its single-dialog invocation count; native UI/update suites stay required |
+| Popup-open scheduling, update polling, source URL, manifest/package transport and hash category | 9 | Release verifies actual UpdateRuntime, UpdateTransport and UpdateClient source boundaries; required native UpdateCore/UpdateController remains |
+| Persisted tray language choice and migration/recovery | 5 | Release checks both language options, persistence, popup rebuild and recovery; native LocalizationRuntime 84/84 stays |
+| Capability resolver/adapter | 2 | Release owns canonical SystemCapabilities source; native runtime/UI capability suites still execute |
+| Runtime include registry, Candidate provenance/fast policy, Windows/release dispatch and verifier argument | 6 | Release owns source/workflow wiring, while Candidate/Release automation continues to enforce exact-SHA status gates independently |
+| **Total duplicated Regression assertions retired** | **31** | **No change to actual native cases, security boundaries or release states** |
+
+**New fail-closed ownership contract:** `tools/validate_test_contracts.py` compares parsed Python AST calls for `s.has`/`s.no`, scoped to same source target, literal and polarity for UI/update/workflow families (with known source aliases). It rejects reintroduced same-source checks in Regression, and verifies **five canonical Release-owner anchors** remain. Its deterministic in-memory negative mutations reinsert duplicate checks and remove each canary owner to prove that the gate blocks both regressions. Opposite-polarity, different-source, conditional migration, and TaskBroker/privilege/boot cases remain outside this P2 contract and belong to P3 if applicable.
+
+**Static test counts expected:** Contract Propagation **55 → 61**, Regression **176 → 145** (removed 31); Release **436**, Core **261**, Boundary **170** remain unchanged. Native Windows PowerShell 5.1 parser **67/67**, functional **610/610**, localization **84/84** and TaskBroker Boundary/Migration **25/25 + 42/42** remain unchanged. Candidate **3/3**, Release **8/8**, release preactivation, reproducible packages/history, and Cloudflare read-only health verification are unchanged.
+
+**Exclusions retained intentionally:** Release/Regression preactivation ordering, non-mutating Development Completion (opposite authority), historical migration-only branches, distinct-scope header focus/source checks, separate transport-stage classifications without a same-source duplicate, and all P3 ACL/privilege/TaskBroker/firmware operations. Reducing the raw assertion count is not a substitute for proving behavior or trust-boundary coverage.
+
 ## Permanent Python gates
 
 | File | Category | Purpose |
