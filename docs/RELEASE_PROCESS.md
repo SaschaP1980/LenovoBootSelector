@@ -2,6 +2,10 @@
 
 From v0.5.10.0 onward the canonical release model is **1 build = 1 release branch = 1 pull request = 1 merge**.
 
+### Bounded post-deployment health retry (LBS-125, v1.1.2.0+)
+
+Only the actual Wrangler deployment path retries the complete read-only post-deployment Worker health contract. Max five attempts, 8-second per-request timeout, 2/4/6/8-second delays, 70-second overall deadline. An HTTP 200 response with a previous valid fingerprint may recover; invalid service identity, malformed health fields or changed upload configuration remain fail-closed. The existing one production deployment receipt changes to success only on verified health; otherwise its existing failure handler marks it failed. No additional deployment, credentials or state mutation occurs during health retries. The health-only route and canonical main/release integrity gates are unchanged. The new verifier is included in the tracked deployment fingerprint.
+
 ### Conditional post-release Cloudflare Worker verification (LBS-108 / LBS-123, v1.1.1.0+)
 
 Every successfully verified source release still dispatches the trusted Worker job from canonical `main` with exact released SHA, version, tag and ZIP hashes. The Worker job now reads the **most recent production deployment receipt** from the GitHub Deployments API and compares its deterministic Worker/configuration/upload-contract fingerprint against both the released source and the live Worker health response.

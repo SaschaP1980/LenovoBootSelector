@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.1.2.0 – Bounded Cloudflare post-deployment health verification (LBS-125)
+
+- Retry complete read-only post-Wrangler health checks within a finite budget when Cloudflare temporarily serves a previous valid fingerprint or eligible transient HTTP/transport failures.
+- Preserve fail-closed service identity, upload-enable state, exact fingerprint and the existing single deployment-receipt lifecycle; never redeploy, mutate archives, expose secrets or bypass release integrity gates during retries.
+- Add permanent test-first Node regressions for transient recovery, early success, persistent mismatch, invalid health and budget exhaustion, plus hosted Linux/Windows verification. Leave the verified unchanged-Worker health-only route intact.
+- No changes to Windows tray behavior, firmware/UEFI/BCD, TaskBroker, settings, updater or diagnostics upload/storage.
+
 ## v1.1.1.1 – Version-only Hotfix (Work-Path timing benchmark)
 
 - Increase the application version from v1.1.1.0 to v1.1.1.1 without changing any product behavior, security boundaries, diagnostics Worker, firmware/UEFI, settings, updater, or TaskBroker logic.
