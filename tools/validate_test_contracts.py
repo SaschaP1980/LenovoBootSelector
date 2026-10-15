@@ -77,6 +77,42 @@ def validate(root: Path) -> tuple[list[str], int]:
         if marker not in emitted_markers:
             errors.append(f'Windows aggregate parses missing TOTAL marker: {marker!r}')
 
+    # LBS-30: one-off localization acceptance is historical evidence, not an
+    # active fifth validator. Machine-consumed release workflow contracts are
+    # checked by Release, not re-asserted as identical source literals in
+    # Regression. The other four independent gate EXECUTIONS remain mandatory.
+    active_special = root / 'tests' / 'validate_lbs23_localization.py'
+    checks += 1
+    if active_special.exists():
+        errors.append('LBS-30 obsolete localization validator remains in active tests')
+    archive = root / 'tests-history' / 'localization-v0.8.0.0.py'
+    checks += 1
+    if not archive.is_file():
+        errors.append('LBS-30 historical localization evidence not archived')
+    release_gate = read_text(root / 'tests' / 'validate_release.py')
+    checks += 1
+    if "lbs23_validator=root/'tests/validate_lbs23_localization.py'" in release_gate:
+        errors.append('LBS-30 Release still invokes historical issue-specific validator')
+    regression = read_text(root / 'tests' / 'validate_regression.py')
+    # Scan ownership assertions only: Regression may legitimately read the
+    # release workflow/helper in a *different*, behavior-oriented check.
+    regression_literals = '\n'.join(line for line in regression.splitlines()
+                                    if re.match(r'^\s+s\.(?:has|contains|no)\(', line))
+    for marker in (
+        'RELEASE_PREACTIVATION_SUMMARY=',
+        'CANDIDATE_PREFLIGHT_SUMMARY=',
+        'RELEASE_VERIFICATION_SUMMARY=',
+        'tools/validate_test_contracts.py',
+        'development-completion/gate',
+        'CANDIDATE_TIMING_SUMMARY=',
+        'actions/workflows/release.yml/dispatches',
+        'uses: ./.github/workflows/windows-powershell51.yml',
+        'git push origin --delete "$WORK_BRANCH"',
+        'WINDOWS_POWERSHELL51_SUMMARY=',
+    ):
+        checks += 1
+        if marker in regression_literals:
+            errors.append('LBS-30 Release-owned literal duplicated in Regression: ' + marker)
     return errors, checks
 
 

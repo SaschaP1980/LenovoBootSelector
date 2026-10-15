@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.1.3.0 – Permanent test ownership and LBS-23 validator archival (LBS-30 / #65)
+
+- Archive the former issue-specific LBS-23 localization validator byte-identically; transfer retained migration/startup behavior checks to permanent native/Core/Release owners and add three Windows PowerShell 5.1 bilingual catalog checks.
+- Remove 27 repeated Release-owned workflow/source-literal assertions from Regression while keeping independent security/privilege checks and all four active release validators.
+- Add a permanent ownership check to Contract Propagation and one tightly pinned historical archival exception to the release deletion guard; no other deletion or weakened Candidate/Release validation.
+- No application runtime logic, boot selection, UEFI/BCD, TaskBroker, updater, settings, diagnostics backend or user behavior changes.
+
 ## v1.1.2.0 – Bounded Cloudflare post-deployment health verification (LBS-125)
 
 - Retry complete read-only post-Wrangler health checks within a finite budget when Cloudflare temporarily serves a previous valid fingerprint or eligible transient HTTP/transport failures.
