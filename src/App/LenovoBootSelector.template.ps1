@@ -90,6 +90,87 @@ public sealed class LenovoMenuColorTable : ProfessionalColorTable
     public override Color ToolStripGradientEnd { get { return bg; } }
 }
 
+// Small, deterministic country flags for the Language submenu only.
+// Drawn locally at the active DPI; no emoji fonts, native image gutters or assets.
+public static class LenovoLocaleFlags
+{
+    private const string MenuName = "LenovoLanguageDropDown";
+    private static int Scale(int value, float dpi)
+    {
+        return Math.Max(1, (int)Math.Round(value * Math.Max(96f, dpi) / 96f));
+    }
+
+    public static string GetLocale(ToolStripItem item)
+    {
+        if (item == null || item.Owner == null || item.Owner.Name != MenuName)
+            return null;
+        if (item.Name == "LocaleFlag.en-US") return "en-US";
+        if (item.Name == "LocaleFlag.de-DE") return "de-DE";
+        return null;
+    }
+
+    public static Rectangle GetBounds(ToolStripItem item, Rectangle row, float dpi)
+    {
+        if (GetLocale(item) == null) return Rectangle.Empty;
+        int width = Scale(16, dpi);
+        int height = Scale(12, dpi);
+        return new Rectangle(row.Left + Scale(10, dpi),
+            row.Top + Math.Max(0, (row.Height - height) / 2), width, height);
+    }
+
+    public static int TextLeft(ToolStripItem item, Rectangle row, float dpi)
+    {
+        if (GetLocale(item) == null) return row.Left;
+        return row.Left + Scale(34, dpi);
+    }
+
+    public static void Draw(Graphics g, ToolStripItem item, Rectangle row)
+    {
+        string locale = GetLocale(item);
+        if (locale == null || g == null) return;
+        Rectangle flag = GetBounds(item, row, g.DpiX);
+        GraphicsState saved = g.Save();
+        try
+        {
+            g.SmoothingMode = SmoothingMode.None;
+            g.SetClip(flag, CombineMode.Intersect);
+            if (locale == "de-DE")
+            {
+                Color[] bands = { Color.Black, Color.FromArgb(221, 0, 0), Color.FromArgb(255, 206, 0) };
+                for (int i = 0; i < bands.Length; i++)
+                {
+                    using (Brush brush = new SolidBrush(bands[i]))
+                        g.FillRectangle(brush, new RectangleF(flag.Left, flag.Top + i * flag.Height / 3f,
+                            flag.Width, flag.Height / 3f + 0.3f));
+                }
+            }
+            else
+            {
+                using (Brush white = new SolidBrush(Color.White))
+                    g.FillRectangle(white, flag);
+                using (Brush red = new SolidBrush(Color.FromArgb(178, 34, 52)))
+                    for (int i = 0; i < 13; i += 2)
+                        g.FillRectangle(red, new RectangleF(flag.Left, flag.Top + i * flag.Height / 13f,
+                            flag.Width, flag.Height / 13f + 0.2f));
+                RectangleF canton = new RectangleF(flag.Left, flag.Top,
+                    flag.Width * 0.47f, flag.Height * 7f / 13f);
+                using (Brush blue = new SolidBrush(Color.FromArgb(60, 59, 110)))
+                    g.FillRectangle(blue, canton);
+                // At this icon size, light star dots are legible without tiny glyphs.
+                using (Brush stars = new SolidBrush(Color.White))
+                {
+                    float dot = Math.Max(1f, g.DpiX / 96f);
+                    for (int rowIndex = 0; rowIndex < 3; rowIndex++)
+                        for (int col = 0; col < 3; col++)
+                            g.FillRectangle(stars, canton.Left + (col + 0.5f) * canton.Width / 3f,
+                                canton.Top + (rowIndex + 0.5f) * canton.Height / 3f, dot, dot);
+                }
+            }
+        }
+        finally { g.Restore(saved); }
+    }
+}
+
 public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
 {
     private readonly Color accent = Color.FromArgb(225, 37, 27);
@@ -259,7 +340,21 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
         else if (item.Checked)
             DrawRightCheck(e.Graphics, row, item.Enabled);
 
+        LenovoLocaleFlags.Draw(e.Graphics, item, row);
         e.Graphics.Restore(state);
+    }
+
+    protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
+    {
+        if (LenovoLocaleFlags.GetLocale(e.Item) != null)
+        {
+            Rectangle text = e.TextRectangle;
+            int left = Math.Max(text.Left,
+                LenovoLocaleFlags.TextLeft(e.Item, new Rectangle(0, 0, e.Item.Width, e.Item.Height), e.Graphics.DpiX));
+            if (left < text.Right)
+                e.TextRectangle = new Rectangle(left, text.Top, text.Right - left, text.Height);
+        }
+        base.OnRenderItemText(e);
     }
 
     protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
@@ -1693,20 +1788,23 @@ try {
     $languageRoot.Text = Get-LocalizedString -Key 'Settings.Language'
     $languageRoot.DropDown = New-Object LenovoDropDownMenu
     $languageRoot.DropDown.TargetWidth = 220
+    $languageRoot.DropDown.Name = 'LenovoLanguageDropDown'
     Initialize-LenovoMenuAppearance -Menu $languageRoot.DropDown
     $languageRoot.Add_DropDownOpening({ Initialize-LenovoMenuAppearance -Menu $this.DropDown })
     $script:LanguageMenuRoot = $languageRoot
 
     $languageEnglish = New-Object System.Windows.Forms.ToolStripMenuItem
+    $languageEnglish.Name = 'LocaleFlag.en-US'
     $languageEnglish.Text = Get-LocalizedString -Key 'Language.English'
-    $languageEnglish.Padding = New-Object System.Windows.Forms.Padding(18, 4, 32, 4)
+    $languageEnglish.Padding = New-Object System.Windows.Forms.Padding(38, 4, 32, 4)
     $languageEnglish.Add_Click({ [void](Set-LanguageFromUi -Locale 'en-US') })
     $script:LanguageEnglishMenuItem = $languageEnglish
     [void]$languageRoot.DropDownItems.Add($languageEnglish)
 
     $languageGerman = New-Object System.Windows.Forms.ToolStripMenuItem
+    $languageGerman.Name = 'LocaleFlag.de-DE'
     $languageGerman.Text = Get-LocalizedString -Key 'Language.German'
-    $languageGerman.Padding = New-Object System.Windows.Forms.Padding(18, 4, 32, 4)
+    $languageGerman.Padding = New-Object System.Windows.Forms.Padding(38, 4, 32, 4)
     $languageGerman.Add_Click({ [void](Set-LanguageFromUi -Locale 'de-DE') })
     $script:LanguageGermanMenuItem = $languageGerman
     [void]$languageRoot.DropDownItems.Add($languageGerman)
