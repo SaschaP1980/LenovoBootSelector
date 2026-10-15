@@ -161,6 +161,101 @@ try {
         if ($script:RuntimeDiagnosticMenuItem) { $script:RuntimeDiagnosticMenuItem.Dispose(); $script:RuntimeDiagnosticMenuItem = $null }
     }
 
+    # LBS-117 country flag renderer: compile the actual template C# in PS5.1,
+    # exercise scoped menu identity, geometry, pixels and locale checkmarks.
+    $templateText = [IO.File]::ReadAllText((Join-Path $root 'src\App\LenovoBootSelector.template.ps1'), [Text.Encoding]::UTF8)
+    $beginMarker = 'Add-Type -TypeDefinition @"'
+    $endMarker = '"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing'
+    $startIndex = $templateText.IndexOf($beginMarker, [StringComparison]::Ordinal)
+    $endIndex = $templateText.IndexOf($endMarker, $startIndex + $beginMarker.Length, [StringComparison]::Ordinal)
+    if ($startIndex -lt 0 -or $endIndex -le $startIndex) { throw 'LBS-117 menu C# source block not found' }
+    $menuCode = $templateText.Substring($startIndex + $beginMarker.Length, $endIndex - $startIndex - $beginMarker.Length)
+    Add-Type -TypeDefinition $menuCode -ReferencedAssemblies System.Windows.Forms,System.Drawing
+
+    Assert-Localization 'LBS-117 real tray wires US and German flag identities' (
+        $templateText.Contains('$languageRoot.DropDown.Name = ''LenovoLanguageDropDown''') -and
+        $templateText.Contains('$languageEnglish.Name = ''LocaleFlag.en-US''') -and
+        $templateText.Contains('$languageGerman.Name = ''LocaleFlag.de-DE''')
+    )
+    $flagsMenu = New-Object LenovoDropDownMenu
+    $flagsMenu.Name = 'LenovoLanguageDropDown'
+    $usFlagItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $usFlagItem.Name = 'LocaleFlag.en-US'
+    $usFlagItem.Text = 'English'
+    $deFlagItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $deFlagItem.Name = 'LocaleFlag.de-DE'
+    $deFlagItem.Text = 'Deutsch'
+    $unrelatedItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $unrelatedItem.Name = 'Maintenance'
+    [void]$flagsMenu.Items.Add($usFlagItem)
+    [void]$flagsMenu.Items.Add($deFlagItem)
+    [void]$flagsMenu.Items.Add($unrelatedItem)
+    $otherMenu = New-Object LenovoDropDownMenu
+    $wrongOwner = New-Object System.Windows.Forms.ToolStripMenuItem
+    $wrongOwner.Name = 'LocaleFlag.en-US'
+    [void]$otherMenu.Items.Add($wrongOwner)
+    try {
+        Assert-Localization 'LBS-117 en-US maps only to US flag' ([LenovoLocaleFlags]::GetLocale($usFlagItem) -ceq 'en-US')
+        Assert-Localization 'LBS-117 de-DE maps only to Germany flag' ([LenovoLocaleFlags]::GetLocale($deFlagItem) -ceq 'de-DE')
+        Assert-Localization 'LBS-117 unrelated language-menu entry has no flag' ($null -eq [LenovoLocaleFlags]::GetLocale($unrelatedItem))
+        Assert-Localization 'LBS-117 other menus never acquire flags' ($null -eq [LenovoLocaleFlags]::GetLocale($wrongOwner))
+        $row = New-Object Drawing.Rectangle(0,0,220,28)
+        $usBounds = [LenovoLocaleFlags]::GetBounds($usFlagItem,$row,[single]96)
+        $deBounds = [LenovoLocaleFlags]::GetBounds($deFlagItem,$row,[single]96)
+        Assert-Localization 'LBS-117 flags are 16 by 12 and vertically centered' (
+            $usBounds.Width -eq 16 -and $usBounds.Height -eq 12 -and
+            $usBounds.Top -eq 8 -and $deBounds.Equals($usBounds)
+        )
+        Assert-Localization 'LBS-117 text begins after icon at standard DPI' (
+            [LenovoLocaleFlags]::TextLeft($usFlagItem,$row,[single]96) -gt ($usBounds.Right + 4)
+        )
+        $scaled = [LenovoLocaleFlags]::GetBounds($deFlagItem,$row,[single]144)
+        Assert-Localization 'LBS-117 flag geometry scales at 150 percent DPI' (
+            $scaled.Width -eq 24 -and $scaled.Height -eq 18 -and
+            [LenovoLocaleFlags]::TextLeft($deFlagItem,$row,[single]144) -gt ($scaled.Right + 4)
+        )
+        $bitmap = New-Object System.Drawing.Bitmap(220,28)
+        $g = [Drawing.Graphics]::FromImage($bitmap)
+        try {
+            [LenovoLocaleFlags]::Draw($g,$usFlagItem,$row)
+            $usRed = $bitmap.GetPixel(($usBounds.Right - 2),$usBounds.Top)
+            $usBlue = $bitmap.GetPixel($usBounds.Left,$usBounds.Top)
+            Assert-Localization 'LBS-117 US flag draws red stripes and navy canton' (
+                $usRed.ToArgb() -eq ([Drawing.Color]::FromArgb(178,34,52)).ToArgb() -and
+                $usBlue.ToArgb() -eq ([Drawing.Color]::FromArgb(60,59,110)).ToArgb()
+            )
+            $g.Clear([Drawing.Color]::Transparent)
+            [LenovoLocaleFlags]::Draw($g,$deFlagItem,$row)
+            Assert-Localization 'LBS-117 German flag draws black red gold bands' (
+                $bitmap.GetPixel($deBounds.Left,$deBounds.Top).ToArgb() -eq [Drawing.Color]::Black.ToArgb() -and
+                $bitmap.GetPixel($deBounds.Left,($deBounds.Top + 5)).ToArgb() -eq ([Drawing.Color]::FromArgb(221,0,0)).ToArgb() -and
+                $bitmap.GetPixel($deBounds.Left,($deBounds.Bottom - 1)).ToArgb() -eq ([Drawing.Color]::FromArgb(255,206,0)).ToArgb()
+            )
+        }
+        finally { $g.Dispose(); $bitmap.Dispose() }
+        $script:LanguageEnglishMenuItem = $usFlagItem
+        $script:LanguageGermanMenuItem = $deFlagItem
+        [void](Set-ActiveLocale -Locale 'en-US' -Persist)
+        Update-LanguageMenuState
+        Assert-Localization 'LBS-117 en-US remains checked only for English' ($usFlagItem.Checked -and -not $deFlagItem.Checked)
+        [void](Set-ActiveLocale -Locale 'de-DE' -Persist)
+        Update-LanguageMenuState
+        Assert-Localization 'LBS-117 de-DE remains checked only for German' ($deFlagItem.Checked -and -not $usFlagItem.Checked)
+        Assert-Localization 'LBS-117 other menu gutters remain disabled' (
+            -not $otherMenu.ShowImageMargin -and -not $otherMenu.ShowCheckMargin -and
+            -not $flagsMenu.ShowImageMargin -and -not $flagsMenu.ShowCheckMargin
+        )
+        Assert-Localization 'LBS-117 menu text remains English and Deutsch' (
+            $usFlagItem.Text -ceq 'English' -and $deFlagItem.Text -ceq 'Deutsch'
+        )
+    }
+    finally {
+        $script:LanguageEnglishMenuItem = $null
+        $script:LanguageGermanMenuItem = $null
+        $flagsMenu.Dispose()
+        $otherMenu.Dispose()
+    }
+
     Assert-Localization 'English and German catalogs have identical key sets' (Test-LocalizationCatalogParityCore)
     Assert-Localization 'Named localization formatting is deterministic' ((Get-LocalizedStringCore -Key 'Storage.InternalSsdModel' -Locale 'en-US' -Values @{ Model='TEST' }) -eq 'Internal SSD: TEST')
 }
@@ -169,5 +264,5 @@ finally {
     try { if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force } } catch { }
 }
 
-Write-Host "LOCALIZATION TOTAL $checks/41"
-if ($checks -ne 41) { throw "Expected 41 localization checks, got $checks" }
+Write-Host "LOCALIZATION TOTAL $checks/55"
+if ($checks -ne 55) { throw "Expected 55 localization checks, got $checks" }
