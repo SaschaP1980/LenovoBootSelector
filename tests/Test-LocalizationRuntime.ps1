@@ -128,6 +128,39 @@ try {
     Load-AppSettings
     Assert-Localization 'Later explicit German choice survives reload' ((Get-ActiveLocale) -eq 'de-DE' -and [string]$script:LocalePreferenceSource -eq 'user' -and -not $script:LocalePreferenceNeedsConfirmation)
 
+
+    # LBS-111: test the real live tray refresh with actual WinForms menu items.
+    . (Join-Path $root 'src\UI\LanguagePresentation.ps1')
+    Assert-Localization 'English upload catalog uses sentence case' ((Get-LocalizedStringCore -Key 'Diagnostics.Upload' -Locale 'en-US') -eq 'Upload diagnostics…')
+    Assert-Localization 'German upload catalog remains translated' ((Get-LocalizedStringCore -Key 'Diagnostics.Upload' -Locale 'de-DE') -eq 'Diagnose hochladen…')
+    $script:RuntimeDiagnosticMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $script:DiagnosticsUploadMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    try {
+        [void](Set-ActiveLocale -Locale 'en-US' -Persist)
+        Update-TrayLocalizedText
+        Assert-Localization 'English tray refresh localizes diagnostic save' ($script:RuntimeDiagnosticMenuItem.Text -eq 'Save diagnostics…')
+        Assert-Localization 'English tray refresh localizes diagnostic upload' ($script:DiagnosticsUploadMenuItem.Text -eq 'Upload diagnostics…')
+
+        [void](Set-ActiveLocale -Locale 'de-DE' -Persist)
+        Update-TrayLocalizedText
+        Assert-Localization 'Switch en-US to de-DE localizes diagnostic save' ($script:RuntimeDiagnosticMenuItem.Text -eq 'Diagnose speichern…')
+        Assert-Localization 'Switch en-US to de-DE localizes diagnostic upload' ($script:DiagnosticsUploadMenuItem.Text -eq 'Diagnose hochladen…')
+
+        [void](Set-ActiveLocale -Locale 'en-US' -Persist)
+        Update-TrayLocalizedText
+        Assert-Localization 'Switch de-DE to en-US localizes diagnostic save' ($script:RuntimeDiagnosticMenuItem.Text -eq 'Save diagnostics…')
+        Assert-Localization 'Switch de-DE to en-US localizes diagnostic upload' ($script:DiagnosticsUploadMenuItem.Text -eq 'Upload diagnostics…')
+
+        $script:DiagnosticsUploadMenuItem.Dispose()
+        $script:DiagnosticsUploadMenuItem = $null
+        Update-TrayLocalizedText
+        Assert-Localization 'Missing upload menu item does not block other refreshes' ($script:RuntimeDiagnosticMenuItem.Text -eq 'Save diagnostics…')
+    }
+    finally {
+        if ($script:DiagnosticsUploadMenuItem) { $script:DiagnosticsUploadMenuItem.Dispose(); $script:DiagnosticsUploadMenuItem = $null }
+        if ($script:RuntimeDiagnosticMenuItem) { $script:RuntimeDiagnosticMenuItem.Dispose(); $script:RuntimeDiagnosticMenuItem = $null }
+    }
+
     Assert-Localization 'English and German catalogs have identical key sets' (Test-LocalizationCatalogParityCore)
     Assert-Localization 'Named localization formatting is deterministic' ((Get-LocalizedStringCore -Key 'Storage.InternalSsdModel' -Locale 'en-US' -Values @{ Model='TEST' }) -eq 'Internal SSD: TEST')
 }
@@ -136,5 +169,5 @@ finally {
     try { if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force } } catch { }
 }
 
-Write-Host "LOCALIZATION TOTAL $checks/32"
-if ($checks -ne 32) { throw "Expected 32 localization checks, got $checks" }
+Write-Host "LOCALIZATION TOTAL $checks/41"
+if ($checks -ne 41) { throw "Expected 41 localization checks, got $checks" }

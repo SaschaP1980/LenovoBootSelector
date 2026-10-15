@@ -113,7 +113,7 @@ function Get-LocalizationCatalogCore {
             'Update.Check' = 'Check for new version…'
             'Update.Install' = 'Update app…'
             'Diagnostics.Save' = 'Save diagnostics…'
-            'Diagnostics.Upload' = 'Upload Diagnostics…'
+            'Diagnostics.Upload' = 'Upload diagnostics…'
             'Boot.OtherTarget' = 'Other boot target'
             'Boot.OtherTargetTooltip' = 'Gray: other boot target'
             'Boot.MenuTitle' = 'Lenovo Boot Menu'
@@ -1782,7 +1782,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     }
 }
 
-$script:AppVersion = '0.11.1.2'
+$script:AppVersion = '0.11.1.3'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -4442,6 +4442,7 @@ function Update-TrayLocalizedText {
     if ($script:UpdateCheckMenuItem) { $script:UpdateCheckMenuItem.Text = Get-LocalizedString -Key 'Update.Check' }
     if ($script:UpdateInstallMenuItem) { $script:UpdateInstallMenuItem.Text = Get-LocalizedString -Key 'Update.Install' }
     if ($script:RuntimeDiagnosticMenuItem) { $script:RuntimeDiagnosticMenuItem.Text = Get-LocalizedString -Key 'Diagnostics.Save' }
+    if ($script:DiagnosticsUploadMenuItem) { $script:DiagnosticsUploadMenuItem.Text = Get-LocalizedString -Key 'Diagnostics.Upload' }
     if ($script:RestartMenuItem) { $script:RestartMenuItem.Text = Get-LocalizedString -Key 'Action.RestartWindows' }
     if ($script:TrayExitMenuItem) { $script:TrayExitMenuItem.Text = Get-LocalizedString -Key 'Tray.Exit' }
     Update-LanguageMenuState
