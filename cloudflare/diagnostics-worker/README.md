@@ -2,6 +2,14 @@
 
 [Issue #103](https://github.com/SaschaP1980/LenovoBootSelector/issues/103) governs the implementation. The source lives in the existing product repository, but **diagnostic archives never belong in its public Git tree**.
 
+## Bounded post-deployment health verification (LBS-125, v1.1.2.0+)
+
+After a **real successful Wrangler deployment** (never on unchanged `health-only`), the trusted GitHub job uses `scripts/verify-post-deploy-health.mjs` to retry the entire read-only `GET /health` contract, including successful HTTP 200 responses that still expose a previous valid fingerprint. HTTP-only `curl --retry` could not recover that semantic mismatch.
+
+Bounded policy: **five attempts maximum**, per-request **8-second** timeout, backoffs **2, 4, 6, 8 seconds**, and a hard **70-second total budget**. Return on first fully verified result. Retry only transient HTTP 429/502/503/504, transport/timeouts and otherwise-valid stale SHA-256 fingerprints. Invalid service identity, malformed health response, changed `ingestionEnabled` and other non-recoverable errors fail closed. Logs contain only counts, elapsed durations and non-sensitive category codes; never response bodies, tokens, diagnostics ZIP or private headers.
+
+Retries **never redeploy**, check deployment secrets or write GitHub receipts. The original single pending production receipt receives `success` only after all invariants pass or `failure` on exhaustion/non-recoverable mismatch, using the existing workflow failure handler. The unchanged-Worker `HEALTH_ONLY_PASS` route remains read-only and secret-free. The helper itself belongs to the deterministic deployment fingerprint, so this release triggers one real deployment of the revised trusted workflow.
+
 ## Conditional deployment policy (LBS-123, v1.1.1.0+)
 
 The Release Orchestrator continues to dispatch a separate trusted Worker job after final release verification. That job uses the GitHub Deployments API environment `diagnostics-worker-production` as an auditable production receipt, not the preceding Windows product tag. A SHA-256 fingerprint covers Worker modules, Wrangler config, deployment pipeline, tests and pinned diagnostics-upload contract; the value is embedded in the deployed bundle and exposed on public `GET /health` without any secrets.

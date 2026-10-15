@@ -220,14 +220,12 @@ jobs:
           TARGET: ${{ steps.plan.outputs.fingerprint }}
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --retry 3 --retry-delay 2 --max-time 20 \
-            'https://lenovo-boot-selector-diagnostics.sascha-petrovitsch.workers.dev/health' \
-            > "$RUNNER_TEMP/diagnostics-health-after.json"
-          jq -e --arg sha "$TARGET" '(.service=="lenovo-boot-selector-diagnostics") and
-            ((.ingestionEnabled|type)=="boolean") and .deploymentFingerprint==$sha' \
-            "$RUNNER_TEMP/diagnostics-health-after.json" >/dev/null
-          jq -e -s '.[0].ingestionEnabled == .[1].ingestionEnabled' \
-            "$RUNNER_TEMP/diagnostics-health-before.json" "$RUNNER_TEMP/diagnostics-health-after.json" >/dev/null
+          # LBS-125: retry only read-only complete health checks, including old
+          # HTTP 200 fingerprints, with finite attempt/request/total budgets.
+          # Existing deployment and receipt writes occur exactly once outside retries.
+          node cloudflare/diagnostics-worker/scripts/verify-post-deploy-health.mjs \
+            "$TARGET" "$RUNNER_TEMP/diagnostics-health-before.json" \
+            "$RUNNER_TEMP/diagnostics-health-after.json"
           echo "WORKER_DEPLOY_HEALTH=PASS"
 
       - name: Commit successful production deployment receipt
