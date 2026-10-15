@@ -23,6 +23,7 @@ on:
 
 permissions:
   contents: read
+  deployments: write
 
 concurrency:
   group: diagnostics-worker-production
@@ -82,13 +83,6 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Run fail-closed Worker tests
-        run: node --test cloudflare/diagnostics-worker/tests/*.test.mjs
-
-      - name: Check Wrangler bundle without deployment
-        working-directory: cloudflare/diagnostics-worker
-        run: npx --yes wrangler@4 deploy --dry-run --outdir /tmp/lbs-diagnostics-worker-bundle
-
       - name: Capture baseline live Worker health
         shell: bash
         run: |
@@ -99,7 +93,82 @@ jobs:
           jq -e '(.service=="lenovo-boot-selector-diagnostics") and ((.ingestionEnabled|type)=="boolean")' \
             "$RUNNER_TEMP/diagnostics-health-before.json" >/dev/null
 
+      # Read-only resolution uses GitHub's durable successful production receipt,
+      # plus the live Worker fingerprint. No Cloudflare deployment secrets here.
+      - name: Select verified health-only or full deploy path
+        id: plan
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          set -euo pipefail
+          TARGET=$(node cloudflare/diagnostics-worker/scripts/deployment-plan.mjs fingerprint)
+          [[ "$TARGET" =~ ^[0-9a-f]{64}$ ]]
+          gh api --method GET "repos/$GITHUB_REPOSITORY/deployments?environment=diagnostics-worker-production&per_page=1" \
+            > "$RUNNER_TEMP/lbs-deployments.json"
+          if [ "$(jq 'length' "$RUNNER_TEMP/lbs-deployments.json")" -eq 0 ]; then
+            printf 'null\n' > "$RUNNER_TEMP/lbs-deployment-receipt.json"
+          else
+            ID=$(jq -r '.[0].id' "$RUNNER_TEMP/lbs-deployments.json")
+            [[ "$ID" =~ ^[0-9]+$ ]]
+            gh api --method GET "repos/$GITHUB_REPOSITORY/deployments/$ID/statuses?per_page=1" \
+              > "$RUNNER_TEMP/lbs-deployment-statuses.json"
+            STATUS=$(jq -r 'if length == 0 then "pending" else .[0].state end' "$RUNNER_TEMP/lbs-deployment-statuses.json")
+            jq --arg status "$STATUS" '.[0] | {
+              status:$status, fingerprint:.payload.fingerprint,
+              ingestionEnabled:.payload.ingestionEnabled,
+              verified:.payload.verified
+            }' "$RUNNER_TEMP/lbs-deployments.json" > "$RUNNER_TEMP/lbs-deployment-receipt.json"
+          fi
+          MODE=auto
+          if [ -z "$EXPECTED_MAIN_SHA" ]; then MODE=manual; fi
+          PLAN=$(node cloudflare/diagnostics-worker/scripts/deployment-plan.mjs plan \
+            "$TARGET" "$RUNNER_TEMP/lbs-deployment-receipt.json" \
+            "$RUNNER_TEMP/diagnostics-health-before.json" "$MODE")
+          test "$PLAN" = "health-only" -o "$PLAN" = "deploy"
+          echo "fingerprint=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "mode=$PLAN" >> "$GITHUB_OUTPUT"
+          echo "WORKER_DEPLOY_DECISION=$PLAN fingerprint=$TARGET"
+
+      - name: Revalidate published main before any production outcome
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "$EXPECTED_MAIN_SHA" ]; then
+            NOW=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')
+            test "$NOW" = "$EXPECTED_MAIN_SHA"
+            test "$(git rev-parse HEAD)" = "$EXPECTED_MAIN_SHA"
+          fi
+
+      - name: Verify unchanged Worker without redeployment
+        if: steps.plan.outputs.mode == 'health-only'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "WORKER_DEPLOY_RESULT=HEALTH_ONLY_PASS fingerprint=${{ steps.plan.outputs.fingerprint }}"
+          echo "WORKER_DEPLOY_HEALTH=PASS"
+          # No Wrangler deploy, Cloudflare credentials, KV mutation or secret access.
+
+      - name: Run fail-closed Worker tests
+        if: steps.plan.outputs.mode == 'deploy'
+        run: node --test cloudflare/diagnostics-worker/tests/*.test.mjs
+
+      - name: Stamp the verified fingerprint in this deployment checkout only
+        if: steps.plan.outputs.mode == 'deploy'
+        shell: bash
+        run: node cloudflare/diagnostics-worker/scripts/deployment-plan.mjs stamp "${{ steps.plan.outputs.fingerprint }}"
+
+      - name: Check Wrangler bundle without deployment
+        if: steps.plan.outputs.mode == 'deploy'
+        working-directory: cloudflare/diagnostics-worker
+        run: npx --yes wrangler@4 deploy --dry-run --outdir /tmp/lbs-diagnostics-worker-bundle
+
       - name: Check deployment credentials
+        if: steps.plan.outputs.mode == 'deploy'
         env:
           HAS_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
           HAS_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
@@ -107,7 +176,35 @@ jobs:
           test "$HAS_API_TOKEN" = "true"
           test "$HAS_ACCOUNT_ID" = "true"
 
+      # Create a durable GitHub receipt BEFORE deployment. An interrupted/failed
+      # run leaves a non-success latest receipt, so a subsequent run cannot
+      # incorrectly claim the older successful deployment as current.
+      - name: Register pending trusted production deployment
+        id: receipt
+        if: steps.plan.outputs.mode == 'deploy'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ steps.plan.outputs.fingerprint }}
+        run: |
+          set -euo pipefail
+          MAIN_SHA=$(git rev-parse HEAD)
+          INGESTION=$(jq -r '.ingestionEnabled' "$RUNNER_TEMP/diagnostics-health-before.json")
+          jq -n --arg ref "$MAIN_SHA" --arg digest "$TARGET" --argjson enabled "$INGESTION" '{
+            ref:$ref,environment:"diagnostics-worker-production",
+            auto_merge:false,required_contexts:[],production_environment:true,
+            description:"Verified Lenovo diagnostics Worker rollout",
+            payload:{fingerprint:$digest,ingestionEnabled:$enabled,verified:true}
+          }' > "$RUNNER_TEMP/lbs-create-deployment.json"
+          ID=$(gh api --method POST "repos/$GITHUB_REPOSITORY/deployments" \
+            --input "$RUNNER_TEMP/lbs-create-deployment.json" --jq '.id')
+          [[ "$ID" =~ ^[0-9]+$ ]]
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/deployments/$ID/statuses" \
+            -f state=in_progress -f description="Deployment started after verified source and tests" >/dev/null
+
       - name: Deploy verified main to Cloudflare
+        if: steps.plan.outputs.mode == 'deploy'
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -117,14 +214,44 @@ jobs:
           command: deploy
 
       - name: Verify health and preserved upload configuration
+        if: steps.plan.outputs.mode == 'deploy'
         shell: bash
+        env:
+          TARGET: ${{ steps.plan.outputs.fingerprint }}
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --retry 3 --retry-delay 2 --max-time 20 \
             'https://lenovo-boot-selector-diagnostics.sascha-petrovitsch.workers.dev/health' \
             > "$RUNNER_TEMP/diagnostics-health-after.json"
-          jq -e '(.service=="lenovo-boot-selector-diagnostics") and ((.ingestionEnabled|type)=="boolean")' \
+          jq -e --arg sha "$TARGET" '(.service=="lenovo-boot-selector-diagnostics") and
+            ((.ingestionEnabled|type)=="boolean") and .deploymentFingerprint==$sha' \
             "$RUNNER_TEMP/diagnostics-health-after.json" >/dev/null
           jq -e -s '.[0].ingestionEnabled == .[1].ingestionEnabled' \
             "$RUNNER_TEMP/diagnostics-health-before.json" "$RUNNER_TEMP/diagnostics-health-after.json" >/dev/null
           echo "WORKER_DEPLOY_HEALTH=PASS"
+
+      - name: Commit successful production deployment receipt
+        if: steps.plan.outputs.mode == 'deploy'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ID: ${{ steps.receipt.outputs.id }}
+          TARGET: ${{ steps.plan.outputs.fingerprint }}
+        run: |
+          set -euo pipefail
+          [[ "$ID" =~ ^[0-9]+$ ]]
+          gh api --method POST "repos/$GITHUB_REPOSITORY/deployments/$ID/statuses" \
+            -f state=success -f description="Worker fingerprint and upload state verified" \
+            -f environment_url='https://lenovo-boot-selector-diagnostics.sascha-petrovitsch.workers.dev/health' >/dev/null
+          echo "WORKER_DEPLOY_RESULT=DEPLOYED_AND_HEALTHY fingerprint=$TARGET receipt=$ID"
+
+      - name: Preserve failed production receipt on deployment error
+        if: failure() && steps.receipt.outputs.id != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ID: ${{ steps.receipt.outputs.id }}
+        run: |
+          gh api --method POST "repos/$GITHUB_REPOSITORY/deployments/$ID/statuses" \
+            -f state=failure -f description="Worker deployment or verification failed" >/dev/null
+          echo "WORKER_DEPLOY_RESULT=BLOCKED"
