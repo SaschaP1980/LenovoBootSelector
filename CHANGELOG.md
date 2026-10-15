@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.1.4.0 – Native test ownership consolidation (LBS-130 Phase P1)
+
+- Eliminate 26 redundant static assertions of identical native TaskBroker test labels, suite registrations and copies of already-owned native count/AST contracts; all four independent permanent validators remain executable.
+- Centralize exact native TaskBroker Boundary/Migration aggregate registration and ReadAndExecute/Modify/FullControl ACL invocation/polarity contracts in the mandatory Contract Propagation gate, including fail-closed negative mutation probes.
+- Keep all real native PowerShell 5.1 tests and fixed coverage totals unchanged; preserve Runtime/Core/Boundary/Release security, UEFI/BCD, TaskBroker, update, release and Cloudflare contracts.
+- P2 (UI/update/CI string overlaps) and P3 (privileged/boot-security cross-boundary review) remain unimplemented in open issue #130; no product behavior changes.
+
 ## v1.1.3.0 – Permanent test ownership and LBS-23 validator archival (LBS-30 / #65)
 
 - Archive the former issue-specific LBS-23 localization validator byte-identically; transfer retained migration/startup behavior checks to permanent native/Core/Release owners and add three Windows PowerShell 5.1 bilingual catalog checks.
