@@ -26,6 +26,24 @@ The original LBS-23 validator has **32 assertions** and is archived byte-identic
 
 **Gate execution is not assertion duplication.** The four permanent Python gates remain separately executed by Development Completion, Candidate and Release; the propagation validator remains mandatory and hosted Windows PowerShell 5.1 executes the native tests. Candidate 3/3, Release 8/8, reproducibility/history/ZIP and source-tag checks are unchanged. The original 74 LBS-13 historical validators remain; the archived LBS-23 file becomes the 75th, with a one-file deletion and byte-identical Git archive proof enforced by Release.
 
+## LBS-130 / P1 — canonical native-test structural ownership (v1.1.4.0)
+
+**Phase P1 only (P2/P3 remain open).** After LBS-30, the four permanent validators still repeated checks that a native TaskBroker test exists, is included in the same aggregate runner and contains the *names* of three ACL checks. Those checks all inspected the same test text rather than providing four independent behaviors. P1 removes **26 redundant static assertions** (Release 6, Core 6, Boundary 6, Regression 8), while retaining the actual privileged-operation/installer ACL predicates and independent Runtime/Core/Boundary/Release security-invariant checks.
+
+**Single authoritative ownership:** `tools/validate_test_contracts.py` now checks that `Test-WindowsPowerShell51.ps1` *executes exactly once* each `Test-TaskBrokerBoundary.ps1` and `Test-TaskBrokerMigration.ps1` (anchored call shape, not a mere filename substring). It additionally verifies the executable native `Test-TaskBrokerBoundary.ps1` still contains exactly one each of the following *function calls and expected polarities*, independent of test label wording: `ReadAndExecute → Assert-False`, `Modify → Assert-True`, `FullControl → Assert-True`. Its fail-closed in-memory negative mutations simulate missing/duplicate suite calls and missing/reversed ACL test calls. Native hosted Windows PowerShell 5.1 still executes the original unchanged suites; no native check was removed or count relaxed.
+
+| Contract | Before | After / owner |
+| --- | --- | --- |
+| TaskBroker Boundary/Migration aggregate registration | Three per-suite source-string observations across Release/Core/Boundary | Two authoritative anchored invocation checks in Contract Propagation, plus mandatory Windows execution |
+| Three ACL native test-label presence checks | Three copies each in all four permanent Python validators (12 greps) | Three ACL invocation/polarity structural checks in Contract Propagation, native execution remains 25/25 |
+| Native Boundary suite exists | Four static file-presence checks | Nonempty native source plus three structural checks in Contract Propagation, Windows runs unmodified |
+| Duplicate native source AST/count checks | Regression repeated Release-owned update AST, update 79, mutex 4 and system capability 47 expectations | Release and Contract Propagation remain canonical for counts; native fixed-count and Windows summary remain authoritative |
+| Four independent Python gate executables | Release/Core/Boundary/Regression | **All four retained** and executed independently |
+
+**Expected static gate delta:** Release 442 → 436, Core 267 → 261, Boundary 176 → 170, Regression 184 → 176; Contract Propagation 50 → 55 because five focused structural protections replace repeated text presence checks. These are intended assertion-count changes, **not removed native test cases**. Hosted Windows parser **67/67**, functional **610/610** (TaskBroker Boundary 25/25, Migration 42/42) are expected unchanged. Any change to an existing native total must still be synchronized under LBS-40; this P1 change intentionally makes none.
+
+**Deferred:** P2 owns UI/update/workflow Release–Regression duplicates. P3 owns authorization, ACL/schema and boot-security invariants across different trust surfaces. P1 does **not** consolidate them. A future cleanup may not reintroduce duplicate name-greps instead of using this single contract.
+
 ## Permanent Python gates
 
 | File | Category | Purpose |
