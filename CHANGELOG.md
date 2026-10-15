@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.1.5.0 – UI/update/workflow ownership cleanup (LBS-130 Phase P2)
+
+- Remove 31 repeated Release-owned UI, update, localization, capability and pipeline source checks from Regression while preserving its version-to-basis comparisons, negative safety invariants and independent gate execution.
+- Extend mandatory Contract Propagation with AST-level same-source/polarity overlap checks and five canonical owner proofs, including deterministic negative mutations for reintroduced overlap or missing owner.
+- Keep all native Windows PowerShell 5.1 tests, all four Python gate entry points, Candidate 3/3, Release 8/8, reproducibility, immutable history, TaskBroker/ACL/UEFI/BCD safeguards and Cloudflare behavior unchanged.
+- P1 remains completed; P3 remains explicitly open in GitHub #130. No application behavior or runtime-source change.
+
 ## v1.1.4.0 – Native test ownership consolidation (LBS-130 Phase P1)
 
 - Eliminate 26 redundant static assertions of identical native TaskBroker test labels, suite registrations and copies of already-owned native count/AST contracts; all four independent permanent validators remain executable.

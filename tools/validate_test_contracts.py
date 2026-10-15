@@ -93,6 +93,90 @@ def self_test_native_contract(aggregate: str, boundary: str) -> None:
                                         needle.group().replace(current, wrong, 1), 1)
         )
 
+
+# LBS-130/P2 — scoped, syntax-based ownership test for same-source same-polarity
+# UI/update/workflow checks. Opposite gates and TaskBroker/privilege assertions
+# are deliberately excluded: they protect distinct security boundaries (P3).
+P2_ALIASES = {
+    'template': 'app_template',
+    'cw': 'candidate_workflow',
+    'ww': 'windows_workflow',
+    'w': 'release_workflow',
+}
+P2_SOURCES = frozenset((
+    'ui', 'refresh_ui', 'popup_surface', 'popup_ui', 'update_runtime',
+    'app_template', 'transport', 'infra', 'language_ui',
+    'startup_recovery', 'system_capabilities', 'runtime_builder',
+    'candidate_workflow', 'windows_workflow', 'release_workflow',
+))
+P2_OWNER_LABELS = (
+    'LBS-14 click is gated by update interaction state',
+    'LBS-5 manifest transport is explicitly classified',
+    'LBS-17 language selector persists through active locale service',
+    'Candidate workflow requires work-branch provenance',
+    'Release workflow passes work branch into verification',
+)
+
+
+def p2_assertions(source: str) -> tuple[set[tuple[str, str, str]], set[str]]:
+    rows: set[tuple[str, str, str]] = set()
+    labels: set[str] = set()
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if not isinstance(node.func.value, ast.Name) or node.func.value.id != 's':
+            continue
+        if not node.args or not isinstance(node.args[0], ast.Constant):
+            continue
+        if not isinstance(node.args[0].value, str):
+            continue
+        labels.add(node.args[0].value)
+        if node.func.attr not in ('has', 'no') or len(node.args) < 3:
+            continue
+        target, token = node.args[1], node.args[2]
+        if not isinstance(target, ast.Name) or not isinstance(token, ast.Constant):
+            continue
+        if not isinstance(token.value, str):
+            continue
+        canonical = P2_ALIASES.get(target.id, target.id)
+        if canonical in P2_SOURCES:
+            rows.add((node.func.attr, canonical, token.value))
+    return rows, labels
+
+
+def p2_ownership_errors(release_source: str, regression_source: str) -> list[str]:
+    release_checks, release_labels = p2_assertions(release_source)
+    regression_checks, _ = p2_assertions(regression_source)
+    errors = [
+        'LBS-130/P2 duplicate permanent UI/update/workflow owner: ' + repr(entry)
+        for entry in sorted(release_checks & regression_checks)
+    ]
+    errors.extend(
+        'LBS-130/P2 canonical Release owner missing: ' + label
+        for label in P2_OWNER_LABELS if label not in release_labels
+    )
+    return errors
+
+
+def self_test_p2_ownership(release_source: str, regression_source: str) -> None:
+    """Negative mutations prove both duplicate rejection and owner preservation."""
+    assert not p2_ownership_errors(release_source, regression_source)
+    assert p2_ownership_errors(
+        release_source,
+        regression_source + "\n" + "s.has('injected overlap', cw, 'Work-Branch:')\n"
+    )
+    assert p2_ownership_errors(
+        release_source,
+        regression_source + "\n" + "s.no('injected overlap', app_template, 'Start-StartupUpdateCheck')\n"
+    )
+    for label in P2_OWNER_LABELS:
+        # Removing a migrated invariant's only permanent owner must fail closed.
+        position = release_source.find("s.has('" + label + "'")
+        assert position >= 0
+        mutated = release_source[:position] + "s.has('injected non-owner'" + release_source[position+len("s.has('" + label + "'"):]
+        assert p2_ownership_errors(mutated, regression_source)
+
 def validate(root: Path) -> tuple[list[str], int]:
     errors = []
     checks = 0
@@ -175,6 +259,15 @@ def validate(root: Path) -> tuple[list[str], int]:
         checks += 1
         if marker in regression_literals:
             errors.append('LBS-30 Release-owned literal duplicated in Regression: ' + marker)
+    # P2: unique Release ownership after eliminating identical Regression
+    # source checks, with injected negative cases for overlap and missing owner.
+    release_p2 = read_text(root / 'tests' / 'validate_release.py')
+    regression_p2 = read_text(root / 'tests' / 'validate_regression.py')
+    p2_errors = p2_ownership_errors(release_p2, regression_p2)
+    checks += 1 + len(P2_OWNER_LABELS)
+    errors.extend(p2_errors)
+    if not p2_errors:
+        self_test_p2_ownership(release_p2, regression_p2)
     return errors, checks
 
 
