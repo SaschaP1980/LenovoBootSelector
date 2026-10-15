@@ -41,6 +41,58 @@ def permanent_validator_literals(root: Path) -> list[tuple[str, str]]:
     return rows
 
 
+
+# LBS-130/P1: one authoritative structural contract for the native ACL cases
+# and their mandatory Windows aggregate registration. This is intentionally
+# different from old four-way greps of the human-readable assertion labels.
+def taskbroker_native_contract_errors(aggregate: str, boundary: str) -> list[str]:
+    errors: list[str] = []
+    for name in ('Test-TaskBrokerBoundary.ps1', 'Test-TaskBrokerMigration.ps1'):
+        invocation = (r"(?m)^\s*&\s*\(Join-Path\s+\$root\s+'"
+                      + re.escape("tests\\" + name) + r"'\)\s*$")
+        count = len(re.findall(invocation, aggregate))
+        if count != 1:
+            errors.append(f'LBS-130/P1 native runner requires exactly one executable {name}: found={count}')
+    for permission, expected in (
+        ('ReadAndExecute', 'False'), ('Modify', 'True'), ('FullControl', 'True')
+    ):
+        expression = (
+            r"(?m)^\s*Assert-(True|False)\s+['\"][^'\"\r\n]+['\"]\s+"
+            r"\(\s*Test-TaskBrokerRightsContainMutation\s+-Rights\s+"
+            r"\(\s*\[System\.Security\.AccessControl\.FileSystemRights\]::"
+            + permission + r"\s*\)\s*\)\s*$"
+        )
+        found = re.findall(expression, boundary)
+        if found != [expected]:
+            errors.append(f'LBS-130/P1 native ACL {permission} must execute Assert-{expected} once: got={found}')
+    return errors
+
+
+def self_test_native_contract(aggregate: str, boundary: str) -> None:
+    """Deterministic in-memory negative mutations, no privileged operations."""
+    assert taskbroker_native_contract_errors(aggregate, boundary) == []
+    for name in ('Test-TaskBrokerBoundary.ps1', 'Test-TaskBrokerMigration.ps1'):
+        marker = "& (Join-Path $root 'tests\\" + name + "')"
+        assert aggregate.count(marker) == 1
+        assert taskbroker_native_contract_errors(aggregate.replace(marker, '', 1), boundary)
+        assert taskbroker_native_contract_errors(aggregate.replace(marker, marker + '\n' + marker, 1), boundary)
+    for permission, current, wrong in (
+        ('ReadAndExecute', 'Assert-False', 'Assert-True'),
+        ('Modify', 'Assert-True', 'Assert-False'),
+        ('FullControl', 'Assert-True', 'Assert-False')
+    ):
+        needle = re.search(r'(?m)^\s*' + current +
+                           r'\s+[^\r\n]*\bTest-TaskBrokerRightsContainMutation\b'
+                           r'[^\r\n]*::' + permission + r'\b[^\r\n]*$', boundary)
+        assert needle is not None
+        assert taskbroker_native_contract_errors(
+            aggregate, boundary.replace(needle.group(), '', 1)
+        )
+        assert taskbroker_native_contract_errors(
+            aggregate, boundary.replace(needle.group(),
+                                        needle.group().replace(current, wrong, 1), 1)
+        )
+
 def validate(root: Path) -> tuple[list[str], int]:
     errors = []
     checks = 0
@@ -76,6 +128,16 @@ def validate(root: Path) -> tuple[list[str], int]:
         marker = match.group(1).replace('\\', '').strip()
         if marker not in emitted_markers:
             errors.append(f'Windows aggregate parses missing TOTAL marker: {marker!r}')
+
+    # P1: the native PowerShell suite runs under required hosted Windows PS5.1.
+    # Keep exactly one structural registration/ACL expectation owner here.
+    native_wrapper = sources.get('Test-WindowsPowerShell51.ps1', '')
+    native_acl_suite = sources.get('Test-TaskBrokerBoundary.ps1', '')
+    native_errors = taskbroker_native_contract_errors(native_wrapper, native_acl_suite)
+    checks += 5
+    errors.extend(native_errors)
+    if not native_errors:
+        self_test_native_contract(native_wrapper, native_acl_suite)
 
     # LBS-30: one-off localization acceptance is historical evidence, not an
     # active fifth validator. Machine-consumed release workflow contracts are

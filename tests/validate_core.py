@@ -230,13 +230,6 @@ def main():
     s.contains('v0.6.4.1 state validator delegates to ACL mutation predicate',install,'Test-TaskBrokerRightsContainMutation -Rights $rights')
     s.contains('v0.6.4.1 diagnostics expose physical TaskBroker presence',diagnostics,'$present = [bool](Test-TaskBrokerInstallationPresent)')
     s.contains('v0.6.4.1 diagnostics expose compatibility separately',diagnostics,'compatible = $compatible')
-    s.check('LBS-6 native boundary test exists',(root/'tests/Test-TaskBrokerBoundary.ps1').is_file())
-    native_boundary=txt(root/'tests/Test-TaskBrokerBoundary.ps1')
-    s.contains('v0.6.4.1 native boundary covers ReadAndExecute',native_boundary,'ReadAndExecute is accepted as non-mutating')
-    s.contains('v0.6.4.1 native boundary covers Modify',native_boundary,'Modify is rejected as mutating')
-    s.contains('v0.6.4.1 native boundary covers FullControl',native_boundary,'FullControl is rejected as mutating')
-    s.contains('LBS-6 native boundary test is aggregated',txt(root/'tests/Test-WindowsPowerShell51.ps1'),'Test-TaskBrokerBoundary.ps1')
-    s.contains('LBS-33 native migration test is aggregated',txt(root/'tests/Test-WindowsPowerShell51.ps1'),'Test-TaskBrokerMigration.ps1')
 
     update_test=txt(root/'tests/Test-UpdateCore.ps1')
     s.contains('LBS-5 update tests source transport module',update_test,"src\\Infrastructure\\UpdateTransport.ps1")
