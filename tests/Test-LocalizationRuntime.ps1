@@ -44,6 +44,18 @@ try {
     Assert-Localization 'Active locale starts as en-US' ((Get-ActiveLocale) -eq 'en-US')
     Assert-Localization 'Central English lookup works' ((Get-LocalizedString -Key 'Common.Cancel') -eq 'Cancel')
 
+    # LBS-30: native, observable catalog coverage migrated from the legacy
+    # source-literal-only LBS-23 validator (both supported locales).
+    foreach ($migrationKey in @('Language.MigrationTitle', 'Language.MigrationUseEnglish', 'Language.MigrationKeepGerman')) {
+        $english = Get-LocalizedStringCore -Key $migrationKey -Locale 'en-US'
+        $german = Get-LocalizedStringCore -Key $migrationKey -Locale 'de-DE'
+        Assert-Localization ('LBS-23 migration prompt resolves ' + $migrationKey) (
+            -not [string]::IsNullOrWhiteSpace([string]$english) -and
+            -not [string]::IsNullOrWhiteSpace([string]$german) -and
+            $english -ne $migrationKey -and $german -ne $migrationKey
+        )
+    }
+
     $selected = Set-ActiveLocale -Locale 'de-DE' -Persist
     Assert-Localization 'German selection resolves to de-DE' ($selected -eq 'de-DE')
     Assert-Localization 'Language selection writes settings file' (Test-Path -LiteralPath $script:SettingsPath -PathType Leaf)
@@ -476,5 +488,5 @@ finally {
     try { if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force } } catch { }
 }
 
-Write-Host "LOCALIZATION TOTAL $checks/81"
-if ($checks -ne 81) { throw "Expected 81 localization checks, got $checks" }
+Write-Host "LOCALIZATION TOTAL $checks/84"
+if ($checks -ne 84) { throw "Expected 84 localization checks, got $checks" }

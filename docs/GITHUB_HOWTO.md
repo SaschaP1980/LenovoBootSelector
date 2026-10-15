@@ -73,6 +73,10 @@ Do not rely on chat memory or off-repository transition artifacts for such knowl
 
 When interactive work reveals a durable fact that a future engineering session will need, update the appropriate repository documentation, Issue/comment, test, workflow, or source contract in the same workstream. The continuity test is simple: a fresh session with access only to GitHub must be able to recover the fact.
 
+## LBS-30 — reviewed one-file archival exception
+
+The GitHub Release Orchestrator continues to reject arbitrary tracked-file deletions. The unique LBS-30 migration deletes `tests/validate_lbs23_localization.py` **only** when the archived `tests-history/localization-v0.8.0.0.py` has exactly the same Git blob SHA as the previous canonical `origin/main` file. The exact one path is declared in `repositoryDeleteIntent`; any extra deletion remains blocked. All 74 original LBS-13 archives must be retained unchanged. Native localization behavior, fixed-count Contract Propagation and separate Linux/Windows Candidate, four Release/Core/Boundary/Regression and release integrity gates remain mandatory. The assertion mapping lives in `tests/README.md`.
+
 ## LBS-125 — bounded post-deployment health checks
 
 After a real Wrangler deploy, the helper `cloudflare/diagnostics-worker/scripts/verify-post-deploy-health.mjs` repeats the entire read-only health contract (including valid HTTP-200 stale fingerprints). It is strictly bounded: five requests, eight seconds each, 2/4/6/8-second delays, 70-second total budget. Invalid health identity or changed upload state blocks immediately. The single pending deployment receipt is finalized using existing success/failure steps; retries do not deploy or access Cloudflare secrets. The unchanged-Worker health-only verification remains unaffected. The helper is part of the deployment dependency fingerprint.

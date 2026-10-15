@@ -27,6 +27,10 @@ The dispatch step's failure is an explicit Release Orchestrator failure; a deplo
 
 Operational companion for ChatGPT/release supervision: [`GITHUB_HOWTO.md`](GITHUB_HOWTO.md).
 
+## LBS-30 single-file historical test archival (v1.1.3.0)
+
+One narrow exception to the ordinary release no-deletion policy permits removing the obsolete `tests/validate_lbs23_localization.py` active issue-specific validator. The original file must be archived unchanged under `tests-history/localization-v0.8.0.0.py`, and the workflow verifies its `origin/main` Git blob exactly matches the archived blob. The deletion set must consist of exactly that one path, declared in `repositoryDeleteIntent`; every other deletion remains fail-closed. The original 74 LBS-13 archives remain immutable. Native behavior ownership and selected Release startup-composition checks replace historical literal-only assertions. Candidate 3/3 and Release 8/8 gates, hosted Windows PowerShell 5.1, Contract Propagation, preactivation and ZIP reproducibility remain unchanged.
+
 ## Documentation-only scope
 
 Scope classification precedes release-level and work-branch selection.

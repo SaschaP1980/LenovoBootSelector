@@ -94,10 +94,20 @@ def main():
     readme=txt(root/'README.md') if (root/'README.md').is_file() else ''
     changelog=txt(root/'CHANGELOG.md') if (root/'CHANGELOG.md').is_file() else ''
     localization_doc=txt(root/'docs/LOCALIZATION.md') if (root/'docs/LOCALIZATION.md').is_file() else ''
-    lbs23_validator=root/'tests/validate_lbs23_localization.py'
-    s.c('LBS-23 focused localization migration validator exists',lbs23_validator.is_file())
-    lbs23_cp=subprocess.run([sys.executable,'-B',str(lbs23_validator),'--root',str(root)],capture_output=True,text=True) if lbs23_validator.is_file() else None
-    s.eq('LBS-23 focused localization migration validator passes',lbs23_cp.returncode if lbs23_cp else 1,0)
+    # LBS-30: native LocalizationRuntime/Core own migration behavior.
+    # Retain distinct startup-composition invariants in permanent Release.
+    s.c('LBS-30 one-off localization validator is historical',
+        not (root/'tests/validate_lbs23_localization.py').exists() and
+        (root/'tests-history/localization-v0.8.0.0.py').is_file())
+    language_ui=txt(root/'src/UI/LanguagePresentation.ps1')
+    app_template=txt(root/'src/App/LenovoBootSelector.template.ps1')
+    s.has('LBS-23 migration confirmation still invokes its choice dialog',
+          language_ui,'Show-LocaleMigrationDialog')
+    s.has('LBS-23 startup resolves pending locale before showing UI',
+          app_template,'[void](Resolve-PendingLocalePreference)')
+    s.c('LBS-23 entry preferences load before startup recovery module',
+        0 <= app_template.find('# @include src/Core/EntryPreferences.ps1') <
+        app_template.find('# @include src/UI/StartupRecoveryDialog.ps1'))
     s.has('README current development version matches canonical version',readme,f'**Current development version:** v{version}')
     s.has('CHANGELOG contains canonical version section',changelog,f'## v{version} ')
     s.c('LBS-17 localization architecture document exists',(root/'docs/LOCALIZATION.md').is_file())
@@ -119,11 +129,13 @@ def main():
     s.c('LBS-13 historical tests README exists',(root/'tests-history/README.md').is_file())
     s.c('LBS-13 no versioned validators remain in active tests',not any((root/'tests').glob('validate_v*.py')))
     historical_validators=sorted((root/'tests-history').glob('*.py')) if (root/'tests-history').is_dir() else []
-    historical_pattern=re.compile(r'^(release|core|boundary|regression)-v\d+\.\d+\.\d+(?:\.\d+)?\.py$')
-    s.c('LBS-13 historical validators use category plus readable version',bool(historical_validators) and all(historical_pattern.fullmatch(x.name) for x in historical_validators),[x.name for x in historical_validators if not historical_pattern.fullmatch(x.name)])
+    historical_pattern=re.compile(r'^(release|core|boundary|regression|localization)-v\d+\.\d+\.\d+(?:\.\d+)?\.py$')
+    s.c('Archived validators use category and readable version',bool(historical_validators) and all(historical_pattern.fullmatch(x.name) for x in historical_validators),[x.name for x in historical_validators if not historical_pattern.fullmatch(x.name)])
     historical_categories={x.name.split('-v',1)[0] for x in historical_validators}
-    s.eq('LBS-13 all historical test categories retained',historical_categories,{'release','core','boundary','regression'})
-    s.eq('LBS-13 historical validator count retained',len(historical_validators),74)
+    s.eq('LBS-13 original four categories plus LBS-30 localization',historical_categories,{'release','core','boundary','regression','localization'})
+    original_history=[p for p in historical_validators if p.name!='localization-v0.8.0.0.py']
+    s.eq('LBS-13 original historical validator count preserved',len(original_history),74)
+    s.eq('LBS-30 exactly one archived localization validator added',len(historical_validators),75)
     # Native harness count contracts: protect against silent assertion-count drift.
     update_test=txt(root/'tests/Test-UpdateCore.ps1')
     update_controller_test=txt(root/'tests/Test-UpdateController.ps1') if (root/'tests/Test-UpdateController.ps1').is_file() else ''
@@ -145,8 +157,8 @@ def main():
     windows_wrapper=txt(root/'tests/Test-WindowsPowerShell51.ps1')
     s.has('LBS-26 native aggregate runner invokes update controller suite',windows_wrapper,'Test-UpdateController.ps1')
     s.c('LBS-17 native localization test exists',bool(localization_native))
-    s.has('LBS-111 native localization test keeps fixed total 41',localization_native,'Write-Host "LOCALIZATION TOTAL $checks/81"')
-    s.has('LBS-23 native localization test fails closed on count drift',localization_native,'if ($checks -ne 81) { throw "Expected 81 localization checks, got $checks" }')
+    s.has('LBS-111 native localization test keeps fixed total 41',localization_native,'Write-Host "LOCALIZATION TOTAL $checks/84"')
+    s.has('LBS-23 native localization test fails closed on count drift',localization_native,'if ($checks -ne 84) { throw "Expected 84 localization checks, got $checks" }')
     s.has('LBS-17 native localization test covers persisted language selection',localization_native,"Set-ActiveLocale -Locale 'de-DE' -Persist")
     s.has('LBS-23 native localization test covers English legacy migration',localization_native,'Pre-localization schema migrates to en-US')
     s.has('LBS-17 native aggregate runner invokes localization suite',windows_wrapper,"Test-LocalizationRuntime.ps1")

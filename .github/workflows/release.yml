@@ -258,6 +258,24 @@ jobs:
                 echo "LBS-13 migration left versioned validators in active tests/." >&2
                 exit 1
               fi
+            elif git cat-file -e origin/main:tests/validate_lbs23_localization.py 2>/dev/null && \
+                 test -f tests-history/localization-v0.8.0.0.py; then
+              # LBS-30: narrowly approved, byte-for-byte historical archival.
+              # Never treat this as a general test/validator deletion waiver.
+              test "$DELETED_PATHS" = 'tests/validate_lbs23_localization.py' || {
+                echo "LBS-30 deletion set must contain only the retired validator." >&2
+                exit 1
+              }
+              test ! -e tests/validate_lbs23_localization.py || {
+                echo "LBS-30 archived validator remains active." >&2
+                exit 1
+              }
+              OLD_VALIDATOR_BLOB=$(git rev-parse 'origin/main:tests/validate_lbs23_localization.py')
+              ARCHIVED_VALIDATOR_BLOB=$(git rev-parse 'HEAD:tests-history/localization-v0.8.0.0.py')
+              test "$OLD_VALIDATOR_BLOB" = "$ARCHIVED_VALIDATOR_BLOB" || {
+                echo "LBS-30 archival source is not byte-identical." >&2
+                exit 1
+              }
             elif git cat-file -e origin/main:src/App/LenovoBootMenuTray.template.ps1 2>/dev/null && \
                  test -f src/App/LenovoBootSelector.template.ps1; then
               EXPECTED_LBS19_DELETIONS='src/App/LenovoBootMenuTray.template.ps1'
