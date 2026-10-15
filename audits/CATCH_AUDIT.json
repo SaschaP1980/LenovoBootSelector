@@ -1,5 +1,5 @@
 {
-  "version": "0.11.1.2",
+  "version": "0.11.1.3",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
@@ -704,35 +704,35 @@
     },
     {
       "source": "src/UI/LanguagePresentation.ps1",
-      "line": 45,
+      "line": 46,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "} catch { }"
     },
     {
       "source": "src/UI/LanguagePresentation.ps1",
-      "line": 48,
+      "line": 49,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { Update-AutostartUi | Out-Null } catch { }"
     },
     {
       "source": "src/UI/LanguagePresentation.ps1",
-      "line": 49,
+      "line": 50,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { Update-MaintenanceUi } catch { }"
     },
     {
       "source": "src/UI/LanguagePresentation.ps1",
-      "line": 50,
+      "line": 51,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { Update-ManageEntriesUiState } catch { }"
     },
     {
       "source": "src/UI/LanguagePresentation.ps1",
-      "line": 51,
+      "line": 52,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { Update-PopupRows } catch { }"

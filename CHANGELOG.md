@@ -1,5 +1,13 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.11.1.3 – Fix diagnostics upload tray localization
+
+- Refresh the diagnostics upload menu item from the canonical `Diagnostics.Upload` localization key when switching languages while the tray application remains running.
+- Use `Upload diagnostics…` (English sentence case); retain `Diagnose hochladen…` in the German catalog and keep the menu order and upload click action unchanged.
+- Extend real Windows PowerShell 5.1 localization regressions for both live language-switch directions, both diagnostics menu labels and safe handling when the upload menu item is absent.
+- Deterministically update the generated runtime and associated source audits. No change to the diagnostics archive, cloud storage, Task Broker or safety boundaries.
+- Release profile `patch` because product source `src/**` changes.
+
 ## v0.11.1.2 – Release-gated automatic Cloudflare Worker deployment
 
 - Remove recurring manual GitHub Actions dispatch for production Worker updates. The verified Release Orchestrator now launches the separate secret-isolated deployment workflow after final Release Verification PASS, passing the exact released main commit and version through a protected `workflow_dispatch`.

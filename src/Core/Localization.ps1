@@ -75,7 +75,7 @@ function Get-LocalizationCatalogCore {
             'Update.Check' = 'Check for new version…'
             'Update.Install' = 'Update app…'
             'Diagnostics.Save' = 'Save diagnostics…'
-            'Diagnostics.Upload' = 'Upload Diagnostics…'
+            'Diagnostics.Upload' = 'Upload diagnostics…'
             'Boot.OtherTarget' = 'Other boot target'
             'Boot.OtherTargetTooltip' = 'Gray: other boot target'
             'Boot.MenuTitle' = 'Lenovo Boot Menu'
