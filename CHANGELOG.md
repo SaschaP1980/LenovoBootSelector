@@ -1,5 +1,13 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.1.0.0 – Explicit settings-load recovery states (LBS-32)
+
+- Distinguish first-run missing settings (`Missing`) from normalized persisted settings (`Loaded`), malformed/invalid settings (`Invalid`), and settings that cannot be probed/read (`Unreadable`), preserving safe runtime defaults without hiding the failure.
+- Emit structured `SETTINGS_LOAD_FALLBACK` and `SETTINGS_SAVE_BLOCKED` diagnostic events with category-only metadata; never include raw settings contents or user paths in error events.
+- Fail closed on attempts to save over a known-invalid or unreadable `settings.json`. The exact original application-owned file is preserved. Restoration/removal of that file followed by an explicit clean reload is the documented recovery transition; no automatic arbitrary file deletion, rename or risky overwrite.
+- Keep schema 6, English default, explicit German preference, migration-pending locale state and legacy default-target migration unchanged. Preserve existing deterministic UTF-8 no-BOM JSON and same-directory temporary replacement for valid saves.
+- Extend permanent native Windows PowerShell 5.1 behavior tests and release-validator contracts. No changes to UEFI/BCD/TaskBroker, device privilege boundaries, firmware writes or Cloudflare Worker.
+
 ## v1.0.1.1 – Restore complete language labels (hotfix)
 
 - Fix the v1.0.1.0 tray Language submenu regression that clipped `English` and `Deutsch` after the new flag icons. Use a fresh, item-local text rectangle across the full available language row rather than narrowing the precomputed WinForms text rectangle.

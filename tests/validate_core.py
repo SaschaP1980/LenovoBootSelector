@@ -129,6 +129,7 @@ def main():
 
     # Thin shell adapters actually consume the core; no dead extraction.
     getset=ps_function(tray,'Get-AppSettings') or ''
+    getsettingsresult=ps_function(tray,'Get-AppSettingsLoadResult') or ''
     saveset=ps_function(tray,'Save-AppSettings') or ''
     loadset=ps_function(tray,'Load-AppSettings') or ''
     localize_service=txt(root/'src/Application/LocalizationService.ps1') if (root/'src/Application/LocalizationService.ps1').is_file() else ''
@@ -136,9 +137,12 @@ def main():
     order=ps_function(tray,'Get-OrderedEntriesForUi') or ''
     friendly=ps_function(tray,'Get-FriendlyBootEntry') or ''
     fwstate=ps_function(tray,'Get-FirmwareBootState') or ''
-    s.contains('Settings shell calls default core',getset,'New-DefaultAppSettingsCore')
-    s.contains('Settings shell calls normalization core',getset,'ConvertTo-NormalizedAppSettingsCore')
-    s.contains('Settings shell delegates repository read',getset,'Read-AppSettingsRepository')
+    s.contains('LBS-32 Settings getter delegates to explicit outcome',getset,'Get-AppSettingsLoadResult')
+    s.contains('LBS-32 Settings result handles safe default core',getsettingsresult,'New-DefaultAppSettingsCore')
+    s.contains('LBS-32 Settings result delegates Core normalization',getsettingsresult,'ConvertTo-NormalizedAppSettingsCore')
+    s.contains('LBS-32 Settings result delegates classified repository read',getsettingsresult,'Read-AppSettingsRepositoryResult')
+    s.contains('LBS-32 Save refuses unsafe recovery',saveset,'SETTINGS_SAVE_BLOCKED')
+    s.contains('LBS-32 Load emits structured fallback event',loadset,'SETTINGS_LOAD_FALLBACK')
     s.contains('LBS-23 settings save current schema',saveset,'schemaVersion = 6')
     s.contains('LBS-17 settings save locale',saveset,'locale = Resolve-LocaleIdCore -Locale $script:UiLocale')
     s.contains('LBS-17 settings load locale',loadset,'$script:UiLocale = Resolve-LocaleIdCore')

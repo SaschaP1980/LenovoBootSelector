@@ -955,6 +955,7 @@ $script:AutostartRunValueName = 'Lenovo Boot Selector'
 $script:LegacyAutostartRunValueName = 'Lenovo Boot Menu Tray'
 $script:SettingsDir = Join-Path $env:LOCALAPPDATA 'Lenovo Boot Menu Tray'
 $script:SettingsPath = Join-Path $script:SettingsDir 'settings.json'
+$script:SettingsLoadState = $null
 $script:UiLocale = 'en-US'
 $script:LocalePreferenceSource = 'default'
 $script:LocalePreferenceNeedsConfirmation = $false
