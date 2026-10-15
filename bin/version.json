@@ -1,11 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "1.1.0.0",
-  "releaseProfile": "patch",
-  "protectedFragmentIntent": [
-    "ps:Get-AppSettings",
-    "ps:Load-AppSettings",
-    "ps:Save-AppSettings"
-  ],
+  "version": "1.1.0.1",
+  "releaseProfile": "version-only",
+  "protectedFragmentIntent": [],
   "repositoryDeleteIntent": []
 }
