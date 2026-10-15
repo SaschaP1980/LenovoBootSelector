@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.0.1.0 – Add country flags to language submenu
+
+- Add small locally drawn US and German flags to the left of the corresponding `en-US` English and `de-DE` Deutsch tray submenu choices, without changing the supported language set.
+- Keep the right-aligned selected-language checkmark, existing dark menu renderer, selection/hover behavior and keyboard access. Locale flag drawing and text inset are restricted to the named language submenu; unrelated menus keep their original appearance.
+- Draw flags as DPI-scaled, resource-safe GDI+ primitives instead of relying on Windows emoji glyphs, external assets or native image gutters.
+- Add permanent Windows PowerShell 5.1 regression coverage for flag mapping, geometric spacing, rendered colors and existing locale-selection state. No changes to locale catalog/default, privilege boundaries, UEFI, settings migration or Cloudflare Worker.
+
 ## v1.0.0.0 – First stable release
 
 - Designate the verified v0.11.1.4 Lenovo Boot Selector feature and behavior baseline as the first stable major release after successful daily use.
