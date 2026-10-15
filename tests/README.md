@@ -6,6 +6,26 @@
 
 `cloudflare/diagnostics-worker/tests/conditional-deploy.test.mjs` validates LBS-123 deployment fingerprints, successful-production-receipt guards, health-only versus deployment decisions, source/runtime workflow invariants and the pinned Windows upload contract. The trusted Worker job runs it through the existing complete Node test suite only when a new Worker deployment is required; hosted Work-Branch Diagnostics Worker CI runs it for changed backend sources. A version-only release with a verified matching live fingerprint instead takes the secret-free health-only path.
 
+## LBS-30 assertion ownership and historical localization (v1.1.3.0)
+
+The original LBS-23 validator has **32 assertions** and is archived byte-identically as `tests-history/localization-v0.8.0.0.py`. It no longer runs as a fifth active gate.
+
+| Old LBS-23 assertion category | Count | Permanent owner |
+| --- | ---: | --- |
+| Preference schema/core migration and normalization | 8 | Core / native FunctionalCore and LocalizationRuntime |
+| Settings persistence and restoration | 4 | Native LocalizationRuntime settings tests |
+| Explicit locale service | 2 | Native locale selection, persistence and reload |
+| Startup recovery locale | 2 | Native startup-recovery behavior and Release wiring check |
+| UI choice-dialog migration | 3 | Native explicit choice/confirmation and Release dialog integration |
+| Bilingual migration catalog keys | 3 | Three *new* native localization lookup tests (both locales) |
+| Startup template composition and order | 2 | Permanent Release startup ordering and resolver integration checks |
+| Source-text presence of six native test names | 6 | The actual six native migration tests executed on Windows, not tests-of-test-names |
+| Exact natural-language document fragments | 2 | Existing Release/localization documentation contracts |
+
+**Owners:** Release controls packaging, repository history, documentation, workflow integrity and distinct startup composition; Core controls pure module behavior; Boundary controls privilege/security and independently protects runtime/installer trust boundaries; Regression controls basis comparisons and declared change intent. Exactly **27** duplicate Release-owned source-literal assertions were removed from Regression. Existing independent TaskBroker/privilege assertions are intentionally preserved, not counted as redundant simply because of similar spelling.
+
+**Gate execution is not assertion duplication.** The four permanent Python gates remain separately executed by Development Completion, Candidate and Release; the propagation validator remains mandatory and hosted Windows PowerShell 5.1 executes the native tests. Candidate 3/3, Release 8/8, reproducibility/history/ZIP and source-tag checks are unchanged. The original 74 LBS-13 historical validators remain; the archived LBS-23 file becomes the 75th, with a one-file deletion and byte-identical Git archive proof enforced by Release.
+
 ## Permanent Python gates
 
 | File | Category | Purpose |
@@ -78,7 +98,7 @@ Native PowerShell suites intentionally use different count strategies; one gener
 | `Test-FunctionalCore.ps1` | Dynamic PASS counting; includes deterministic LBS-31 storage-resolution cases with no hardware dependency. |
 | `Test-StorageInfrastructure.ps1` | Straight-line: fixed runtime count of 17 covering Windows disk/partition normalization, per-disk partition-query failure, and unavailable inventory. |
 | `Test-UIPresentation.ps1` | Straight-line: fixed runtime count of 25 covering normal selected rows, hidden/manage visual state, alias-editor state, hover behavior, scroll layout, and canonical capability interaction gates using real WinForms controls. |
-| `Test-LocalizationRuntime.ps1` | Straight-line: fixed runtime count of 81 covering native locale selection, explicit-preference persistence, v0.8.0.0 ambiguity resolution, startup-recovery migration, catalog parity, LBS-111 live diagnostics menu refresh and LBS-117 scoped US/German flag drawing, DPI geometry, checkmark preservation, hotfix full-label WinForms rasterization under narrow native text rectangles, and authentic US stripe endpoints, and LBS-32 missing/loaded/invalid/unreadable settings load outcomes, structured diagnostics, fail-closed preservation and explicit recovery. |
+| `Test-LocalizationRuntime.ps1` | Straight-line: fixed runtime count of 84 covering native locale selection, explicit-preference persistence, v0.8.0.0 ambiguity resolution, startup-recovery migration, catalog parity, LBS-111 live diagnostics menu refresh and LBS-117 scoped US/German flag drawing, DPI geometry, checkmark preservation, hotfix full-label WinForms rasterization under narrow native text rectangles, and authentic US stripe endpoints, and LBS-32 missing/loaded/invalid/unreadable settings load outcomes, structured diagnostics, fail-closed preservation and explicit recovery. |
 | `Test-WindowsPowerShell51.ps1` | Aggregate runner/parser gate; file count is dynamic and is not an assertion-coverage count. |
 
 When assertions are added, the corresponding contract must be updated deliberately. In particular, the fixed `79` guard in the update test must not be derived automatically from the source count: it is an additional change-control guard so that a suite extension cannot pass unnoticed.
