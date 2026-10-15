@@ -16,6 +16,7 @@ const EXACT_FILES = [
   "cloudflare/diagnostics-worker/wrangler.jsonc",
   ".github/workflows/deploy-diagnostics-worker.yml",
   "cloudflare/diagnostics-worker/scripts/deployment-plan.mjs",
+  "cloudflare/diagnostics-worker/scripts/verify-post-deploy-health.mjs",
   "src/Infrastructure/DiagnosticsUploadTransport.ps1",
   "src/Infrastructure/DiagnosticsIdentity.ps1",
   "tests/Test-DiagnosticsUploadTransport.ps1",
