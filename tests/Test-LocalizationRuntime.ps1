@@ -340,6 +340,134 @@ try {
         $otherMenu.Dispose()
     }
 
+
+    # LBS-32: persisted settings must not be silently replaced after load failures.
+    $script:SettingsDiagnosticsObserved = @()
+    function New-RuntimeDiagnosticData { param([hashtable]$Values) return $Values }
+    function Write-RuntimeDiagnosticEvent {
+        param([string]$Event, [string]$Stage, $Success, $Data, [string]$Level)
+        $script:SettingsDiagnosticsObserved += [pscustomobject]@{
+            Event = $Event; Stage = $Stage; Success = $Success; Data = $Data; Level = $Level
+        }
+    }
+
+    Remove-Item -LiteralPath $script:SettingsPath -Force -ErrorAction SilentlyContinue
+    $missingOutcome = Get-AppSettingsLoadResult
+    Assert-Localization 'LBS-32 missing file is a non-error first-run outcome' (
+        $missingOutcome.Status -eq 'Missing' -and -not $missingOutcome.PersistenceBlocked -and
+        $missingOutcome.Settings.locale -eq 'en-US'
+    )
+    $null = Get-AppSettings
+    Assert-Localization 'LBS-32 settings getter exposes Missing status separately' (
+        $script:SettingsLoadState.Status -eq 'Missing'
+    )
+
+    $goodSettings = [ordered]@{
+        schemaVersion=6; locale='de-DE'; localePreferenceSource='user'
+        defaultGuid=$null; entryOrder=@('ABC','abc'); hiddenEntryGuids=@('AAA')
+        entryAliases=[ordered]@{ 'ABC'='Müller' }
+    }
+    Write-AppSettingsRepository -Directory $script:SettingsDir -Path $script:SettingsPath -Payload $goodSettings
+    $loadedOutcome = Get-AppSettingsLoadResult
+    Assert-Localization 'LBS-32 loaded outcome preserves schema-6 locale and normalized entries' (
+        $loadedOutcome.Status -eq 'Loaded' -and -not $loadedOutcome.PersistenceBlocked -and
+        $loadedOutcome.Settings.locale -eq 'de-DE' -and
+        $loadedOutcome.Settings.localePreferenceSource -eq 'user' -and
+        @($loadedOutcome.Settings.entryOrder).Count -eq 1
+    )
+    Load-AppSettings
+    Assert-Localization 'LBS-32 successful reload records Loaded state' (
+        $script:SettingsLoadState.Status -eq 'Loaded' -and $script:UiLocale -eq 'de-DE'
+    )
+
+    $malformed = '{ "schemaVersion": 6, broken JSON '
+    [IO.File]::WriteAllText($script:SettingsPath, $malformed, (New-Object Text.UTF8Encoding($false)))
+    $invalidOutcome = Get-AppSettingsLoadResult
+    Assert-Localization 'LBS-32 invalid JSON is not classified as missing' (
+        $invalidOutcome.Status -eq 'Invalid' -and
+        $invalidOutcome.FailureKind -eq 'ParseFailure' -and
+        $invalidOutcome.PersistenceBlocked -and $invalidOutcome.Settings.locale -eq 'en-US'
+    )
+    $script:SettingsDiagnosticsObserved = @()
+    Load-AppSettings
+    Assert-Localization 'LBS-32 invalid persisted state has safe runtime defaults' (
+        $script:UiLocale -eq 'en-US' -and $script:SettingsLoadState.Status -eq 'Invalid'
+    )
+    Assert-Localization 'LBS-32 invalid settings produce structured failure diagnostics' (
+        @($script:SettingsDiagnosticsObserved | Where-Object {
+            $_.Event -eq 'SETTINGS_LOAD_FALLBACK' -and $_.Stage -eq 'settings' -and
+            $_.Data.status -eq 'Invalid' -and $_.Data.failureKind -eq 'ParseFailure' -and
+            $_.Data.persistenceBlocked -eq $true
+        }).Count -eq 1
+    )
+    $blockedSave = $false
+    try { Save-AppSettings } catch { $blockedSave = $true }
+    Assert-Localization 'LBS-32 save blocks known-invalid source without overwriting bytes' (
+        $blockedSave -and [IO.File]::ReadAllText($script:SettingsPath) -ceq $malformed
+    )
+    Assert-Localization 'LBS-32 blocked settings save is observable' (
+        @($script:SettingsDiagnosticsObserved | Where-Object { $_.Event -eq 'SETTINGS_SAVE_BLOCKED' }).Count -gt 0
+    )
+
+    Write-AppSettingsRepository -Directory $script:SettingsDir -Path $script:SettingsPath -Payload $goodSettings
+    $stillBlocked = $false
+    try { Save-AppSettings } catch { $stillBlocked = $true }
+    Assert-Localization 'LBS-32 external repair requires explicit clean reload before saving' $stillBlocked
+    Load-AppSettings
+    Save-AppSettings
+    Assert-Localization 'LBS-32 successful reload allows deterministic schema-6 save' (
+        $script:SettingsLoadState.Status -eq 'Loaded' -and
+        ([IO.File]::ReadAllText($script:SettingsPath) | ConvertFrom-Json).schemaVersion -eq 6 -and
+        -not (Test-Path -LiteralPath ($script:SettingsPath + '.tmp'))
+    )
+
+    [IO.File]::WriteAllText($script:SettingsPath, 'null', (New-Object Text.UTF8Encoding($false)))
+    $nullRoot = Get-AppSettingsLoadResult
+    Assert-Localization 'LBS-32 JSON null root is Invalid not Missing' (
+        $nullRoot.Status -eq 'Invalid' -and $nullRoot.FailureKind -eq 'InvalidRoot'
+    )
+
+    [IO.File]::WriteAllText($script:SettingsPath, '{"schemaVersion":"not-an-int"}', (New-Object Text.UTF8Encoding($false)))
+    $badNormalize = Get-AppSettingsLoadResult
+    Assert-Localization 'LBS-32 invalid schema normalization is explicitly reported' (
+        $badNormalize.Status -eq 'Invalid' -and $badNormalize.FailureKind -eq 'NormalizeFailure'
+    )
+
+    Remove-Item -LiteralPath $script:SettingsPath -Force
+    [void](New-Item -ItemType Directory -Path $script:SettingsPath -Force)
+    $unreadable = Get-AppSettingsLoadResult
+    Assert-Localization 'LBS-32 non-readable path reports Unreadable not first run' (
+        $unreadable.Status -eq 'Unreadable' -and
+        $unreadable.FailureKind -eq 'ReadFailure' -and $unreadable.PersistenceBlocked
+    )
+    $script:SettingsDiagnosticsObserved = @()
+    Load-AppSettings
+    Assert-Localization 'LBS-32 I/O failure survives as application state and diagnostics' (
+        $script:SettingsLoadState.Status -eq 'Unreadable' -and
+        @($script:SettingsDiagnosticsObserved | Where-Object {
+            $_.Event -eq 'SETTINGS_LOAD_FALLBACK' -and $_.Data.status -eq 'Unreadable'
+        }).Count -eq 1
+    )
+    $noDirectoryOverwrite = $false
+    try { Save-AppSettings } catch { $noDirectoryOverwrite = $true }
+    Assert-Localization 'LBS-32 unreadable directory is preserved after rejected save' (
+        $noDirectoryOverwrite -and (Test-Path -LiteralPath $script:SettingsPath -PathType Container)
+    )
+    Remove-Item -LiteralPath $script:SettingsPath -Recurse -Force
+    Load-AppSettings
+    Assert-Localization 'LBS-32 repaired missing path permits first-run saving' (
+        $script:SettingsLoadState.Status -eq 'Missing'
+    )
+    $script:EntryAliases = @{ '{abcdef12-3456-7890-abcd-ef1234567890}' = 'Müller' }
+    Save-AppSettings
+    $savedBytes = [IO.File]::ReadAllBytes($script:SettingsPath)
+    $savedText = [IO.File]::ReadAllText($script:SettingsPath, [Text.Encoding]::UTF8)
+    Assert-Localization 'LBS-32 repaired settings persist as UTF-8 without BOM' (
+        $savedBytes.Length -gt 2 -and
+        -not ($savedBytes[0] -eq 0xEF -and $savedBytes[1] -eq 0xBB -and $savedBytes[2] -eq 0xBF) -and
+        $savedText.Contains('Müller') -and -not (Test-Path -LiteralPath ($script:SettingsPath + '.tmp'))
+    )
+
     Assert-Localization 'English and German catalogs have identical key sets' (Test-LocalizationCatalogParityCore)
     Assert-Localization 'Named localization formatting is deterministic' ((Get-LocalizedStringCore -Key 'Storage.InternalSsdModel' -Locale 'en-US' -Values @{ Model='TEST' }) -eq 'Internal SSD: TEST')
 }
@@ -348,5 +476,5 @@ finally {
     try { if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force } } catch { }
 }
 
-Write-Host "LOCALIZATION TOTAL $checks/63"
-if ($checks -ne 63) { throw "Expected 63 localization checks, got $checks" }
+Write-Host "LOCALIZATION TOTAL $checks/81"
+if ($checks -ne 81) { throw "Expected 81 localization checks, got $checks" }
