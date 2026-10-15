@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.1.1.0 – Conditional Cloudflare Diagnostics Worker deployment (LBS-123)
+
+- Only redeploy the Diagnostics Worker after a verified release when its tracked Worker code, Wrangler configuration, deployment workflow or diagnostics-upload contract has changed since the last verified healthy production rollout.
+- Require a durable, successful GitHub production deployment receipt and matching live `/health` deployment fingerprint before taking a secret-free read-only `HEALTH_ONLY_PASS` route for unchanged releases. First bootstrap and failed/incomplete prior deployments take the full deployment route; inconsistent successful receipt/live state is blocked.
+- For real changes preserve full Node/ZIP/PowerShell compatibility tests, Wrangler dry-run, existing scoped Cloudflare credentials, protected production deployment, upload-state parity, post-deployment health and persistent production receipt. Manual break-glass recovery remains a full deployment.
+- Preserve the verified release main SHA/version/tag/ZIP checks, one-at-a-time production deployment and explicit `DEPLOYED_AND_HEALTHY` status. No automatic archive backfill, KV mutations, secret rotation, paid service enablement or Boot/UEFI/TaskBroker modifications.
+
 ## v1.1.0.1 – Version-only Hotfix (Work-Path benchmark)
 
 - Increase the application version from v1.1.0.0 to v1.1.0.1 without any product behavior, settings, UI, TaskBroker, firmware, diagnostics, dependency or Cloudflare Worker change.

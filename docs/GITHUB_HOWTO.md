@@ -73,6 +73,10 @@ Do not rely on chat memory or off-repository transition artifacts for such knowl
 
 When interactive work reveals a durable fact that a future engineering session will need, update the appropriate repository documentation, Issue/comment, test, workflow, or source contract in the same workstream. The continuity test is simple: a fresh session with access only to GitHub must be able to recover the fact.
 
+## Conditional Cloudflare deployment outcome (LBS-123)
+
+After every verified product release the trusted Worker workflow checks the latest successful GitHub production deployment receipt plus the live deployment fingerprint. `HEALTH_ONLY_PASS` means no Cloudflare production deployment or deployment-secret consumption; `DEPLOYED_AND_HEALTHY` means the full Worker deployment path succeeded. Never claim Worker deployment from a source Release Orchestrator PASS alone. A drift/malformed/failed receipt must not silently pass as unchanged. This mechanism was introduced in v1.1.1.0; older releases always redeployed.
+
 ## Source of truth
 
 - `main` is the canonical development basis.
