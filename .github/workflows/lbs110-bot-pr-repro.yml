@@ -1,0 +1,82 @@
+name: LBS-110 Bot PR Approval Reproduction
+
+on:
+  push:
+    branches:
+      - 'work/LBS-110'
+    paths:
+      - '.github/workflows/lbs110-bot-pr-repro.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  reproduce:
+    if: github.repository == 'SaschaP1980/LenovoBootSelector' && github.ref == 'refs/heads/work/LBS-110'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Observe GITHUB_TOKEN-created PR approval without approving or deploying
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          expected_main='887227cf4d78ef7b43512c82980f0df87081fa9c'
+          actual_main=$(gh api "repos/$repo/branches/main" --jq '.commit.sha')
+          test "$actual_main" = "$expected_main" || { echo 'LBS110_ABORT: main moved'; exit 1; }
+          test "$GITHUB_REF" = 'refs/heads/work/LBS-110'
+          branch="repro/LBS-110-bot-pr-$GITHUB_RUN_ID"
+          pr_number=''
+          ref_created=false
+          pr_closed=false
+          cleanup() {
+            set +e
+            if [ -n "$pr_number" ] && [ "$pr_closed" = false ]; then
+              gh api -X PATCH "repos/$repo/pulls/$pr_number" -f state=closed >/dev/null
+            fi
+            if [ "$ref_created" = true ]; then
+              gh api -X DELETE "repos/$repo/git/refs/heads/$branch" >/dev/null
+            fi
+          }
+          trap cleanup EXIT
+          gh api -X POST "repos/$repo/git/refs" -f "ref=refs/heads/$branch" -f "sha=$GITHUB_SHA" >/dev/null
+          ref_created=true
+          pr_number=$(gh api -X POST "repos/$repo/pulls" \
+            -f base=main -f "head=$branch" \
+            -f title='[LBS-110] Controlled bot PR approval experiment - do not merge' \
+            -f body='This isolated PR is created by GITHUB_TOKEN to observe CI approval state. Do not approve or merge. It is closed automatically. No Cloudflare write or secret access.' \
+            --jq '.number')
+          echo "LBS110_PR=https://github.com/$repo/pull/$pr_number"
+          last_id=''
+          sample() {
+            phase="$1"
+            id=$(gh api "repos/$repo/actions/runs?event=pull_request&head_sha=$GITHUB_SHA&per_page=100" \
+              --jq "[.workflow_runs[] | select(.name == \"Diagnostics Worker CI\" and .head_branch == \"$branch\") | .id][0] // empty")
+            if [ -z "$id" ]; then
+              echo "LBS110_SAMPLE phase=$phase run=not-yet-visible"
+              return 0
+            fi
+            last_id="$id"
+            details=$(gh api "repos/$repo/actions/runs/$id" \
+              --jq '[.status, (.conclusion // "null"), .event] | join("|")')
+            jobs=$(gh api "repos/$repo/actions/runs/$id/jobs?per_page=100" --jq '.total_count')
+            echo "LBS110_SAMPLE phase=$phase run=$id details=$details jobs=$jobs"
+          }
+          # Keep the bot PR open to distinguish an approval gate from a deletion race.
+          for attempt in $(seq 1 16); do
+            sample "open-$attempt"
+            sleep 4
+          done
+          gh api -X PATCH "repos/$repo/pulls/$pr_number" -f state=closed >/dev/null
+          pr_closed=true
+          echo 'LBS110_PR_CLOSED=true'
+          for attempt in $(seq 1 8); do
+            sample "closed-$attempt"
+            sleep 3
+          done
+          echo "LBS110_REPRO_SUMMARY pr=$pr_number run=${last_id:-none} branch=$branch"
+          # EXIT cleanup deletes only this workflow-owned temporary repro ref.
