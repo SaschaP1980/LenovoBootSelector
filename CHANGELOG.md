@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.0.0.0 – First stable release
+
+- Designate the verified v0.11.1.4 Lenovo Boot Selector feature and behavior baseline as the first stable major release after successful daily use.
+- No new features, functionality changes, Windows/UEFI/TaskBroker behavior changes, settings migrations or changes to privilege boundaries; all product sources under `src/**` remain byte-for-byte identical to v0.11.1.4.
+- Only the version injected into the deterministically generated runtime and the version fields in existing catch-audit and architecture-baseline metadata change before publication. The established Linux/Windows Candidate, Release and deployment safety gates remain fully enforced.
+- Release profile: `version-only`. The preserved v1.0.0.0 tag, source and ZIP archives provide a durable stable reference for subsequent feature development.
+
 ## v0.11.1.4 – Restrict Diagnostics Worker CI to work-branch pushes
 
 - Remove the redundant `pull_request` trigger from Diagnostics Worker CI. Only relevant `push` changes on `work/LBS-*` execute its Linux Node/Wrangler and hosted Windows jobs; ordinary, external and automated release PRs do not run these additional checks.
