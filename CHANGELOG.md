@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v0.11.1.4 – Restrict Diagnostics Worker CI to work-branch pushes
+
+- Remove the redundant `pull_request` trigger from Diagnostics Worker CI. Only relevant `push` changes on `work/LBS-*` execute its Linux Node/Wrangler and hosted Windows jobs; ordinary, external and automated release PRs do not run these additional checks.
+- Preserve all independent Candidate Linux/Windows, Release Orchestrator and pre-deployment Node/Wrangler gates. This avoids approval-gated zero-job CI failures from `GITHUB_TOKEN`-created release PRs without introducing a GitHub App or weakening the canonical release gates.
+- Replace the superseded PR-authentication regression with a permanent test-first RED→GREEN push-only trigger and safety-contract regression.
+- No `src/**` product changes; `version-only` Hotfix. Generated runtime, catch audit, architecture baseline and integrity metadata reflect the new version only.
+
 ## v0.11.1.3 – Fix diagnostics upload tray localization
 
 - Refresh the diagnostics upload menu item from the canonical `Diagnostics.Upload` localization key when switching languages while the tray application remains running.
