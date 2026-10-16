@@ -63,6 +63,24 @@ The original LBS-23 validator has **32 assertions** and is archived byte-identic
 
 **Exclusions retained intentionally:** Release/Regression preactivation ordering, non-mutating Development Completion (opposite authority), historical migration-only branches, distinct-scope header focus/source checks, separate transport-stage classifications without a same-source duplicate, and all P3 ACL/privilege/TaskBroker/firmware operations. Reducing the raw assertion count is not a substitute for proving behavior or trust-boundary coverage.
 
+## LBS-130 / P3 — security-boundary ownership and negative proofs (v1.1.6.0)
+
+**Phase P3 closes the #130 backlog only after hosted and release verification.** The v1.1.5.0 cross-validator audit found 27 lexical security overlap groups; that number was **not** a removal target. This narrowly scoped phase removes **24 weaker whole-file Core/Regression source assertions** (Core **9**, Regression **15**), **only after** transferring explicit guarantees to the permanent Boundary/Release gates and adding stronger source-function safety contracts to mandatory Contract Propagation. No original Boundary/Release security assertion, PowerShell native case, app/runtime/installer/uninstaller source, privilege boundary or BCD behavior is removed.
+
+| Security concern | Former redundant assertions | Permanent authority after P3 |
+| --- | ---: | --- |
+| Installer/runtime schema `0.2.14`, `fixed-task-v2` | Core 3, Regression 3 | Boundary and Release each remain independently active; new cross-surface equality/security check; native TaskBroker Boundary/Migration |
+| Exact operation allowlist, no free task name, metadata name derivation | Core 2, Regression 4 | Boundary function-scoped runner **and** resolver checks; native negative metadata/operation tests; cross-function security contract |
+| Installer mutation-bit ACL, protected directory/file ACL and ownership checks | Core 3, Regression 5 | Boundary scoped ACL validator, Release packaged installer check, native ACL behavior, explicit protected-state and task DACL contracts |
+| TaskBroker diagnostic presence/readability/compatibility | Core 1, Regression 3 | Boundary and Release separate states; explicit diagnostic function contract and negative mutation checks |
+| **Total redundant source assertions removed** | **24** | **No functional native test reduction** |
+
+The new `tools/validate_test_contracts.py` P3 extension has **16 independently named security-source conditions** over the actual installer, runtime resolver/runner/metadata, state/DACL ACL functions, diagnostics, migration ordering and One-Shot BootNext versus forbidden permanent `displayorder` writes. It additionally injects **16 deterministic negative source mutations** in memory (wrong schema/marker, broad operation, task-name bypass, ACL bits/protection, diagnostic fusion, premature/wildcard legacy removal and permanent boot order) and requires every mutation to fail closed. The checks do not execute any privileged operation, write ACLs or alter firmware. They are **bounded source-form proofs**, not proof of a real installed SYSTEM task DACL or arbitrary unseen syntactic encoding of a `displayorder` command.
+
+**Intentional independent defenses retained:** Release's shipped installer/runtime assertions, Boundary's function-scoped privilege/metadata/ACL operations, Regression's historical migration and wildcard negatives, Core's pure read-only parser and boot safety assertions, native `Test-TaskBrokerBoundary.ps1` and `Test-TaskBrokerMigration.ps1`, mandatory Windows PowerShell 5.1 and P1/P2 ownership contracts. The read-only parser may still inspect `displayorder`; a permanent firmware write is prohibited. Static source checks complement, rather than replace, native behavior tests. No duplicate-grep elimination is a reason to change installer or application semantics.
+
+**Expected checks:** Contract Propagation **61 → 101** (24 ownership exclusions plus 16 security conditions), Core **261 → 252**, Regression **145 → 130**, Release **436**, Boundary **170**. Native PowerShell parser **67/67**, functional **610/610**, TaskBroker Boundary **25/25** and Migration **42/42** remain unchanged. Candidate **3/3**, Release **8/8**, deterministic ZIP and historical integrity are mandatory. Exact P3 test-first RED and GREEN GitHub runs, any corrections, final SHA and native acceptance belong in [Issue #130](https://github.com/SaschaP1980/LenovoBootSelector/issues/130).
+
 ## Permanent Python gates
 
 | File | Category | Purpose |
