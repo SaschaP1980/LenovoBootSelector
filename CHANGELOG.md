@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.1.6.1 – Version-only Hotfix (Fast-Path)
+
+- Erhöht ausschließlich die Release-Version von v1.1.6.0 auf v1.1.6.1; keine Funktions-, Sicherheits-, TaskBroker-, UI- oder Cloudflare-Änderungen.
+- Versionsabhängige generierte Runtime- und Audit-/Architektur-Metadaten synchronisiert; veröffentlicht über den branchlosen Fast-Path.
+
 ## v1.1.6.0 – Security ownership and negative mutation proofs (LBS-130 Phase P3)
 
 - Consolidate 24 redundant Core/Regression whole-file TaskBroker/schema/ACL/diagnostics source checks into stronger function-specific security ownership contracts; retain independent Boundary/Release and native negative checks.
