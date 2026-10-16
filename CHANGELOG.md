@@ -1,5 +1,9 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.1.6.3 – Version-only Hotfix (Fast-Path)
+
+- Increase the release version from v1.1.6.2 to v1.1.6.3 only; no functional product changes.
+
 ## v1.1.6.2 – Pre-Candidate changelog language enforcement (Fast-Path Hotfix)
 
 - Add a read-only English-language and version-heading readiness check before Candidate exposure, with deterministic missing-version, German-text and malformed-notes regression tests.
