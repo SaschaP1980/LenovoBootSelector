@@ -2,8 +2,8 @@
 
 ## v1.1.6.1 – Version-only Hotfix (Fast-Path)
 
-- Erhöht ausschließlich die Release-Version von v1.1.6.0 auf v1.1.6.1; keine Funktions-, Sicherheits-, TaskBroker-, UI- oder Cloudflare-Änderungen.
-- Versionsabhängige generierte Runtime- und Audit-/Architektur-Metadaten synchronisiert; veröffentlicht über den branchlosen Fast-Path.
+- Increase the release version from v1.1.6.0 to v1.1.6.1 only; no runtime, UI, TaskBroker, security, firmware or Cloudflare behavior changes.
+- Synchronize the deterministic generated runtime version and catch/architecture audit metadata for the branchless Fast-Path release.
 
 ## v1.1.6.0 – Security ownership and negative mutation proofs (LBS-130 Phase P3)
 
