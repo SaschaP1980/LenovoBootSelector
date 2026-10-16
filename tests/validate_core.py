@@ -211,12 +211,6 @@ def main():
     install=txt(root/'bin/Install-LenovoBootMenuTasks.ps1'); uninstall=txt(root/'bin/Uninstall-LenovoBootMenuTasks.ps1')
     taskbroker=txt(root/'src/Infrastructure/TaskBroker.ps1')
     diagnostics=txt(root/'src/Infrastructure/RuntimeDiagnostics.ps1')
-    runner=ps_function(taskbroker,'Invoke-AuthorizedTask') or ''
-    s.contains('LBS-6 TaskBroker schema is hardened v0.2.14',tray,"$script:SupportedTaskBrokerVersions = @('0.2.14')")
-    s.contains('LBS-6 installer schema is hardened v0.2.14',install,"$version = '0.2.14'")
-    s.contains('LBS-6 metadata boundary marker is emitted',install,"boundaryContract = 'fixed-task-v2'")
-    s.absent('LBS-6 runtime task runner has no free TaskName parameter',runner.lower(),'[string]$taskname')
-    s.contains('LBS-6 runtime task runner uses operation ValidateSet',runner,"[ValidateSet('ManagerRefresh','FirmwareRefresh','BootNext','DefaultSet','DefaultClear')]")
     s.eq('Elevation prompts still restricted to setup/remove',tray.count('-Verb RunAs'),2)
     s.contains('Explicit BootNext broker operation bundled',tray,'function Set-TaskBrokerBootNextTarget')
     s.absent('Historical Invoke-BcdEdit removed from runtime',tray,'Invoke-BcdEdit')
@@ -225,10 +219,6 @@ def main():
     s.contains('Cleanup exact allowlist retained',uninstall,'$exactTaskNames = @(')
     s.contains('Cleanup exact per-GUID ownership pattern retained',uninstall,"'^LenovoBootSelector-Set-[0-9a-fA-F]{32}$'")
     s.check('LBS-6 canonical security boundary document exists',(root/'docs/SECURITY_BOUNDARY.md').is_file())
-    s.contains('v0.6.4.1 installer has explicit ACL mutation predicate',install,'function Test-TaskBrokerRightsContainMutation')
-    s.contains('v0.6.4.1 installer tests concrete write data bit',install,'FileSystemRights]::WriteData')
-    s.contains('v0.6.4.1 state validator delegates to ACL mutation predicate',install,'Test-TaskBrokerRightsContainMutation -Rights $rights')
-    s.contains('v0.6.4.1 diagnostics expose physical TaskBroker presence',diagnostics,'$present = [bool](Test-TaskBrokerInstallationPresent)')
     s.contains('v0.6.4.1 diagnostics expose compatibility separately',diagnostics,'compatible = $compatible')
 
     update_test=txt(root/'tests/Test-UpdateCore.ps1')

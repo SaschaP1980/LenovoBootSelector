@@ -177,6 +177,188 @@ def self_test_p2_ownership(release_source: str, regression_source: str) -> None:
         mutated = release_source[:position] + "s.has('injected non-owner'" + release_source[position+len("s.has('" + label + "'"):]
         assert p2_ownership_errors(mutated, regression_source)
 
+
+# LBS-130/P3: RED ownership target, before equivalent security-semantic
+# mutation checks are installed. Duplicates are removed only on GREEN.
+P3_DUPLICATE_CORE = ["LBS-6 TaskBroker schema is hardened v0.2.14","LBS-6 installer schema is hardened v0.2.14","LBS-6 metadata boundary marker is emitted","LBS-6 runtime task runner has no free TaskName parameter","LBS-6 runtime task runner uses operation ValidateSet","v0.6.4.1 installer has explicit ACL mutation predicate","v0.6.4.1 installer tests concrete write data bit","v0.6.4.1 state validator delegates to ACL mutation predicate","v0.6.4.1 diagnostics expose physical TaskBroker presence"]
+P3_DUPLICATE_REGRESSION = ["LBS-6 TaskBroker schema is v0.2.14","LBS-6 installer schema is v0.2.14","LBS-6 explicit metadata boundary contract retained","LBS-6 no free TaskName call reaches runtime runner","LBS-6 operation-only runtime runner retained","LBS-6 strict metadata contract retained","LBS-6 fixed task-name derivation retained","LBS-6 task ACL dangerous-rights rejection retained","LBS-6 ProgramData ACL protection retained","LBS-6 metadata ACL protection retained","v0.6.4.1 ACL mutation predicate retained","v0.6.4.1 state validator calls ACL mutation predicate","v0.6.4.1 diagnostics separate physical presence","v0.6.4.1 diagnostics separate metadata readability","v0.6.4.1 diagnostics separate compatibility"]
+
+def p3_retired_labels(source: str, labels: list[str]) -> list[str]:
+    # Parse assertion calls, not unrelated comments or documentation strings.
+    tree = ast.parse(source)
+    found = {n.args[0].value for n in ast.walk(tree)
+             if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+             and isinstance(n.func.value, ast.Name) and n.func.value.id == 's'
+             and n.args and isinstance(n.args[0], ast.Constant)
+             and isinstance(n.args[0].value, str)}
+    return [name for name in labels if name in found]
+
+
+# P3: function-scoped security contracts. All probes read unprivileged source;
+# no Scheduled Task, ACL, registry, BCD or firmware mutation is executed.
+P3_ALLOWED_OPS = "[ValidateSet('ManagerRefresh','FirmwareRefresh','BootNext','DefaultSet','DefaultClear')]"
+P3_MUTATION_RIGHTS = (
+    'WriteData', 'AppendData', 'WriteExtendedAttributes', 'WriteAttributes',
+    'DeleteSubdirectoriesAndFiles', 'Delete', 'ChangePermissions', 'TakeOwnership'
+)
+P3_BOOT_ORDER_WRITE = re.compile(
+    r"/set[\s'\",]+\{+fwbootmgr\}+[\s'\",]+displayorder\b", re.I
+)
+
+
+def p3_sources(root: Path) -> dict[str, str]:
+    paths = {
+        'installer': 'bin/Install-LenovoBootMenuTasks.ps1',
+        'uninstaller': 'bin/Uninstall-LenovoBootMenuTasks.ps1',
+        'broker': 'src/Infrastructure/TaskBroker.ps1',
+        'diagnostics': 'src/Infrastructure/RuntimeDiagnostics.ps1',
+        'tray': 'bin/LenovoBootMenuTray.ps1',
+    }
+    return {name: read_text(root / path) for name, path in paths.items()}
+
+
+def p3_function(source: str, name: str) -> str:
+    # Top-level PowerShell functions only, not a matching token in a comment.
+    expr = r'(?ms)^function\s+' + re.escape(name) + r'\b.*?(?=^function\s+|\Z)'
+    match = re.search(expr, source)
+    return match.group(0) if match else ''
+
+
+def p3_security_conditions(source: dict[str, str]) -> list[tuple[str, bool]]:
+    install, broker, diag = source['installer'], source['broker'], source['diagnostics']
+    runtime = source['tray']
+    metadata = p3_function(broker, 'Test-TaskBrokerMetadataContract')
+    resolver = p3_function(broker, 'Resolve-TaskBrokerAuthorizedTaskName')
+    runner = p3_function(broker, 'Invoke-AuthorizedTask')
+    predicate = p3_function(install, 'Test-TaskBrokerRightsContainMutation')
+    state = p3_function(install, 'Test-TaskBrokerStatePathLeastPrivilege')
+    directory = p3_function(install, 'Protect-TaskBrokerStateDirectory')
+    metafile = p3_function(install, 'Protect-TaskBrokerMetadataFile')
+    task_acl = p3_function(install, 'Test-SddlReadExecuteAce')
+    diagnostic = p3_function(diag, 'Get-RuntimeDiagnosticBrokerSummary')
+    version = "$version = '0.2.14'"
+    return [
+        ('installer/runtime schema agreement',
+         version in install and "$script:SupportedTaskBrokerVersions = @('0.2.14')" in runtime
+         and '$script:SupportedTaskBrokerVersions -notcontains' in metadata),
+        ('fixed-task-v2 runtime/installer marker',
+         "boundaryContract = 'fixed-task-v2'" in install
+         and "boundaryContract -ne 'fixed-task-v2'" in metadata),
+        ('runtime metadata binds GUID and exact derived task names',
+         all(x in metadata for x in (
+             '$seenGuids.ContainsKey($normalized)', '$seenTaskNames.ContainsKey($bootKey)',
+             'Get-TaskBrokerExpectedTargetTaskName -Guid $normalized',
+             'Get-TaskBrokerExpectedTargetTaskName -Guid $normalized -DefaultTarget',
+             '[string]$target.taskName -ne $expectedBoot',
+             '[string]$target.defaultTaskName -ne $expectedDefault'))),
+        ('runtime task runner accepts operation only',
+         P3_ALLOWED_OPS in runner and '[string]$Operation' in runner
+         and re.search(r'\[string\]\s*\$TaskName\b', runner, re.I) is None
+         and 'Resolve-TaskBrokerAuthorizedTaskName -Operation $Operation -Guid $normalizedGuid' in runner),
+        ('runtime task resolver keeps operation and compatibility gate',
+         P3_ALLOWED_OPS in resolver and 'Test-TaskBrokerMetadataCompatible' in resolver
+         and "throw 'Nicht unterstützte TaskBroker-Operation.'" in resolver
+         and "'DefaultRestore' {" not in resolver),
+        ('runtime resolver allows only GUID-derived target tasks',
+         all(x in resolver for x in (
+             'Normalize-TaskBrokerGuid -Guid $Guid', 'Get-TaskBrokerTarget -Guid $normalized',
+             'Get-TaskBrokerExpectedTargetTaskName -Guid $normalized',
+             '[string]$target.taskName -ne $expected',
+             '[string]$target.defaultTaskName -ne $expected'))),
+        ('privileged runner opens and starts exact resolved task',
+         'GetTask("\\$taskName")' in runner and
+         'Start-ScheduledTask -TaskName $taskName -ErrorAction Stop' in runner),
+        ('installer ACL mutation mask checks concrete write rights',
+         bool(predicate) and
+         all('FileSystemRights]::'+right in predicate for right in P3_MUTATION_RIGHTS)
+         and 'FileSystemRights]::Modify -bor' not in predicate
+         and '($Rights -band $mutationMask) -ne 0' in predicate),
+        ('installed state ACL validation is fail-closed',
+         all(x in state for x in (
+             'Get-Acl -LiteralPath $Path', '-not $acl.AreAccessRulesProtected',
+             'Test-TaskBrokerRightsContainMutation -Rights $rights',
+             '[System.Security.AccessControl.FileSystemRights]::ReadAndExecute',
+             '$hasSystemFull -and $hasAdminsFull -and $hasUsersRead'))),
+        ('state directory ACL applies protected read-execute policy',
+         bool(directory) and all(x in directory for x in (
+             '$acl.SetAccessRuleProtection($true,$false)', 'FileSystemRights]::FullControl',
+             'FileSystemRights]::ReadAndExecute',
+             'Set-Acl -LiteralPath $StateDir -AclObject $acl'))),
+        ('metadata file ACL applies protected read-execute policy',
+         bool(metafile) and all(x in metafile for x in (
+             '$acl.SetAccessRuleProtection($true,$false)', 'FileSystemRights]::FullControl',
+             'FileSystemRights]::ReadAndExecute',
+             'Set-Acl -LiteralPath $metadataFile -AclObject $acl'))),
+        ('scheduled task DACL rejects dangerous access',
+         bool(task_acl) and all(x in task_acl for x in (
+             '$dangerousMask', '($mask -band $dangerousMask) -ne 0',
+             '$hasGenericReadExecute', '$hasMappedReadExecute'))),
+        ('diagnostics distinguish presence, readability, compatibility',
+         bool(diagnostic) and all(x in diagnostic for x in (
+             'Test-TaskBrokerInstallationPresent', 'present = $false',
+             'present = $true', 'metadataReadable = $false',
+             'metadataReadable = $true', 'compatible = $false',
+             'compatible = $compatible'))),
+        ('canonical migration verified before legacy removal',
+         0 <= install.find("Set-Step 'verify-canonical-installation'") <
+         install.find("Set-Step 'cleanup-legacy-taskbroker'") <
+         install.find('Remove-LegacyTaskBrokerInstallation',
+                      install.find("Set-Step 'cleanup-legacy-taskbroker'"))),
+        ('legacy cleanup rejects wildcard task removal',
+         "function Test-LegacyTaskBrokerOwnedTaskName" in install
+         and "Unregister-ScheduledTask -TaskName 'LenovoBootMenu-*'" not in install
+         and "Unregister-ScheduledTask -TaskName 'Lenovo" not in source['uninstaller']),
+        ('one-shot bootsequence allowed, permanent boot-order writes forbidden',
+         '''$bootArgs = '/set "{{fwbootmgr}}" bootsequence "{0}"' -f $guid''' in install
+         and "/set '{fwbootmgr}' bootsequence" in install
+         and all(P3_BOOT_ORDER_WRITE.search(source[p]) is None
+                 for p in ('installer', 'broker', 'tray'))),
+    ]
+
+
+def p3_security_errors(source: dict[str, str]) -> list[str]:
+    return ['LBS-130/P3 security invariant broken: '+name
+            for name, ok in p3_security_conditions(source) if not ok]
+
+
+def p3_negative_mutations(source: dict[str, str]) -> None:
+    # In-memory, deterministic fail-closed fault injection; no external writes.
+    mutations = [
+        ('installer', "$version = '0.2.14'", "$version = '0.2.13'"),
+        ('tray', "$script:SupportedTaskBrokerVersions = @('0.2.14')",
+         "$script:SupportedTaskBrokerVersions = @('0.2.13')"),
+        ('installer', "boundaryContract = 'fixed-task-v2'", "boundaryContract = 'fixed-task-v1'"),
+        ('broker', "boundaryContract -ne 'fixed-task-v2'", "boundaryContract -ne 'fixed-task-v1'"),
+        ('broker', "Get-TaskBrokerExpectedTargetTaskName -Guid $normalized -DefaultTarget",
+         "Get-TaskBrokerExpectedTargetTaskName -Guid $Guid -DefaultTarget"),
+        ('broker', P3_ALLOWED_OPS, "[ValidateSet('ManagerRefresh','AnyTask')]"),
+        ('broker', 'Resolve-TaskBrokerAuthorizedTaskName -Operation $Operation -Guid $normalizedGuid',
+         'Get-ScheduledTask -TaskName $Guid'),
+        ('installer', 'FileSystemRights]::WriteData -bor', 'FileSystemRights]::ReadData -bor'),
+        ('installer', '$acl.SetAccessRuleProtection($true,$false)',
+         '$acl.SetAccessRuleProtection($false,$true)'),
+        ('installer', 'Set-Acl -LiteralPath $metadataFile -AclObject $acl',
+         'Write-Host "ACL not applied"'),
+        ('installer', '($mask -band $dangerousMask) -ne 0',
+         '($mask -band $dangerousMask) -eq 0'),
+        ('diagnostics', 'compatible = $compatible', 'compatible = $true'),
+        ('installer', "Set-Step 'verify-canonical-installation'",
+         "Set-Step 'verify-marker-removed'"),
+        ('installer', "Unregister-ScheduledTask -TaskName $removed",
+         "Unregister-ScheduledTask -TaskName 'LenovoBootMenu-*'"),
+        ('installer', '''$bootArgs = '/set "{{fwbootmgr}}" bootsequence "{0}"' -f $guid''',
+         '''$bootArgs = '/set "{{fwbootmgr}}" displayorder "{0}"' -f $guid'''),
+    ]
+    for path, old, new in mutations:
+        assert old in source[path], f'P3 expected mutation anchor missing: {path} {old}'
+        altered = source.copy()
+        altered[path] = source[path].replace(old, new, 1)
+        assert p3_security_errors(altered), f'P3 mutation escaped checks: {path} {old}'
+    # A distinct spelling of the permanent write is also rejected.
+    injected = source.copy()
+    injected['installer'] += '\n& $bcdedit /set "{fwbootmgr}" displayorder $guid\n'
+    assert p3_security_errors(injected)
+
 def validate(root: Path) -> tuple[list[str], int]:
     errors = []
     checks = 0
@@ -268,6 +450,19 @@ def validate(root: Path) -> tuple[list[str], int]:
     errors.extend(p2_errors)
     if not p2_errors:
         self_test_p2_ownership(release_p2, regression_p2)
+    # P3: preserve the stronger runtime/installer/ACL/migration/boot guards
+    # before retiring redundant source-token assertions from Core/Regression.
+    security_sources = p3_sources(root)
+    security_conditions = p3_security_conditions(security_sources)
+    checks += len(security_conditions)
+    errors.extend(p3_security_errors(security_sources))
+    if all(ok for _, ok in security_conditions):
+        p3_negative_mutations(security_sources)
+    for filename, labels in (('validate_core.py', P3_DUPLICATE_CORE),
+                             ('validate_regression.py', P3_DUPLICATE_REGRESSION)):
+        checks += len(labels)
+        for label in p3_retired_labels(read_text(root/'tests'/filename), labels):
+            errors.append('LBS-130/P3 duplicate source assertion still active in '+filename+': '+label)
     return errors, checks
 
 

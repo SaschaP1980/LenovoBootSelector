@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.1.6.0 – Security ownership and negative mutation proofs (LBS-130 Phase P3)
+
+- Consolidate 24 redundant Core/Regression whole-file TaskBroker/schema/ACL/diagnostics source checks into stronger function-specific security ownership contracts; retain independent Boundary/Release and native negative checks.
+- Mandatory Contract Propagation now verifies 16 distinct installer/runtime/ACL/migration/boot safety invariants and executes 16 deterministic in-memory fail-closed negative mutations, including permanent displayorder write attempts.
+- No TaskBroker/installer/uninstaller/runtime, ACL/BCD/UEFI, Windows native suites, updater/diagnostics upload, Cloudflare, or privileged product behavior changed.
+- Preserve P1/P2 safety contracts and all four independent Python gates; full hosted Windows and deterministic release verification required.
+
 ## v1.1.5.0 – UI/update/workflow ownership cleanup (LBS-130 Phase P2)
 
 - Remove 31 repeated Release-owned UI, update, localization, capability and pipeline source checks from Regression while preserving its version-to-basis comparisons, negative safety invariants and independent gate execution.
