@@ -171,7 +171,7 @@ Assert-Equal 77 $placed.Y 'Top-docked taskbar places popup below the icon'
 $rightWork = [Drawing.Rectangle]::new(0, 0, 1860, 1080)
 $rightIcon = [Drawing.Rectangle]::new(1870, 500, 24, 24)
 $placed = Get-PopupLocationFromAnchor -WorkingArea $rightWork -DisplayBounds $display -AnchorRect $rightIcon -PopupSize $size -HasAnchor
-Assert-Equal 1472 $placed.X 'Right-docked taskbar places popup to icon left'
+Assert-Equal 1470 $placed.X 'Right-docked taskbar clamps popup within work area'
 Assert-Equal 176 $placed.Y 'Side-docked taskbar aligns popup vertically'
 $leftWork = [Drawing.Rectangle]::new(55, 0, 1865, 1080)
 $leftIcon = [Drawing.Rectangle]::new(12, 500, 24, 24)
