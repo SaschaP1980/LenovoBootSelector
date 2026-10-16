@@ -150,6 +150,20 @@ Do not interpret “only bump the version” as permission to omit the changelog
 
 The v0.6.7.1 measurement confirmed this behavior: the first candidate was rejected because only `bin/version.json` had changed; after adding the minimal v0.6.7.1 changelog section, the same candidate branch passed.
 
+### Mandatory language readiness before Candidate exposure
+
+Use **English** for the new changelog heading and release notes, including version-only Hotfixes. The v1.1.6.1 Candidate initially failed when its new notes were written in German; fixing the notes on the Candidate branch was avoidable.
+
+On the **intended candidate tree, before creating/pushing a `candidate/v*` ref**, run:
+
+```bash
+python3 -B tools/pre_candidate_language_check.py --root .
+```
+
+Only proceed after `PRE_CANDIDATE_LANGUAGE_RESULT=PASS`. The check is read-only, requires the first `CHANGELOG.md` version heading to match `bin/version.json`, requires a nonempty release-note bullet, inspects the new section for German wording, and reruns the permanent repository Markdown-language validator. Correct failures in the unreferenced candidate tree and rerun before exposing the branch. For an issue-less version-only Hotfix, a standard valid note is: `- Increase the release version only; no functional changes.`
+
+`tools/candidate_preflight.py` and `tools/prepare_release.py` also invoke this check fail-closed before expensive builds or generated file mutations; these are independent defensive checks **after** Candidate creation and cannot by themselves prevent a direct API client from creating a Candidate ref. The pre-exposure requirement remains mandatory for all Fast-Path operators. The checker is heuristic for natural language; it does not certify every possible English/German sentence.
+
 ## Fresh-worktree rule
 
 Build and validation must operate from a fresh, known repository state based on current `main`/the intended release head.

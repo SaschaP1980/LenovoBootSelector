@@ -50,8 +50,11 @@ def update_download_metadata(root:Path,cfg:dict,published_utc:str,release_hash:s
         if text!=rendered: raise RuntimeError('downloads/README.md is not canonical')
     else: readme_path.write_text(rendered,encoding='utf-8-sig')
 def main()->int:
-    ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); ap.add_argument('--output-dir',type=Path,required=True); ap.add_argument('--published-utc'); ap.add_argument('--check',action='store_true'); args=ap.parse_args(); root=args.root.resolve(); out=args.output_dir.resolve(); out.mkdir(parents=True,exist_ok=True); cfg=load_release_config(root); version=cfg['version']
+    ap=argparse.ArgumentParser(); ap.add_argument('--root',type=Path,default=ROOT_DEFAULT); ap.add_argument('--output-dir',type=Path,required=True); ap.add_argument('--published-utc'); ap.add_argument('--check',action='store_true'); args=ap.parse_args(); root=args.root.resolve(); out=args.output_dir.resolve(); cfg=load_release_config(root); version=cfg['version']
     try:
+        # Enforce language before any output-directory creation or metadata mutation.
+        run(root/'tools/pre_candidate_language_check.py','--root',root)
+        out.mkdir(parents=True,exist_ok=True)
         published_utc=resolve_published_utc(cfg,args.published_utc); require_changelog(root,version); update_readme(root,version,args.check)
         if args.check:
             run(root/'tools/build_runtime.py','--root',root,'--check'); run(root/'tools/build_catch_audit.py','--root',root,'--check'); run(root/'tools/build_architecture_baseline.py','--root',root,'--check')

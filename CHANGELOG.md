@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.1.6.2 – Pre-Candidate changelog language enforcement (Fast-Path Hotfix)
+
+- Add a read-only English-language and version-heading readiness check before Candidate exposure, with deterministic missing-version, German-text and malformed-notes regression tests.
+- Enforce the same guard in Candidate Preflight and release preparation before package generation; retain the existing independent Markdown language gate and all security/release checks.
+- Clarify the mandatory Fast-Path pre-exposure command and its limits in development and release documentation; no runtime, firmware, TaskBroker, UI or Cloudflare behavior changes.
+
 ## v1.1.6.1 – Version-only Hotfix (Fast-Path)
 
 - Increase the release version from v1.1.6.0 to v1.1.6.1 only; no runtime, UI, TaskBroker, security, firmware or Cloudflare behavior changes.

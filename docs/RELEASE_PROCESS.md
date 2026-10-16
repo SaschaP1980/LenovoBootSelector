@@ -109,6 +109,7 @@ Do not run the entire repository/native test matrix before every intermediate co
 - directly relevant syntax/parser/encoding checks for changed source types;
 - relevant deterministic-generation checks when generated artifacts are affected;
 - any additional focused test that protects a distinct risk introduced by the change.
+- the **read-only English Markdown/changelog readiness check** on the intended Candidate tree: `python3 -B tools/pre_candidate_language_check.py --root .`. Require `PRE_CANDIDATE_LANGUAGE_RESULT=PASS` before exposing `candidate/v*`, including for version-only Hotfixes. Candidate and release tooling independently repeat the check; do not substitute that later enforcement for the pre-exposure check.
 
 The Candidate branch is **release-ready**, not a RED-test vehicle. Do not intentionally publish a known-failing Candidate or run Candidate Preflight merely to prove the pre-fix failure. Candidate Preflight is the mandatory integration/release-entry gate for a state that is already expected to pass. Unexpected Candidate failures continue to use the existing same-branch fast-forward correction path.
 

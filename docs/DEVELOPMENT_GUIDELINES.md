@@ -141,9 +141,10 @@ For a Patch/Hotfix that is **not** routed to a work branch, prefer one short ato
 2. for a confirmed bug/regression, reproduce it and establish the focused RED regression against the unfixed canonical basis; for a non-bug change, define the smallest focused positive acceptance/validation check instead;
 3. prepare the complete source/test/documentation/release-metadata change in memory/Git objects without creating a chain of visible intermediate commits;
 4. run the defect-specific GREEN regression or the focused positive validation, plus the smallest relevant syntax/encoding/determinism checks;
-5. create **one unreferenced candidate commit** from the pinned `main`;
-6. inspect the complete candidate diff/scope once;
-7. re-read `main` and expose `candidate/v<version>` only if the base lease still holds.
+5. **before exposing a Candidate ref**, on the intended complete candidate tree run `python3 -B tools/pre_candidate_language_check.py --root .`; the result must be `PRE_CANDIDATE_LANGUAGE_RESULT=PASS`. This read-only gate checks the current version's first changelog section, release-note wording, and repository Markdown language. Reject and correct any failure **before** creating the Candidate branch; never intentionally use Candidate Preflight to discover this known defect;
+6. create **one unreferenced candidate commit** from the pinned `main`;
+7. inspect the complete candidate diff/scope once and re-run the same read-only check on that candidate tree if content has changed;
+8. re-read `main` and expose `candidate/v<version>` only if the base lease still holds.
 
 Do not create a durable RED commit merely to prove test-first work for a normal branchless bug/regression Hotfix. Durable RED evidence belongs in the Issue/release audit trail; non-bug changes do not invent artificial RED evidence. The Candidate itself remains release-ready only.
 

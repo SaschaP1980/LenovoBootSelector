@@ -61,6 +61,9 @@ def main()->int:
     basis=args.basis_root.resolve()
     try:
         cfg=load_release_config(root)
+        # Cheap, read-only fail-closed check before packaging or full gate execution.
+        run([sys.executable,'-B',str(root/'tools/pre_candidate_language_check.py'),
+             '--root',str(root)])
         delta=verify_repository_delta(root,args.main_ref,cfg,args.mode)
 
         with tempfile.TemporaryDirectory(prefix='lbs-candidate-preflight-') as td:
