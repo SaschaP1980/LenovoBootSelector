@@ -1,12 +1,12 @@
 {
-  "version": "1.1.8.0",
+  "version": "1.1.9.0",
   "runtime": {
-    "lines": 9340,
-    "functions": 287,
-    "scriptReferences": 1118,
+    "lines": 9486,
+    "functions": 293,
+    "scriptReferences": 1122,
     "scriptVariables": 131,
-    "catchBlocks": 210,
-    "inlineSilentCatches": 119
+    "catchBlocks": 215,
+    "inlineSilentCatches": 121
   },
   "core": {
     "files": 7,
@@ -21,19 +21,19 @@
     "scriptReferences": 78
   },
   "infrastructure": {
-    "files": 10,
-    "lines": 1737,
-    "functions": 88,
+    "files": 11,
+    "lines": 1847,
+    "functions": 93,
     "scriptReferences": 115
   },
   "ui": {
     "files": 18,
-    "lines": 2944,
-    "functions": 82,
-    "scriptReferences": 571
+    "lines": 2954,
+    "functions": 83,
+    "scriptReferences": 575
   },
   "appTemplate": {
-    "lines": 2063,
+    "lines": 2089,
     "functions": 30,
     "scriptReferences": 354
   }

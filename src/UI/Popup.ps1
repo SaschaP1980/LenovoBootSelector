@@ -129,6 +129,16 @@ function Show-OrTogglePopup {
     }
 }
 
+# Explicit launcher re-entry is SHOW, never the tray-icon toggle (which hides
+# an already visible popup). This runs on the existing WinForms UI thread.
+function Show-OrActivatePopup {
+    if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) {
+        [void]$script:Popup.Activate()
+        return
+    }
+    Show-OrTogglePopup
+}
+
 function Load-TrayIcon {
     $iconPath = Join-Path $PSScriptRoot 'LenovoBootMenuTray.ico'
     if (Test-Path $iconPath) {

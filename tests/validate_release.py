@@ -187,8 +187,16 @@ def main():
     s.has('LBS-132 UI presentation suite keeps fixed total 46',ui_presentation,'Write-Host "UI PRESENTATION TOTAL $script:checks/46"')
     s.has('LBS-29 native aggregate runner invokes UI presentation suite',windows_wrapper,"Test-UIPresentation.ps1")
     mutex_test=txt(root/'tests/Test-SingleInstanceMutex.ps1')
+    activation_test=txt(root/'tests/Test-InstanceActivation.ps1')
     s.has('Mutex native test keeps explicit total output',mutex_test,'Write-Host "MUTEX TOTAL $checks/4"')
     s.has('Mutex native test fails closed on count drift',mutex_test,'if ($checks -ne 4) { throw "Unexpected mutex test count $checks" }')
+    s.has('LBS-140 activation test fixed count',activation_test,'if ($checks -ne 21) { throw "Unexpected instance activation test count $checks" }')
+    s.has('LBS-140 native integration is executable from the Windows aggregate',txt(root/'tests/Test-WindowsPowerShell51.ps1'),"& (Join-Path $root 'tests\\Test-InstanceActivation.ps1')")
+    s.has('LBS-140 activation channel is loaded prior to startup mutex',app_template,'# @include src/Infrastructure/InstanceActivation.ps1')
+    s.has('LBS-140 duplicate invokes activation channel',app_template,'if (Send-LbsActivationRequest) { exit 0 }')
+    s.has('LBS-140 popup has idempotent activation function',txt(root/'src/UI/Popup.ps1'),'function Show-OrActivatePopup')
+    s.has('LBS-140 listener registered before tray startup',app_template,'Start-LbsActivationListener -Signal $activationEvent')
+    s.has('LBS-140 listener cleaned before release of mutex',app_template,'Stop-LbsActivationListener -Listener $activationListener')
     identifier_doc_path=root/'docs/IDENTIFIER_COMPATIBILITY.md'
     identifier_test_path=root/'tests/Test-IdentifierCompatibility.ps1'
     s.c('LBS-19 identifier compatibility document exists',identifier_doc_path.is_file())
