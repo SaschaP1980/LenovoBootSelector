@@ -116,6 +116,22 @@ def validate_pre_activation_evidence(payload:dict, *, version:str, candidate_sha
     require(payload.get('reproducible') is True,'pre-activation reproducibility evidence missing')
     return payload
 
+def validate_squash_merge(*, version:str, pr_number:int, base_main_sha:str, main_sha:str,
+                          merge_sha:str, parents:list[str], subject:str,
+                          merge_tree:str, pr_head_tree:str)->dict:
+    """Fail closed unless activation produced precisely one canonical squash commit."""
+    require(bool(re.fullmatch(r'[0-9a-f]{40}',base_main_sha)), 'invalid pre-activation base main SHA')
+    require(bool(re.fullmatch(r'[0-9a-f]{40}',merge_sha)), 'invalid PR squash commit SHA')
+    require(main_sha==merge_sha, 'squash PR commit is not the exact current main HEAD')
+    require(len(parents)==1 and parents[0]==base_main_sha,
+            'squash release must have exactly one parent equal to pre-activation base main')
+    expected_subject=f'Publish Lenovo Boot Selector v{version} (#{pr_number})'
+    require(subject==expected_subject, f'noncanonical squash release commit title: {subject!r}')
+    require(merge_tree==pr_head_tree, 'squash tree differs from verified final PR head tree')
+    return {'strategy':'squash', 'mainCommitsAdded':1, 'parentSha':base_main_sha,
+            'subject':subject, 'treeIdenticalToVerifiedPrHead':True}
+
+
 def self_test()->int:
     good={'statuses':[{'context':c,'state':'success'} for c in EXPECTED_RELEASE_CONTEXTS]}
     result=validate_release_statuses(good)
@@ -162,6 +178,30 @@ def self_test()->int:
         pass
     else:
         raise RuntimeError('self-test accepted invalid work branch')
+    test_sha=lambda c:c*40
+    squash=dict(version='2.3.4.5',pr_number=12,base_main_sha=test_sha('a'),
+                main_sha=test_sha('c'),merge_sha=test_sha('c'),parents=[test_sha('a')],
+                subject='Publish Lenovo Boot Selector v2.3.4.5 (#12)',
+                merge_tree=test_sha('d'),pr_head_tree=test_sha('d'))
+    require(validate_squash_merge(**squash)['mainCommitsAdded']==1,
+            'self-test rejected exact single-parent squash')
+    for wrong in (
+        {'parents':[test_sha('a'), test_sha('b')]},
+        {'parents':[test_sha('b')]},
+        {'main_sha':test_sha('b')},
+        {'subject':'Merge pull request #12'},
+        {'subject':'Publish Lenovo Boot Selector v2.3.4.5 (#13)'},
+        {'merge_tree':test_sha('e')},
+        {'base_main_sha':'not a commit'},
+        {'merge_sha':'not a commit'},
+    ):
+        bad=dict(squash);bad.update(wrong)
+        try:
+            validate_squash_merge(**bad)
+        except RuntimeError:
+            pass
+        else:
+            raise RuntimeError(f'self-test accepted invalid squash: {wrong}')
     print('PASS release verification helper self-test')
     return 0
 
@@ -231,10 +271,19 @@ def main()->int:
         pr=gh_json(repo,f'pulls/{pr_number}')
         require(pr.get('state')=='closed' and pr.get('merged_at'),'publication PR is not merged')
         require((pr.get('head') or {}).get('sha')==args.final_sha,'PR head SHA mismatch')
+        pr_commit_count=int(pr.get('commits',0))
+        require(pr_commit_count>=1,'published release PR has no auditable constituent commits')
         merge_sha=str(pr.get('merge_commit_sha') or '')
-        require(bool(merge_sha),'PR merge commit missing')
-        require(run(['git','-C',str(root),'merge-base','--is-ancestor',merge_sha,'origin/main'],check=False).returncode==0,
-                'PR merge commit is not contained in current main')
+        base_main_sha=str(pre_activation.get('baseMainSha') or '')
+        merge_line=git(root,'rev-list','--parents','-n','1',merge_sha).split()
+        require(bool(merge_line) and merge_line[0]==merge_sha, 'PR squash commit is not locally resolvable')
+        squash=validate_squash_merge(
+            version=args.version,pr_number=pr_number,base_main_sha=base_main_sha,
+            main_sha=main_sha,merge_sha=merge_sha,parents=merge_line[1:],
+            subject=git(root,'log','-1','--format=%s',merge_sha),
+            merge_tree=git(root,'rev-parse',f'{merge_sha}^{{tree}}'),
+            pr_head_tree=git(root,'rev-parse',f'{args.final_sha}^{{tree}}'),
+        )
 
         owner=repo.split('/',1)[0]
         prs=gh_json(repo,f'pulls?state=all&head={owner}:release/v{args.version}&per_page=100')
@@ -250,6 +299,8 @@ def main()->int:
         source_tag=f'v{args.version}'
         tagged_source=git(root,'rev-parse',f'{source_tag}^{{commit}}')
         require(tagged_source==args.source_commit,'source tag does not resolve to expected source commit')
+        require(git(root,'cat-file','-t',f'refs/tags/{source_tag}')=='tag',
+                'source tag must remain an annotated tag')
         source_paths=git(root,'ls-tree','-r','--name-only',args.source_commit).splitlines()
         source_zip_free=not any(p.lower().endswith('.zip') for p in source_paths)
         source_cache_free=not any('__pycache__/' in p or p.endswith('.pyc') for p in source_paths)
@@ -300,7 +351,9 @@ def main()->int:
             'finalPrHeadSha':args.final_sha,
             'prNumber':pr_number,
             'prUrl':args.pr_url,
+            'prCommitCount':pr_commit_count,
             'mergeCommitSha':merge_sha,
+            'mergeStrategy':squash,
             'mainSha':main_sha,
             'sourceTag':source_tag,
             'sourceCommit':args.source_commit,
@@ -351,6 +404,7 @@ def main()->int:
                 f.write(f'- Candidate SHA: `{args.candidate_sha}`\n')
                 f.write(f'- Source commit: `{args.source_commit}`\n')
                 f.write(f'- Main SHA: `{main_sha}`\n')
+                f.write(f'- Merge strategy: **squash**, one commit on main, parent `{base_main_sha}`\n')
                 f.write(f'- Release ZIP SHA-256: `{release.get("sha256")}`\n')
                 f.write('- Pre-activation verification: **PASS**\n')
                 f.write('- Candidate/release branches: **deleted**\n')

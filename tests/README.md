@@ -167,3 +167,5 @@ When assertions are added, the corresponding contract must be updated deliberate
 ## Repository documentation language
 
 English is the canonical language for all repository Markdown and durable GitHub documentation. The permanent release validation checks this policy pragmatically while allowing clearly delimited technical literals and exact UI strings.
+
+LBS-8 release verifier native topology self-test: `python3 -B tools/release_verification.py --self-test` includes one-parent squash proof and deliberate failure mutations (extra parent, wrong base/HEAD, noncanonical title, PR number mismatch, tree mismatch, malformed SHAs). Hosted Candidate/Release calls also check the actual published squash commit against the validated PR, exact source tag and final `main`.
