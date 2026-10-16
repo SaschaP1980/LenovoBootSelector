@@ -6,9 +6,9 @@ LBS-19 standardizes active application-owned naming where that is safe, while pr
 
 The term **Lenovo Boot Menu** remains valid when it describes the actual Lenovo/firmware boot menu as a boot target.
 
-## A — Safe rename
+## A — Completed safe renames (historical mapping)
 
-These identifiers are application-internal or developer-facing and have no external compatibility contract:
+The following source-to-target renames are **already complete**. Their former source names, including the old template filename, do not refer to current paths or pending changes. They were application-internal/developer-facing identifiers without external compatibility contracts:
 
 | Identifier | Canonical target | Rationale |
 | --- | --- | --- |
@@ -18,7 +18,7 @@ These identifiers are application-internal or developer-facing and have no exter
 | `LenovoBootMenuTaskInstall-*` | `LenovoBootSelectorTaskInstall-*` | Ephemeral installer workspace prefix. |
 | User-visible uninstall prefix `Lenovo Boot Menu:` | `Lenovo Boot Selector:` | Product-facing console text. |
 
-Documentation and active build/test references follow the canonical source-template name.
+Documentation and active build/test references follow the canonical source-template name. This completed mapping is historical; category-C identifiers below remain intentional **active compatibility contracts**.
 
 ## B — Migration required
 

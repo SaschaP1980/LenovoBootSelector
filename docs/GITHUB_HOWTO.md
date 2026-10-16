@@ -6,30 +6,16 @@ The canonical one-line entry point for a completely new chat is `docs/INITIAL_PR
 
 When a fresh engineering session takes over development, a build, a Hotfix, or a GitHub release for Lenovo Boot Selector, it must reconstruct the complete current project state from GitHub. No previous chat, handover artifact, model memory, local checkout, or prior source ZIP is required or authoritative.
 
-Mandatory order:
+**Canonical mandatory bootstrap:** Execute **all numbered steps in [Initial Prompt](INITIAL_PROMPT.md#2-bootstrap--always-execute-first)**, including full reads of `docs/DEVELOPMENT_GUIDELINES.md`, `tests/README.md`, `bin/version.json`, and all listed workflows, tools and four validators. Do this **before scope classification**, regardless of whether the later task is documentation-only, Patch/Hotfix fast path, or Work-Path. This document defines **no shorter alternative mandatory read set**.
 
-1. **Read current `main` and record its SHA/tree.**
-2. **Read this `docs/GITHUB_HOWTO.md` in full from current `main`.**
-3. **Read `docs/RELEASE_PROCESS.md` in full.**
-4. **Read `docs/DEVELOPMENT_GUIDELINES.md` in full** for Major/Minor work and for Patch/Hotfix work only when the pre-implementation effort/risk analysis escalates it to the work-branch/checkpoint model.
-5. For Issue-backed work, read the **current GitHub Issue** including state, labels, comments, and acceptance criteria.
-6. Read **`bin/version.json`** and verify current version, `releaseProfile`, `protectedFragmentIntent`, and `repositoryDeleteIntent`.
-7. Read the relevant executable contracts:
-   - `.github/workflows/candidate-preflight.yml`
-   - `.github/workflows/windows-powershell51.yml`
-   - `.github/workflows/release.yml`
-   - `tools/candidate_preflight.py`
-   - `tools/release_verification.py`
-   - the four permanent validators under `tests/`
-8. If resuming an existing `work/LBS-*` task, read that work-branch head and the Issue's rolling recovery comment, then directly verify any referenced GitHub Actions run before continuing. A legacy `.chatgpt-work/LBS-<github-issue-number>.md` may exist on older active branches but is not the primary recovery surface.
-9. Only then determine scope, target version, and implementation/release plan. For Patch/Hotfix, perform the brief effort/risk analysis **before implementation** and default to the branchless atomic path unless the analysis justifies escalation.
+After bootstrap, reconcile `main` and any relevant Issue/comments/labels. If resuming `work/LBS-*`, inspect its head and the **single cumulative GitHub Issue rolling recovery comment**, then independently check cited GitHub Actions runs. Legacy `.chatgpt-work/LBS-*.md` files are not the canonical recovery record. Choose version and implementation path **after** classifying scope. For the cross-system operational map, see [DevOps Operations](DEVOPS_OPERATIONS.md), which does not redefine the underlying GitHub/release contracts.
 
 ### Authority order
 
 When information conflicts:
 
 1. current GitHub `main`, including executable workflows/tools;
-2. current normative documents `docs/GITHUB_HOWTO.md` and `docs/RELEASE_PROCESS.md`;
+2. current normative documents `docs/GITHUB_HOWTO.md`, `docs/RELEASE_PROCESS.md`, and `docs/DEVELOPMENT_GUIDELINES.md`;
 3. current GitHub Issues and their comments, including recorded acceptance evidence.
 
 Off-repository material such as previous chats, model memory, local files, source ZIPs, or handover artifacts has no authority. If a durable fact is missing from GitHub, capture it there rather than carrying it forward privately.
@@ -51,16 +37,9 @@ If any of these fundamentals is unclear, read the repository/Issue first instead
 
 ## Authority and conflict resolution
 
-Use this precedence when information disagrees:
+The **single precedence** is defined in [Initial Prompt](INITIAL_PROMPT.md#3-authority-order): current executable GitHub `main` contracts first, the appropriate normative GitHub/release/development documents second, and current Issues/comments third. This section is a navigation reference, not a competing authority policy.
 
-1. The current GitHub repository state and executable workflow/build code on `main`.
-2. Normative repository documentation, especially `docs/RELEASE_PROCESS.md` and this document.
-3. Current GitHub Issues/comments for backlog, implementation status, and acceptance evidence.
-
-Previous chat context is not part of the authority chain. A fresh session must be able to derive every durable project fact needed for safe continuation from GitHub alone.
-
-Never use a stale feature branch as a development basis merely because it still exists. The canonical development basis is GitHub `main`, unless the user explicitly names another verified branch.
-
+Previous chat context is not an authority source. Do not use stale feature branches as development bases merely because they exist.
 ## Living-document maintenance — mandatory
 
 This operational GitHub guide is a **living project artifact** and must be kept current.
@@ -73,11 +52,13 @@ Do not rely on chat memory or off-repository transition artifacts for such knowl
 
 When interactive work reveals a durable fact that a future engineering session will need, update the appropriate repository documentation, Issue/comment, test, workflow, or source contract in the same workstream. The continuity test is simple: a fresh session with access only to GitHub must be able to recover the fact.
 
-## LBS-30 — reviewed one-file archival exception
+## Historical completed migration with retained enforcement — LBS-30
 
 The GitHub Release Orchestrator continues to reject arbitrary tracked-file deletions. The unique LBS-30 migration deletes `tests/validate_lbs23_localization.py` **only** when the archived `tests-history/localization-v0.8.0.0.py` has exactly the same Git blob SHA as the previous canonical `origin/main` file. The exact one path is declared in `repositoryDeleteIntent`; any extra deletion remains blocked. All 74 original LBS-13 archives must be retained unchanged. Native localization behavior, fixed-count Contract Propagation and separate Linux/Windows Candidate, four Release/Core/Boundary/Regression and release integrity gates remain mandatory. The assertion mapping lives in `tests/README.md`.
 
 ## LBS-125 — bounded post-deployment health checks
+
+The cross-system Worker operational and incident/evidence map is in [DevOps Operations](DEVOPS_OPERATIONS.md). This How-To remains the GitHub operating contract.
 
 After a real Wrangler deploy, the helper `cloudflare/diagnostics-worker/scripts/verify-post-deploy-health.mjs` repeats the entire read-only health contract (including valid HTTP-200 stale fingerprints). It is strictly bounded: five requests, eight seconds each, 2/4/6/8-second delays, 70-second total budget. Invalid health identity or changed upload state blocks immediately. The single pending deployment receipt is finalized using existing success/failure steps; retries do not deploy or access Cloudflare secrets. The unchanged-Worker health-only verification remains unaffected. The helper is part of the deployment dependency fingerprint.
 

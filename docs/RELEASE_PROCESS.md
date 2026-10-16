@@ -20,14 +20,14 @@ Every successfully verified source release still dispatches the trusted Worker j
 
 The independent Worker job must conclude successfully even when no redeployment was required. Product Release Verification and separate Worker outcome are never conflated. The Release Orchestrator never invokes an untrusted branch or relaxes its Candidate/Release gates.
 
-### Earlier unconditional Cloudflare Worker deployment (LBS-108, v0.11.1.2–v1.1.0.1)
+### Historical only: earlier unconditional Cloudflare Worker deployment (LBS-108, v0.11.1.2–v1.1.0.1)
 
-**Automatic by default:** A verified Release Orchestrator completion on GitHub triggers a separate production Worker workflow using GitHub's native `workflow_dispatch` (not an implicit `main` push). The release job dispatches only after final post-merge release verification reports PASS. It hands over immutable `main` SHA and version, while the deployment job re-verifies tag, `downloads/latest.json` ZIP SHA and size, runs Node/Wrangler prechecks, uses the existing GitHub Secrets, and checks the public Worker health status after deployment. Production deployment is not considered successful without the separate GitHub deployment job success, even if the source Release succeeded.
+**Historical behavior during the specified older releases (superseded by the current conditional deployment model):** A verified Release Orchestrator completion on GitHub triggers a separate production Worker workflow using GitHub's native `workflow_dispatch` (not an implicit `main` push). The release job dispatches only after final post-merge release verification reports PASS. It hands over immutable `main` SHA and version, while the deployment job re-verifies tag, `downloads/latest.json` ZIP SHA and size, runs Node/Wrangler prechecks, uses the existing GitHub Secrets, and checks the public Worker health status after deployment. Production deployment is not considered successful without the separate GitHub deployment job success, even if the source Release succeeded.
 
 The dispatch step's failure is an explicit Release Orchestrator failure; a deployment failure stays visible in the separate workflow without silently rolling back the published source. The existing `workflow_dispatch` manual path remains break-glass recovery only. **Historic KV retention migration, secret rotation, archive deletion and upload enable/disable changes are never implicit parts of this automated Worker deployment**; those require separate owner authorization. This keeps the initial new workflow bootstrap capable of deploying a previously released Worker without recurring owner clicks.
 
 
-Operational companion for ChatGPT/release supervision: [`GITHUB_HOWTO.md`](GITHUB_HOWTO.md).
+Operational companion for ChatGPT/release supervision: [`GITHUB_HOWTO.md`](GITHUB_HOWTO.md). The cross-system CI/CD, incident and Cloudflare operations overview is [`DEVOPS_OPERATIONS.md`](DEVOPS_OPERATIONS.md), which does **not** redefine this authoritative source-release process.
 
 ## LBS-30 single-file historical test archival (v1.1.3.0)
 

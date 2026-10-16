@@ -1,6 +1,6 @@
 # Build & Deployment – Chat Report Presentation Standard
 
-This document defines the **user-facing final report presentation** for Lenovo Boot Selector build, deployment, release and process-benchmark instructions. It is linked from `docs/DEVELOPMENT_GUIDELINES.md`. It governs presentation only: executable workflows, validators, release gates, safety policy, evidence requirements and the Issue rolling recovery ledger retain precedence and remain unchanged.
+This document defines the **user-facing final report presentation** for Lenovo Boot Selector build, deployment, release and process-benchmark instructions. It is linked from `docs/DEVELOPMENT_GUIDELINES.md`. It governs presentation only: executable workflows, validators, release gates, safety policy, evidence requirements and the Issue rolling recovery ledger retain precedence and remain unchanged. [DevOps Operations](DEVOPS_OPERATIONS.md) covers cross-system operation and evidence, not this user-facing presentation policy.
 
 ## When to use it
 
