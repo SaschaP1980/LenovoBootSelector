@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.1.9.0 – Reopen existing popup on second launch (LBS-140)
+
+- A second interactive start now signals the existing same-user tray instance to open its current popup, rather than treating the ordinary duplicate launch as a runtime error.
+- Use an event with per-user/session ACLs and UI-thread delivery; retain the existing single-owner mutex, worker-mode exceptions, bounded failure path and real fatal-startup recovery diagnostics.
+- A visible popup stays visible and receives focus; hidden popup opens via the existing presentation and boot-state refresh path. Preserve tray icon left-click toggle and context-menu behavior.
+- Add PowerShell 5.1 cross-process signal, WinForms callback, idempotence and negative-security tests. No TaskBroker, UEFI, permanent BootOrder, update, Cloudflare or privilege expansion.
+
 ## v1.1.8.0 – LBS-8: one squash commit per release
 
 - Change the permanent Release Orchestrator publication action to an explicit squash merge with the canonical `Publish Lenovo Boot Selector vX.Y.Z.W (#PR)` commit subject; preserve the single pre-activation-gated PR as the only public update-pointer activation.

@@ -39,6 +39,7 @@ function Start-LenovoBootSelectorHidden {
 # @include src/Core/Localization.ps1
 # @include src/Core/EntryPreferences.ps1
 # @include src/UI/StartupRecoveryDialog.ps1
+# @include src/Infrastructure/InstanceActivation.ps1
 
 # v0.2.18: The tray intentionally runs unelevated. Privileged firmware operations
 # are delegated to fixed, pre-authorized Windows Scheduled Tasks. No custom EXE
@@ -832,6 +833,8 @@ public static class LenovoBootSelectorConsoleWindow {
 # tested explicitly: an existing-but-free named mutex is not an active instance.
 $mutex = $null
 $mutexOwned = $false
+$activationEvent = $null
+$activationListener = $null
 $singleInstanceMutexState = 'not-applicable'
 $singleInstanceGraceMs = 500
 if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
@@ -871,10 +874,16 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     if (-not $mutexOwned) {
         try { $mutex.Dispose() } catch { }
         $mutex = $null
+        if (Send-LbsActivationRequest) { exit 0 }
+        # A genuine failed handoff is not treated as a successful activation.
         $startupLocale = Get-StartupRecoveryLocale
         Show-FatalMessage (Get-LocalizedStringCore -Key 'Startup.AlreadyRunningMessage' -Locale $startupLocale) -AllowRestart $false | Out-Null
-        exit 0
+        exit 2
     }
+    # Publish the signal immediately after mutex ownership. If the primary
+    # instance is still initializing, the AutoReset event retains the request
+    # until its UI listener is installed (no polling or second tray owner).
+    $activationEvent = New-LbsActivationEvent
 }
 
 $script:AppVersion = '@APP_VERSION@'
@@ -1783,6 +1792,15 @@ try {
     Repair-AutostartLauncherIfNeeded
 
     $script:Popup = New-PopupForm
+    $activationListener = Start-LbsActivationListener -Signal $activationEvent -OnActivate {
+        try {
+            Show-OrActivatePopup
+            Write-RuntimeDiagnosticEvent -Event 'SINGLE_INSTANCE_ACTIVATED' -Stage 'ui' -Success $true
+        }
+        catch {
+            Write-RuntimeDiagnosticEvent -Event 'SINGLE_INSTANCE_ACTIVATION_FAILED' -Stage 'ui' -Success $false -ErrorRecord $_ -Level warning
+        }
+    }
     $script:TrayIcon = New-Object System.Windows.Forms.NotifyIcon
     $script:TrayIcon.Icon = Load-TrayIcon
     $script:TrayIcon.Text = 'Lenovo Boot Selector'
@@ -2047,6 +2065,14 @@ finally {
     if ($script:TrayIcon) {
         $script:TrayIcon.Visible = $false
         $script:TrayIcon.Dispose()
+    }
+    if ($activationListener) {
+        try { Stop-LbsActivationListener -Listener $activationListener } catch { }
+        $activationListener = $null
+    }
+    if ($activationEvent) {
+        try { $activationEvent.Dispose() } catch { }
+        $activationEvent = $null
     }
     if ($script:Popup -and -not $script:Popup.IsDisposed) { $script:Popup.Dispose() }
     if ($mutex) {
