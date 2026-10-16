@@ -17,6 +17,7 @@ Current releases use **Lenovo Boot Selector** as the product name. The historica
 
 | Version | Release | Size | SHA-256 | Git tag |
 | --- | --- | ---: | --- | --- |
+| v1.1.6.2 | [LenovoBootMenuTray-v1.1.6.2.zip](LenovoBootMenuTray-v1.1.6.2.zip) | 119.963 Bytes | `9f63ec5ab980c894f2c8e1fa04086b95f6055dddf3ae97e2a6259266cae60358` | `v1.1.6.2` |
 | v1.1.6.1 | [LenovoBootMenuTray-v1.1.6.1.zip](LenovoBootMenuTray-v1.1.6.1.zip) | 119.963 Bytes | `b63528cb36774221a2dbee627744153fe4fe1acd3f0aa10a02a36c4d3fa130da` | `v1.1.6.1` |
 | v1.1.6.0 | [LenovoBootMenuTray-v1.1.6.0.zip](LenovoBootMenuTray-v1.1.6.0.zip) | 119.961 Bytes | `9228e8ce7cf757a5c39fddc872a32371cc1105cc400422de1481c6a0a6aa6351` | `v1.1.6.0` |
 | v1.1.5.0 | [LenovoBootMenuTray-v1.1.5.0.zip](LenovoBootMenuTray-v1.1.5.0.zip) | 119.965 Bytes | `4f08342ab526237893b661ed0b24d852ffb4f367cba6795f2467752f980a6c28` | `v1.1.5.0` |

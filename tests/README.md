@@ -2,6 +2,12 @@
 
 `tests/` contains only the **active canonical tests** and the baseline data they require. Version-specific historical validators are stored separately under [`../tests-history/`](../tests-history/).
 
+## Pre-Candidate changelog language guard (v1.1.6.2)
+
+The read-only `tools/pre_candidate_language_check.py` is mandatory on the final intended release tree **before** exposing a Candidate branch. It validates the exact current version in the first changelog heading, nonempty current release notes and English-looking prose throughout the repository. Run `python3 -B tools/pre_candidate_language_check.py --root .` and require `PRE_CANDIDATE_LANGUAGE_RESULT=PASS`.
+
+Its deterministic `--self-test` covers a valid English Hotfix, German release notes, missing bullets, mismatched version headings and unrelated German Markdown. The permanent Release validator runs both the self-test and the actual check. Candidate Preflight and release preparation repeat the check fail-closed before building packages. This prevents another unnoticed German changelog from passing the repository pipeline, while the pre-exposure command avoids known-failing Candidate runs when followed. Language detection is heuristic and is not a formal translation-quality certificate.
+
 ## Diagnostics Worker conditional-deployment tests
 
 `cloudflare/diagnostics-worker/tests/conditional-deploy.test.mjs` validates LBS-123 deployment fingerprints, successful-production-receipt guards, health-only versus deployment decisions, source/runtime workflow invariants and the pinned Windows upload contract. The trusted Worker job runs it through the existing complete Node test suite only when a new Worker deployment is required; hosted Work-Branch Diagnostics Worker CI runs it for changed backend sources. A version-only release with a verified matching live fingerprint instead takes the secret-free health-only path.

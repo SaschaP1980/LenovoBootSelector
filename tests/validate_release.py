@@ -60,6 +60,20 @@ def main():
     s.c('LBS-18 Markdown language validator exists',markdown_gate.is_file())
     markdown_cp=subprocess.run([sys.executable,'-B',str(markdown_gate),'--root',str(root)],capture_output=True,text=True) if markdown_gate.is_file() else None
     s.eq('LBS-18 repository Markdown language gate passes',markdown_cp.returncode if markdown_cp else 1,0)
+    # Reproduce v1.1.6.1's first-Candidate language failure before future
+    # Candidate exposure, and keep the new read-only, fail-closed command tested.
+    pre_candidate_language=root/'tools/pre_candidate_language_check.py'
+    s.c('Hotfix pre-Candidate language guard exists',pre_candidate_language.is_file())
+    language_selftest=subprocess.run(
+        [sys.executable,'-B',str(pre_candidate_language),'--self-test'],
+        capture_output=True,text=True) if pre_candidate_language.is_file() else None
+    s.eq('Hotfix pre-Candidate language guard detects German and malformed releases',
+         language_selftest.returncode if language_selftest else 1,0)
+    language_current=subprocess.run(
+        [sys.executable,'-B',str(pre_candidate_language),'--root',str(root)],
+        capture_output=True,text=True) if pre_candidate_language.is_file() else None
+    s.eq('Hotfix current release candidate is English and version-matched',
+         language_current.returncode if language_current else 1,0)
     initial_prompt=txt(root/'docs/INITIAL_PROMPT.md') if (root/'docs/INITIAL_PROMPT.md').is_file() else ''
     github_howto=txt(root/'docs/GITHUB_HOWTO.md') if (root/'docs/GITHUB_HOWTO.md').is_file() else ''
     release_process=txt(root/'docs/RELEASE_PROCESS.md') if (root/'docs/RELEASE_PROCESS.md').is_file() else ''
@@ -248,6 +262,12 @@ def main():
     prepare=txt(root/'tools/prepare_release.py') if (root/'tools/prepare_release.py').is_file() else ''
     common=txt(root/'tools/release_common.py') if (root/'tools/release_common.py').is_file() else ''
     candidate_preflight=txt(root/'tools/candidate_preflight.py') if (root/'tools/candidate_preflight.py').is_file() else ''
+    s.has('Hotfix candidate preflight repeats language gate before packages',
+          candidate_preflight,'tools/pre_candidate_language_check.py')
+    s.has('Hotfix prepare-release blocks non-English changelog before mutation',
+          prepare,'tools/pre_candidate_language_check.py')
+    s.has('Hotfix process requires pre-Candidate language PASS',
+          github_howto,'python3 -B tools/pre_candidate_language_check.py --root .')
     release_verification=txt(verification_path) if verification_path.is_file() else ''
     pre_activation=txt(pre_activation_path) if pre_activation_path.is_file() else ''
     runtime_builder=txt(root/'tools/build_runtime.py')
