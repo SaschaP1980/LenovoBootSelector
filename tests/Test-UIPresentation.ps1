@@ -6,6 +6,7 @@ $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 
 . (Join-Path $root 'src\UI\BootEntryList.ps1')
 . (Join-Path $root 'src\UI\BootEntryRows.ps1')
+. (Join-Path $root 'src\UI\PopupPosition.ps1')
 
 $script:checks = 0
 function Assert-Equal($Expected,$Actual,[string]$Name) {
@@ -138,5 +139,66 @@ $scroll.Value = 40
 Update-BootEntryScrollLayout -ListPanel $listPanel -ContentPanel $contentPanel -ScrollBar $scroll -ContentBottom 200 -BaseRowHeight 60 -RowGap 4
 Assert-Equal -40 $contentPanel.Top 'UI scroll layout applies scrollbar value to content offset'
 
-Write-Host "UI PRESENTATION TOTAL $script:checks/25"
-if ($script:checks -ne 25) { throw "Unexpected UI presentation test count $script:checks" }
+
+# LBS-132: native PS5.1 geometry assertions, no Explorer or privileged operation.
+$display = [Drawing.Rectangle]::new(0, 0, 1920, 1080)
+$work = [Drawing.Rectangle]::new(0, 0, 1920, 1040)
+$size = [Drawing.Size]::new(390, 672)
+$icon = [Drawing.Rectangle]::new(1650, 1008, 24, 24)
+$placed = Get-PopupLocationFromAnchor -WorkingArea $work -DisplayBounds $display -AnchorRect $icon -PopupSize $size -HasAnchor
+Assert-Equal 1467 $placed.X 'Popup centers horizontally above the actual icon'
+Assert-Equal 328 $placed.Y 'Popup uses icon top for bottom taskbar placement'
+$icon = [Drawing.Rectangle]::new(1500, 1008, 24, 24)
+$placed = Get-PopupLocationFromAnchor -WorkingArea $work -DisplayBounds $display -AnchorRect $icon -PopupSize $size -HasAnchor
+Assert-Equal 1317 $placed.X 'Reordered icon changes horizontal popup position'
+$icon = [Drawing.Rectangle]::new(1900, 1008, 24, 24)
+$placed = Get-PopupLocationFromAnchor -WorkingArea $work -DisplayBounds $display -AnchorRect $icon -PopupSize $size -HasAnchor
+Assert-Equal 1530 $placed.X 'Popup clamps to right screen edge'
+$icon = [Drawing.Rectangle]::new(0, 1008, 24, 24)
+$placed = Get-PopupLocationFromAnchor -WorkingArea $work -DisplayBounds $display -AnchorRect $icon -PopupSize $size -HasAnchor
+Assert-Equal 0 $placed.X 'Popup clamps to left screen edge'
+$icon = [Drawing.Rectangle]::new(850, 800, 24, 24)
+$placed = Get-PopupLocationFromAnchor -WorkingArea $work -DisplayBounds $display -AnchorRect $icon -PopupSize $size -HasAnchor
+Assert-Equal 667 $placed.X 'Overflow flyout icon owns horizontal anchor'
+Assert-Equal 120 $placed.Y 'Overflow flyout icon owns vertical anchor'
+$placed = Get-PopupLocationFromAnchor -WorkingArea $work -DisplayBounds $display -PopupSize $size
+Assert-Equal 1522 $placed.X 'Non-pointer fallback has deterministic horizontal placement'
+Assert-Equal 360 $placed.Y 'Non-pointer fallback has deterministic vertical placement'
+$topWork = [Drawing.Rectangle]::new(0, 40, 1920, 1040)
+$topIcon = [Drawing.Rectangle]::new(850, 45, 24, 24)
+$placed = Get-PopupLocationFromAnchor -WorkingArea $topWork -DisplayBounds $display -AnchorRect $topIcon -PopupSize $size -HasAnchor
+Assert-Equal 77 $placed.Y 'Top-docked taskbar places popup below the icon'
+$rightWork = [Drawing.Rectangle]::new(0, 0, 1860, 1080)
+$rightIcon = [Drawing.Rectangle]::new(1870, 500, 24, 24)
+$placed = Get-PopupLocationFromAnchor -WorkingArea $rightWork -DisplayBounds $display -AnchorRect $rightIcon -PopupSize $size -HasAnchor
+Assert-Equal 1472 $placed.X 'Right-docked taskbar places popup to icon left'
+Assert-Equal 176 $placed.Y 'Side-docked taskbar aligns popup vertically'
+$leftWork = [Drawing.Rectangle]::new(55, 0, 1865, 1080)
+$leftIcon = [Drawing.Rectangle]::new(12, 500, 24, 24)
+$placed = Get-PopupLocationFromAnchor -WorkingArea $leftWork -DisplayBounds $display -AnchorRect $leftIcon -PopupSize $size -HasAnchor
+Assert-Equal 55 $placed.X 'Left-docked taskbar clamps popup to working area'
+$negativeDisplay = [Drawing.Rectangle]::new(-1600, -200, 1600, 900)
+$negativeWork = [Drawing.Rectangle]::new(-1600, -200, 1600, 860)
+$negativeIcon = [Drawing.Rectangle]::new(-300, 600, 24, 24)
+$placed = Get-PopupLocationFromAnchor -WorkingArea $negativeWork -DisplayBounds $negativeDisplay -AnchorRect $negativeIcon -PopupSize $size -HasAnchor
+Assert-Equal -483 $placed.X 'Negative virtual-screen X centers on second monitor'
+Assert-Equal -80 $placed.Y 'Negative virtual-screen Y remains within working area'
+$scaledSize = [Drawing.Size]::new(480, 800)
+$scaledIcon = [Drawing.Rectangle]::new(950, 1000, 40, 40)
+$placed = Get-PopupLocationFromAnchor -WorkingArea $work -DisplayBounds $display -AnchorRect $scaledIcon -PopupSize $scaledSize -HasAnchor
+Assert-Equal 730 $placed.X 'Scaled form width is used rather than hardcoded 390'
+Assert-Equal 192 $placed.Y 'Scaled form height is used rather than hardcoded 672'
+$autoHide = [Drawing.Rectangle]::new(0, 0, 1920, 1080)
+$autoIcon = [Drawing.Rectangle]::new(1600, 1040, 24, 24)
+$placed = Get-PopupLocationFromAnchor -WorkingArea $autoHide -DisplayBounds $autoHide -AnchorRect $autoIcon -PopupSize $size -HasAnchor
+Assert-Equal 360 $placed.Y 'Auto-hidden bottom taskbar prefers placement above icon'
+$shortWork = [Drawing.Rectangle]::new(0, 0, 850, 700)
+$shortIcon = [Drawing.Rectangle]::new(15, 660, 24, 24)
+$placed = Get-PopupLocationFromAnchor -WorkingArea $shortWork -DisplayBounds $shortWork -AnchorRect $shortIcon -PopupSize $size -HasAnchor
+Assert-Equal 28 $placed.Y 'Tall popup clamps inside short usable work area'
+$placed = Get-PopupLocationFromAnchor -WorkingArea $negativeWork -DisplayBounds $negativeDisplay -PopupSize $size
+Assert-Equal -398 $placed.X 'Negative-monitor fallback clamps correctly'
+Assert-Equal -20 $placed.Y 'Negative-monitor fallback places above usable bottom'
+
+Write-Host "UI PRESENTATION TOTAL $script:checks/46"
+if ($script:checks -ne 46) { throw "Unexpected UI presentation test count $script:checks" }
