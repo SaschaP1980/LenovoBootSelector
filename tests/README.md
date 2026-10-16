@@ -117,6 +117,7 @@ LBS-40 adds `../tools/validate_test_contracts.py` as a shared preflight contract
 | `Test-MaintenanceRuntime.ps1` | Runtime | Maintenance state and modes |
 | `Test-SystemCapabilities.ps1` | Application | Canonical system-function readiness/capability derivation from explicit facts |
 | `Test-SingleInstanceMutex.ps1` | Runtime | Single-instance / mutex lifecycle |
+| `Test-InstanceActivation.ps1` | Runtime | Local-user activation signal, cross-process delivery, WinForms callback, idempotent popup focus and negative paths |
 | `Test-BootTargetDrift.ps1` | Safety | Drift detection and fail-closed states |
 | `Test-TaskBrokerBoundary.ps1` | Safety | Fixed-task / metadata privilege boundary without privileged execution |
 | `Test-TaskBrokerMigration.ps1` | Safety / Migration | LBS-33 canonical privileged identifiers, migration ordering, legacy cleanup ownership, and default-state precedence |
@@ -152,6 +153,7 @@ Native PowerShell suites intentionally use different count strategies; one gener
 | `Test-TaskBrokerMigration.ps1` | Straight-line: fixed runtime count of 42 covering LBS-33 migration, LBS-34 authoritative Task Scheduler XML trigger verification, and LBS-35 batched ScheduledTasks performance contracts. |
 | `Test-BootTargetDrift.ps1` | Straight-line: fixed runtime count of 13. |
 | `Test-SingleInstanceMutex.ps1` | Explicit manual increments; fixed fail guard of 4. |
+| `Test-InstanceActivation.ps1` | Explicit manual increments; fixed runtime count of 21 with same-user cross-process and WinForms message-loop tests. |
 | `Test-IdentifierCompatibility.ps1` | Straight-line: fixed runtime count of 29 covering LBS-19 naming, migration-failure safety, unrelated-value isolation, and retained compatibility roots. |
 | `Test-MaintenanceRuntime.ps1` | Loop-derived: 15 runtime checks from static assertions plus assertions repeated per mode. |
 | `Test-SystemCapabilities.ps1` | Straight-line: fixed runtime count of 47 covering setup/repair/checking/ready/drift/busy/unknown capability derivation and fail-closed actions. |
