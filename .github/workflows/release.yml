@@ -318,7 +318,7 @@ jobs:
             --base main \
             --head "$EXPECTED_BRANCH" \
             --title "Publish Lenovo Boot Selector v$VERSION" \
-            --body "One release branch, one PR and one merge. GitHub independently rebuilt and verified the release before this PR. Historical ZIPs are unchanged and exactly one new release ZIP is added.")
+            --body "One release branch, one PR and one squash commit on main. GitHub independently rebuilt and verified the release before this PR. The annotated source tag identifies the distinct ZIP-free source commit; historical ZIPs are unchanged and exactly one new release ZIP is added.")
 
           # Tag only after all gates and successful PR creation, but before merge.
           git tag -a "v$VERSION" "$SOURCE_COMMIT" -m "Lenovo Boot Selector v$VERSION"
@@ -342,7 +342,12 @@ jobs:
             --reproducibility-marker /tmp/lbs-release/reproducible.ok \
             --output /tmp/lbs-release/release-pre-activation.json
 
-          gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --merge --delete-branch
+          # LBS-8: one canonical main commit per release; the annotated source tag
+          # intentionally remains on its separate verified ZIP-free source commit.
+          PR_NUMBER="${PR_URL##*/}"
+          [[ "$PR_NUMBER" =~ ^[0-9]+$ ]] || { echo "Invalid publication PR number: $PR_URL" >&2; exit 1; }
+          gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --squash \
+            --subject "Publish Lenovo Boot Selector v$VERSION (#$PR_NUMBER)" --delete-branch
 
           # Work branches are durable recovery state during development, but they are
           # disposable only after successful publication. Re-check the exact tree at

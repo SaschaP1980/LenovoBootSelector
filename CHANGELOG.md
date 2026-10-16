@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.1.8.0 – LBS-8: one squash commit per release
+
+- Change the permanent Release Orchestrator publication action to an explicit squash merge with the canonical `Publish Lenovo Boot Selector vX.Y.Z.W (#PR)` commit subject; preserve the single pre-activation-gated PR as the only public update-pointer activation.
+- Fail closed after merge unless `main` is exactly the resulting one-parent squash commit against the pre-activation base, its tree is identical to the verified final PR head, and the separately annotated ZIP-free source tag remains exact.
+- Extend permanent release gates and helper negative self-tests for merge topology, title, tree identity, and source-tag integrity; preserve all Candidate 3/3 and Release 8/8 gates, reproducibility, historical ZIP immutability and worker deployment isolation.
+- No product runtime, UI, BootService, TaskBroker, BCD/UEFI, firmware, updater logic, settings or privilege-boundary changes.
+
 ## v1.1.7.0 – Icon-relative main popup anchoring (LBS-132)
 
 - Center the main popup over the LBS notification icon using best-effort public Windows UI Automation bounds, including supported overflow flyout locations; a genuine icon-click position is the bounded fallback when shell bounds are unavailable.
