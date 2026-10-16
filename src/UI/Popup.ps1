@@ -46,17 +46,38 @@
     return $form
 }
 function Position-Popup {
+    param([switch]$FromTrayClick)
     if (-not $script:Popup) { return }
-    $screen = [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position)
-    $wa = $screen.WorkingArea
-    $x = $wa.Right - $script:Popup.Width - 10
-    $y = $wa.Bottom - $script:Popup.Height - 10
-    if ($x -lt $wa.Left) { $x = $wa.Left + 5 }
-    if ($y -lt $wa.Top) { $y = $wa.Top + 5 }
-    $script:Popup.Location = New-Object Drawing.Point($x, $y)
+
+    $hasClick = $false
+    $clickPoint = [Drawing.Point]::Empty
+    if ($FromTrayClick -and $null -ne $script:TrayPopupClickUtc -and
+        ([DateTime]::UtcNow - $script:TrayPopupClickUtc).TotalSeconds -le 30) {
+        $clickPoint = $script:TrayPopupClickPoint
+        $hasClick = $true
+    }
+
+    $iconRect = Get-VisiblePopupTrayIconRectangle -ClickPoint $clickPoint -HasClickPoint:$hasClick
+    if ($null -ne $iconRect) {
+        $screen = [System.Windows.Forms.Screen]::FromRectangle($iconRect)
+    }
+    elseif ($hasClick) {
+        $screen = [System.Windows.Forms.Screen]::FromPoint($clickPoint)
+        # Only a genuine recent NotifyIcon click may supply this approximate anchor.
+        $iconRect = [Drawing.Rectangle]::new($clickPoint.X - 12, $clickPoint.Y - 12, 24, 24)
+    }
+    else {
+        # Non-pointer/first-run fallback: deterministic primary display, never cursor.
+        $screen = [System.Windows.Forms.Screen]::PrimaryScreen
+    }
+
+    if ($null -eq $screen) { return }
+    $location = Get-PopupLocationFromAnchor -WorkingArea $screen.WorkingArea -DisplayBounds $screen.Bounds -AnchorRect $iconRect -PopupSize $script:Popup.Size -HasAnchor:($null -ne $iconRect)
+    $script:Popup.Location = $location
 }
 
 function Show-OrTogglePopup {
+    param([switch]$FromTrayClick)
     if (-not $script:Popup -or $script:Popup.IsDisposed) {
         $script:Popup = New-PopupForm
     }
@@ -92,7 +113,7 @@ function Show-OrTogglePopup {
 
     Update-AutostartUi | Out-Null
     Update-MaintenanceUi
-    Position-Popup
+    Position-Popup -FromTrayClick:$FromTrayClick
     $script:Popup.Show()
     $script:Popup.Activate()
 

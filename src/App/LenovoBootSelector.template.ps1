@@ -1732,6 +1732,7 @@ function Load-BootStateFromExistingCache {
 }
 
 # @include src/UI/PopupComposition.ps1
+# @include src/UI/PopupPosition.ps1
 # @include src/UI/Popup.ps1
 
 Initialize-RuntimeDiagnostics
@@ -1801,7 +1802,7 @@ try {
     $script:TrayOpenMenuItem = $openItem
     $openItem.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
     $openItem.ForeColor = $script:ColorAccent
-    $openItem.Add_Click({ Show-OrTogglePopup })
+    $openItem.Add_Click({ Show-OrTogglePopup -FromTrayClick })
     [void]$context.Items.Add($openItem)
 
     # v0.2.32: Refresh and Standard-Startziel remain in the main popup only.
@@ -1937,10 +1938,18 @@ try {
 
     $script:TrayIcon.ContextMenuStrip = $context
     [void](Show-PendingUpdateResultOnStartup)
+    $script:TrayPopupClickUtc = $null
+    $script:TrayPopupClickPoint = [Drawing.Point]::Empty
     $script:TrayIcon.Add_MouseClick({
         param($sender, $eventArgs)
+        if ($eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Left -or
+            $eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Right) {
+            # Capture only genuine tray-icon clicks; never borrow arbitrary cursor state.
+            $script:TrayPopupClickPoint = [System.Windows.Forms.Cursor]::Position
+            $script:TrayPopupClickUtc = [DateTime]::UtcNow
+        }
         if ($eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
-            Show-OrTogglePopup
+            Show-OrTogglePopup -FromTrayClick
         }
     })
 

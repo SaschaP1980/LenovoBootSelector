@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.1.7.0 – Icon-relative main popup anchoring (LBS-132)
+
+- Center the main popup over the LBS notification icon using best-effort public Windows UI Automation bounds, including supported overflow flyout locations; a genuine icon-click position is the bounded fallback when shell bounds are unavailable.
+- Resolve the anchor monitor, use the actual form size, clamp within the display working area, and handle side/top taskbar layouts; retain a deterministic primary-screen fallback for non-pointer openings.
+- Extend native Windows PowerShell 5.1 UI presentation coverage with 21 popup geometry cases, preserve tray-menu behavior and existing boot/TaskBroker/update safety, and document shell/DPI limitations and manual Explorer acceptance.
+
 ## v1.1.6.3 – Version-only Hotfix (Fast-Path)
 
 - Increase the release version from v1.1.6.2 to v1.1.6.3 only; no functional product changes.
