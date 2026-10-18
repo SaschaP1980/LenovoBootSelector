@@ -49,7 +49,7 @@ function Apply-BackgroundRefreshResult {
     }
 
     $state = Get-FirmwareBootState -UseExistingCache
-    Apply-FirmwareBootState -State $state
+    Apply-FirmwareBootState -State $state -VerifiedFresh
     Update-TaskBrokerUiState -Fast | Out-Null
     Show-BootTargetDriftNotificationIfNeeded
     return $true

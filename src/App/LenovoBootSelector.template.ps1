@@ -1761,11 +1761,11 @@ function Get-EntryByGuid([string]$Guid) {
 
 
 function Apply-FirmwareBootState {
-    param([Parameter(Mandatory=$true)]$State)
+    param([Parameter(Mandatory=$true)]$State, [switch]$VerifiedFresh)
 
     $script:CurrentEntries = @($State.Entries)
     $script:SelectedGuid = if ($State.SelectedGuid) { $State.SelectedGuid.ToLowerInvariant() } else { $null }
-    $script:NextBootFirmwareReadVerified = $true
+    $script:NextBootFirmwareReadVerified = [bool]$VerifiedFresh
 
     if ($script:SelectedGuid) {
         $selected = Get-EntryByGuid $script:SelectedGuid
@@ -1790,7 +1790,7 @@ function Refresh-BootState {
     try {
         $state = Get-FirmwareBootState -RefreshStorage:$RefreshStorage
         [void](Update-BootTargetDriftState)
-        Apply-FirmwareBootState -State $state
+        Apply-FirmwareBootState -State $state -VerifiedFresh
         $sw.Stop()
         Write-RuntimeDiagnosticEvent -Event 'BOOT_STATE_REFRESH' -Stage 'boot-state' -Success $true -DurationMs $sw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{ refreshStorage = [bool]$RefreshStorage; entryCount = @($state.Entries).Count; selectedGuid = $state.SelectedGuid })
     }
