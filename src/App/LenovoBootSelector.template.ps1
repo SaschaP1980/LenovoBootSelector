@@ -1685,10 +1685,11 @@ $script:BackgroundRefreshState = New-BackgroundRefreshRuntimeState
 function Get-FirmwareBootState {
     param(
         [switch]$RefreshStorage,
-        [switch]$UseExistingCache
+        [switch]$UseExistingCache,
+        [switch]$ForceManagerRefresh
     )
 
-    $snapshot = Get-BootServiceFirmwareSnapshot -UseExistingCache:$UseExistingCache
+    $snapshot = Get-BootServiceFirmwareSnapshot -UseExistingCache:$UseExistingCache -ForceManagerRefresh:$ForceManagerRefresh
     $descriptions = $snapshot.Descriptions
     $managerState = $snapshot.ManagerState
     $displayOrder = @($managerState.DisplayOrder)
@@ -1788,7 +1789,7 @@ function Refresh-BootState {
         $script:FirmwareCacheText = $null
     }
     try {
-        $state = Get-FirmwareBootState -RefreshStorage:$RefreshStorage
+        $state = Get-FirmwareBootState -RefreshStorage:$RefreshStorage -ForceManagerRefresh
         [void](Update-BootTargetDriftState)
         Apply-FirmwareBootState -State $state -VerifiedFresh
         $sw.Stop()

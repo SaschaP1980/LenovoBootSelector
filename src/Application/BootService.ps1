@@ -1,7 +1,12 @@
 ﻿function Get-BootServiceFirmwareSnapshot {
-    param([switch]$UseExistingCache)
+    param([switch]$UseExistingCache, [switch]$ForceManagerRefresh)
 
-    $managerText = Get-TaskBrokerFirmwareManagerText -UseExistingCache:$UseExistingCache
+    if ($UseExistingCache -and $ForceManagerRefresh) {
+        throw 'Cannot combine cached firmware state with a forced firmware-manager refresh.'
+    }
+    # A snapshot later labelled freshly verified must bypass the short manager
+    # cache. A cached popup-open snapshot must never be labelled verified.
+    $managerText = Get-TaskBrokerFirmwareManagerText -UseExistingCache:$UseExistingCache -Force:$ForceManagerRefresh
     $firmwareText = Get-TaskBrokerFirmwareEntriesText -UseExistingCache:$UseExistingCache
 
     [pscustomobject]@{
