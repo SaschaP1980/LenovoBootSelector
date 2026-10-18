@@ -55,6 +55,7 @@ $script:TestResultText = '{"Success":true,"Stage":"complete","StorageContext":nu
 $script:TestPopupRows = 0
 $script:TestRefreshVisual = 0
 $script:TestApplyFirmware = 0
+$script:TestApplyFirmwareVerified = @()
 $script:TestSyncCaches = 0
 $script:TestDriftUpdates = 0
 $script:TestDriftNotifications = 0
@@ -74,7 +75,7 @@ function Update-PopupRows { $script:TestPopupRows++ }
 function Sync-TaskBrokerFirmwareCachesFromFiles { $script:TestSyncCaches++; return [pscustomobject]@{} }
 function Update-BootTargetDriftState { $script:TestDriftUpdates++; return $true }
 function Get-FirmwareBootState { param([switch]$UseExistingCache); return [pscustomobject]@{ Entries=@(); SelectedGuid=$null } }
-function Apply-FirmwareBootState { param($State); $script:TestApplyFirmware++ }
+function Apply-FirmwareBootState { param($State, [switch]$VerifiedFresh); $script:TestApplyFirmware++; $script:TestApplyFirmwareVerified += [bool]$VerifiedFresh }
 function Show-BootTargetDriftNotificationIfNeeded { $script:TestDriftNotifications++ }
 function Update-RefreshButtonVisual { $script:TestRefreshVisual++ }
 function Read-BackgroundRefreshResultText { param([string]$Path); return [string]$script:TestResultText }
@@ -149,6 +150,7 @@ try {
     Assert-RefreshControllerTest 'Successful timing is retained in RefreshRuntime state' ($script:BackgroundRefreshState.LastTiming.TotalMs -eq 22)
     Assert-RefreshControllerTest 'Successful result refreshes caches and drift' ($script:TestSyncCaches -ge 2 -and $script:TestDriftUpdates -ge 2)
     Assert-RefreshControllerTest 'Second completion owns timer cleanup' ([bool]$secondTimer.Stopped -and [bool]$secondTimer.Disposed)
+    Assert-RefreshControllerTest 'Background refresh marks applied firmware state freshly verified' ($script:TestApplyFirmware -ge 2 -and @($script:TestApplyFirmwareVerified | Where-Object { -not $_ }).Count -eq 0)
 
     $readyFailure = [pscustomobject]@{
         Success = $false
@@ -216,5 +218,5 @@ finally {
     try { if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force } } catch { }
 }
 
-Write-Host "REFRESH CONTROLLER TOTAL $script:checks/38"
-if ($script:checks -ne 38) { throw "Expected 38 refresh controller checks, got $script:checks" }
+Write-Host "REFRESH CONTROLLER TOTAL $script:checks/39"
+if ($script:checks -ne 39) { throw "Expected 39 refresh controller checks, got $script:checks" }

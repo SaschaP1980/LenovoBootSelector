@@ -149,7 +149,7 @@ Native PowerShell suites intentionally use different count strategies; one gener
 | `Test-UpdateCore.ps1` | **AST self-audit + fixed coverage guard.** PowerShell counts the `Assert-True` / `Assert-Equal` command ASTs, compares them with the actually executed `$checks`, and additionally requires exactly 79. The permanent release gate validates the same contract statically. |
 | `Test-UpdateController.ps1` | Straight-line: fixed runtime count of 56 covering LBS-26 Application orchestration and explicit Infrastructure/UI adapter boundaries. |
 | `Test-RefreshRuntime.ps1` | Straight-line: fixed runtime count of 28, including LBS-22 inherited/fresh diagnostics-session coverage for background-refresh, update-check, and update-prepare roles. |
-| `Test-RefreshController.ps1` | Straight-line: fixed runtime count of 38 covering LBS-27 lifecycle orchestration and the explicit Infrastructure worker boundary. |
+| `Test-RefreshController.ps1` | Straight-line: fixed runtime count of 39 covering LBS-27 lifecycle orchestration, the explicit Infrastructure worker boundary and LBS-143's freshly verified firmware-state propagation. |
 | `Test-BootNextOwnership.ps1` | Straight-line: fixed runtime count of 20 including manual precedence, same-cycle auto restore, absent/stale/observable external state and next-boot display cases. |
 | `Test-TaskBrokerBoundary.ps1` | Straight-line: fixed runtime count of 25, including rejection of the v1 boundary and legacy fixed task names. |
 | `Test-TaskBrokerMigration.ps1` | Straight-line: fixed runtime count of 42 covering LBS-33 migration, LBS-34 authoritative Task Scheduler XML trigger verification, and LBS-35 batched ScheduledTasks performance contracts. |
