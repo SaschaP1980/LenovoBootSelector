@@ -31,9 +31,11 @@ function Test-TaskBrokerMetadataContract {
         $expectedManagerFile = Join-Path $script:TaskBrokerStateDir 'fwbootmgr.txt'
         $expectedFirmwareFile = Join-Path $script:TaskBrokerStateDir 'firmware.txt'
         $expectedDefaultFile = Join-Path (Join-Path $script:TaskBrokerStateDir 'Default') 'default-guid.txt'
+        $expectedOriginFile = Join-Path (Join-Path $script:TaskBrokerStateDir 'Default') 'bootnext-origin.json'
         if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$Metadata.managerFile),[System.IO.Path]::GetFullPath($expectedManagerFile),[System.StringComparison]::OrdinalIgnoreCase)) { return $false }
         if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$Metadata.firmwareFile),[System.IO.Path]::GetFullPath($expectedFirmwareFile),[System.StringComparison]::OrdinalIgnoreCase)) { return $false }
         if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$Metadata.defaultFile),[System.IO.Path]::GetFullPath($expectedDefaultFile),[System.StringComparison]::OrdinalIgnoreCase)) { return $false }
+        if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$Metadata.bootNextOriginFile),[System.IO.Path]::GetFullPath($expectedOriginFile),[System.StringComparison]::OrdinalIgnoreCase)) { return $false }
 
         $targets = @($Metadata.targets)
         if ($targets.Count -lt 1) { return $false }
@@ -405,6 +407,26 @@ function Get-TaskBrokerDefaultTargetGuid {
     return $null
 }
 
+
+function Get-TaskBrokerBootNextOwnership {
+    $meta = Get-TaskBrokerMetadata
+    if (-not $meta) { return $null }
+    $path = [string]$meta.bootNextOriginFile
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
+    try {
+        $record = [System.IO.File]::ReadAllText($path,[System.Text.Encoding]::UTF8) | ConvertFrom-Json -ErrorAction Stop
+        if ([int]$record.schema -ne 1) { return $null }
+        $guid = Normalize-TaskBrokerGuid -Guid ([string]$record.guid)
+        if (-not $guid -or -not (Get-TaskBrokerTarget -Guid $guid)) { return $null }
+        if ([string]$record.kind -notin @('auto','manual','pending-auto','pending-manual')) { return $null }
+        $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+        if (-not $os -or -not $os.LastBootUpTime) { return $null }
+        $cycle = [string]([datetime]$os.LastBootUpTime).ToUniversalTime().Ticks
+        if ([string]$record.bootId -cne $cycle) { return $null }
+        return [pscustomobject]@{ Kind = [string]$record.kind; Guid = $guid; BootId = $cycle }
+    }
+    catch { return $null }
+}
 
 function Set-TaskBrokerBootNextTarget {
     param([Parameter(Mandatory=$true)][string]$Guid)

@@ -38,6 +38,7 @@ function Start-LenovoBootSelectorHidden {
 # and fatal-startup UI can honor the persisted locale safely.
 # @include src/Core/Localization.ps1
 # @include src/Core/EntryPreferences.ps1
+# @include src/Core/BootNextOwnership.ps1
 # @include src/UI/StartupRecoveryDialog.ps1
 # @include src/Infrastructure/InstanceActivation.ps1
 
@@ -891,6 +892,7 @@ $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
 $script:SelectedGuid = $null
+$script:NextBootFirmwareReadVerified = $false
 $script:LastStatusText = ''
 $script:ExitRequested = $false
 $script:StorageContext = $null
@@ -917,7 +919,7 @@ $script:DiagnosticsUploadMenuItem = $null
 $script:DiagnosticsUploadState = $null
 $script:DiagnosticsUploadTimer = $null
 
-$script:SupportedTaskBrokerVersions = @('0.2.14')
+$script:SupportedTaskBrokerVersions = @('0.2.15')
 $script:TaskBrokerStateDir = Join-Path $env:ProgramData 'Lenovo Boot Selector\TaskBroker'
 $script:TaskBrokerMetadataPath = Join-Path $script:TaskBrokerStateDir 'task-broker.json'
 $script:LegacyTaskBrokerStateDir = Join-Path $env:ProgramData 'Lenovo Boot Menu\TaskBroker'
@@ -1131,6 +1133,13 @@ function Set-DefaultGuid {
             $script:LastStatusText = Get-LocalizedString -Key 'Default.SystemDisabledStatus'
         }
 
+        # DefaultSet may have synchronized the effective next-boot target inside
+        # the privileged SYSTEM task. Re-read firmware before showing success.
+        try { [void](Refresh-EffectiveNextBootState) }
+        catch {
+            $script:NextBootFirmwareReadVerified = $false
+            Update-RestartTargetUi
+        }
         Complete-LegacyDefaultMigration
         if ($script:Popup -and -not $script:Popup.IsDisposed) {
             $matches = $script:Popup.Controls.Find('StatusLabel', $true)
@@ -1140,6 +1149,11 @@ function Set-DefaultGuid {
         Write-RuntimeDiagnosticEvent -Event 'DEFAULT_TARGET_CHANGE' -Stage 'default' -Success $true -DurationMs $sw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{ operation = $operation; guid = $(if ($Guid) { $Guid.ToLowerInvariant() } else { $null }) })
     }
     catch {
+        # Default persistence can succeed before a subsequent BootNext verification
+        # fails. Reflect both authoritative states rather than claiming a rollback.
+        try { [void](Refresh-SystemDefaultState) } catch { }
+        try { [void](Refresh-EffectiveNextBootState) } catch { $script:NextBootFirmwareReadVerified = $false }
+        Update-RestartTargetUi
         $sw.Stop()
         Write-RuntimeDiagnosticEvent -Event 'DEFAULT_TARGET_CHANGE' -Stage 'default' -Success $false -DurationMs $sw.ElapsedMilliseconds -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ operation = $operation; guid = $(if ($Guid) { $Guid.ToLowerInvariant() } else { $null }) }) -Level error
         throw
@@ -1152,23 +1166,86 @@ function Set-DefaultGuid {
 
 # @include src/UI/MaintenancePresentation.ps1
 
+function Refresh-EffectiveNextBootState {
+    try {
+        $managerText = Get-TaskBrokerFirmwareManagerText -Force
+        $manager = ConvertFrom-FirmwareManagerText -Text ([string]$managerText)
+        $script:SelectedGuid = if ($manager.SelectedGuid) { ([string]$manager.SelectedGuid).ToLowerInvariant() } else { $null }
+        $script:NextBootFirmwareReadVerified = $true
+        Update-RestartTargetUi
+        return $script:SelectedGuid
+    }
+    catch {
+        $script:NextBootFirmwareReadVerified = $false
+        $script:SelectedGuid = $null
+        Update-RestartTargetUi
+        throw
+    }
+}
+
 function Get-NextBootTargetDisplayName {
+    if (-not $script:NextBootFirmwareReadVerified) { return (Get-LocalizedString -Key 'BootNext.Unknown') }
     if ($script:SelectedGuid) {
         $selectedEntry = Get-EntryByGuid $script:SelectedGuid
         if ($selectedEntry) { return [string](Get-EntryDisplayTitle -Entry $selectedEntry) }
+        return (Get-LocalizedString -Key 'Settings.DefaultTargetUnavailable')
     }
     return (Get-LocalizedString -Key 'Boot.DefaultOrder')
 }
 
-function Update-RestartTargetUi {
-    if ($script:RestartTargetLabel -and -not $script:RestartTargetLabel.IsDisposed) {
-        $script:RestartTargetLabel.Text = Get-LocalizedString -Key 'Status.NextTargetLabel' -Values @{ Title=(Get-NextBootTargetDisplayName) }
+function Use-DefaultForNextRestart {
+    $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
+    if (-not $capabilities.CanSetBootNext -or -not $script:DefaultGuid) { return }
+    try {
+        [void](Refresh-EffectiveNextBootState)
+        if ($script:SelectedGuid -eq $script:DefaultGuid) { return }
+        $requested = [string]$script:DefaultGuid
+        Set-BootNextTarget -Guid $requested
+        [void](Refresh-EffectiveNextBootState)
+        if ($script:SelectedGuid -ne $requested) { throw 'Manual next boot target verification failed.' }
+        $script:LastStatusText = Get-LocalizedString -Key 'BootNext.DefaultApplied'
+        Update-PopupRows
     }
+    catch {
+        $script:LastStatusText = Get-LocalizedString -Key 'BootNext.DefaultApplyFailed'
+        Update-PopupRows
+    }
+}
+
+function Update-RestartTargetUi {
+    if (-not $script:RestartTargetLabel -or $script:RestartTargetLabel.IsDisposed) { return }
+    $hasTarget = (-not $script:SelectedGuid -or $null -ne (Get-EntryByGuid $script:SelectedGuid))
+    $model = Resolve-BootNextDisplayStateCore -DefaultGuid $script:DefaultGuid -EffectiveNextGuid $script:SelectedGuid -FirmwareReadSucceeded ([bool]$script:NextBootFirmwareReadVerified) -Checking $false -EffectiveTargetKnown $hasTarget
+    $next = Get-NextBootTargetDisplayName
+    $default = Get-DefaultEntryTitle
+    $canApply = ($model -eq 'different' -or $model -eq 'firmware-order') -and [bool]$script:DefaultGuid
+    switch ($model) {
+        'unknown'        { $labelKey = 'BootNext.UnknownLine' }
+        'firmware-order' { $labelKey = 'BootNext.FirmwareOrderLine' }
+        'aligned'        { $labelKey = 'BootNext.AlignedLine' }
+        'different'      { $labelKey = 'BootNext.DifferentLine' }
+        'unavailable'    { $labelKey = 'BootNext.UnavailableLine' }
+        default          { $labelKey = 'BootNext.UnknownLine' }
+    }
+    $label = Get-LocalizedString -Key $labelKey -Values @{ Next=$next; Default=$default }
+    $script:RestartTargetLabel.Text = $label
+    $script:RestartTargetLabel.Enabled = $true
+    $script:RestartTargetLabel.Cursor = if ($canApply) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
+    $script:RestartTargetLabel.TabStop = [bool]$canApply
+    $script:RestartTargetLabel.ForeColor = if ($canApply) { $script:ColorAccent } else { $script:ColorSecondary }
+    $script:RestartTargetLabel.AccessibleDescription = if ($canApply) { Get-LocalizedString -Key 'BootNext.UseDefaultHint' -Values @{ Default=$default } } else { $label }
+    $script:RestartTargetLabel.FlatAppearance.MouseOverBackColor = if ($canApply) { $script:ColorSelectedRow } else { $script:ColorSurface }
 }
 
 function Restart-Windows {
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     if (-not $capabilities.CanRestart) { return }
+    # A cached SelectedGuid must never be the sole evidence in a restart dialog.
+    try { [void](Refresh-EffectiveNextBootState) }
+    catch {
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Restart.FailedTitle') -Heading (Get-LocalizedString -Key 'BootNext.Unknown') -Message (Get-LocalizedString -Key 'BootNext.CheckFailed') -Kind Error
+        return
+    }
     $targetName = Get-NextBootTargetDisplayName
     $choice = Show-LenovoRestartDialog -TargetName $targetName
     if ($choice -ne [System.Windows.Forms.DialogResult]::Yes) {
@@ -1688,6 +1765,7 @@ function Apply-FirmwareBootState {
 
     $script:CurrentEntries = @($State.Entries)
     $script:SelectedGuid = if ($State.SelectedGuid) { $State.SelectedGuid.ToLowerInvariant() } else { $null }
+    $script:NextBootFirmwareReadVerified = $true
 
     if ($script:SelectedGuid) {
         $selected = Get-EntryByGuid $script:SelectedGuid
@@ -1717,6 +1795,7 @@ function Refresh-BootState {
         Write-RuntimeDiagnosticEvent -Event 'BOOT_STATE_REFRESH' -Stage 'boot-state' -Success $true -DurationMs $sw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{ refreshStorage = [bool]$RefreshStorage; entryCount = @($state.Entries).Count; selectedGuid = $state.SelectedGuid })
     }
     catch {
+        $script:NextBootFirmwareReadVerified = $false
         $sw.Stop()
         Write-RuntimeDiagnosticEvent -Event 'BOOT_STATE_REFRESH' -Stage 'boot-state' -Success $false -DurationMs $sw.ElapsedMilliseconds -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ refreshStorage = [bool]$RefreshStorage }) -Level error
         $script:LastStatusText = Get-LocalizedString -Key 'Status.BootTargetsReadFailed'

@@ -15,7 +15,7 @@ function Assert-Equal([string]$Name,$Expected,$Actual) {
     Write-Host "PASS  $Name"
 }
 
-$script:SupportedTaskBrokerVersions = @('0.2.14')
+$script:SupportedTaskBrokerVersions = @('0.2.15')
 $script:TaskBrokerStateDir = Join-Path ([System.IO.Path]::GetTempPath()) 'LenovoBootSelector-LBS6-Boundary'
 $script:TaskBrokerMetadataPath = Join-Path $script:TaskBrokerStateDir 'task-broker.json'
 $script:TaskBrokerMetadata = $null
@@ -26,7 +26,7 @@ $guid = '{11111111-2222-3333-4444-555555555555}'
 $compact = '11111111222233334444555555555555'
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $meta = [pscustomobject]@{
-    version = '0.2.14'
+    version = '0.2.15'
     boundaryContract = 'fixed-task-v2'
     userSid = $sid
     managerRefreshTask = 'LenovoBootSelector-RefreshManager'
@@ -34,6 +34,7 @@ $meta = [pscustomobject]@{
     managerFile = (Join-Path $script:TaskBrokerStateDir 'fwbootmgr.txt')
     firmwareFile = (Join-Path $script:TaskBrokerStateDir 'firmware.txt')
     defaultFile = (Join-Path (Join-Path $script:TaskBrokerStateDir 'Default') 'default-guid.txt')
+    bootNextOriginFile = (Join-Path (Join-Path $script:TaskBrokerStateDir 'Default') 'bootnext-origin.json')
     defaultClearTask = 'LenovoBootSelector-Default-Clear'
     defaultRestoreTask = 'LenovoBootSelector-Default-Restore'
     targets = @([pscustomobject]@{

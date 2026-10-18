@@ -180,8 +180,8 @@ def self_test_p2_ownership(release_source: str, regression_source: str) -> None:
 
 # LBS-130/P3: RED ownership target, before equivalent security-semantic
 # mutation checks are installed. Duplicates are removed only on GREEN.
-P3_DUPLICATE_CORE = ["LBS-6 TaskBroker schema is hardened v0.2.14","LBS-6 installer schema is hardened v0.2.14","LBS-6 metadata boundary marker is emitted","LBS-6 runtime task runner has no free TaskName parameter","LBS-6 runtime task runner uses operation ValidateSet","v0.6.4.1 installer has explicit ACL mutation predicate","v0.6.4.1 installer tests concrete write data bit","v0.6.4.1 state validator delegates to ACL mutation predicate","v0.6.4.1 diagnostics expose physical TaskBroker presence"]
-P3_DUPLICATE_REGRESSION = ["LBS-6 TaskBroker schema is v0.2.14","LBS-6 installer schema is v0.2.14","LBS-6 explicit metadata boundary contract retained","LBS-6 no free TaskName call reaches runtime runner","LBS-6 operation-only runtime runner retained","LBS-6 strict metadata contract retained","LBS-6 fixed task-name derivation retained","LBS-6 task ACL dangerous-rights rejection retained","LBS-6 ProgramData ACL protection retained","LBS-6 metadata ACL protection retained","v0.6.4.1 ACL mutation predicate retained","v0.6.4.1 state validator calls ACL mutation predicate","v0.6.4.1 diagnostics separate physical presence","v0.6.4.1 diagnostics separate metadata readability","v0.6.4.1 diagnostics separate compatibility"]
+P3_DUPLICATE_CORE = ["LBS-6 TaskBroker schema is hardened v0.2.15","LBS-6 installer schema is hardened v0.2.15","LBS-6 metadata boundary marker is emitted","LBS-6 runtime task runner has no free TaskName parameter","LBS-6 runtime task runner uses operation ValidateSet","v0.6.4.1 installer has explicit ACL mutation predicate","v0.6.4.1 installer tests concrete write data bit","v0.6.4.1 state validator delegates to ACL mutation predicate","v0.6.4.1 diagnostics expose physical TaskBroker presence"]
+P3_DUPLICATE_REGRESSION = ["LBS-6 TaskBroker schema is v0.2.15","LBS-6 installer schema is v0.2.15","LBS-6 explicit metadata boundary contract retained","LBS-6 no free TaskName call reaches runtime runner","LBS-6 operation-only runtime runner retained","LBS-6 strict metadata contract retained","LBS-6 fixed task-name derivation retained","LBS-6 task ACL dangerous-rights rejection retained","LBS-6 ProgramData ACL protection retained","LBS-6 metadata ACL protection retained","v0.6.4.1 ACL mutation predicate retained","v0.6.4.1 state validator calls ACL mutation predicate","v0.6.4.1 diagnostics separate physical presence","v0.6.4.1 diagnostics separate metadata readability","v0.6.4.1 diagnostics separate compatibility"]
 
 def p3_retired_labels(source: str, labels: list[str]) -> list[str]:
     # Parse assertion calls, not unrelated comments or documentation strings.
@@ -236,10 +236,10 @@ def p3_security_conditions(source: dict[str, str]) -> list[tuple[str, bool]]:
     metafile = p3_function(install, 'Protect-TaskBrokerMetadataFile')
     task_acl = p3_function(install, 'Test-SddlReadExecuteAce')
     diagnostic = p3_function(diag, 'Get-RuntimeDiagnosticBrokerSummary')
-    version = "$version = '0.2.14'"
+    version = "$version = '0.2.15'"
     return [
         ('installer/runtime schema agreement',
-         version in install and "$script:SupportedTaskBrokerVersions = @('0.2.14')" in runtime
+         version in install and "$script:SupportedTaskBrokerVersions = @('0.2.15')" in runtime
          and '$script:SupportedTaskBrokerVersions -notcontains' in metadata),
         ('fixed-task-v2 runtime/installer marker',
          "boundaryContract = 'fixed-task-v2'" in install
@@ -324,8 +324,8 @@ def p3_security_errors(source: dict[str, str]) -> list[str]:
 def p3_negative_mutations(source: dict[str, str]) -> None:
     # In-memory, deterministic fail-closed fault injection; no external writes.
     mutations = [
-        ('installer', "$version = '0.2.14'", "$version = '0.2.13'"),
-        ('tray', "$script:SupportedTaskBrokerVersions = @('0.2.14')",
+        ('installer', "$version = '0.2.15'", "$version = '0.2.13'"),
+        ('tray', "$script:SupportedTaskBrokerVersions = @('0.2.15')",
          "$script:SupportedTaskBrokerVersions = @('0.2.13')"),
         ('installer', "boundaryContract = 'fixed-task-v2'", "boundaryContract = 'fixed-task-v1'"),
         ('broker', "boundaryContract -ne 'fixed-task-v2'", "boundaryContract -ne 'fixed-task-v1'"),

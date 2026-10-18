@@ -24,9 +24,9 @@ $uninstaller = [System.IO.File]::ReadAllText($uninstallerPath,[System.Text.Encod
 $template = [System.IO.File]::ReadAllText($templatePath,[System.Text.Encoding]::UTF8)
 $taskBroker = [System.IO.File]::ReadAllText($taskBrokerPath,[System.Text.Encoding]::UTF8)
 
-Assert-True 'Installer advances TaskBroker schema to 0.2.14' ($installer.Contains('$version = ''0.2.14'''))
+Assert-True 'Installer advances TaskBroker schema to 0.2.15' ($installer.Contains('$version = ''0.2.15'''))
 Assert-True 'Installer writes fixed-task-v2 metadata' ($installer.Contains("boundaryContract = 'fixed-task-v2'"))
-Assert-True 'Runtime accepts only TaskBroker schema 0.2.14' ($template.Contains('$script:SupportedTaskBrokerVersions = @(''0.2.14'')'))
+Assert-True 'Runtime accepts only TaskBroker schema 0.2.15' ($template.Contains('$script:SupportedTaskBrokerVersions = @(''0.2.15'')'))
 Assert-True 'Canonical ProgramData TaskBroker root uses Lenovo Boot Selector' ($template.Contains('Join-Path $env:ProgramData ''Lenovo Boot Selector\TaskBroker'''))
 Assert-True 'Legacy ProgramData root remains explicit migration input' ($template.Contains('Join-Path $env:ProgramData ''Lenovo Boot Menu\TaskBroker'''))
 Assert-True 'Canonical static task prefix is present' ($taskBroker.Contains('LenovoBootSelector-RefreshManager'))

@@ -44,11 +44,13 @@ The runtime never accepts a task name supplied by UI state, user input or arbitr
 
 ## Metadata contract
 
-TaskBroker schema 0.2.14 introduces the explicit boundary marker:
+TaskBroker schema 0.2.15 introduces the explicit boundary marker:
 
 `boundaryContract = fixed-task-v2`
 
 Runtime metadata is accepted only when all of the following are true:
+
+- protected boot provenance path is fixed within the TaskBroker Default directory;
 
 - schema version is explicitly supported;
 - boundary marker is exact;
@@ -116,3 +118,11 @@ The canonical gates must continue to verify at least:
 - updater isolation from TaskBroker.
 
 Native Windows testing remains required before claiming actual Task Scheduler ACL behavior as natively proven.
+
+## LBS-143 — coordinated LBS writer priority
+
+From schema 0.2.15, fixed SYSTEM task definitions for `BootNext`, `DefaultSet`, `DefaultClear`, and the existing delayed `DefaultRestore` coordinate their critical sections using the same machine-global mutex. The only provenance state is an ACL-protected, boot-cycle-keyed record inside the installed TaskBroker Default directory, written by SYSTEM task code. A confirmed later LBS manual BootNext (including write-ahead intent) takes priority over any delayed LBS automatic Default Restore. An automatic default change may update the one-time firmware target only when current verified LBS-auto origin and current firmware GUID both match the old default. Read, decision, write and verification take place inside the cooperating LBS lock.
+
+This is **LBS-owned writer precedence**, not a claim of controlling independent privileged firmware writers. External writes are neither synchronized by this lock nor intrinsically attributable when they reuse the same target GUID. Observable external mismatch is preserved where the current state reveals it. Where provenance is unknown or stale, no silent automatic default-change synchronization is permitted. Failed/partial actions are not reported as atomic success. The existing runtime operation whitelist, deterministic task names, SYSTEM/no-admin-UI boundary and one-shot `bootsequence` limit remain mandatory.
+
+Upgrading older 0.2.14 SYSTEM task installations to 0.2.15 requires the explicit elevated Repair system functions flow. No unelevated automatic task reconfiguration is allowed; old metadata fails compatibility checks.

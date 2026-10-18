@@ -180,6 +180,7 @@ jobs:
               systemCapabilities = Get-TestTotal $logText '^SYSTEM CAPABILITIES TOTAL\s+(\d+)/(\d+)\s*$'
               bootTargetDrift = Get-TestTotal $logText '^DRIFT TOTAL\s+(\d+)/(\d+)\s*$'
               taskBrokerBoundary = Get-TestTotal $logText '^TASKBROKER BOUNDARY TOTAL\s+(\d+)/(\d+)\s*$'
+              bootNextOwnership = Get-TestTotal $logText '^BOOTNEXT OWNERSHIP TOTAL\s+(\d+)/(\d+)\s*$'
               taskBrokerMigration = Get-TestTotal $logText '^TASKBROKER MIGRATION TOTAL\s+(\d+)/(\d+)\s*$'
               identifierCompatibility = Get-TestTotal $logText '^IDENTIFIER TOTAL\s+(\d+)/(\d+)\s*$'
               updateAssertionSource = Get-TestTotal $logText '^UPDATE ASSERTION SOURCE\s+(\d+)/(\d+)\s*$'
@@ -201,6 +202,7 @@ jobs:
               'maintenance',
               'systemCapabilities',
               'bootTargetDrift',
+              'bootNextOwnership',
               'taskBrokerBoundary',
               'taskBrokerMigration',
               'identifierCompatibility',
@@ -229,6 +231,7 @@ jobs:
               $totals.maintenance.passed +
               $totals.systemCapabilities.passed +
               $totals.bootTargetDrift.passed +
+              $totals.bootNextOwnership.passed +
               $totals.taskBrokerBoundary.passed +
               $totals.taskBrokerMigration.passed +
               $totals.identifierCompatibility.passed +
@@ -248,6 +251,7 @@ jobs:
               $totals.maintenance.expected +
               $totals.systemCapabilities.expected +
               $totals.bootTargetDrift.expected +
+              $totals.bootNextOwnership.expected +
               $totals.taskBrokerBoundary.expected +
               $totals.taskBrokerMigration.expected +
               $totals.identifierCompatibility.expected +

@@ -161,7 +161,7 @@ def main():
     base=json.loads((root/'tests/characterization-baseline-v0.3.4.json').read_text())
     for fn in ['LenovoBootMenuTray.ico','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','icon-preview.png']:
         s.eq(f'Unrelated runtime asset still baseline-identical: {fn}',sha_file(root/'bin'/fn),base['source_sha256'][fn])
-    s.contains('LBS-6 installer schema bumped',install,"$version = '0.2.14'")
+    s.contains('LBS-6 installer schema bumped',install,"$version = '0.2.15'")
     s.contains('LBS-6 installer writes boundary contract',install,"boundaryContract = 'fixed-task-v2'")
     s.contains('LBS-6 task ACL rejects dangerous rights',install,'$dangerousMask')
     s.absent('LBS-6 task ACL no longer treats GenericAll as sufficient',install,'$hasAll =')

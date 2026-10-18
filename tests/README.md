@@ -75,7 +75,7 @@ The original LBS-23 validator has **32 assertions** and is archived byte-identic
 
 | Security concern | Former redundant assertions | Permanent authority after P3 |
 | --- | ---: | --- |
-| Installer/runtime schema `0.2.14`, `fixed-task-v2` | Core 3, Regression 3 | Boundary and Release each remain independently active; new cross-surface equality/security check; native TaskBroker Boundary/Migration |
+| Installer/runtime schema `0.2.15`, `fixed-task-v2` | Core 3, Regression 3 | Boundary and Release each remain independently active; new cross-surface equality/security check; native TaskBroker Boundary/Migration |
 | Exact operation allowlist, no free task name, metadata name derivation | Core 2, Regression 4 | Boundary function-scoped runner **and** resolver checks; native negative metadata/operation tests; cross-function security contract |
 | Installer mutation-bit ACL, protected directory/file ACL and ownership checks | Core 3, Regression 5 | Boundary scoped ACL validator, Release packaged installer check, native ACL behavior, explicit protected-state and task DACL contracts |
 | TaskBroker diagnostic presence/readability/compatibility | Core 1, Regression 3 | Boundary and Release separate states; explicit diagnostic function contract and negative mutation checks |
@@ -120,6 +120,7 @@ LBS-40 adds `../tools/validate_test_contracts.py` as a shared preflight contract
 | `Test-InstanceActivation.ps1` | Runtime | Local-user activation signal, cross-process delivery, WinForms callback, idempotent popup focus and negative paths |
 | `Test-BootTargetDrift.ps1` | Safety | Drift detection and fail-closed states |
 | `Test-TaskBrokerBoundary.ps1` | Safety | Fixed-task / metadata privilege boundary without privileged execution |
+| `Test-BootNextOwnership.ps1` | Functional core | 20 case fail-closed provenance and next-boot presentation decision matrix |
 | `Test-TaskBrokerMigration.ps1` | Safety / Migration | LBS-33 canonical privileged identifiers, migration ordering, legacy cleanup ownership, and default-state precedence |
 | `Test-IdentifierCompatibility.ps1` | Compatibility | Active naming contract, autostart migration, package compatibility IDs, and cross-version singleton/task invariants |
 | `Test-ArchitectureSoak.ps1` | Soak | Repeated architecture/state stability |
@@ -149,6 +150,7 @@ Native PowerShell suites intentionally use different count strategies; one gener
 | `Test-UpdateController.ps1` | Straight-line: fixed runtime count of 56 covering LBS-26 Application orchestration and explicit Infrastructure/UI adapter boundaries. |
 | `Test-RefreshRuntime.ps1` | Straight-line: fixed runtime count of 28, including LBS-22 inherited/fresh diagnostics-session coverage for background-refresh, update-check, and update-prepare roles. |
 | `Test-RefreshController.ps1` | Straight-line: fixed runtime count of 38 covering LBS-27 lifecycle orchestration and the explicit Infrastructure worker boundary. |
+| `Test-BootNextOwnership.ps1` | Straight-line: fixed runtime count of 20 including manual precedence, same-cycle auto restore, absent/stale/observable external state and next-boot display cases. |
 | `Test-TaskBrokerBoundary.ps1` | Straight-line: fixed runtime count of 25, including rejection of the v1 boundary and legacy fixed task names. |
 | `Test-TaskBrokerMigration.ps1` | Straight-line: fixed runtime count of 42 covering LBS-33 migration, LBS-34 authoritative Task Scheduler XML trigger verification, and LBS-35 batched ScheduledTasks performance contracts. |
 | `Test-BootTargetDrift.ps1` | Straight-line: fixed runtime count of 13. |
