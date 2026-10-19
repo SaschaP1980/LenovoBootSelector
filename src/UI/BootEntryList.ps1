@@ -73,7 +73,10 @@ function Update-PopupRows {
     $contentPanel.Controls.Clear()
 
     $baseRowHeight = 60
-    $rowGap = 4
+    # Rows created after Form autoscaling need the form's live pixel factor.
+    $dpiScale = Get-PopupDpiLayoutScale -Popup $script:Popup
+    $scaledRowHeight = [int][Math]::Round($baseRowHeight * $dpiScale)
+    $rowGap = [int][Math]::Round(4 * $dpiScale)
     $y = 0
     $displayEntries = if ($script:IsManageEntriesMode) {
         @(Get-OrderedEntriesForUi -IncludeHidden -UseManageDraft)
@@ -85,12 +88,13 @@ function Update-PopupRows {
     $contentPanel.AllowDrop = $false
 
     foreach ($entry in $displayEntries) {
-        $rendered = New-BootEntryRow -Entry $entry -Y $y -BaseRowHeight $baseRowHeight -Handlers $handlers
+        $rendered = New-BootEntryRow -Entry $entry -Y 0 -BaseRowHeight $baseRowHeight -Handlers $handlers
+        $height = Set-PopupBootRowDpiLayout -Row $rendered.Row -Scale $dpiScale -Y $y
         $contentPanel.Controls.Add($rendered.Row)
-        $y += ([int]$rendered.Height + $rowGap)
+        $y += ($height + $rowGap)
     }
 
-    Update-BootEntryScrollLayout -ListPanel $listPanel -ContentPanel $contentPanel -ScrollBar $scrollBar -ContentBottom $y -BaseRowHeight $baseRowHeight -RowGap $rowGap
+    Update-BootEntryScrollLayout -ListPanel $listPanel -ContentPanel $contentPanel -ScrollBar $scrollBar -ContentBottom $y -BaseRowHeight $scaledRowHeight -RowGap $rowGap
 
     if ($statusLabel) { $statusLabel.Text = $script:LastStatusText }
     Update-DefaultUi

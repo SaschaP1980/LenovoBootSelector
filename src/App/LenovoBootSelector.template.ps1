@@ -1679,6 +1679,7 @@ function Get-EntryByGuid([string]$Guid) {
     return $script:CurrentEntries | Where-Object { $_.Guid -eq $Guid.ToLowerInvariant() } | Select-Object -First 1
 }
 
+# @include src/UI/PopupDpiLayout.ps1
 # @include src/UI/BootEntryRows.ps1
 # @include src/UI/BootEntryList.ps1
 

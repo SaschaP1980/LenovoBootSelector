@@ -11,6 +11,7 @@
 
     $form = New-Object System.Windows.Forms.Form
     $form.Name = 'LenovoBootSelectorPopup'
+    Initialize-PopupDpiLayout -Form $form
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
     $form.ShowInTaskbar = $false
     $form.TopMost = $true
@@ -35,6 +36,9 @@
     Add-PopupManageEntriesSection -Root $root
     $maintenancePanel = New-MaintenanceStatePanel
     $root.Controls.Add($maintenancePanel)
+
+    # Scale the entire static control tree in one WinForms DPI pass.
+    Complete-PopupDpiLayout -Form $form
 
     # v0.2.28: no window region is applied; the popup stays rectangular.
 

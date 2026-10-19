@@ -6,7 +6,7 @@ LBS-19 standardizes active application-owned naming where that is safe, while pr
 
 The term **Lenovo Boot Menu** remains valid when it describes the actual Lenovo/firmware boot menu as a boot target.
 
-## A — Completed safe renames (historical mapping)
+## A — Safe rename (completed historical mapping)
 
 The following source-to-target renames are **already complete**. Their former source names, including the old template filename, do not refer to current paths or pending changes. They were application-internal/developer-facing identifiers without external compatibility contracts:
 
