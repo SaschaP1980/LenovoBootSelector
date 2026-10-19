@@ -169,9 +169,9 @@ The dedicated native suite is:
 
 It emits:
 
-`LOCALIZATION TOTAL <passed>/32`
+`LOCALIZATION TOTAL <passed>/84`
 
-and is part of the mandatory GitHub-hosted Windows PowerShell 5.1 Candidate gate.
+and is part of the mandatory GitHub-hosted Windows PowerShell 5.1 Candidate gate. The actual expected count is owned by [`tests/Test-LocalizationRuntime.ps1`](../tests/Test-LocalizationRuntime.ps1); the archived 32-assertion LBS-23 Python validator is separate **historical** evidence, not the current native test total.
 
 ## Safety boundaries
 

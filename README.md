@@ -73,7 +73,7 @@ Starting with v0.10.0.0, the privileged TaskBroker installation uses `LenovoBoot
 
 Historical migration and repair details for v0.6.4.0/v0.6.4.1 are retained in [CHANGELOG.md](CHANGELOG.md) rather than presented as current maintenance instructions.
 
-**Current development version:** v1.1.9.0  
+**Current development version:** v1.1.10.0  
 **Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
 
 ## Downloads and revision history
@@ -160,6 +160,11 @@ This presentation makes **no claim of direct 1:1 addressability** of the physica
 | `docs/LOCALIZATION.md` | localization architecture, migration, contribution rules, and gates |
 | `docs/IDENTIFIER_COMPATIBILITY.md` | canonical product naming, retained compatibility IDs, and migration rules |
 | `docs/DEVELOPMENT_GUIDELINES.md` | Work-Path/checkpoint/heartbeat resilience, connector, and development-path rules |
+| `docs/INITIAL_PROMPT.md` | canonical new-session bootstrap |
+| `docs/GITHUB_HOWTO.md` / `docs/RELEASE_PROCESS.md` | GitHub operations and publication authority |
+| `docs/DEVOPS_OPERATIONS.md` | cross-system DevOps, deployments, health/evidence and recovery |
+| `docs/POPUP_ANCHORING.md` | WinForms popup anchoring and native desktop acceptance |
+| `docs/SECURITY_BOUNDARY.md` | fixed TaskBroker and firmware privilege boundary |
 | `audits/` | canonical and historical catch audits |
 | `tools/` | build, packaging, audit, and transition scripts |
 | `downloads/` | historical versioned release ZIPs and update manifests |
@@ -182,9 +187,11 @@ Lenovo Boot Selector is developed as an **agentic software engineering** project
 
 No previous chat, chat summary, handover document or ZIP, model memory, stale local checkout, previous source ZIP, or other unpublished context is required or authoritative for continuing the project. Interactive chats are transient working sessions only. When a durable finding, decision, constraint, acceptance result, or operating rule emerges during a session, it must be captured in the appropriate GitHub artifact before future work depends on it.
 
-Development deliberately uses two persistence models. Small Patch/Hotfix work defaults to one short branchless atomic cycle. Major/Minor work, and any Patch/Hotfix explicitly escalated because it is substantial or interruption-prone, uses a durable `work/LBS-<issue>` Work-Path with coherent product checkpoints plus the temporary `.chatgpt-work/LBS-<issue>.md` continuation journal. While the interactive agent is `ACTIVE`, the journal is updated often enough that its latest heartbeat is no more than approximately three minutes old; `WAITING_FOR_GITHUB` is used only with a concrete independently running Actions run. A roughly five-minute stale heartbeat with no such run is treated as a stopped interactive stream.
+Development uses two persistence models. Small Patch/Hotfix work defaults to a short atomic branchless cycle. Major/Minor work, and an explicitly escalated Patch/Hotfix, uses `work/LBS-<github-issue-number>` with coherent product checkpoint commits and **exactly one cumulative, in-place updated GitHub Issue rolling recovery comment**. The Issue comment—not a tracked worklog file—is the canonical Work-Path Build & Release recovery ledger. While `Agent-State: ACTIVE`, `Last heartbeat` should remain within approximately three minutes; `WAITING_FOR_GITHUB` requires an exact, independently running GitHub Actions run. A roughly five-minute stale heartbeat indicates stopped interactive progress only after checking the referenced run.
 
-Before Candidate creation the Work-Path journal is removed. The Candidate is then created as a clean commit on current `main` whose tree exactly matches the cleaned work branch, so temporary journal/checkpoint history never becomes Candidate, source-tag, PR, or `main` ancestry. After that phase transition, Candidate/Actions/Release state becomes the durable recovery surface. LBS-31, LBS-29 and LBS-27 validated this model in real development; LBS-29 included an actual interactive-stream interruption after Candidate publication and was recovered directly from GitHub state. LBS-27 measured the practical heartbeat cost at roughly **4–6% (about 5%)** of its active Work-Path phase, which the project accepts as a favorable trade for materially stronger interruption recovery. This overhead is confined to Work-Path development; normal small Patch/Hotfix work remains on the journal-free fast path. The canonical details are in [docs/DEVELOPMENT_GUIDELINES.md](docs/DEVELOPMENT_GUIDELINES.md), with GitHub operations in [docs/GITHUB_HOWTO.md](docs/GITHUB_HOWTO.md) and release semantics in [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md).
+**Do not create new `.chatgpt-work/LBS-*.md` files.** On older active work branches such files are **legacy only**: absorb their relevant recovery facts into the rolling Issue comment and remove them before freezing the final tree for exact-SHA Development Completion. That final clean Work SHA must pass `Candidate-Entry: PASS`; the Candidate is a clean commit based on current `main` with an identical qualified tree, without Work checkpoint history. After Candidate exposure GitHub Candidate/Actions/Release state owns publication recovery, while the same Issue comment preserves cumulative supervision and timing.
+
+The historical LBS-27/LBS-29/LBS-31 journal and interruption experiments remain useful historical observations, **not** authority to reinstate tracked journals. The current procedure belongs to [Development Guidelines](docs/DEVELOPMENT_GUIDELINES.md) and the [rolling Issue comment template](docs/templates/WORK_PATH_ROLLING_COMMENT.md); GitHub operations to [GitHub How-To](docs/GITHUB_HOWTO.md), release publication to [Release Process](docs/RELEASE_PROCESS.md), and cross-system operations to [DevOps Operations](docs/DEVOPS_OPERATIONS.md).
 
 Agentic work is constrained by the same engineering controls as any other contribution: Issue-backed scope where required, test-first regression handling, explicit safety boundaries, atomic candidate commits, deterministic builds, Linux and Windows PowerShell 5.1 gates, reproducibility checks, post-release verification, and native acceptance where hardware-specific behavior must be proven. Human direction remains authoritative for product intent, safety-sensitive decisions, and final acceptance.
 

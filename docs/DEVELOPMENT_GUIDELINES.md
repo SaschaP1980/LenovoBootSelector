@@ -30,7 +30,7 @@ A process-validation/benchmark exception is evidence about the development proce
 
 The Work-Path rolling recovery comment defined below is the established resilience standard **only after a `work/LBS-*` path has already been selected**. It is not used for the normal branchless Patch/Hotfix fast path.
 
-The release path remains defined by `docs/RELEASE_PROCESS.md`. Connector/GitHub operating details remain defined by `docs/GITHUB_HOWTO.md`.
+The release path remains defined by `docs/RELEASE_PROCESS.md`. Connector/GitHub operating details remain defined by `docs/GITHUB_HOWTO.md`. The [Initial Prompt](INITIAL_PROMPT.md) owns the full canonical fresh-session bootstrap, while [DevOps Operations](DEVOPS_OPERATIONS.md) maps CI/CD, deployment and incident evidence without changing this document's Work-Path, checkpoints or Development Completion rules.
 
 ## 1. Purpose
 

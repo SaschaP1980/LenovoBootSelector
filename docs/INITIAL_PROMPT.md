@@ -46,6 +46,7 @@ Before planning or implementing a product change:
    - documentation-only/process-guidance change;
    - executable product/release/tooling change.
 8. Only for executable/product release work determine target version, release profile, development path, and concrete file set.
+9. For cross-system deployment, monitoring-evidence, incident, or operations questions, consult `docs/DEVOPS_OPERATIONS.md` as an overview. It does not replace the complete mandatory bootstrap or executable/normative owners.
 
 If the user only asks you to read this file and has not yet provided a concrete task, perform the complete bootstrap and then report briefly:
 - current `main` SHA;
@@ -62,6 +63,8 @@ When information conflicts, use this precedence from strongest to weakest:
 1. current GitHub `main`, especially executable workflows, tools, and validators;
 2. current normative documents `docs/GITHUB_HOWTO.md`, `docs/RELEASE_PROCESS.md`, and `docs/DEVELOPMENT_GUIDELINES.md`;
 3. current GitHub Issues including comments and acceptance evidence.
+
+`docs/INITIAL_PROMPT.md` owns the single mandatory bootstrap, `docs/GITHUB_HOWTO.md` GitHub operations, `docs/RELEASE_PROCESS.md` source publication, and `docs/DEVELOPMENT_GUIDELINES.md` development/Work-Path. The new `docs/DEVOPS_OPERATIONS.md` is a cross-system operating overview, not an alternate normative policy.
 
 No previous chat, model memory, handover artifact, local file, or prior source ZIP participates in the authority order. If durable project knowledge is needed for future work but is not represented in GitHub, treat that as an incomplete project record and capture it in the appropriate repository document, Issue/comment, test, workflow, or source change before relying on it.
 
@@ -365,6 +368,8 @@ The summary confirms, among other things:
 When the workflow is terminal `success` and `RELEASE_VERIFICATION_SUMMARY.result == "PASS"`, use that aggregated data as the verified final facts. Do not reconstruct the same facts again through many redundant connector requests.
 
 If the summary is missing, incomplete, or not PASS, use the full direct post-release verification from `docs/GITHUB_HOWTO.md`.
+
+**Separate Cloudflare Worker result:** GitHub source `RELEASE_VERIFICATION_SUMMARY=PASS` is **not** proof that a separately dispatched Diagnostics Worker deployment/health check succeeded. The trusted Worker run may report `HEALTH_ONLY_PASS`, `DEPLOYED_AND_HEALTHY`, or a failed/blocked outcome. See `docs/RELEASE_PROCESS.md` for the authoritative conditional deployment contract and `docs/DEVOPS_OPERATIONS.md` for hand-offs and incident evidence. Do not claim a Worker result without its actual run.
 
 ## 14. Performance and roundtrip rules
 
