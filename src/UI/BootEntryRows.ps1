@@ -496,6 +496,9 @@ $titleWidth = if ($script:IsManageEntriesMode) { if ($aliasEditActive) { 318 } e
 $titleText = if ($aliasEditActive) { [string]$entry.Title } else { $displayTitle }
 $title = New-Label -Text $titleText -Font (New-Object Drawing.Font('Segoe UI', 10.0, [Drawing.FontStyle]::Bold)) `
     -ForeColor $titleColor -X 58 -Y 6 -Width $titleWidth -Height 21
+$title.AutoEllipsis = $true
+$title.AccessibleDescription = [string]$titleText
+if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($title, [string]$titleText) }
 $title.Tag = $entry.Guid
 $title.Cursor = if ($aliasEditActive) { [System.Windows.Forms.Cursors]::Default } else { [System.Windows.Forms.Cursors]::Hand }
 $title.AllowDrop = ($script:IsManageEntriesMode -and -not $aliasEditActive)
@@ -515,7 +518,9 @@ if (-not $aliasEditActive) {
     }
     $subtitle = New-Label -Text $subtitleText -Font (New-Object Drawing.Font('Segoe UI', 8.3, [Drawing.FontStyle]::Regular)) `
         -ForeColor $subtitleColor -X 58 -Y 27 -Width $subtitleWidth -Height 27
-    $subtitle.AutoEllipsis = $false
+    $subtitle.AutoEllipsis = $true
+    $subtitle.AccessibleDescription = [string]$subtitleText
+    if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($subtitle, [string]$subtitleText) }
     $subtitle.Tag = $entry.Guid
     $subtitle.Cursor = [System.Windows.Forms.Cursors]::Hand
     $subtitle.AllowDrop = $script:IsManageEntriesMode
@@ -557,7 +562,7 @@ function Update-BootEntryScrollLayout {
 
 $viewportHeight = $ListPanel.ClientSize.Height
 $contentHeight = [Math]::Max($viewportHeight, $ContentBottom)
-$ContentPanel.Size = New-Object Drawing.Size(390, $contentHeight)
+$ContentPanel.Size = New-Object Drawing.Size($ListPanel.ClientSize.Width, $contentHeight)
 if ($ScrollBar) {
     $maxScroll = [Math]::Max(0, $contentHeight - $viewportHeight)
     $ScrollBar.LargeChange = [Math]::Max(1, $viewportHeight)

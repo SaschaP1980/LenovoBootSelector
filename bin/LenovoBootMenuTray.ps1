@@ -2026,7 +2026,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.1.9.0'
+$script:AppVersion = '1.1.10.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -7748,6 +7748,48 @@ function Get-EntryByGuid([string]$Guid) {
     return $script:CurrentEntries | Where-Object { $_.Guid -eq $Guid.ToLowerInvariant() } | Select-Object -First 1
 }
 
+# LBS-144: a single 96-DPI logical layout contract for the tray popup.
+# Static controls scale with the form; rows inserted later must scale once.
+function Initialize-PopupDpiLayout {
+    param([Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Form)
+    $Form.SuspendLayout()
+    $Form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::Dpi
+    $Form.AutoScaleDimensions = [Drawing.SizeF]::new([single]96, [single]96)
+}
+
+function Complete-PopupDpiLayout {
+    param([Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Form)
+    $Form.ResumeLayout($true)
+}
+
+function Get-PopupDpiLayoutScale {
+    param(
+        [Parameter(Mandatory=$true)][System.Windows.Forms.Control]$Popup,
+        [int]$DesignWidth = 390
+    )
+    if ($DesignWidth -le 0 -or $Popup.ClientSize.Width -le 0) {
+        throw 'Popup layout width is not available.'
+    }
+    return ([double]$Popup.ClientSize.Width / [double]$DesignWidth)
+}
+
+function Set-PopupBootRowDpiLayout {
+    param(
+        [Parameter(Mandatory=$true)][System.Windows.Forms.Control]$Row,
+        [Parameter(Mandatory=$true)][double]$Scale,
+        [Parameter(Mandatory=$true)][int]$Y
+    )
+    if ($Scale -le 0 -or $Scale -gt 5) { throw 'Invalid popup DPI scale.' }
+    if ([Math]::Abs($Scale - 1.0) -gt 0.0001) {
+        # Row children start at 96-DPI design coordinates even after popup
+        # layout. Scale the whole row only once before inserting it.
+        $factor = [single]$Scale
+        $Row.Scale([Drawing.SizeF]::new($factor, $factor))
+    }
+    $Row.Location = [Drawing.Point]::new(0, $Y)
+    return [int]$Row.Height
+}
+
 # Lenovo Boot Selector - boot-entry row presentation helpers.
 # LBS-29 separates row rendering and interaction responsibilities from list refresh orchestration.
 
@@ -8246,6 +8288,9 @@ $titleWidth = if ($script:IsManageEntriesMode) { if ($aliasEditActive) { 318 } e
 $titleText = if ($aliasEditActive) { [string]$entry.Title } else { $displayTitle }
 $title = New-Label -Text $titleText -Font (New-Object Drawing.Font('Segoe UI', 10.0, [Drawing.FontStyle]::Bold)) `
     -ForeColor $titleColor -X 58 -Y 6 -Width $titleWidth -Height 21
+$title.AutoEllipsis = $true
+$title.AccessibleDescription = [string]$titleText
+if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($title, [string]$titleText) }
 $title.Tag = $entry.Guid
 $title.Cursor = if ($aliasEditActive) { [System.Windows.Forms.Cursors]::Default } else { [System.Windows.Forms.Cursors]::Hand }
 $title.AllowDrop = ($script:IsManageEntriesMode -and -not $aliasEditActive)
@@ -8265,7 +8310,9 @@ if (-not $aliasEditActive) {
     }
     $subtitle = New-Label -Text $subtitleText -Font (New-Object Drawing.Font('Segoe UI', 8.3, [Drawing.FontStyle]::Regular)) `
         -ForeColor $subtitleColor -X 58 -Y 27 -Width $subtitleWidth -Height 27
-    $subtitle.AutoEllipsis = $false
+    $subtitle.AutoEllipsis = $true
+    $subtitle.AccessibleDescription = [string]$subtitleText
+    if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($subtitle, [string]$subtitleText) }
     $subtitle.Tag = $entry.Guid
     $subtitle.Cursor = [System.Windows.Forms.Cursors]::Hand
     $subtitle.AllowDrop = $script:IsManageEntriesMode
@@ -8307,7 +8354,7 @@ function Update-BootEntryScrollLayout {
 
 $viewportHeight = $ListPanel.ClientSize.Height
 $contentHeight = [Math]::Max($viewportHeight, $ContentBottom)
-$ContentPanel.Size = New-Object Drawing.Size(390, $contentHeight)
+$ContentPanel.Size = New-Object Drawing.Size($ListPanel.ClientSize.Width, $contentHeight)
 if ($ScrollBar) {
     $maxScroll = [Math]::Max(0, $contentHeight - $viewportHeight)
     $ScrollBar.LargeChange = [Math]::Max(1, $viewportHeight)
@@ -8395,7 +8442,10 @@ function Update-PopupRows {
     $contentPanel.Controls.Clear()
 
     $baseRowHeight = 60
-    $rowGap = 4
+    # Rows created after Form autoscaling need the form's live pixel factor.
+    $dpiScale = Get-PopupDpiLayoutScale -Popup $script:Popup
+    $scaledRowHeight = [int][Math]::Round($baseRowHeight * $dpiScale)
+    $rowGap = [int][Math]::Round(4 * $dpiScale)
     $y = 0
     $displayEntries = if ($script:IsManageEntriesMode) {
         @(Get-OrderedEntriesForUi -IncludeHidden -UseManageDraft)
@@ -8407,12 +8457,13 @@ function Update-PopupRows {
     $contentPanel.AllowDrop = $false
 
     foreach ($entry in $displayEntries) {
-        $rendered = New-BootEntryRow -Entry $entry -Y $y -BaseRowHeight $baseRowHeight -Handlers $handlers
+        $rendered = New-BootEntryRow -Entry $entry -Y 0 -BaseRowHeight $baseRowHeight -Handlers $handlers
+        $height = Set-PopupBootRowDpiLayout -Row $rendered.Row -Scale $dpiScale -Y $y
         $contentPanel.Controls.Add($rendered.Row)
-        $y += ([int]$rendered.Height + $rowGap)
+        $y += ($height + $rowGap)
     }
 
-    Update-BootEntryScrollLayout -ListPanel $listPanel -ContentPanel $contentPanel -ScrollBar $scrollBar -ContentBottom $y -BaseRowHeight $baseRowHeight -RowGap $rowGap
+    Update-BootEntryScrollLayout -ListPanel $listPanel -ContentPanel $contentPanel -ScrollBar $scrollBar -ContentBottom $y -BaseRowHeight $scaledRowHeight -RowGap $rowGap
 
     if ($statusLabel) { $statusLabel.Text = $script:LastStatusText }
     Update-DefaultUi
@@ -9004,6 +9055,7 @@ function New-PopupForm {
 
     $form = New-Object System.Windows.Forms.Form
     $form.Name = 'LenovoBootSelectorPopup'
+    Initialize-PopupDpiLayout -Form $form
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
     $form.ShowInTaskbar = $false
     $form.TopMost = $true
@@ -9028,6 +9080,9 @@ function New-PopupForm {
     Add-PopupManageEntriesSection -Root $root
     $maintenancePanel = New-MaintenanceStatePanel
     $root.Controls.Add($maintenancePanel)
+
+    # Scale the entire static control tree in one WinForms DPI pass.
+    Complete-PopupDpiLayout -Form $form
 
     # v0.2.28: no window region is applied; the popup stays rectangular.
 

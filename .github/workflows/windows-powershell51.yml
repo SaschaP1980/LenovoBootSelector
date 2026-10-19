@@ -170,6 +170,7 @@ jobs:
               functionalCore = Get-TestTotal $logText '^TOTAL\s+(\d+)/(\d+)\s*$'
               storageInfrastructure = Get-TestTotal $logText '^STORAGE INFRA TOTAL\s+(\d+)/(\d+)\s*$'
               uiPresentation = Get-TestTotal $logText '^UI PRESENTATION TOTAL\s+(\d+)/(\d+)\s*$'
+              popupDpiLayout = Get-TestTotal $logText '^POPUP DPI TOTAL\s+(\d+)/(\d+)\s*$'
               localizationRuntime = Get-TestTotal $logText '^LOCALIZATION TOTAL\s+(\d+)/(\d+)\s*$'
               refreshRuntime = Get-TestTotal $logText '^REFRESH TOTAL\s+(\d+)/(\d+)\s*$'
               refreshController = Get-TestTotal $logText '^REFRESH CONTROLLER TOTAL\s+(\d+)/(\d+)\s*$'
@@ -192,6 +193,7 @@ jobs:
               'functionalCore',
               'storageInfrastructure',
               'uiPresentation',
+              'popupDpiLayout',
               'localizationRuntime',
               'refreshRuntime',
               'refreshController',
@@ -220,6 +222,7 @@ jobs:
               $totals.functionalCore.passed +
               $totals.storageInfrastructure.passed +
               $totals.uiPresentation.passed +
+              $totals.popupDpiLayout.passed +
               $totals.localizationRuntime.passed +
               $totals.refreshRuntime.passed +
               $totals.refreshController.passed +
@@ -239,6 +242,7 @@ jobs:
               $totals.functionalCore.expected +
               $totals.storageInfrastructure.expected +
               $totals.uiPresentation.expected +
+              $totals.popupDpiLayout.expected +
               $totals.localizationRuntime.expected +
               $totals.refreshRuntime.expected +
               $totals.refreshController.expected +

@@ -1,5 +1,13 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.1.10.0 – High-DPI popup layout and readable boot targets (LBS-144)
+
+- Establish a single 96-DPI design baseline and DPI-mode autoscaling for the static WinForms tray popup, rather than mixing fixed control bounds with independently scaled text metrics.
+- Scale boot rows created after the popup layout using its current measured factor, including nested alias editor controls, per-row offsets and scrollbar increments.
+- Keep scroll content sized to the actual viewport width; add ellipsis, full-text tooltips and accessible descriptions to long boot-target titles and subtitles.
+- Add Windows PowerShell 5.1 DPI-layout regression tests covering 100%, 125%, 150%, 200% and 250% geometric cases. Real 250% Lenovo panel and mixed-monitor display acceptance remain separately verifiable.
+- Preserve the existing icon-relative popup placement, boot-selection behavior, TaskBroker/UEFI privilege boundary, updater and diagnostic Worker behavior.
+
 ## v1.1.9.0 – Reopen existing popup on second launch (LBS-140)
 
 - A second interactive start now signals the existing same-user tray instance to open its current popup, rather than treating the ordinary duplicate launch as a runtime error.
