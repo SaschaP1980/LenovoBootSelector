@@ -1,4 +1,5 @@
 ﻿function New-PopupForm {
+    param([double]$TargetScale = 1.0, [string]$ScaleSource = 'initial')
     if (-not $script:BootTypeToolTip) {
         $script:BootTypeToolTip = New-Object System.Windows.Forms.ToolTip
         $script:BootTypeToolTip.InitialDelay = 350
@@ -38,7 +39,11 @@
     $root.Controls.Add($maintenancePanel)
 
     # Scale the entire static control tree in one WinForms DPI pass.
-    Complete-PopupDpiLayout -Form $form
+    Complete-PopupDpiLayout -Form $form -Scale $TargetScale
+    Write-PopupDpiLayoutDiagnostic -Form $form -Phase 'constructed' -MonitorSource $ScaleSource
+    $form.Add_Shown({
+        Write-PopupDpiLayoutDiagnostic -Form $this -Phase 'shown' -MonitorSource 'active-screen'
+    })
 
     # v0.2.28: no window region is applied; the popup stays rectangular.
 
@@ -76,6 +81,11 @@ function Position-Popup {
     }
 
     if ($null -eq $screen) { return }
+    $monitorScale = Get-PopupMonitorDpiScale -Screen $screen
+    if (Set-PopupDpiLayoutScale -Form $script:Popup -Scale ([double]$monitorScale.Factor)) {
+        Update-PopupRows
+        Write-PopupDpiLayoutDiagnostic -Form $script:Popup -Phase 'monitor-change' -MonitorSource ([string]$monitorScale.Source)
+    }
     $location = Get-PopupLocationFromAnchor -WorkingArea $screen.WorkingArea -DisplayBounds $screen.Bounds -AnchorRect $iconRect -PopupSize $script:Popup.Size -HasAnchor:($null -ne $iconRect)
     $script:Popup.Location = $location
 }
@@ -83,7 +93,9 @@ function Position-Popup {
 function Show-OrTogglePopup {
     param([switch]$FromTrayClick)
     if (-not $script:Popup -or $script:Popup.IsDisposed) {
-        $script:Popup = New-PopupForm
+        $initialScreen = [System.Windows.Forms.Screen]::PrimaryScreen
+        $initialScale = Get-PopupMonitorDpiScale -Screen $initialScreen
+        $script:Popup = New-PopupForm -TargetScale ([double]$initialScale.Factor) -ScaleSource ([string]$initialScale.Source)
     }
 
     if ($script:Popup.Visible) {

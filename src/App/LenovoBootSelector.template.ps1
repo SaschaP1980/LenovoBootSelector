@@ -1792,7 +1792,8 @@ try {
     $script:LastStatusText = Get-LocalizedString -Key 'Status.Ready'
     Repair-AutostartLauncherIfNeeded
 
-    $script:Popup = New-PopupForm
+    $initialPopupScale = Get-PopupMonitorDpiScale -Screen ([System.Windows.Forms.Screen]::PrimaryScreen)
+    $script:Popup = New-PopupForm -TargetScale ([double]$initialPopupScale.Factor) -ScaleSource ([string]$initialPopupScale.Source)
     $activationListener = Start-LbsActivationListener -Signal $activationEvent -OnActivate {
         try {
             Show-OrActivatePopup
