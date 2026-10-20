@@ -1,5 +1,16 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+
+## v1.1.11.0 – Correct native 250% popup clipping and disappearing text (LBS-144)
+
+- Correct the failed native 250%-DPI regression from v1.1.10.0: query Windows' actual monitor scale and resize the **complete existing WinForms popup tree** explicitly from its 96-DPI design size. Do not rely on a Dpi autoscaling mode that left the real form at 390 physical pixels.
+- Reapply the effective monitor scale when the tray popup is positioned on another monitor; ensure recreated boot rows, title/subtitle spacing, settings, restart and footer share the same pixel scale. Preserve tray-icon-relative positioning and manual boot actions.
+- Remove automatic ellipsis from the constrained boot-title/subtitle labels, retaining full text in accessible descriptions and tooltips, rather than allowing WinForms to hide those labels entirely.
+- Add privacy-safe `POPUP_DPI_LAYOUT` diagnostic evidence of applied monitor scale, form/client geometry, and font versus label heights; no boot GUID, alias, device identity, or personal label content is logged.
+- Replace the old 16-case synthetic-width DPI suite with real WinForms form/root/header/restart/footer sizing and text-measurement checks at 100–250%, including repeated positioning, monitor changes and 33 native assertions.
+- No modifications to privileged TaskBroker operations, boot order, UEFI firmware selection, update transport or the independent LBS-143 implementation.
+
+
 ## v1.1.10.0 – High-DPI popup layout and readable boot targets (LBS-144)
 
 - Establish a single 96-DPI design baseline and DPI-mode autoscaling for the static WinForms tray popup, rather than mixing fixed control bounds with independently scaled text metrics.
