@@ -496,7 +496,11 @@ $titleWidth = if ($script:IsManageEntriesMode) { if ($aliasEditActive) { 318 } e
 $titleText = if ($aliasEditActive) { [string]$entry.Title } else { $displayTitle }
 $title = New-Label -Text $titleText -Font (New-Object Drawing.Font('Segoe UI', 10.0, [Drawing.FontStyle]::Bold)) `
     -ForeColor $titleColor -X 58 -Y 6 -Width $titleWidth -Height 21
-$title.AutoEllipsis = $true
+$title.Name = 'BootTitleLabel'
+# At high DPI, WinForms AutoEllipsis can suppress the entire label if its
+# vertical rectangle is considered insufficient. Keep text visible; the
+# full name is also available in the tooltip and accessible description.
+$title.AutoEllipsis = $false
 $title.AccessibleDescription = [string]$titleText
 if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($title, [string]$titleText) }
 $title.Tag = $entry.Guid
@@ -518,7 +522,8 @@ if (-not $aliasEditActive) {
     }
     $subtitle = New-Label -Text $subtitleText -Font (New-Object Drawing.Font('Segoe UI', 8.3, [Drawing.FontStyle]::Regular)) `
         -ForeColor $subtitleColor -X 58 -Y 27 -Width $subtitleWidth -Height 27
-    $subtitle.AutoEllipsis = $true
+    $subtitle.Name = 'BootSubtitleLabel'
+    $subtitle.AutoEllipsis = $false
     $subtitle.AccessibleDescription = [string]$subtitleText
     if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($subtitle, [string]$subtitleText) }
     $subtitle.Tag = $entry.Guid
