@@ -1,8 +1,8 @@
-# LBS-144: explicit monitor scale in physical coordinates, with one 96-DPI
-# design baseline. The previous AutoScaleMode.Dpi configuration left the
-# actual tray form at 390 pixels at 250% on the owner's Windows 11 laptop.
-# Native Windows monitor scale is read without changing process DPI awareness
-# or modifying any machine settings.
+# LBS-144: use one WinForms-effective logical coordinate space across
+# mixed-DPI monitors. The operating system's reported monitor scale is
+# diagnostic metadata, not a second layout multiplier. A previous manual
+# 2.5x Form.Scale caused tiny text, an oversized 1680px client and blocked
+# access to the tray icon on the owner's 100%/250% dual-display setup.
 function Resolve-PopupDpiScale {
     param([Parameter(Mandatory=$true)][int]$Percent)
     if ($Percent -lt 100 -or $Percent -gt 500) {
@@ -68,12 +68,15 @@ public static class LenovoPopupScaleNative {
     return [pscustomobject]@{ Factor = 1.0; Source = 'unavailable'; Percent = 100 }
 }
 
+# LBS-144 native evidence: 100%-to-250% monitor change kept fonts at
+# 19/18/15px, while manually multiplying form and rows by 2.5. Do not scale
+# already virtualized WinForms coordinate and font spaces independently.
 function Initialize-PopupDpiLayout {
     param([Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Form)
     $Form.SuspendLayout()
-    # Explicit one-time 96-DPI design scaling; do not multiply it by WinForms
-    # automatic scaling in a second pass.
     $Form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::None
+    # Tag records reported monitor percent only, not a layout multiplier.
+    $Form.Tag = [double]1.0
 }
 
 function Set-PopupDpiLayoutScale {
@@ -83,26 +86,10 @@ function Set-PopupDpiLayoutScale {
     )
     if ($Scale -lt 1.0 -or $Scale -gt 5.0) { throw 'Invalid popup monitor scale.' }
     $previous = [double]$Form.Tag
-    if ($previous -le 0) { $previous = 1.0; $Form.Tag = [double]$previous }
-    if ([Math]::Abs($Scale - $previous) -lt 0.001) { return $false }
-    $ratio = [single]($Scale / $previous)
-    # WinForms' Form.Scale can round/nonlinearly size the client height even
-    # when the width is correct (observed under hosted native 250% test).
-    # Preserve the intended exact 96-DPI design client geometry explicitly.
-    $oldClient = $Form.ClientSize
-    $targetWidth = [int][Math]::Round($oldClient.Width * $ratio)
-    $targetHeight = [int][Math]::Round($oldClient.Height * $ratio)
-    $Form.SuspendLayout()
-    try {
-        $Form.Scale([Drawing.SizeF]::new($ratio, $ratio))
-        $Form.ClientSize = [Drawing.Size]::new($targetWidth, $targetHeight)
-        $root = $Form.Controls['PopupRoot']
-        if ($root) { $root.Size = $Form.ClientSize }
-        # Store only our own applied scale. No guessed physical pixel ratio.
-        $Form.Tag = [double]$Scale
-    }
-    finally { $Form.ResumeLayout($true) }
-    return $true
+    if ($previous -le 0) { $previous = 1.0 }
+    $Form.Tag = [double]$Scale
+    # A monitor transition triggers placement/diagnostics, never Form.Scale.
+    return ([Math]::Abs($Scale - $previous) -ge 0.001)
 }
 
 function Complete-PopupDpiLayout {
@@ -110,12 +97,48 @@ function Complete-PopupDpiLayout {
         [Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Form,
         [double]$Scale = 1.0
     )
+    try { [void](Set-PopupDpiLayoutScale -Form $Form -Scale $Scale) }
+    finally { $Form.ResumeLayout($true) }
+}
+
+# Keep popup and tray reachable. If a work area is shorter than the logical
+# 390x672 design, use native panel scrolling rather than clipping its footer.
+function Set-PopupViewportForWorkingArea {
+    param(
+        [Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Form,
+        [Parameter(Mandatory=$true)][Drawing.Rectangle]$WorkingArea
+    )
+    $designWidth = 390
+    $designHeight = 672
+    $availableWidth = [Math]::Max(200, $WorkingArea.Width - 12)
+    $availableHeight = [Math]::Max(200, $WorkingArea.Height - 12)
+    $wantedWidth = [Math]::Min($designWidth, $availableWidth)
+    $wantedHeight = [Math]::Min($designHeight, $availableHeight)
+    $changed = ($Form.ClientSize.Width -ne $wantedWidth -or $Form.ClientSize.Height -ne $wantedHeight)
+    $root = $Form.Controls['PopupRoot']
+    $Form.SuspendLayout()
     try {
-        # Scale the existing complete static form/control tree, not merely
-        # mock row widths or the outer window rectangle.
-        [void](Set-PopupDpiLayoutScale -Form $Form -Scale $Scale)
+        if ($root) {
+            $root.SuspendLayout()
+            try {
+                if ($wantedHeight -lt $designHeight -or $wantedWidth -lt $designWidth) {
+                    $root.AutoScroll = $true
+                    $root.AutoScrollMinSize = [Drawing.Size]::new($designWidth, $designHeight)
+                }
+                else {
+                    # Clear the logical scroll extent BEFORE turning auto-scroll
+                    # off; avoid stale internal scroll state on monitor return.
+                    $root.AutoScrollMinSize = [Drawing.Size]::Empty
+                    $root.AutoScroll = $false
+                }
+            }
+            finally { $root.ResumeLayout($true) }
+        }
+        $Form.ClientSize = [Drawing.Size]::new($wantedWidth, $wantedHeight)
+        if ($root) { $root.Size = $Form.ClientSize }
     }
     finally { $Form.ResumeLayout($true) }
+    return $changed
 }
 
 function Get-PopupDpiLayoutScale {
@@ -126,7 +149,9 @@ function Get-PopupDpiLayoutScale {
     if ($DesignWidth -le 0 -or $Popup.ClientSize.Width -le 0) {
         throw 'Popup layout width is not available.'
     }
-    return ([double]$Popup.ClientSize.Width / [double]$DesignWidth)
+    # New boot rows share the original 96-DPI form layout coordinate system.
+    # Never interpret a virtualized window-width ratio as physical screen DPI.
+    return [double]1.0
 }
 
 function Set-PopupBootRowDpiLayout {
@@ -160,7 +185,10 @@ function Write-PopupDpiLayoutDiagnostic {
         $subtitle = if ($s.Count -gt 0) { $s[0] } else { $null }
         $data = @{
             phase = $Phase
-            appliedScalePercent = [int][Math]::Round([double]$Form.Tag * 100)
+            appliedScalePercent = 100
+            reportedMonitorScalePercent = [int][Math]::Round([double]$Form.Tag * 100)
+            layoutCoordinateSpace = 'winforms-effective'
+            formClientOuterHeightDelta = [int]($Form.ClientSize.Height - $Form.Height)
             monitorScaleSource = $MonitorSource
             formWidth = [int]$Form.Width
             formHeight = [int]$Form.Height
