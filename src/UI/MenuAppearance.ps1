@@ -98,14 +98,20 @@ function Initialize-LenovoMenuAppearance {
     else {
         New-Object System.Windows.Forms.Padding(0, 2, 0, 2)
     }
+    # Only one paint snapshot per opening, rather than every hover redraw.
+    if (-not $script:LenovoDpiMenuPaintRecorded) {
+        $script:LenovoDpiMenuPaintRecorded = New-Object 'System.Collections.Generic.Dictionary[System.Windows.Forms.ToolStripDropDown,System.Boolean]'
+    }
     $Menu.Add_Opening({
         try {
+            $script:LenovoDpiMenuPaintRecorded[$this] = $false
             $screen = [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position)
             $factor = (Get-PopupMonitorDpiScale -Screen $screen).Factor
             [void](Set-LenovoMenuDpiLayout -Menu $this -Scale ([double]$factor))
             $this.Region = $null
             [LenovoMenuLayout]::PrepareItems($this)
             [LenovoMenuChrome]::Apply($this)
+            Write-LenovoDpiWindowEvent -Control $this -Role $(if ($this.OwnerItem) { 'submenu' } else { 'tray-root' }) -Phase 'opening' -Screen $screen -RequestedScale ([double]$factor)
         } catch { }
     })
     $Menu.Add_Opened({
@@ -113,6 +119,16 @@ function Initialize-LenovoMenuAppearance {
             $this.Region = $null
             [LenovoMenuChrome]::Apply($this)
             [LenovoMenuLayout]::PrepareItems($this)
+            Write-LenovoDpiWindowEvent -Control $this -Role $(if ($this.OwnerItem) { 'submenu' } else { 'tray-root' }) -Phase 'opened'
+        } catch { }
+    })
+    $Menu.Add_Paint({
+        param($sender,$paintArgs)
+        try {
+            if ($sender.Visible -and -not $script:LenovoDpiMenuPaintRecorded[$sender]) {
+                $script:LenovoDpiMenuPaintRecorded[$sender] = $true
+                Write-LenovoDpiWindowEvent -Control $sender -Role $(if ($sender.OwnerItem) { 'submenu' } else { 'tray-root' }) -Phase 'paint' -PaintDpiX $paintArgs.Graphics.DpiX -PaintDpiY $paintArgs.Graphics.DpiY
+            }
         } catch { }
     })
     $Menu.Add_SizeChanged({

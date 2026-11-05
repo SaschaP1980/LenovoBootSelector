@@ -1,6 +1,15 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.1.14.3 – Extend native DPI window diagnostics for mixed-scale displays (LBS-144)
+
+- Add a read-only Win32/DWM DPI snapshot for the initial tray context menu, subsequent opens, language and maintenance submenus, and four standard modal dialogs.
+- Capture each window's real DPI and awareness, process/thread awareness, WinForms layout bounds, caller-context GetWindowRect, and DWM physical extended-frame bounds after showing the window.
+- Record current monitor bounds, working area, requested layout scaling and Graphics.DpiX/Y on first paint, explicitly distinguishing physical pixels from virtualized coordinates.
+- Measure DPI ratios numerically relative to 96 DPI, including custom and intermediate scaling values beyond 100% and 250%, without relying on a fixed scale enumeration.
+- Add 27 permanent native Windows PowerShell 5.1 regression checks. Snapshots must not materialize unopened window handles or log menu/dialog text.
+- Preserve existing layout, font, menu renderer, boot privileges and update behavior. The unresolved 250%-laptop visual defect remains tracked under LBS-144 pending physical analysis.
+
 ## v1.1.14.2 – Initialize DPI coordinates before first tray menu and scale modal dialogs (LBS-144)
 
 - Initialize the existing Lenovo popup's WinForms HWND invisibly at startup, before creating the tray icon or showing any context menu. This prevents the first-right-click menu from relying on DPI-virtualized working-area coordinates that changed after the popup was first shown on a 250% laptop display.
