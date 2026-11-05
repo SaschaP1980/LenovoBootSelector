@@ -1058,6 +1058,7 @@ $script:MaintenanceState = New-MaintenanceRuntimeState
 $script:BootTargetDriftState = New-BootTargetDriftRuntimeState
 $script:UpdateState = New-UpdateRuntimeState
 
+# @include src/UI/DpiWindowDiagnostics.ps1
 # @include src/UI/MenuAppearance.ps1
 
 # @include src/UI/RefreshPresentation.ps1
@@ -2030,7 +2031,9 @@ try {
                 [void](Set-LenovoMenuDpiLayout -Menu $script:TrayContextMenu -Scale ([double]$factor))
                 $size = $script:TrayContextMenu.GetPreferredSize([Drawing.Size]::Empty)
                 $location = Get-TrayContextMenuLocation -ClickPoint $point -MenuSize $size -WorkingArea $screen.WorkingArea -DisplayBounds $screen.Bounds
+                Write-LenovoDpiWindowEvent -Control $script:TrayContextMenu -Role 'tray-root' -Phase 'before-show-call' -Screen $screen -RequestedScale ([double]$factor)
                 $script:TrayContextMenu.Show($location)
+                Write-LenovoDpiWindowEvent -Control $script:TrayContextMenu -Role 'tray-root' -Phase 'after-show-call' -Screen $screen -RequestedScale ([double]$factor)
                 Write-RuntimeDiagnosticEvent -Event 'TRAY_CONTEXT_MENU_LOCATION' -Stage 'ui-layout' -Success $true -Data (New-RuntimeDiagnosticData @{
                     menuWidth = [int]$size.Width
                     menuHeight = [int]$size.Height

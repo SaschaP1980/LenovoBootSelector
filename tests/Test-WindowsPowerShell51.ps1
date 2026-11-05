@@ -51,3 +51,5 @@ Write-Host "PARSER TOTAL $pass/$($files.Count)"
 $menuInkProbe = Join-Path $root 'tests\Test-LBS144-MenuInkRaster.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $menuInkProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-144 menu text raster regression failed' }
+# Read-only DPI window diagnostic, including real Win32/DWM metrics and arbitrary scale values.
+& (Join-Path $root 'tests\Test-LBS144-DpiWindowDiagnostics.ps1')

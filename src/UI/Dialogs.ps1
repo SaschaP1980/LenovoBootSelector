@@ -95,7 +95,8 @@ function Set-LenovoDialogDpiLayout {
 function Prepare-LenovoDialogDpiLayout {
     param(
         [Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Form,
-        [System.Windows.Forms.Form]$Owner
+        [System.Windows.Forms.Form]$Owner,
+        [string]$Role = 'regular-modal'
     )
     $screen = if ($Owner -and -not $Owner.IsDisposed -and $Owner.Visible) {
         [System.Windows.Forms.Screen]::FromControl($Owner)
@@ -104,6 +105,7 @@ function Prepare-LenovoDialogDpiLayout {
     if (-not $screen) { $screen = [System.Windows.Forms.Screen]::PrimaryScreen }
     $scale = Get-PopupMonitorDpiScale -Screen $screen
     Set-LenovoDialogDpiLayout -Form $Form -Scale ([double]$scale.Factor) -WorkingArea $screen.WorkingArea
+    Register-LenovoDialogDpiWindowDiagnostics -Form $Form -Role $Role -Screen $screen -RequestedScale ([double]$scale.Factor)
 }
 
 function Show-LenovoNoticeDialog {
@@ -197,7 +199,7 @@ function Show-LenovoNoticeDialog {
     $form.CancelButton = $ok
     try {
         $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
-        Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner
+        Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner -Role 'notice'
         if ($owner) { [void]$form.ShowDialog($owner) } else { [void]$form.ShowDialog() }
     }
     finally { $form.Dispose() }
@@ -263,7 +265,7 @@ function Show-LocaleMigrationDialog {
 
     try {
         $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
-        Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner
+        Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner -Role 'language-migration'
         if ($owner) { [void]$form.ShowDialog($owner) } else { [void]$form.ShowDialog() }
         return [string]$form.Tag
     }
@@ -383,7 +385,7 @@ function Show-LenovoSystemFunctionsDialog {
 
     try {
         $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
-        Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner
+        Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner -Role 'system-functions'
         if ($owner) { return $form.ShowDialog($owner) }
         return $form.ShowDialog()
     }
@@ -475,7 +477,7 @@ function Show-LenovoRestartDialog {
 
     try {
         $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
-        Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner
+        Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner -Role 'restart-confirmation'
         if ($owner) { return $form.ShowDialog($owner) }
         return $form.ShowDialog()
     }
