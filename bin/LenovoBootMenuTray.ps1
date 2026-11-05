@@ -1241,14 +1241,9 @@ public static class LenovoLocaleFlags
         return Math.Max(1, (int)Math.Round(value * Math.Max(96f, dpi) / 96f));
     }
 
-    // Menu indicators follow the explicitly scaled LBS menu font, not
-    // Graphics.DpiX from the SystemAware PowerShell host (which can reflect
-    // a different monitor from the menu being painted).
-    public static float GetMenuDesignDpi(ToolStripItem item)
-    {
-        if (item == null || item.Font == null) return 96f;
-        return Math.Max(96f, Math.Min(480f, 96f * item.Font.SizeInPoints / 9f));
-    }
+    // Graphics.DpiX is the native GDI pixel density of the paint surface.
+    // Glyph dimensions use this density, not (font.SizeInPoints / 9), since
+    // typographic point sizes must remain constant across monitor scales.
 
     public static string GetLocale(ToolStripItem item)
     {
@@ -1289,7 +1284,7 @@ public static class LenovoLocaleFlags
     {
         string locale = GetLocale(item);
         if (locale == null || g == null) return;
-        Rectangle flag = GetBounds(item, row, GetMenuDesignDpi(item));
+        Rectangle flag = GetBounds(item, row, g.DpiX);
         GraphicsState saved = g.Save();
         try
         {
@@ -1326,7 +1321,7 @@ public static class LenovoLocaleFlags
                 // At this icon size, light star dots are legible without tiny glyphs.
                 using (Brush stars = new SolidBrush(Color.White))
                 {
-                    float dot = Math.Max(1f, GetMenuDesignDpi(item) / 96f);
+                    float dot = Math.Max(1f, g.DpiX / 96f);
                     for (int rowIndex = 0; rowIndex < 3; rowIndex++)
                         for (int col = 0; col < 3; col++)
                             g.FillRectangle(stars, canton.Left + (col + 0.5f) * canton.Width / 3f,
@@ -1510,9 +1505,9 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
 
         // Indicators remain item-local and are painted after the background.
         if (item.HasDropDownItems)
-            DrawRightArrow(e.Graphics, row, item.Enabled, LenovoLocaleFlags.GetMenuDesignDpi(item));
+            DrawRightArrow(e.Graphics, row, item.Enabled, e.Graphics.DpiX);
         else if (item.Checked)
-            DrawRightCheck(e.Graphics, row, item.Enabled, LenovoLocaleFlags.GetMenuDesignDpi(item));
+            DrawRightCheck(e.Graphics, row, item.Enabled, e.Graphics.DpiX);
 
         LenovoLocaleFlags.Draw(e.Graphics, item, row);
         e.Graphics.Restore(state);
@@ -1521,27 +1516,50 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
     protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
     {
         ToolStripDropDown owner = e.ToolStrip as ToolStripDropDown;
-        if (owner != null && LenovoLocaleFlags.GetLocale(e.Item) != null)
+        if (owner == null || e.Item == null || e.Graphics == null)
         {
-            // The native TextRectangle has already reserved a hidden image gutter.
-            // Moving only its left edge clipped "English" and "Deutsch" in 1.0.1.0.
-            // Rebuild the complete item-local rectangle from the real menu row.
-            Rectangle row = FullRowBounds(owner, e.Item);
-            Rectangle text = LenovoLocaleFlags.GetTextBounds(e.Item, row, LenovoLocaleFlags.GetMenuDesignDpi(e.Item));
-            if (text.Width > 0)
-            {
-                GraphicsState state = e.Graphics.Save();
-                try
-                {
-                    e.Graphics.ResetClip();
-                    e.TextRectangle = text;
-                    base.OnRenderItemText(e);
-                }
-                finally { e.Graphics.Restore(state); }
-            }
+            base.OnRenderItemText(e);
             return;
         }
-        base.OnRenderItemText(e);
+        // LBS-144 native 240-DPI raster RED: base.OnRenderItemText printed
+        // a 12px glyph on both 96-DPI and 240-DPI GDI+ surfaces, whereas
+        // Graphics.DrawString produces 12px and 30px respectively. Do not
+        // multiply 9pt fonts: render typographic points on the target HDC.
+        Rectangle row = FullRowBounds(owner, e.Item);
+        Rectangle text;
+        if (LenovoLocaleFlags.GetLocale(e.Item) != null)
+        {
+            // Preserve the full language label and dedicated, DPI-scaled flag.
+            text = LenovoLocaleFlags.GetTextBounds(e.Item, row, e.Graphics.DpiX);
+            // LBS-117: language labels expose their expanded text rectangle.
+            e.TextRectangle = text;
+        }
+        else
+        {
+            // The native item TextRectangle may carry a stale 96-DPI height
+            // or a hidden image gutter. Use full item-local row coordinates.
+            int left = row.Left + Math.Max(0, e.Item.Padding.Left);
+            int right = row.Right - Math.Max(0, e.Item.Padding.Right);
+            text = new Rectangle(left, row.Top, Math.Max(0, right - left), row.Height);
+        }
+        if (text.Width <= 0 || text.Height <= 0) return;
+        GraphicsState state = e.Graphics.Save();
+        try
+        {
+            e.Graphics.ResetClip();
+            using (StringFormat format = (StringFormat)StringFormat.GenericTypographic.Clone())
+            using (Brush brush = new SolidBrush(e.TextColor))
+            {
+                format.Alignment = StringAlignment.Near;
+                format.LineAlignment = StringAlignment.Center;
+                format.FormatFlags |= StringFormatFlags.NoWrap;
+                format.Trimming = StringTrimming.EllipsisCharacter;
+                format.HotkeyPrefix = System.Drawing.Text.HotkeyPrefix.Show;
+                Font font = e.TextFont ?? e.Item.Font;
+                e.Graphics.DrawString(e.Text ?? String.Empty, font, brush, text, format);
+            }
+        }
+        finally { e.Graphics.Restore(state); }
     }
 
     protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
@@ -2042,7 +2060,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.1.13.0'
+$script:AppVersion = '1.1.14.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -2544,8 +2562,8 @@ $script:UpdateState = New-UpdateRuntimeState
 # LBS-144: independent, physical-pixel DPI layout for ToolStrip menus.
 # A SystemAware PowerShell/WinForms host supplies the design 9pt text and
 # fixed 260px menu independently of its 96/240 system DPI. Keep immutable
-# baselines so tray, language, maintenance and default-target menus can switch
-# between 100% and 250% without cumulative scaling or layout drift.
+# geometry baselines; font point sizes stay at 9pt because GDI/WinForms
+# converts points to pixels at its current DPI without further multiplication.
 function Get-LenovoScaledMenuPadding {
     param(
         [Parameter(Mandatory=$true)][System.Windows.Forms.Padding]$Padding,
@@ -2596,9 +2614,9 @@ function Set-LenovoMenuDpiLayout {
     if ([Math]::Abs($state.Scale - $Scale) -lt 0.001) { return $false }
     $Menu.SuspendLayout()
     try {
-        # All LBS menus use the same 96-DPI Segoe UI 9pt design font.
-        # Submenus must not inherit the already-scaled parent item font.
-        $Menu.Font = [Drawing.Font]::new('Segoe UI',[single](9.0 * $Scale),[Drawing.FontStyle]::Regular)
+        # Fonts remain 9pt: DPI affects the rendered pixel line height.
+        # Submenus must not inherit any separately transformed parent font.
+        $Menu.Font = [Drawing.Font]::new('Segoe UI',[single]9.0,[Drawing.FontStyle]::Regular)
         $Menu.Padding = Get-LenovoScaledMenuPadding -Padding $state.Padding -Scale $Scale
         if ($null -ne $Menu.PSObject.Properties['TargetWidth']) {
             $Menu.TargetWidth = [Math]::Max(1,[int][Math]::Round($state.Width * $Scale))
@@ -2607,7 +2625,7 @@ function Set-LenovoMenuDpiLayout {
             $base = $state.ItemBases[$item]
             $item.AutoSize = $false
             $item.Padding = Get-LenovoScaledMenuPadding -Padding $base.Padding -Scale $Scale
-            $item.Font = [Drawing.Font]::new('Segoe UI',[single](9.0 * $Scale),[Drawing.FontStyle]$base.FontStyle)
+            $item.Font = [Drawing.Font]::new('Segoe UI',[single]9.0,[Drawing.FontStyle]$base.FontStyle)
             $item.Height = [Math]::Max(1,[int][Math]::Round($base.Height * $Scale))
         }
     }
@@ -7918,9 +7936,10 @@ public static class LenovoPopupScaleNative {
 # LBS-144 physical Windows captures: the WinForms popup remained 390x672
 # pixels with window DPI 240 (laptop-primary) and 96 (external-primary).
 # PowerShell/WinForms owns a SystemAware HWND, not a PMv2 HWND.
-# Keep one 96-DPI design baseline; explicitly scale bounds AND fonts from
-# immutable design metrics. Never combine this with WinForms AutoScale or
-# Form.Scale, which previously produced independently sized text and rows.
+# Keep one 96-DPI design baseline; scale pixel control bounds from immutable
+# design metrics, but preserve point-unit Font.Size. Windows/GDI converts
+# points to physical pixels using window DPI; multiplying points also would
+# double-scale glyphs and clip the text at 240 DPI.
 function Initialize-PopupDpiLayout {
     param([Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Form)
     $Form.SuspendLayout()
@@ -8000,10 +8019,10 @@ function Set-PopupControlPhysicalScale {
             [int][Math]::Round($base.Margin.Top * $Scale),
             [int][Math]::Round($base.Margin.Right * $Scale),
             [int][Math]::Round($base.Margin.Bottom * $Scale))
-        # Font.Size is in the original font unit, not Graphics.DpiX pixels.
-        # Scale point sizes exactly once with their own control bounds.
+        # Font.Size is a typographic point unit. Rendering already converts
+        # it to DPI-relative pixel height; NEVER multiply by monitor scale.
         $Control.Font = [Drawing.Font]::new(
-            $base.FontFamily,[single]($base.FontSize * $Scale),
+            $base.FontFamily,[single]$base.FontSize,
             [Drawing.FontStyle]$base.FontStyle,[Drawing.GraphicsUnit]$base.FontUnit)
         foreach ($child in $Control.Controls) {
             Set-PopupControlPhysicalScale -Control $child -Scale $Scale -UseStoredBaseline $UseStoredBaseline

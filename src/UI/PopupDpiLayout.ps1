@@ -71,9 +71,10 @@ public static class LenovoPopupScaleNative {
 # LBS-144 physical Windows captures: the WinForms popup remained 390x672
 # pixels with window DPI 240 (laptop-primary) and 96 (external-primary).
 # PowerShell/WinForms owns a SystemAware HWND, not a PMv2 HWND.
-# Keep one 96-DPI design baseline; explicitly scale bounds AND fonts from
-# immutable design metrics. Never combine this with WinForms AutoScale or
-# Form.Scale, which previously produced independently sized text and rows.
+# Keep one 96-DPI design baseline; scale pixel control bounds from immutable
+# design metrics, but preserve point-unit Font.Size. Windows/GDI converts
+# points to physical pixels using window DPI; multiplying points also would
+# double-scale glyphs and clip the text at 240 DPI.
 function Initialize-PopupDpiLayout {
     param([Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Form)
     $Form.SuspendLayout()
@@ -153,10 +154,10 @@ function Set-PopupControlPhysicalScale {
             [int][Math]::Round($base.Margin.Top * $Scale),
             [int][Math]::Round($base.Margin.Right * $Scale),
             [int][Math]::Round($base.Margin.Bottom * $Scale))
-        # Font.Size is in the original font unit, not Graphics.DpiX pixels.
-        # Scale point sizes exactly once with their own control bounds.
+        # Font.Size is a typographic point unit. Rendering already converts
+        # it to DPI-relative pixel height; NEVER multiply by monitor scale.
         $Control.Font = [Drawing.Font]::new(
-            $base.FontFamily,[single]($base.FontSize * $Scale),
+            $base.FontFamily,[single]$base.FontSize,
             [Drawing.FontStyle]$base.FontStyle,[Drawing.GraphicsUnit]$base.FontUnit)
         foreach ($child in $Control.Controls) {
             Set-PopupControlPhysicalScale -Control $child -Scale $Scale -UseStoredBaseline $UseStoredBaseline

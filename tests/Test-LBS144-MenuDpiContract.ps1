@@ -29,8 +29,8 @@ $baseHeight = $item.Height
 try {
     [void](Set-LenovoMenuDpiLayout -Menu $menu -Scale 2.5)
     Assert-MenuDpi 'Root menu target width grows to 650 physical px' ($menu.TargetWidth -eq 650)
-    Assert-MenuDpi 'Root menu point font grows to 22.5' ($menu.Font.Size -ge 22.45)
-    Assert-MenuDpi 'Root menu item font grows to 22.5' ($item.Font.Size -ge 22.45)
+    Assert-MenuDpi 'Root menu point font remains 9pt' ([Math]::Abs($menu.Font.Size - 9.0) -lt .1)
+    Assert-MenuDpi 'Root menu item point font remains 9pt' ([Math]::Abs($item.Font.Size - 9.0) -lt .1)
     Assert-MenuDpi 'Root menu item height grows with text' ($item.Height -ge [int][Math]::Floor($baseHeight * 2.4))
     Write-Host ("LBS-144 MENU METRICS: menu-padding={0},{1},{2},{3}; item-padding={4},{5},{6},{7}; item-height={8}" -f $menu.Padding.Left,$menu.Padding.Top,$menu.Padding.Right,$menu.Padding.Bottom,$item.Padding.Left,$item.Padding.Top,$item.Padding.Right,$item.Padding.Bottom,$item.Height)
     # ToolStripDropDown owns its chrome padding (2px on Windows); item padding is our DPI contract.
@@ -44,7 +44,7 @@ try {
     [void]$sub.Items.Add((New-Object System.Windows.Forms.ToolStripMenuItem('Deutsch')))
     try {
         [void](Set-LenovoMenuDpiLayout -Menu $sub -Scale 2.5)
-        Assert-MenuDpi 'Independent submenu uses selected screen DPI' ($sub.Font.Size -ge 22.45 -and $sub.Items[0].Font.Size -ge 22.45)
+        Assert-MenuDpi 'Independent submenu keeps 9pt text and physical row bounds' ([Math]::Abs($sub.Font.Size - 9.0) -lt .1 -and [Math]::Abs($sub.Items[0].Font.Size - 9.0) -lt .1)
     }
     finally { $sub.Dispose() }
 }

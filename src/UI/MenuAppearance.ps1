@@ -1,8 +1,8 @@
 # LBS-144: independent, physical-pixel DPI layout for ToolStrip menus.
 # A SystemAware PowerShell/WinForms host supplies the design 9pt text and
 # fixed 260px menu independently of its 96/240 system DPI. Keep immutable
-# baselines so tray, language, maintenance and default-target menus can switch
-# between 100% and 250% without cumulative scaling or layout drift.
+# geometry baselines; font point sizes stay at 9pt because GDI/WinForms
+# converts points to pixels at its current DPI without further multiplication.
 function Get-LenovoScaledMenuPadding {
     param(
         [Parameter(Mandatory=$true)][System.Windows.Forms.Padding]$Padding,
@@ -53,9 +53,9 @@ function Set-LenovoMenuDpiLayout {
     if ([Math]::Abs($state.Scale - $Scale) -lt 0.001) { return $false }
     $Menu.SuspendLayout()
     try {
-        # All LBS menus use the same 96-DPI Segoe UI 9pt design font.
-        # Submenus must not inherit the already-scaled parent item font.
-        $Menu.Font = [Drawing.Font]::new('Segoe UI',[single](9.0 * $Scale),[Drawing.FontStyle]::Regular)
+        # Fonts remain 9pt: DPI affects the rendered pixel line height.
+        # Submenus must not inherit any separately transformed parent font.
+        $Menu.Font = [Drawing.Font]::new('Segoe UI',[single]9.0,[Drawing.FontStyle]::Regular)
         $Menu.Padding = Get-LenovoScaledMenuPadding -Padding $state.Padding -Scale $Scale
         if ($null -ne $Menu.PSObject.Properties['TargetWidth']) {
             $Menu.TargetWidth = [Math]::Max(1,[int][Math]::Round($state.Width * $Scale))
@@ -64,7 +64,7 @@ function Set-LenovoMenuDpiLayout {
             $base = $state.ItemBases[$item]
             $item.AutoSize = $false
             $item.Padding = Get-LenovoScaledMenuPadding -Padding $base.Padding -Scale $Scale
-            $item.Font = [Drawing.Font]::new('Segoe UI',[single](9.0 * $Scale),[Drawing.FontStyle]$base.FontStyle)
+            $item.Font = [Drawing.Font]::new('Segoe UI',[single]9.0,[Drawing.FontStyle]$base.FontStyle)
             $item.Height = [Math]::Max(1,[int][Math]::Round($base.Height * $Scale))
         }
     }

@@ -101,14 +101,9 @@ public static class LenovoLocaleFlags
         return Math.Max(1, (int)Math.Round(value * Math.Max(96f, dpi) / 96f));
     }
 
-    // Menu indicators follow the explicitly scaled LBS menu font, not
-    // Graphics.DpiX from the SystemAware PowerShell host (which can reflect
-    // a different monitor from the menu being painted).
-    public static float GetMenuDesignDpi(ToolStripItem item)
-    {
-        if (item == null || item.Font == null) return 96f;
-        return Math.Max(96f, Math.Min(480f, 96f * item.Font.SizeInPoints / 9f));
-    }
+    // Graphics.DpiX is the native GDI pixel density of the paint surface.
+    // Glyph dimensions use this density, not (font.SizeInPoints / 9), since
+    // typographic point sizes must remain constant across monitor scales.
 
     public static string GetLocale(ToolStripItem item)
     {
@@ -149,7 +144,7 @@ public static class LenovoLocaleFlags
     {
         string locale = GetLocale(item);
         if (locale == null || g == null) return;
-        Rectangle flag = GetBounds(item, row, GetMenuDesignDpi(item));
+        Rectangle flag = GetBounds(item, row, g.DpiX);
         GraphicsState saved = g.Save();
         try
         {
@@ -186,7 +181,7 @@ public static class LenovoLocaleFlags
                 // At this icon size, light star dots are legible without tiny glyphs.
                 using (Brush stars = new SolidBrush(Color.White))
                 {
-                    float dot = Math.Max(1f, GetMenuDesignDpi(item) / 96f);
+                    float dot = Math.Max(1f, g.DpiX / 96f);
                     for (int rowIndex = 0; rowIndex < 3; rowIndex++)
                         for (int col = 0; col < 3; col++)
                             g.FillRectangle(stars, canton.Left + (col + 0.5f) * canton.Width / 3f,
@@ -370,9 +365,9 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
 
         // Indicators remain item-local and are painted after the background.
         if (item.HasDropDownItems)
-            DrawRightArrow(e.Graphics, row, item.Enabled, LenovoLocaleFlags.GetMenuDesignDpi(item));
+            DrawRightArrow(e.Graphics, row, item.Enabled, e.Graphics.DpiX);
         else if (item.Checked)
-            DrawRightCheck(e.Graphics, row, item.Enabled, LenovoLocaleFlags.GetMenuDesignDpi(item));
+            DrawRightCheck(e.Graphics, row, item.Enabled, e.Graphics.DpiX);
 
         LenovoLocaleFlags.Draw(e.Graphics, item, row);
         e.Graphics.Restore(state);
@@ -381,27 +376,50 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
     protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
     {
         ToolStripDropDown owner = e.ToolStrip as ToolStripDropDown;
-        if (owner != null && LenovoLocaleFlags.GetLocale(e.Item) != null)
+        if (owner == null || e.Item == null || e.Graphics == null)
         {
-            // The native TextRectangle has already reserved a hidden image gutter.
-            // Moving only its left edge clipped "English" and "Deutsch" in 1.0.1.0.
-            // Rebuild the complete item-local rectangle from the real menu row.
-            Rectangle row = FullRowBounds(owner, e.Item);
-            Rectangle text = LenovoLocaleFlags.GetTextBounds(e.Item, row, LenovoLocaleFlags.GetMenuDesignDpi(e.Item));
-            if (text.Width > 0)
-            {
-                GraphicsState state = e.Graphics.Save();
-                try
-                {
-                    e.Graphics.ResetClip();
-                    e.TextRectangle = text;
-                    base.OnRenderItemText(e);
-                }
-                finally { e.Graphics.Restore(state); }
-            }
+            base.OnRenderItemText(e);
             return;
         }
-        base.OnRenderItemText(e);
+        // LBS-144 native 240-DPI raster RED: base.OnRenderItemText printed
+        // a 12px glyph on both 96-DPI and 240-DPI GDI+ surfaces, whereas
+        // Graphics.DrawString produces 12px and 30px respectively. Do not
+        // multiply 9pt fonts: render typographic points on the target HDC.
+        Rectangle row = FullRowBounds(owner, e.Item);
+        Rectangle text;
+        if (LenovoLocaleFlags.GetLocale(e.Item) != null)
+        {
+            // Preserve the full language label and dedicated, DPI-scaled flag.
+            text = LenovoLocaleFlags.GetTextBounds(e.Item, row, e.Graphics.DpiX);
+            // LBS-117: language labels expose their expanded text rectangle.
+            e.TextRectangle = text;
+        }
+        else
+        {
+            // The native item TextRectangle may carry a stale 96-DPI height
+            // or a hidden image gutter. Use full item-local row coordinates.
+            int left = row.Left + Math.Max(0, e.Item.Padding.Left);
+            int right = row.Right - Math.Max(0, e.Item.Padding.Right);
+            text = new Rectangle(left, row.Top, Math.Max(0, right - left), row.Height);
+        }
+        if (text.Width <= 0 || text.Height <= 0) return;
+        GraphicsState state = e.Graphics.Save();
+        try
+        {
+            e.Graphics.ResetClip();
+            using (StringFormat format = (StringFormat)StringFormat.GenericTypographic.Clone())
+            using (Brush brush = new SolidBrush(e.TextColor))
+            {
+                format.Alignment = StringAlignment.Near;
+                format.LineAlignment = StringAlignment.Center;
+                format.FormatFlags |= StringFormatFlags.NoWrap;
+                format.Trimming = StringTrimming.EllipsisCharacter;
+                format.HotkeyPrefix = System.Drawing.Text.HotkeyPrefix.Show;
+                Font font = e.TextFont ?? e.Item.Font;
+                e.Graphics.DrawString(e.Text ?? String.Empty, font, brush, text, format);
+            }
+        }
+        finally { e.Graphics.Restore(state); }
     }
 
     protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
