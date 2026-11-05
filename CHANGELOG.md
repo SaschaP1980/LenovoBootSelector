@@ -1,6 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.1.14.2 – Initialize DPI coordinates before first tray menu and scale modal dialogs (LBS-144)
+
+- Initialize the existing Lenovo popup's WinForms HWND invisibly at startup, before creating the tray icon or showing any context menu. This prevents the first-right-click menu from relying on DPI-virtualized working-area coordinates that changed after the popup was first shown on a 250% laptop display.
+- Record the primary screen's working-area dimensions before and after the initial HWND creation for field diagnostics. Preserve normal popup visibility, the icon-relative menu placement and the existing DPI-aware menu-text renderer.
+- Apply independent 96-DPI design-pixel scaling to the four regular modal dialog types: update/diagnostics notices, language migration, maintenance/system functions and restart confirmation. Leave point-unit fonts and dialog return values unchanged, center within the selected screen's work area, and provide scrolling when native window size caps prevent full visibility.
+- Keep the distinct startup fatal-recovery dialog on its existing WinForms DPI scaling policy. No changes to UEFI actions, TaskBroker privileges, boot selection, update security or the Cloudflare Worker.
+- Add 18 native Windows PowerShell 5.1 startup/dialog DPI checks with focused RED-to-GREEN evidence, covering invisible handle initialization, 96% and 250% geometry, text fit, buttons, layout containment, initial tray order and the separate fatal-recovery policy. Physical owner acceptance on a mixed-DPI 250%/100% setup remains required after publication.
+
 ## v1.1.14.1 – Correct 250% mixed-DPI popup and menu typography (LBS-144)
 
 - Correct the real 240-DPI typography defect reproduced after v1.1.13.0: a 10.2pt popup heading was multiplied to 25.5pt and measured 113.06 physical pixels high inside a 55-pixel label.
