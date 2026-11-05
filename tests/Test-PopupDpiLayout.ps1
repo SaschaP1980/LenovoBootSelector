@@ -58,11 +58,11 @@ try {
     Assert-PopupDpi 'Native 250% is applied monitor scale' ([Math]::Abs([double]$form.Tag - 2.5) -lt .001)
     Assert-PopupDpi 'Native 250% scales physical form client' ($form.ClientSize.Width -eq 975 -and $form.ClientSize.Height -eq 1680)
     Assert-PopupDpi 'Native 250% scales header bounds' ($header.Width -ge 712 -and $header.Height -ge 55)
-    Assert-PopupDpi 'Native 250% scales header font' ($header.Font.Height -ge ($fontHeight * 2.4))
+    Assert-PopupDpi 'Native 250% preserves typographic point font' ($header.Font.Height -eq $fontHeight)
     Assert-PopupDpi 'New boot rows use live physical scale' ([Math]::Abs((Get-PopupDpiLayoutScale -Popup $form)-2.5) -lt .001)
     Assert-PopupDpi 'Same-monitor placement is idempotent' (-not (Set-PopupDpiLayoutScale -Form $form -Scale 2.5))
     [void](Set-PopupDpiLayoutScale -Form $form -Scale 1.25)
-    Assert-PopupDpi '125% switch restores physical font and form' ($form.ClientSize.Width -eq 488 -and $header.Font.Height -gt $fontHeight)
+    Assert-PopupDpi '125% switch preserves point font and scales physical form' ($form.ClientSize.Width -eq 488 -and $header.Font.Height -eq $fontHeight)
     [void](Set-PopupDpiLayoutScale -Form $form -Scale 2.5)
     $normal = [Drawing.Rectangle]::new(1920,0,3840,2280)
     [void](Set-PopupViewportForWorkingArea -Form $form -WorkingArea $normal)
@@ -121,5 +121,6 @@ try {
 finally { $form.Dispose() }
 $script:checks += [int](& (Join-Path $root 'tests\Test-LBS144-PhysicalDpiContract.ps1'))
 $script:checks += [int](& (Join-Path $root 'tests\Test-LBS144-MenuDpiContract.ps1'))
-Write-Host "POPUP DPI TOTAL $script:checks/54"
-if ($script:checks -ne 54) { throw "Expected 54 popup DPI checks, got $script:checks" }
+$script:checks += [int](& (Join-Path $root 'tests\Test-LBS144-PhysicalFontFit.ps1'))
+Write-Host "POPUP DPI TOTAL $script:checks/62"
+if ($script:checks -ne 62) { throw "Expected 62 popup DPI checks, got $script:checks" }
