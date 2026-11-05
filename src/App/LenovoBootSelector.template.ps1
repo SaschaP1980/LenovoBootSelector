@@ -1956,7 +1956,9 @@ try {
         }
     }
 
-    $script:TrayIcon.ContextMenuStrip = $context
+    # Shell-owned auto-placement jumped to a different monitor in mixed DPI.
+    $script:TrayContextMenu = $context
+    $script:TrayIcon.ContextMenuStrip = $null
     [void](Show-PendingUpdateResultOnStartup)
     $script:TrayPopupClickUtc = $null
     $script:TrayPopupClickPoint = [Drawing.Point]::Empty
@@ -1970,6 +1972,24 @@ try {
         }
         if ($eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
             Show-OrTogglePopup -FromTrayClick
+        }
+        elseif ($eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Right) {
+            if ($script:Popup -and $script:Popup.Visible) { $script:Popup.Hide() }
+            $point = $script:TrayPopupClickPoint
+            $screen = [System.Windows.Forms.Screen]::FromPoint($point)
+            if ($script:TrayContextMenu -and $screen) {
+                Initialize-LenovoMenuAppearance -Menu $script:TrayContextMenu
+                $size = $script:TrayContextMenu.GetPreferredSize([Drawing.Size]::Empty)
+                $location = Get-TrayContextMenuLocation -ClickPoint $point -MenuSize $size -WorkingArea $screen.WorkingArea -DisplayBounds $screen.Bounds
+                $script:TrayContextMenu.Show($location)
+                Write-RuntimeDiagnosticEvent -Event 'TRAY_CONTEXT_MENU_LOCATION' -Stage 'ui-layout' -Success $true -Data (New-RuntimeDiagnosticData @{
+                    menuWidth = [int]$size.Width
+                    menuHeight = [int]$size.Height
+                    screenWorkWidth = [int]$screen.WorkingArea.Width
+                    screenWorkHeight = [int]$screen.WorkingArea.Height
+                    menuShownOnClickMonitor = [bool]($screen.Bounds.Contains($location))
+                })
+            }
         }
     })
 
