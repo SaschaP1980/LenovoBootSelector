@@ -1241,6 +1241,15 @@ public static class LenovoLocaleFlags
         return Math.Max(1, (int)Math.Round(value * Math.Max(96f, dpi) / 96f));
     }
 
+    // Menu indicators follow the explicitly scaled LBS menu font, not
+    // Graphics.DpiX from the SystemAware PowerShell host (which can reflect
+    // a different monitor from the menu being painted).
+    public static float GetMenuDesignDpi(ToolStripItem item)
+    {
+        if (item == null || item.Font == null) return 96f;
+        return Math.Max(96f, Math.Min(480f, 96f * item.Font.SizeInPoints / 9f));
+    }
+
     public static string GetLocale(ToolStripItem item)
     {
         if (item == null || item.Owner == null || item.Owner.Name != MenuName)
@@ -1280,7 +1289,7 @@ public static class LenovoLocaleFlags
     {
         string locale = GetLocale(item);
         if (locale == null || g == null) return;
-        Rectangle flag = GetBounds(item, row, g.DpiX);
+        Rectangle flag = GetBounds(item, row, GetMenuDesignDpi(item));
         GraphicsState saved = g.Save();
         try
         {
@@ -1317,7 +1326,7 @@ public static class LenovoLocaleFlags
                 // At this icon size, light star dots are legible without tiny glyphs.
                 using (Brush stars = new SolidBrush(Color.White))
                 {
-                    float dot = Math.Max(1f, g.DpiX / 96f);
+                    float dot = Math.Max(1f, GetMenuDesignDpi(item) / 96f);
                     for (int rowIndex = 0; rowIndex < 3; rowIndex++)
                         for (int col = 0; col < 3; col++)
                             g.FillRectangle(stars, canton.Left + (col + 0.5f) * canton.Width / 3f,
@@ -1360,40 +1369,47 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
         return new Rectangle(left, 0, width, Math.Max(1, item.Height));
     }
 
-    private void DrawRightCheck(Graphics g, Rectangle row, bool enabled)
+    private static int Ui(int value, float scale)
     {
-        int size = 14;
-        int x = Math.Max(row.Left + 2, row.Right - 24);
+        return Math.Max(1, (int)Math.Round(value * scale));
+    }
+
+    private void DrawRightCheck(Graphics g, Rectangle row, bool enabled, float dpi)
+    {
+        float scale = Math.Max(1f, dpi / 96f);
+        int size = Ui(14, scale);
+        int x = Math.Max(row.Left + Ui(2, scale), row.Right - Ui(24, scale));
         int y = row.Top + Math.Max(1, (row.Height - size) / 2);
         Rectangle box = new Rectangle(x, y, size, size);
         SmoothingMode oldMode = g.SmoothingMode;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         using (Brush brush = new SolidBrush(enabled ? accent : disabled))
             g.FillRectangle(brush, box);
-        using (Pen pen = new Pen(Color.White, 1.8f))
+        using (Pen pen = new Pen(Color.White, Math.Max(1f, 1.8f * scale)))
         {
             pen.StartCap = LineCap.Round;
             pen.EndCap = LineCap.Round;
             g.DrawLines(pen, new Point[] {
-                new Point(box.Left + 3, box.Top + 7),
-                new Point(box.Left + 6, box.Top + 10),
-                new Point(box.Left + 11, box.Top + 4)
+                new Point(box.Left + Ui(3, scale), box.Top + Ui(7, scale)),
+                new Point(box.Left + Ui(6, scale), box.Top + Ui(10, scale)),
+                new Point(box.Left + Ui(11, scale), box.Top + Ui(4, scale))
             });
         }
         g.SmoothingMode = oldMode;
     }
 
-    private void DrawRightArrow(Graphics g, Rectangle row, bool enabled)
+    private void DrawRightArrow(Graphics g, Rectangle row, bool enabled, float dpi)
     {
-        int cx = row.Right - 15;
+        float scale = Math.Max(1f, dpi / 96f);
+        int cx = row.Right - Ui(15, scale);
         int cy = row.Top + (row.Height / 2);
         Color c = enabled ? arrow : disabled;
         using (Brush brush = new SolidBrush(c))
         {
             Point[] points = new Point[] {
-                new Point(cx - 2, cy - 4),
-                new Point(cx + 2, cy),
-                new Point(cx - 2, cy + 4)
+                new Point(cx - Ui(2, scale), cy - Ui(4, scale)),
+                new Point(cx + Ui(2, scale), cy),
+                new Point(cx - Ui(2, scale), cy + Ui(4, scale))
             };
             g.FillPolygon(brush, points);
         }
@@ -1494,9 +1510,9 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
 
         // Indicators remain item-local and are painted after the background.
         if (item.HasDropDownItems)
-            DrawRightArrow(e.Graphics, row, item.Enabled);
+            DrawRightArrow(e.Graphics, row, item.Enabled, LenovoLocaleFlags.GetMenuDesignDpi(item));
         else if (item.Checked)
-            DrawRightCheck(e.Graphics, row, item.Enabled);
+            DrawRightCheck(e.Graphics, row, item.Enabled, LenovoLocaleFlags.GetMenuDesignDpi(item));
 
         LenovoLocaleFlags.Draw(e.Graphics, item, row);
         e.Graphics.Restore(state);
@@ -1511,7 +1527,7 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
             // Moving only its left edge clipped "English" and "Deutsch" in 1.0.1.0.
             // Rebuild the complete item-local rectangle from the real menu row.
             Rectangle row = FullRowBounds(owner, e.Item);
-            Rectangle text = LenovoLocaleFlags.GetTextBounds(e.Item, row, e.Graphics.DpiX);
+            Rectangle text = LenovoLocaleFlags.GetTextBounds(e.Item, row, LenovoLocaleFlags.GetMenuDesignDpi(e.Item));
             if (text.Width > 0)
             {
                 GraphicsState state = e.Graphics.Save();
@@ -2026,7 +2042,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.1.12.0'
+$script:AppVersion = '1.1.13.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -2525,6 +2541,81 @@ $script:MaintenanceState = New-MaintenanceRuntimeState
 $script:BootTargetDriftState = New-BootTargetDriftRuntimeState
 $script:UpdateState = New-UpdateRuntimeState
 
+# LBS-144: independent, physical-pixel DPI layout for ToolStrip menus.
+# A SystemAware PowerShell/WinForms host supplies the design 9pt text and
+# fixed 260px menu independently of its 96/240 system DPI. Keep immutable
+# baselines so tray, language, maintenance and default-target menus can switch
+# between 100% and 250% without cumulative scaling or layout drift.
+function Get-LenovoScaledMenuPadding {
+    param(
+        [Parameter(Mandatory=$true)][System.Windows.Forms.Padding]$Padding,
+        [Parameter(Mandatory=$true)][double]$Scale
+    )
+    return [System.Windows.Forms.Padding]::new(
+        [int][Math]::Round($Padding.Left * $Scale),
+        [int][Math]::Round($Padding.Top * $Scale),
+        [int][Math]::Round($Padding.Right * $Scale),
+        [int][Math]::Round($Padding.Bottom * $Scale))
+}
+
+function Set-LenovoMenuDpiLayout {
+    param(
+        [Parameter(Mandatory=$true)][System.Windows.Forms.ToolStripDropDown]$Menu,
+        [Parameter(Mandatory=$true)][double]$Scale
+    )
+    if ($Scale -lt 1.0 -or $Scale -gt 5.0) { throw 'Invalid menu monitor scale.' }
+    if (-not $script:LenovoMenuDesignBaselines) {
+        $script:LenovoMenuDesignBaselines = New-Object 'System.Collections.Generic.Dictionary[System.Windows.Forms.ToolStripDropDown,System.Object]'
+    }
+    if (-not $script:LenovoMenuDesignBaselines.ContainsKey($Menu)) {
+        $widthProperty = $Menu.PSObject.Properties['TargetWidth']
+        $width = if ($null -ne $widthProperty) { [int]$widthProperty.Value } else { 0 }
+        $state = [pscustomobject]@{
+            Width = $width
+            Padding = $Menu.Padding
+            ItemBases = (New-Object 'System.Collections.Generic.Dictionary[System.Windows.Forms.ToolStripItem,System.Object]')
+            Scale = [double]1.0
+        }
+        $script:LenovoMenuDesignBaselines.Add($Menu,$state)
+        $Menu.Add_Disposed({
+            if ($script:LenovoMenuDesignBaselines) {
+                [void]$script:LenovoMenuDesignBaselines.Remove($this)
+            }
+        })
+    }
+    $state = $script:LenovoMenuDesignBaselines[$Menu]
+    foreach ($item in $Menu.Items) {
+        if (-not $state.ItemBases.ContainsKey($item)) {
+            $state.ItemBases.Add($item,[pscustomobject]@{
+                Height = [Math]::Max(1,[int]$item.Height)
+                Padding = $item.Padding
+                FontStyle = $item.Font.Style
+            })
+        }
+    }
+    if ([Math]::Abs($state.Scale - $Scale) -lt 0.001) { return $false }
+    $Menu.SuspendLayout()
+    try {
+        # All LBS menus use the same 96-DPI Segoe UI 9pt design font.
+        # Submenus must not inherit the already-scaled parent item font.
+        $Menu.Font = [Drawing.Font]::new('Segoe UI',[single](9.0 * $Scale),[Drawing.FontStyle]::Regular)
+        $Menu.Padding = Get-LenovoScaledMenuPadding -Padding $state.Padding -Scale $Scale
+        if ($null -ne $Menu.PSObject.Properties['TargetWidth']) {
+            $Menu.TargetWidth = [Math]::Max(1,[int][Math]::Round($state.Width * $Scale))
+        }
+        foreach ($item in $Menu.Items) {
+            $base = $state.ItemBases[$item]
+            $item.AutoSize = $false
+            $item.Padding = Get-LenovoScaledMenuPadding -Padding $base.Padding -Scale $Scale
+            $item.Font = [Drawing.Font]::new('Segoe UI',[single](9.0 * $Scale),[Drawing.FontStyle]$base.FontStyle)
+            $item.Height = [Math]::Max(1,[int][Math]::Round($base.Height * $Scale))
+        }
+    }
+    finally { $Menu.ResumeLayout($true) }
+    $state.Scale = [double]$Scale
+    return $true
+}
+
 function Initialize-LenovoMenuAppearance {
     param(
         [Parameter(Mandatory=$true)][System.Windows.Forms.ToolStripDropDown]$Menu,
@@ -2552,6 +2643,9 @@ function Initialize-LenovoMenuAppearance {
     }
     $Menu.Add_Opening({
         try {
+            $screen = [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position)
+            $factor = (Get-PopupMonitorDpiScale -Screen $screen).Factor
+            [void](Set-LenovoMenuDpiLayout -Menu $this -Scale ([double]$factor))
             $this.Region = $null
             [LenovoMenuLayout]::PrepareItems($this)
             [LenovoMenuChrome]::Apply($this)
@@ -5194,6 +5288,9 @@ function Show-DefaultTargetMenu {
         if ($script:DefaultContextMenu) { $script:DefaultContextMenu.Dispose() }
     } catch { }
     $script:DefaultContextMenu = New-DefaultTargetMenu
+    $ownerScreen = [System.Windows.Forms.Screen]::FromControl($Owner)
+    $ownerScale = (Get-PopupMonitorDpiScale -Screen $ownerScreen).Factor
+    [void](Set-LenovoMenuDpiLayout -Menu $script:DefaultContextMenu -Scale ([double]$ownerScale))
     $script:DefaultContextMenu.Show($Owner, (New-Object Drawing.Point(0, $Owner.Height)))
 }
 
@@ -7818,15 +7915,101 @@ public static class LenovoPopupScaleNative {
     return [pscustomobject]@{ Factor = 1.0; Source = 'unavailable'; Percent = 100 }
 }
 
-# LBS-144 native evidence: 100%-to-250% monitor change kept fonts at
-# 19/18/15px, while manually multiplying form and rows by 2.5. Do not scale
-# already virtualized WinForms coordinate and font spaces independently.
+# LBS-144 physical Windows captures: the WinForms popup remained 390x672
+# pixels with window DPI 240 (laptop-primary) and 96 (external-primary).
+# PowerShell/WinForms owns a SystemAware HWND, not a PMv2 HWND.
+# Keep one 96-DPI design baseline; explicitly scale bounds AND fonts from
+# immutable design metrics. Never combine this with WinForms AutoScale or
+# Form.Scale, which previously produced independently sized text and rows.
 function Initialize-PopupDpiLayout {
     param([Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Form)
     $Form.SuspendLayout()
     $Form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::None
-    # Tag records reported monitor percent only, not a layout multiplier.
     $Form.Tag = [double]1.0
+    # A new popup starts a new design snapshot; dynamically rebuilt rows are
+    # scaled from their own fresh 96-DPI builder values, not cached here.
+    $script:PopupDesignMetrics = New-Object 'System.Collections.Generic.Dictionary[System.Windows.Forms.Control,System.Object]'
+}
+
+function Save-PopupControlDesignMetrics {
+    param([Parameter(Mandatory=$true)][System.Windows.Forms.Control]$Control)
+    if (-not $script:PopupDesignMetrics.ContainsKey($Control)) {
+        $font = $Control.Font
+        $script:PopupDesignMetrics.Add($Control, [pscustomobject]@{
+            Bounds = $Control.Bounds
+            ClientSize = $Control.ClientSize
+            Padding = $Control.Padding
+            Margin = $Control.Margin
+            FontFamily = $font.FontFamily
+            FontSize = [single]$font.Size
+            FontStyle = $font.Style
+            FontUnit = $font.Unit
+        })
+    }
+    foreach ($child in $Control.Controls) {
+        Save-PopupControlDesignMetrics -Control $child
+    }
+}
+
+function Set-PopupControlPhysicalScale {
+    param(
+        [Parameter(Mandatory=$true)][System.Windows.Forms.Control]$Control,
+        [Parameter(Mandatory=$true)][double]$Scale,
+        [Parameter(Mandatory=$true)][bool]$UseStoredBaseline
+    )
+    if ($UseStoredBaseline) {
+        $base = $script:PopupDesignMetrics[$Control]
+        if ($null -eq $base) { throw 'Missing popup design baseline.' }
+    }
+    else {
+        # A boot row is created at design size just before this single call.
+        $font = $Control.Font
+        $base = [pscustomobject]@{
+            Bounds = $Control.Bounds
+            ClientSize = $Control.ClientSize
+            Padding = $Control.Padding
+            Margin = $Control.Margin
+            FontFamily = $font.FontFamily
+            FontSize = [single]$font.Size
+            FontStyle = $font.Style
+            FontUnit = $font.Unit
+        }
+    }
+    $rect = [Drawing.Rectangle]::new(
+        [int][Math]::Round($base.Bounds.X * $Scale),
+        [int][Math]::Round($base.Bounds.Y * $Scale),
+        [Math]::Max(1,[int][Math]::Round($base.Bounds.Width * $Scale)),
+        [Math]::Max(1,[int][Math]::Round($base.Bounds.Height * $Scale)))
+    $Control.SuspendLayout()
+    try {
+        if ($Control -is [System.Windows.Forms.Form]) {
+            $Control.ClientSize = [Drawing.Size]::new(
+                [Math]::Max(1,[int][Math]::Round($base.ClientSize.Width * $Scale)),
+                [Math]::Max(1,[int][Math]::Round($base.ClientSize.Height * $Scale)))
+        }
+        else {
+            $Control.Bounds = $rect
+        }
+        $Control.Padding = [System.Windows.Forms.Padding]::new(
+            [int][Math]::Round($base.Padding.Left * $Scale),
+            [int][Math]::Round($base.Padding.Top * $Scale),
+            [int][Math]::Round($base.Padding.Right * $Scale),
+            [int][Math]::Round($base.Padding.Bottom * $Scale))
+        $Control.Margin = [System.Windows.Forms.Padding]::new(
+            [int][Math]::Round($base.Margin.Left * $Scale),
+            [int][Math]::Round($base.Margin.Top * $Scale),
+            [int][Math]::Round($base.Margin.Right * $Scale),
+            [int][Math]::Round($base.Margin.Bottom * $Scale))
+        # Font.Size is in the original font unit, not Graphics.DpiX pixels.
+        # Scale point sizes exactly once with their own control bounds.
+        $Control.Font = [Drawing.Font]::new(
+            $base.FontFamily,[single]($base.FontSize * $Scale),
+            [Drawing.FontStyle]$base.FontStyle,[Drawing.GraphicsUnit]$base.FontUnit)
+        foreach ($child in $Control.Controls) {
+            Set-PopupControlPhysicalScale -Control $child -Scale $Scale -UseStoredBaseline $UseStoredBaseline
+        }
+    }
+    finally { $Control.ResumeLayout($true) }
 }
 
 function Set-PopupDpiLayoutScale {
@@ -7837,9 +8020,11 @@ function Set-PopupDpiLayoutScale {
     if ($Scale -lt 1.0 -or $Scale -gt 5.0) { throw 'Invalid popup monitor scale.' }
     $previous = [double]$Form.Tag
     if ($previous -le 0) { $previous = 1.0 }
+    Save-PopupControlDesignMetrics -Control $Form
+    if ([Math]::Abs($Scale - $previous) -lt 0.001) { return $false }
+    Set-PopupControlPhysicalScale -Control $Form -Scale $Scale -UseStoredBaseline $true
     $Form.Tag = [double]$Scale
-    # A monitor transition triggers placement/diagnostics, never Form.Scale.
-    return ([Math]::Abs($Scale - $previous) -ge 0.001)
+    return $true
 }
 
 function Complete-PopupDpiLayout {
@@ -7851,15 +8036,17 @@ function Complete-PopupDpiLayout {
     finally { $Form.ResumeLayout($true) }
 }
 
-# Keep popup and tray reachable. If a work area is shorter than the logical
-# 390x672 design, use native panel scrolling rather than clipping its footer.
+# Work-area coordinates and Form.ClientSize are physical in the observed
+# SystemAware LBS process. Clip to the *target* screen and expose scrolling.
 function Set-PopupViewportForWorkingArea {
     param(
         [Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Form,
         [Parameter(Mandatory=$true)][Drawing.Rectangle]$WorkingArea
     )
-    $designWidth = 390
-    $designHeight = 672
+    $scale = [double]$Form.Tag
+    if ($scale -le 0) { $scale = 1.0 }
+    $designWidth = [int][Math]::Round(390 * $scale)
+    $designHeight = [int][Math]::Round(672 * $scale)
     $availableWidth = [Math]::Max(200, $WorkingArea.Width - 12)
     $availableHeight = [Math]::Max(200, $WorkingArea.Height - 12)
     $wantedWidth = [Math]::Min($designWidth, $availableWidth)
@@ -7876,8 +8063,6 @@ function Set-PopupViewportForWorkingArea {
                     $root.AutoScrollMinSize = [Drawing.Size]::new($designWidth, $designHeight)
                 }
                 else {
-                    # Clear the logical scroll extent BEFORE turning auto-scroll
-                    # off; avoid stale internal scroll state on monitor return.
                     $root.AutoScrollMinSize = [Drawing.Size]::Empty
                     $root.AutoScroll = $false
                 }
@@ -7899,9 +8084,7 @@ function Get-PopupDpiLayoutScale {
     if ($DesignWidth -le 0 -or $Popup.ClientSize.Width -le 0) {
         throw 'Popup layout width is not available.'
     }
-    # New boot rows share the original 96-DPI form layout coordinate system.
-    # Never interpret a virtualized window-width ratio as physical screen DPI.
-    return [double]1.0
+    return [double]$Popup.Tag
 }
 
 function Set-PopupBootRowDpiLayout {
@@ -7912,8 +8095,7 @@ function Set-PopupBootRowDpiLayout {
     )
     if ($Scale -le 0 -or $Scale -gt 5) { throw 'Invalid popup DPI scale.' }
     if ([Math]::Abs($Scale - 1.0) -gt 0.0001) {
-        $factor = [single]$Scale
-        $Row.Scale([Drawing.SizeF]::new($factor, $factor))
+        Set-PopupControlPhysicalScale -Control $Row -Scale $Scale -UseStoredBaseline $false
     }
     $Row.Location = [Drawing.Point]::new(0, $Y)
     return [int]$Row.Height
@@ -7935,9 +8117,9 @@ function Write-PopupDpiLayoutDiagnostic {
         $subtitle = if ($s.Count -gt 0) { $s[0] } else { $null }
         $data = @{
             phase = $Phase
-            appliedScalePercent = 100
+            appliedScalePercent = [int][Math]::Round([double]$Form.Tag * 100)
             reportedMonitorScalePercent = [int][Math]::Round([double]$Form.Tag * 100)
-            layoutCoordinateSpace = 'winforms-effective'
+            layoutCoordinateSpace = 'system-aware-physical-design-scaled'
             formClientOuterHeightDelta = [int]($Form.ClientSize.Height - $Form.Height)
             monitorScaleSource = $MonitorSource
             formWidth = [int]$Form.Width
@@ -9649,6 +9831,8 @@ try {
             $screen = [System.Windows.Forms.Screen]::FromPoint($point)
             if ($script:TrayContextMenu -and $screen) {
                 Initialize-LenovoMenuAppearance -Menu $script:TrayContextMenu
+                $factor = (Get-PopupMonitorDpiScale -Screen $screen).Factor
+                [void](Set-LenovoMenuDpiLayout -Menu $script:TrayContextMenu -Scale ([double]$factor))
                 $size = $script:TrayContextMenu.GetPreferredSize([Drawing.Size]::Empty)
                 $location = Get-TrayContextMenuLocation -ClickPoint $point -MenuSize $size -WorkingArea $screen.WorkingArea -DisplayBounds $screen.Bounds
                 $script:TrayContextMenu.Show($location)
