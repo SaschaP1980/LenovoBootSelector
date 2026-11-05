@@ -1,6 +1,15 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.1.12.0 – Mixed-DPI popup and tray-menu coordinate correction (LBS-144)
+
+- Correct the owner-confirmed 100%/250% dual-monitor regression in v1.1.11.0: keep the complete WinForms popup and dynamically created boot rows in a single effective logical coordinate space. Windows' reported monitor scale is recorded for diagnostics, not multiplied into already-presented control positions.
+- Limit the popup viewport to the active monitor's available work area, with native scrolling on unusually short screens, so the footer and notification-area icon remain reachable.
+- Open the tray context menu explicitly from the actual right-click location, using the same WinForms cursor and screen work-area coordinates. Position its top-level menu adjacent to the icon and retain WinForms' relative submenu behavior rather than shell auto-placement across monitors.
+- Make `POPUP_DPI_LAYOUT` report applied UI scale separately from the reported monitor percentage. Add non-identifying menu placement geometry diagnostics without collecting boot aliases, usernames, GUIDs or device identifiers.
+- Replace the old 250%-multiplied UI-size assertions with 38 native WinForms checks for unchanged font/control geometry, work-area scrolling and menu placement on two synthetic displays. Owner validation on the physical 100%/250% setup remains necessary.
+- Do not change UEFI boot operations, default/BootNext state, privileged TaskBroker or Cloudflare diagnostics transport.
+
 ## v1.1.11.0 – Correct native 250% popup clipping and disappearing text (LBS-144)
 
 - Correct the failed native 250%-DPI regression from v1.1.10.0: query Windows' actual monitor scale and resize the **complete existing WinForms popup tree** explicitly from its 96-DPI design size. Do not rely on a Dpi autoscaling mode that left the real form at 390 physical pixels.

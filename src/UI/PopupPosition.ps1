@@ -105,3 +105,38 @@ function Get-VisiblePopupTrayIconRectangle {
     }
     return $null
 }
+
+# Avoid NotifyIcon's mixed-DPI shell auto-placement; use the WinForms cursor
+# and Screen.WorkingArea coordinates together for this per-click menu location.
+function Get-TrayContextMenuLocation {
+    param(
+        [Parameter(Mandatory=$true)][Drawing.Point]$ClickPoint,
+        [Parameter(Mandatory=$true)][Drawing.Size]$MenuSize,
+        [Parameter(Mandatory=$true)][Drawing.Rectangle]$WorkingArea,
+        [Parameter(Mandatory=$true)][Drawing.Rectangle]$DisplayBounds
+    )
+    $gap = 8
+    $bottomInset = $DisplayBounds.Bottom - $WorkingArea.Bottom
+    $topInset = $WorkingArea.Top - $DisplayBounds.Top
+    $leftInset = $WorkingArea.Left - $DisplayBounds.Left
+    $rightInset = $DisplayBounds.Right - $WorkingArea.Right
+    $x = $ClickPoint.X - [int][Math]::Floor($MenuSize.Width / 2)
+    $y = $ClickPoint.Y - $MenuSize.Height - $gap
+    if ($topInset -gt $bottomInset -and $topInset -ge $leftInset -and $topInset -ge $rightInset) {
+        $y = $ClickPoint.Y + $gap
+    }
+    elseif ($leftInset -gt $bottomInset -and $leftInset -gt $rightInset) {
+        $x = $ClickPoint.X + $gap
+        $y = $ClickPoint.Y - [int][Math]::Floor($MenuSize.Height / 2)
+    }
+    elseif ($rightInset -gt $bottomInset -and $rightInset -ge $leftInset) {
+        $x = $ClickPoint.X - $MenuSize.Width - $gap
+        $y = $ClickPoint.Y - [int][Math]::Floor($MenuSize.Height / 2)
+    }
+    $maxX = [Math]::Max($WorkingArea.Left, $WorkingArea.Right - $MenuSize.Width)
+    $maxY = [Math]::Max($WorkingArea.Top, $WorkingArea.Bottom - $MenuSize.Height)
+    return [Drawing.Point]::new(
+        [int][Math]::Min($maxX, [Math]::Max($WorkingArea.Left, $x)),
+        [int][Math]::Min($maxY, [Math]::Max($WorkingArea.Top, $y))
+    )
+}
