@@ -101,6 +101,15 @@ public static class LenovoLocaleFlags
         return Math.Max(1, (int)Math.Round(value * Math.Max(96f, dpi) / 96f));
     }
 
+    // Menu indicators follow the explicitly scaled LBS menu font, not
+    // Graphics.DpiX from the SystemAware PowerShell host (which can reflect
+    // a different monitor from the menu being painted).
+    public static float GetMenuDesignDpi(ToolStripItem item)
+    {
+        if (item == null || item.Font == null) return 96f;
+        return Math.Max(96f, Math.Min(480f, 96f * item.Font.SizeInPoints / 9f));
+    }
+
     public static string GetLocale(ToolStripItem item)
     {
         if (item == null || item.Owner == null || item.Owner.Name != MenuName)
@@ -140,7 +149,7 @@ public static class LenovoLocaleFlags
     {
         string locale = GetLocale(item);
         if (locale == null || g == null) return;
-        Rectangle flag = GetBounds(item, row, g.DpiX);
+        Rectangle flag = GetBounds(item, row, GetMenuDesignDpi(item));
         GraphicsState saved = g.Save();
         try
         {
@@ -177,7 +186,7 @@ public static class LenovoLocaleFlags
                 // At this icon size, light star dots are legible without tiny glyphs.
                 using (Brush stars = new SolidBrush(Color.White))
                 {
-                    float dot = Math.Max(1f, g.DpiX / 96f);
+                    float dot = Math.Max(1f, GetMenuDesignDpi(item) / 96f);
                     for (int rowIndex = 0; rowIndex < 3; rowIndex++)
                         for (int col = 0; col < 3; col++)
                             g.FillRectangle(stars, canton.Left + (col + 0.5f) * canton.Width / 3f,
@@ -220,40 +229,47 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
         return new Rectangle(left, 0, width, Math.Max(1, item.Height));
     }
 
-    private void DrawRightCheck(Graphics g, Rectangle row, bool enabled)
+    private static int Ui(int value, float scale)
     {
-        int size = 14;
-        int x = Math.Max(row.Left + 2, row.Right - 24);
+        return Math.Max(1, (int)Math.Round(value * scale));
+    }
+
+    private void DrawRightCheck(Graphics g, Rectangle row, bool enabled, float dpi)
+    {
+        float scale = Math.Max(1f, dpi / 96f);
+        int size = Ui(14, scale);
+        int x = Math.Max(row.Left + Ui(2, scale), row.Right - Ui(24, scale));
         int y = row.Top + Math.Max(1, (row.Height - size) / 2);
         Rectangle box = new Rectangle(x, y, size, size);
         SmoothingMode oldMode = g.SmoothingMode;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         using (Brush brush = new SolidBrush(enabled ? accent : disabled))
             g.FillRectangle(brush, box);
-        using (Pen pen = new Pen(Color.White, 1.8f))
+        using (Pen pen = new Pen(Color.White, Math.Max(1f, 1.8f * scale)))
         {
             pen.StartCap = LineCap.Round;
             pen.EndCap = LineCap.Round;
             g.DrawLines(pen, new Point[] {
-                new Point(box.Left + 3, box.Top + 7),
-                new Point(box.Left + 6, box.Top + 10),
-                new Point(box.Left + 11, box.Top + 4)
+                new Point(box.Left + Ui(3, scale), box.Top + Ui(7, scale)),
+                new Point(box.Left + Ui(6, scale), box.Top + Ui(10, scale)),
+                new Point(box.Left + Ui(11, scale), box.Top + Ui(4, scale))
             });
         }
         g.SmoothingMode = oldMode;
     }
 
-    private void DrawRightArrow(Graphics g, Rectangle row, bool enabled)
+    private void DrawRightArrow(Graphics g, Rectangle row, bool enabled, float dpi)
     {
-        int cx = row.Right - 15;
+        float scale = Math.Max(1f, dpi / 96f);
+        int cx = row.Right - Ui(15, scale);
         int cy = row.Top + (row.Height / 2);
         Color c = enabled ? arrow : disabled;
         using (Brush brush = new SolidBrush(c))
         {
             Point[] points = new Point[] {
-                new Point(cx - 2, cy - 4),
-                new Point(cx + 2, cy),
-                new Point(cx - 2, cy + 4)
+                new Point(cx - Ui(2, scale), cy - Ui(4, scale)),
+                new Point(cx + Ui(2, scale), cy),
+                new Point(cx - Ui(2, scale), cy + Ui(4, scale))
             };
             g.FillPolygon(brush, points);
         }
@@ -354,9 +370,9 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
 
         // Indicators remain item-local and are painted after the background.
         if (item.HasDropDownItems)
-            DrawRightArrow(e.Graphics, row, item.Enabled);
+            DrawRightArrow(e.Graphics, row, item.Enabled, LenovoLocaleFlags.GetMenuDesignDpi(item));
         else if (item.Checked)
-            DrawRightCheck(e.Graphics, row, item.Enabled);
+            DrawRightCheck(e.Graphics, row, item.Enabled, LenovoLocaleFlags.GetMenuDesignDpi(item));
 
         LenovoLocaleFlags.Draw(e.Graphics, item, row);
         e.Graphics.Restore(state);
@@ -371,7 +387,7 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
             // Moving only its left edge clipped "English" and "Deutsch" in 1.0.1.0.
             // Rebuild the complete item-local rectangle from the real menu row.
             Rectangle row = FullRowBounds(owner, e.Item);
-            Rectangle text = LenovoLocaleFlags.GetTextBounds(e.Item, row, e.Graphics.DpiX);
+            Rectangle text = LenovoLocaleFlags.GetTextBounds(e.Item, row, LenovoLocaleFlags.GetMenuDesignDpi(e.Item));
             if (text.Width > 0)
             {
                 GraphicsState state = e.Graphics.Save();
@@ -1979,6 +1995,8 @@ try {
             $screen = [System.Windows.Forms.Screen]::FromPoint($point)
             if ($script:TrayContextMenu -and $screen) {
                 Initialize-LenovoMenuAppearance -Menu $script:TrayContextMenu
+                $factor = (Get-PopupMonitorDpiScale -Screen $screen).Factor
+                [void](Set-LenovoMenuDpiLayout -Menu $script:TrayContextMenu -Scale ([double]$factor))
                 $size = $script:TrayContextMenu.GetPreferredSize([Drawing.Size]::Empty)
                 $location = Get-TrayContextMenuLocation -ClickPoint $point -MenuSize $size -WorkingArea $screen.WorkingArea -DisplayBounds $screen.Bounds
                 $script:TrayContextMenu.Show($location)

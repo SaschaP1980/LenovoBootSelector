@@ -1,6 +1,15 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.1.13.0 – Physical DPI scaling for mixed-monitor WinForms UI (LBS-144)
+
+- Correct the owner-reproduced 96/240 DPI defect: the PowerShell 5.1 WinForms popup had remained physically 390×672 pixels at both 100% and 250%, while its visible windows were SystemAware rather than PerMonitorV2.
+- Scale all popup bounds, fonts, paddings and dynamically created boot-entry controls from immutable 96-DPI design metrics. On 240 DPI the full design measures 975×1680 physical pixels, and returning to 96 DPI restores the original geometry without cumulative rounding.
+- Scale tray, language, maintenance and default-target menus, including row heights, native item padding, submenu fonts, owner-drawn country flags, checks and arrows, for the clicked monitor. Position the menu after calculating its scaled preferred size.
+- Preserve icon-relative popup/menu placement, work-area clamping, scrollable short viewports, localized labels, interactive actions and the existing TaskBroker/one-shot UEFI safety boundaries.
+- Replace the former 38 no-scaling assumptions with 54 native Windows PowerShell 5.1 DPI checks. New focused real-WinForms regression tests were first RED on v1.1.12.0 and were proved GREEN for popup/boot rows and ToolStrip root/submenus on Windows; these hosted tests simulate monitor scale and do not replace the owner's physical 100%/250% two-screen acceptance.
+- Do not change firmware writes, BootNext/default-target semantics, updater behavior or LBS-143 synchronization work.
+
 ## v1.1.12.0 – Mixed-DPI popup and tray-menu coordinate correction (LBS-144)
 
 - Correct the owner-confirmed 100%/250% dual-monitor regression in v1.1.11.0: keep the complete WinForms popup and dynamically created boot rows in a single effective logical coordinate space. Windows' reported monitor scale is recorded for diagnostics, not multiplied into already-presented control positions.
