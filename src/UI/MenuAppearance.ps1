@@ -1,3 +1,78 @@
+# LBS-144: independent, physical-pixel DPI layout for ToolStrip menus.
+# A SystemAware PowerShell/WinForms host supplies the design 9pt text and
+# fixed 260px menu independently of its 96/240 system DPI. Keep immutable
+# baselines so tray, language, maintenance and default-target menus can switch
+# between 100% and 250% without cumulative scaling or layout drift.
+function Get-LenovoScaledMenuPadding {
+    param(
+        [Parameter(Mandatory=$true)][System.Windows.Forms.Padding]$Padding,
+        [Parameter(Mandatory=$true)][double]$Scale
+    )
+    return [System.Windows.Forms.Padding]::new(
+        [int][Math]::Round($Padding.Left * $Scale),
+        [int][Math]::Round($Padding.Top * $Scale),
+        [int][Math]::Round($Padding.Right * $Scale),
+        [int][Math]::Round($Padding.Bottom * $Scale))
+}
+
+function Set-LenovoMenuDpiLayout {
+    param(
+        [Parameter(Mandatory=$true)][System.Windows.Forms.ToolStripDropDown]$Menu,
+        [Parameter(Mandatory=$true)][double]$Scale
+    )
+    if ($Scale -lt 1.0 -or $Scale -gt 5.0) { throw 'Invalid menu monitor scale.' }
+    if (-not $script:LenovoMenuDesignBaselines) {
+        $script:LenovoMenuDesignBaselines = New-Object 'System.Collections.Generic.Dictionary[System.Windows.Forms.ToolStripDropDown,System.Object]'
+    }
+    if (-not $script:LenovoMenuDesignBaselines.ContainsKey($Menu)) {
+        $widthProperty = $Menu.PSObject.Properties['TargetWidth']
+        $width = if ($null -ne $widthProperty) { [int]$widthProperty.Value } else { 0 }
+        $state = [pscustomobject]@{
+            Width = $width
+            Padding = $Menu.Padding
+            ItemBases = (New-Object 'System.Collections.Generic.Dictionary[System.Windows.Forms.ToolStripItem,System.Object]')
+            Scale = [double]1.0
+        }
+        $script:LenovoMenuDesignBaselines.Add($Menu,$state)
+        $Menu.Add_Disposed({
+            if ($script:LenovoMenuDesignBaselines) {
+                [void]$script:LenovoMenuDesignBaselines.Remove($this)
+            }
+        })
+    }
+    $state = $script:LenovoMenuDesignBaselines[$Menu]
+    foreach ($item in $Menu.Items) {
+        if (-not $state.ItemBases.ContainsKey($item)) {
+            $state.ItemBases.Add($item,[pscustomobject]@{
+                Height = [Math]::Max(1,[int]$item.Height)
+                Padding = $item.Padding
+                FontStyle = $item.Font.Style
+            })
+        }
+    }
+    if ([Math]::Abs($state.Scale - $Scale) -lt 0.001) { return $false }
+    $Menu.SuspendLayout()
+    try {
+        # All LBS menus use the same 96-DPI Segoe UI 9pt design font.
+        # Submenus must not inherit the already-scaled parent item font.
+        $Menu.Font = [Drawing.Font]::new('Segoe UI',[single](9.0 * $Scale),[Drawing.FontStyle]::Regular)
+        $Menu.Padding = Get-LenovoScaledMenuPadding -Padding $state.Padding -Scale $Scale
+        if ($null -ne $Menu.PSObject.Properties['TargetWidth']) {
+            $Menu.TargetWidth = [Math]::Max(1,[int][Math]::Round($state.Width * $Scale))
+        }
+        foreach ($item in $Menu.Items) {
+            $base = $state.ItemBases[$item]
+            $item.AutoSize = $false
+            $item.Padding = Get-LenovoScaledMenuPadding -Padding $base.Padding -Scale $Scale
+            $item.Font = [Drawing.Font]::new('Segoe UI',[single](9.0 * $Scale),[Drawing.FontStyle]$base.FontStyle)
+            $item.Height = [Math]::Max(1,[int][Math]::Round($base.Height * $Scale))
+        }
+    }
+    finally { $Menu.ResumeLayout($true) }
+    $state.Scale = [double]$Scale
+    return $true
+}
+
 function Initialize-LenovoMenuAppearance {
     param(
         [Parameter(Mandatory=$true)][System.Windows.Forms.ToolStripDropDown]$Menu,
@@ -25,6 +100,9 @@ function Initialize-LenovoMenuAppearance {
     }
     $Menu.Add_Opening({
         try {
+            $screen = [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position)
+            $factor = (Get-PopupMonitorDpiScale -Screen $screen).Factor
+            [void](Set-LenovoMenuDpiLayout -Menu $this -Scale ([double]$factor))
             $this.Region = $null
             [LenovoMenuLayout]::PrepareItems($this)
             [LenovoMenuChrome]::Apply($this)

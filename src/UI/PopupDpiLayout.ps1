@@ -68,15 +68,101 @@ public static class LenovoPopupScaleNative {
     return [pscustomobject]@{ Factor = 1.0; Source = 'unavailable'; Percent = 100 }
 }
 
-# LBS-144 native evidence: 100%-to-250% monitor change kept fonts at
-# 19/18/15px, while manually multiplying form and rows by 2.5. Do not scale
-# already virtualized WinForms coordinate and font spaces independently.
+# LBS-144 physical Windows captures: the WinForms popup remained 390x672
+# pixels with window DPI 240 (laptop-primary) and 96 (external-primary).
+# PowerShell/WinForms owns a SystemAware HWND, not a PMv2 HWND.
+# Keep one 96-DPI design baseline; explicitly scale bounds AND fonts from
+# immutable design metrics. Never combine this with WinForms AutoScale or
+# Form.Scale, which previously produced independently sized text and rows.
 function Initialize-PopupDpiLayout {
     param([Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Form)
     $Form.SuspendLayout()
     $Form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::None
-    # Tag records reported monitor percent only, not a layout multiplier.
     $Form.Tag = [double]1.0
+    # A new popup starts a new design snapshot; dynamically rebuilt rows are
+    # scaled from their own fresh 96-DPI builder values, not cached here.
+    $script:PopupDesignMetrics = New-Object 'System.Collections.Generic.Dictionary[System.Windows.Forms.Control,System.Object]'
+}
+
+function Save-PopupControlDesignMetrics {
+    param([Parameter(Mandatory=$true)][System.Windows.Forms.Control]$Control)
+    if (-not $script:PopupDesignMetrics.ContainsKey($Control)) {
+        $font = $Control.Font
+        $script:PopupDesignMetrics.Add($Control, [pscustomobject]@{
+            Bounds = $Control.Bounds
+            ClientSize = $Control.ClientSize
+            Padding = $Control.Padding
+            Margin = $Control.Margin
+            FontFamily = $font.FontFamily
+            FontSize = [single]$font.Size
+            FontStyle = $font.Style
+            FontUnit = $font.Unit
+        })
+    }
+    foreach ($child in $Control.Controls) {
+        Save-PopupControlDesignMetrics -Control $child
+    }
+}
+
+function Set-PopupControlPhysicalScale {
+    param(
+        [Parameter(Mandatory=$true)][System.Windows.Forms.Control]$Control,
+        [Parameter(Mandatory=$true)][double]$Scale,
+        [Parameter(Mandatory=$true)][bool]$UseStoredBaseline
+    )
+    if ($UseStoredBaseline) {
+        $base = $script:PopupDesignMetrics[$Control]
+        if ($null -eq $base) { throw 'Missing popup design baseline.' }
+    }
+    else {
+        # A boot row is created at design size just before this single call.
+        $font = $Control.Font
+        $base = [pscustomobject]@{
+            Bounds = $Control.Bounds
+            ClientSize = $Control.ClientSize
+            Padding = $Control.Padding
+            Margin = $Control.Margin
+            FontFamily = $font.FontFamily
+            FontSize = [single]$font.Size
+            FontStyle = $font.Style
+            FontUnit = $font.Unit
+        }
+    }
+    $rect = [Drawing.Rectangle]::new(
+        [int][Math]::Round($base.Bounds.X * $Scale),
+        [int][Math]::Round($base.Bounds.Y * $Scale),
+        [Math]::Max(1,[int][Math]::Round($base.Bounds.Width * $Scale)),
+        [Math]::Max(1,[int][Math]::Round($base.Bounds.Height * $Scale)))
+    $Control.SuspendLayout()
+    try {
+        if ($Control -is [System.Windows.Forms.Form]) {
+            $Control.ClientSize = [Drawing.Size]::new(
+                [Math]::Max(1,[int][Math]::Round($base.ClientSize.Width * $Scale)),
+                [Math]::Max(1,[int][Math]::Round($base.ClientSize.Height * $Scale)))
+        }
+        else {
+            $Control.Bounds = $rect
+        }
+        $Control.Padding = [System.Windows.Forms.Padding]::new(
+            [int][Math]::Round($base.Padding.Left * $Scale),
+            [int][Math]::Round($base.Padding.Top * $Scale),
+            [int][Math]::Round($base.Padding.Right * $Scale),
+            [int][Math]::Round($base.Padding.Bottom * $Scale))
+        $Control.Margin = [System.Windows.Forms.Padding]::new(
+            [int][Math]::Round($base.Margin.Left * $Scale),
+            [int][Math]::Round($base.Margin.Top * $Scale),
+            [int][Math]::Round($base.Margin.Right * $Scale),
+            [int][Math]::Round($base.Margin.Bottom * $Scale))
+        # Font.Size is in the original font unit, not Graphics.DpiX pixels.
+        # Scale point sizes exactly once with their own control bounds.
+        $Control.Font = [Drawing.Font]::new(
+            $base.FontFamily,[single]($base.FontSize * $Scale),
+            [Drawing.FontStyle]$base.FontStyle,[Drawing.GraphicsUnit]$base.FontUnit)
+        foreach ($child in $Control.Controls) {
+            Set-PopupControlPhysicalScale -Control $child -Scale $Scale -UseStoredBaseline $UseStoredBaseline
+        }
+    }
+    finally { $Control.ResumeLayout($true) }
 }
 
 function Set-PopupDpiLayoutScale {
@@ -87,9 +173,11 @@ function Set-PopupDpiLayoutScale {
     if ($Scale -lt 1.0 -or $Scale -gt 5.0) { throw 'Invalid popup monitor scale.' }
     $previous = [double]$Form.Tag
     if ($previous -le 0) { $previous = 1.0 }
+    Save-PopupControlDesignMetrics -Control $Form
+    if ([Math]::Abs($Scale - $previous) -lt 0.001) { return $false }
+    Set-PopupControlPhysicalScale -Control $Form -Scale $Scale -UseStoredBaseline $true
     $Form.Tag = [double]$Scale
-    # A monitor transition triggers placement/diagnostics, never Form.Scale.
-    return ([Math]::Abs($Scale - $previous) -ge 0.001)
+    return $true
 }
 
 function Complete-PopupDpiLayout {
@@ -101,15 +189,17 @@ function Complete-PopupDpiLayout {
     finally { $Form.ResumeLayout($true) }
 }
 
-# Keep popup and tray reachable. If a work area is shorter than the logical
-# 390x672 design, use native panel scrolling rather than clipping its footer.
+# Work-area coordinates and Form.ClientSize are physical in the observed
+# SystemAware LBS process. Clip to the *target* screen and expose scrolling.
 function Set-PopupViewportForWorkingArea {
     param(
         [Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Form,
         [Parameter(Mandatory=$true)][Drawing.Rectangle]$WorkingArea
     )
-    $designWidth = 390
-    $designHeight = 672
+    $scale = [double]$Form.Tag
+    if ($scale -le 0) { $scale = 1.0 }
+    $designWidth = [int][Math]::Round(390 * $scale)
+    $designHeight = [int][Math]::Round(672 * $scale)
     $availableWidth = [Math]::Max(200, $WorkingArea.Width - 12)
     $availableHeight = [Math]::Max(200, $WorkingArea.Height - 12)
     $wantedWidth = [Math]::Min($designWidth, $availableWidth)
@@ -126,8 +216,6 @@ function Set-PopupViewportForWorkingArea {
                     $root.AutoScrollMinSize = [Drawing.Size]::new($designWidth, $designHeight)
                 }
                 else {
-                    # Clear the logical scroll extent BEFORE turning auto-scroll
-                    # off; avoid stale internal scroll state on monitor return.
                     $root.AutoScrollMinSize = [Drawing.Size]::Empty
                     $root.AutoScroll = $false
                 }
@@ -149,9 +237,7 @@ function Get-PopupDpiLayoutScale {
     if ($DesignWidth -le 0 -or $Popup.ClientSize.Width -le 0) {
         throw 'Popup layout width is not available.'
     }
-    # New boot rows share the original 96-DPI form layout coordinate system.
-    # Never interpret a virtualized window-width ratio as physical screen DPI.
-    return [double]1.0
+    return [double]$Popup.Tag
 }
 
 function Set-PopupBootRowDpiLayout {
@@ -162,8 +248,7 @@ function Set-PopupBootRowDpiLayout {
     )
     if ($Scale -le 0 -or $Scale -gt 5) { throw 'Invalid popup DPI scale.' }
     if ([Math]::Abs($Scale - 1.0) -gt 0.0001) {
-        $factor = [single]$Scale
-        $Row.Scale([Drawing.SizeF]::new($factor, $factor))
+        Set-PopupControlPhysicalScale -Control $Row -Scale $Scale -UseStoredBaseline $false
     }
     $Row.Location = [Drawing.Point]::new(0, $Y)
     return [int]$Row.Height
@@ -185,9 +270,9 @@ function Write-PopupDpiLayoutDiagnostic {
         $subtitle = if ($s.Count -gt 0) { $s[0] } else { $null }
         $data = @{
             phase = $Phase
-            appliedScalePercent = 100
+            appliedScalePercent = [int][Math]::Round([double]$Form.Tag * 100)
             reportedMonitorScalePercent = [int][Math]::Round([double]$Form.Tag * 100)
-            layoutCoordinateSpace = 'winforms-effective'
+            layoutCoordinateSpace = 'system-aware-physical-design-scaled'
             formClientOuterHeightDelta = [int]($Form.ClientSize.Height - $Form.Height)
             monitorScaleSource = $MonitorSource
             formWidth = [int]$Form.Width

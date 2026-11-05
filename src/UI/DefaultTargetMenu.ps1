@@ -41,5 +41,8 @@ function Show-DefaultTargetMenu {
         if ($script:DefaultContextMenu) { $script:DefaultContextMenu.Dispose() }
     } catch { }
     $script:DefaultContextMenu = New-DefaultTargetMenu
+    $ownerScreen = [System.Windows.Forms.Screen]::FromControl($Owner)
+    $ownerScale = (Get-PopupMonitorDpiScale -Screen $ownerScreen).Factor
+    [void](Set-LenovoMenuDpiLayout -Menu $script:DefaultContextMenu -Scale ([double]$ownerScale))
     $script:DefaultContextMenu.Show($Owner, (New-Object Drawing.Point(0, $Owner.Height)))
 }
