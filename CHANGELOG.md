@@ -1,6 +1,16 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.1.14.1 – Correct 250% mixed-DPI popup and menu typography (LBS-144)
+
+- Correct the real 240-DPI typography defect reproduced after v1.1.13.0: a 10.2pt popup heading was multiplied to 25.5pt and measured 113.06 physical pixels high inside a 55-pixel label.
+- Preserve Segoe UI point sizes across DPI changes while proportionally scaling the WinForms layout geometry, boot-row bounds, context-menu widths, item heights and paddings. Let GDI+ convert points to physical pixels at the target drawing DPI.
+- Use the actual menu rendering graphics DPI for owner-drawn flags, checkmarks and submenu arrows rather than inferring DPI from an inflated font point size.
+- Replace earlier double-scaling assumptions in native WinForms tests and add eight permanent GDI+ 96/240-DPI text-height checks; the new regression was first RED against v1.1.13.0 and GREEN after the fix.
+- Fix undersized context-menu and language-submenu text on 240-DPI laptop displays: the native ToolStrip text renderer rasterized only 12-pixel glyphs at both 96 and 240 DPI, while owner-drawn icons scaled. Render menu labels using DPI-aware GDI+ Graphics.DrawString at 9-point typography; retain the LBS-117 language text-rectangle contract.
+- Add a permanent Windows PowerShell 5.1 menu text raster regression that measures 12-pixel glyphs at 96 DPI and 30 pixels at 240 DPI. The fix passed the 714-case native Windows functional suite and the raster RED-to-GREEN test.
+- Preserve boot/default-target operations, the UEFI/TaskBroker security boundary, localization and release/updater behavior. The owner confirmed the final unreleased test build visually correct at 250% and 100% before publication.
+
 ## v1.1.13.0 – Physical DPI scaling for mixed-monitor WinForms UI (LBS-144)
 
 - Correct the owner-reproduced 96/240 DPI defect: the PowerShell 5.1 WinForms popup had remained physically 390×672 pixels at both 100% and 250%, while its visible windows were SystemAware rather than PerMonitorV2.

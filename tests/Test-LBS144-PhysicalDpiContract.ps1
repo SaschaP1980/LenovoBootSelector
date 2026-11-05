@@ -31,7 +31,7 @@ try {
     [void](Set-PopupDpiLayoutScale -Form $form -Scale 2.5)
     Assert-DpiPhysical '240 DPI physical popup width and height' ($form.ClientSize.Width -eq 975 -and $form.ClientSize.Height -eq 1680)
     Assert-DpiPhysical '240 DPI physical header bounds' ($header.Left -eq 40 -and $header.Width -ge 712 -and $header.Height -ge 55)
-    Assert-DpiPhysical '240 DPI header font scales with bounds' ($header.Font.Size -ge ($baseFontSize * 2.45))
+    Assert-DpiPhysical '240 DPI header point font remains at design size' ([Math]::Abs($header.Font.Size - $baseFontSize) -lt 0.1)
     Assert-DpiPhysical '240 DPI dynamic row scale reported' ([Math]::Abs((Get-PopupDpiLayoutScale -Popup $form)-2.5) -lt .001)
     $row = New-Object System.Windows.Forms.Panel
     $row.Size = [Drawing.Size]::new(390,60)
@@ -51,7 +51,7 @@ try {
     $row.Controls.Add($subtitle)
     $h = Set-PopupBootRowDpiLayout -Row $row -Scale (Get-PopupDpiLayoutScale -Popup $form) -Y 225
     Assert-DpiPhysical '240 DPI row width and height' ($row.Width -eq 975 -and $h -eq 150)
-    Assert-DpiPhysical '240 DPI row typography and layout' ($title.Font.Size -gt 20 -and $subtitle.Font.Size -gt 16 -and $title.Bottom -le $subtitle.Top)
+    Assert-DpiPhysical '240 DPI row point sizes remain at design values' ([Math]::Abs($title.Font.Size - 10.0) -lt 0.1 -and [Math]::Abs($subtitle.Font.Size - 8.3) -lt 0.1 -and $title.Bottom -le $subtitle.Top)
     $row.Dispose()
     [void](Set-PopupDpiLayoutScale -Form $form -Scale 1.0)
     Assert-DpiPhysical 'Return to 96 DPI recovers design geometry' ($form.ClientSize.Width -eq 390 -and $header.Width -eq 285 -and [Math]::Abs($header.Font.Size - $baseFontSize) -lt 0.1)

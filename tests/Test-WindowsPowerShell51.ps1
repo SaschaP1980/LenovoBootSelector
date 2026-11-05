@@ -44,3 +44,8 @@ Write-Host "PARSER TOTAL $pass/$($files.Count)"
 & (Join-Path $root 'tests\Test-IdentifierCompatibility.ps1')
 & (Join-Path $root 'tests\Test-UpdateCore.ps1')
 & (Join-Path $root 'tests\Test-UpdateController.ps1')
+# LBS-144: Renderer raster probe compiles the canonical embedded C# types and
+# must run in an isolated PS5.1 process (this aggregate already loaded them).
+$menuInkProbe = Join-Path $root 'tests\Test-LBS144-MenuInkRaster.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $menuInkProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-144 menu text raster regression failed' }
