@@ -68,6 +68,17 @@ public static class LenovoPopupScaleNative {
     return [pscustomobject]@{ Factor = 1.0; Source = 'unavailable'; Percent = 100 }
 }
 
+# LBS-144: the 250% laptop reports a virtualized 1536x912 working area
+# until the first popup HWND is created; then Screen.WorkingArea reports the
+# physical 3840x2280 size. The tray menu must never be the first HWND user.
+# Materialize the already-constructed invisible popup's handle during startup
+# (no Show/Activate/firmware action). Repeated calls are idempotent.
+function Initialize-LenovoTrayDpiContext {
+    param([Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Popup)
+    if ($Popup.IsDisposed) { throw 'Cannot initialize DPI context for a disposed popup.' }
+    if (-not $Popup.IsHandleCreated) { [void]$Popup.Handle }
+}
+
 # LBS-144 physical Windows captures: the WinForms popup remained 390x672
 # pixels with window DPI 240 (laptop-primary) and 96 (external-primary).
 # PowerShell/WinForms owns a SystemAware HWND, not a PMv2 HWND.

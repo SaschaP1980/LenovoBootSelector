@@ -1828,6 +1828,19 @@ try {
 
     $initialPopupScale = Get-PopupMonitorDpiScale -Screen ([System.Windows.Forms.Screen]::PrimaryScreen)
     $script:Popup = New-PopupForm -TargetScale ([double]$initialPopupScale.Factor) -ScaleSource ([string]$initialPopupScale.Source)
+    # The pre-handle Screen.WorkingArea can be DPI-virtualized at 250%.
+    # Capture both sides to distinguish DPI initialization from menu geometry.
+    $preHandleWork = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    Initialize-LenovoTrayDpiContext -Popup $script:Popup
+    $postHandleWork = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    Write-RuntimeDiagnosticEvent -Event 'TRAY_DPI_CONTEXT_INITIALIZED' -Stage 'ui-layout' -Success $true -Data (New-RuntimeDiagnosticData @{
+        preHandleWorkWidth = [int]$preHandleWork.Width
+        preHandleWorkHeight = [int]$preHandleWork.Height
+        postHandleWorkWidth = [int]$postHandleWork.Width
+        postHandleWorkHeight = [int]$postHandleWork.Height
+        popupHandleCreated = [bool]$script:Popup.IsHandleCreated
+        popupVisible = [bool]$script:Popup.Visible
+    })
     $activationListener = Start-LbsActivationListener -Signal $activationEvent -OnActivate {
         try {
             Show-OrActivatePopup
