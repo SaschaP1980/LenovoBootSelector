@@ -2060,7 +2060,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.1.14.1'
+$script:AppVersion = '1.1.14.2'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -5313,6 +5313,114 @@ function Show-DefaultTargetMenu {
 }
 
 
+# LBS-144: regular modal forms have 96-DPI *pixel* geometry but
+# typographic point-unit fonts. Do not reuse the popup's script-global
+# design metric cache and never multiply Font.Size by the monitor factor.
+# All controls are new and scaled exactly once before ShowDialog().
+function Get-LenovoDialogScaledSize {
+    param(
+        [Parameter(Mandatory=$true)][Drawing.Size]$DesignSize,
+        [Parameter(Mandatory=$true)][double]$Scale
+    )
+    if ($Scale -lt 1.0 -or $Scale -gt 5.0) { throw 'Invalid dialog DPI scale.' }
+    return [Drawing.Size]::new(
+        [Math]::Max(1,[int][Math]::Round($DesignSize.Width * $Scale,[MidpointRounding]::AwayFromZero)),
+        [Math]::Max(1,[int][Math]::Round($DesignSize.Height * $Scale,[MidpointRounding]::AwayFromZero)))
+}
+
+function Set-LenovoDialogDpiLayout {
+    param(
+        [Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Form,
+        [Parameter(Mandatory=$true)][double]$Scale,
+        [Parameter(Mandatory=$true)][Drawing.Rectangle]$WorkingArea
+    )
+    if ($Scale -lt 1.0 -or $Scale -gt 5.0) { throw 'Invalid dialog DPI scale.' }
+    if ($WorkingArea.Width -le 0 -or $WorkingArea.Height -le 0) { throw 'Invalid dialog work area.' }
+    $Form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::None
+    $baseline = $Form.ClientSize
+    $pending = New-Object System.Collections.Stack
+    $pending.Push($Form)
+    $entries = New-Object 'System.Collections.Generic.List[object]'
+    while ($pending.Count -gt 0) {
+        $control = [System.Windows.Forms.Control]$pending.Pop()
+        $entries.Add([pscustomobject]@{
+            Control = $control
+            Bounds = $control.Bounds
+            Padding = $control.Padding
+            Margin = $control.Margin
+            Dock = $control.Dock
+        })
+        foreach ($child in $control.Controls) { $pending.Push($child) }
+    }
+    foreach ($entry in $entries) { $entry.Control.SuspendLayout() }
+    try {
+        foreach ($entry in $entries) {
+            $control = [System.Windows.Forms.Control]$entry.Control
+            if ([object]::ReferenceEquals($control, $Form)) { continue }
+            if ($entry.Dock -eq [System.Windows.Forms.DockStyle]::None) {
+                $r = $entry.Bounds
+                $control.Bounds = [Drawing.Rectangle]::new(
+                    [int][Math]::Round($r.Left * $Scale),
+                    [int][Math]::Round($r.Top * $Scale),
+                    [Math]::Max(1,[int][Math]::Round($r.Width * $Scale)),
+                    [Math]::Max(1,[int][Math]::Round($r.Height * $Scale)))
+            }
+            $p = $entry.Padding
+            $control.Padding = [System.Windows.Forms.Padding]::new(
+                [int][Math]::Round($p.Left * $Scale),[int][Math]::Round($p.Top * $Scale),
+                [int][Math]::Round($p.Right * $Scale),[int][Math]::Round($p.Bottom * $Scale))
+            $m = $entry.Margin
+            $control.Margin = [System.Windows.Forms.Padding]::new(
+                [int][Math]::Round($m.Left * $Scale),[int][Math]::Round($m.Top * $Scale),
+                [int][Math]::Round($m.Right * $Scale),[int][Math]::Round($m.Bottom * $Scale))
+        }
+        $desired = Get-LenovoDialogScaledSize -DesignSize $baseline -Scale $Scale
+        $Form.ClientSize = $desired
+        # WinForms may cap an unshown borderless form to the actual desktop
+        # MaxWindowTrackSize (small CI displays). Preserve access to every
+        # scaled control through the root panel's scrollable virtual client.
+        foreach ($entry in $entries) {
+            $control = [System.Windows.Forms.Control]$entry.Control
+            if ([object]::ReferenceEquals($control.Parent, $Form) -and $control -is [System.Windows.Forms.Panel]) {
+                $control.Dock = [System.Windows.Forms.DockStyle]::Fill
+            }
+        }
+        $Form.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
+        $Form.Location = [Drawing.Point]::new(
+            [int]($WorkingArea.Left + [Math]::Floor(($WorkingArea.Width - $Form.Width) / 2.0)),
+            [int]($WorkingArea.Top + [Math]::Floor(($WorkingArea.Height - $Form.Height) / 2.0)))
+    }
+    finally {
+        for ($i = $entries.Count - 1; $i -ge 0; $i--) {
+            $entries[$i].Control.ResumeLayout($true)
+        }
+    }
+    # An unshown WinForms form may only adopt the system's MaxWindowTrackSize
+    # *after* ResumeLayout. Check the resulting client here, not before.
+    if ($Form.ClientSize.Width -lt $desired.Width -or $Form.ClientSize.Height -lt $desired.Height) {
+        foreach ($control in $Form.Controls) {
+            if ($control -is [System.Windows.Forms.Panel]) {
+                $control.AutoScroll = $true
+                $control.AutoScrollMinSize = $desired
+            }
+        }
+    }
+}
+
+function Prepare-LenovoDialogDpiLayout {
+    param(
+        [Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Form,
+        [System.Windows.Forms.Form]$Owner
+    )
+    $screen = if ($Owner -and -not $Owner.IsDisposed -and $Owner.Visible) {
+        [System.Windows.Forms.Screen]::FromControl($Owner)
+    }
+    else { [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position) }
+    if (-not $screen) { $screen = [System.Windows.Forms.Screen]::PrimaryScreen }
+    $scale = Get-PopupMonitorDpiScale -Screen $screen
+    Set-LenovoDialogDpiLayout -Form $Form -Scale ([double]$scale.Factor) -WorkingArea $screen.WorkingArea
+}
+
 function Show-LenovoNoticeDialog {
     param(
         [Parameter(Mandatory=$true)][string]$Title,
@@ -5404,6 +5512,7 @@ function Show-LenovoNoticeDialog {
     $form.CancelButton = $ok
     try {
         $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
+        Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner
         if ($owner) { [void]$form.ShowDialog($owner) } else { [void]$form.ShowDialog() }
     }
     finally { $form.Dispose() }
@@ -5469,6 +5578,7 @@ function Show-LocaleMigrationDialog {
 
     try {
         $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
+        Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner
         if ($owner) { [void]$form.ShowDialog($owner) } else { [void]$form.ShowDialog() }
         return [string]$form.Tag
     }
@@ -5588,6 +5698,7 @@ function Show-LenovoSystemFunctionsDialog {
 
     try {
         $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
+        Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner
         if ($owner) { return $form.ShowDialog($owner) }
         return $form.ShowDialog()
     }
@@ -5679,6 +5790,7 @@ function Show-LenovoRestartDialog {
 
     try {
         $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
+        Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner
         if ($owner) { return $form.ShowDialog($owner) }
         return $form.ShowDialog()
     }
@@ -7933,6 +8045,17 @@ public static class LenovoPopupScaleNative {
     return [pscustomobject]@{ Factor = 1.0; Source = 'unavailable'; Percent = 100 }
 }
 
+# LBS-144: the 250% laptop reports a virtualized 1536x912 working area
+# until the first popup HWND is created; then Screen.WorkingArea reports the
+# physical 3840x2280 size. The tray menu must never be the first HWND user.
+# Materialize the already-constructed invisible popup's handle during startup
+# (no Show/Activate/firmware action). Repeated calls are idempotent.
+function Initialize-LenovoTrayDpiContext {
+    param([Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Popup)
+    if ($Popup.IsDisposed) { throw 'Cannot initialize DPI context for a disposed popup.' }
+    if (-not $Popup.IsHandleCreated) { [void]$Popup.Handle }
+}
+
 # LBS-144 physical Windows captures: the WinForms popup remained 390x672
 # pixels with window DPI 240 (laptop-primary) and 96 (external-primary).
 # PowerShell/WinForms owns a SystemAware HWND, not a PMv2 HWND.
@@ -9665,6 +9788,19 @@ try {
 
     $initialPopupScale = Get-PopupMonitorDpiScale -Screen ([System.Windows.Forms.Screen]::PrimaryScreen)
     $script:Popup = New-PopupForm -TargetScale ([double]$initialPopupScale.Factor) -ScaleSource ([string]$initialPopupScale.Source)
+    # The pre-handle Screen.WorkingArea can be DPI-virtualized at 250%.
+    # Capture both sides to distinguish DPI initialization from menu geometry.
+    $preHandleWork = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    Initialize-LenovoTrayDpiContext -Popup $script:Popup
+    $postHandleWork = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    Write-RuntimeDiagnosticEvent -Event 'TRAY_DPI_CONTEXT_INITIALIZED' -Stage 'ui-layout' -Success $true -Data (New-RuntimeDiagnosticData @{
+        preHandleWorkWidth = [int]$preHandleWork.Width
+        preHandleWorkHeight = [int]$preHandleWork.Height
+        postHandleWorkWidth = [int]$postHandleWork.Width
+        postHandleWorkHeight = [int]$postHandleWork.Height
+        popupHandleCreated = [bool]$script:Popup.IsHandleCreated
+        popupVisible = [bool]$script:Popup.Visible
+    })
     $activationListener = Start-LbsActivationListener -Signal $activationEvent -OnActivate {
         try {
             Show-OrActivatePopup
