@@ -1,6 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.1.14.5 – Recover update notices and correct mixed-monitor ToolStrip sizing (LBS-144)
+
+- Correct ownerless update-result notice placement on two active displays by targeting the stable primary WinForms work area instead of a potentially virtualized cursor position, and re-center/clamp each regular modal after its native HWND is shown. Preserve visible-owner dialog targeting and existing keyboard OK/Cancel behavior.
+- Remove the demonstrated DPI-compounding ToolStrip row-height baseline: define immutable 96-DPI 24-pixel menu rows and 6-pixel separators, then scale each exactly once. Preserve 9-point typographic fonts, width and padding contracts, colored menu rendering and the original tray anchor positioning.
+- Capture all active monitor device names, primary flags, screen and work-area rectangles, per-monitor scale reports, selected display identity, cursor coordinates and current DPI-awareness in new read-only MONITOR_TOPOLOGY_SNAPSHOT events at startup, before ordinary modal dialogs and on tray opening.
+- Add 27 focused real WinForms Windows PowerShell 5.1 tests for 100%–300% rows, negative-origin monitor work-area positioning, a real topmost dialog HWND and all-screen topology, with bug-specific RED→GREEN evidence. Update the existing menu test to assert immutable 96-DPI row heights and register the new regression in the permanent Windows suite.
+- Retain the SystemAware first-HWND initialization introduced in v1.1.14.4 and all BootNext, firmware, TaskBroker, update-transport and Cloudflare Worker boundaries. Hosted synthetic geometry tests cannot establish final visual acceptance on the owner's dual-monitor 250%/100% hardware; Issue LBS-144 remains open pending physical verification.
+
 ## v1.1.14.4 – Correct first-tray DPI context and mixed-monitor scaling (LBS-144)
 
 - Fix the physical 250% laptop first-tray failure verified in v1.1.14.3: the DPI-Unaware root menu's 650 logical pixels were inflated by Windows into 1625 physical pixels, until the main popup was shown.

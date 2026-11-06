@@ -2,6 +2,42 @@
 # typographic point-unit fonts. Do not reuse the popup's script-global
 # design metric cache and never multiply Font.Size by the monitor factor.
 # All controls are new and scaled exactly once before ShowDialog().
+# Calculate a visible top-left in the SAME WinForms coordinate space as the
+# selected Screen.WorkingArea, including negative-origin external displays.
+function Get-LenovoVisibleDialogLocation {
+    param(
+        [Parameter(Mandatory=$true)][Drawing.Rectangle]$WorkingArea,
+        [Parameter(Mandatory=$true)][Drawing.Size]$WindowSize
+    )
+    if ($WorkingArea.Width -le 0 -or $WorkingArea.Height -le 0 -or
+        $WindowSize.Width -le 0 -or $WindowSize.Height -le 0) {
+        throw 'Invalid dialog work-area or size.'
+    }
+    $centerX = [int][Math]::Floor($WorkingArea.Left + ($WorkingArea.Width - $WindowSize.Width) / 2.0)
+    $centerY = [int][Math]::Floor($WorkingArea.Top + ($WorkingArea.Height - $WindowSize.Height) / 2.0)
+    $maxX = [Math]::Max($WorkingArea.Left, $WorkingArea.Right - $WindowSize.Width)
+    $maxY = [Math]::Max($WorkingArea.Top, $WorkingArea.Bottom - $WindowSize.Height)
+    return [Drawing.Point]::new(
+        [int][Math]::Min($maxX,[Math]::Max($WorkingArea.Left,$centerX)),
+        [int][Math]::Min($maxY,[Math]::Max($WorkingArea.Top,$centerY)))
+}
+
+# The pre-Show WinForms size/position can change when the native HWND is
+# created (host MaxWindowTrackSize, mixed-DPI and monitor selection).
+# Clamp once again inside Shown, before the existing physical DWM snapshot.
+function Register-LenovoDialogVisibilityCorrection {
+    param(
+        [Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Form,
+        [Parameter(Mandatory=$true)][System.Windows.Forms.Screen]$Screen
+    )
+    $screenCopy = $Screen
+    $Form.Add_Shown({
+        if ($this.IsDisposed) { return }
+        $this.Location = Get-LenovoVisibleDialogLocation -WorkingArea $screenCopy.WorkingArea -WindowSize $this.Size
+        if ($this.Visible) { [void]$this.Activate() }
+    }.GetNewClosure())
+}
+
 function Get-LenovoDialogScaledSize {
     param(
         [Parameter(Mandatory=$true)][Drawing.Size]$DesignSize,
@@ -71,9 +107,7 @@ function Set-LenovoDialogDpiLayout {
             }
         }
         $Form.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
-        $Form.Location = [Drawing.Point]::new(
-            [int]($WorkingArea.Left + [Math]::Floor(($WorkingArea.Width - $Form.Width) / 2.0)),
-            [int]($WorkingArea.Top + [Math]::Floor(($WorkingArea.Height - $Form.Height) / 2.0)))
+        $Form.Location = Get-LenovoVisibleDialogLocation -WorkingArea $WorkingArea -WindowSize $Form.Size
     }
     finally {
         for ($i = $entries.Count - 1; $i -ge 0; $i--) {
@@ -101,10 +135,14 @@ function Prepare-LenovoDialogDpiLayout {
     $screen = if ($Owner -and -not $Owner.IsDisposed -and $Owner.Visible) {
         [System.Windows.Forms.Screen]::FromControl($Owner)
     }
-    else { [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position) }
+    # Without a visible owner, use the stable primary display rather than
+    # a possibly DPI-virtualized cursor coordinate on a secondary monitor.
+    else { [System.Windows.Forms.Screen]::PrimaryScreen }
     if (-not $screen) { $screen = [System.Windows.Forms.Screen]::PrimaryScreen }
     $scale = Get-LenovoUiCoordinateScale -Screen $screen
     Set-LenovoDialogDpiLayout -Form $Form -Scale ([double]$scale.Factor) -WorkingArea $screen.WorkingArea
+    Register-LenovoDialogVisibilityCorrection -Form $Form -Screen $screen
+    Write-LenovoMonitorTopologyEvent -Phase ('before-' + $Role) -Screen $screen
     Register-LenovoDialogDpiWindowDiagnostics -Form $Form -Role $Role -Screen $screen -RequestedScale ([double]$scale.Factor)
 }
 

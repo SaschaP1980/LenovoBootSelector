@@ -15,6 +15,15 @@ function Get-LenovoScaledMenuPadding {
         [int][Math]::Round($Padding.Bottom * $Scale))
 }
 
+# ToolStripItem.Height is already dependent on the host's current DPI.
+# It is NOT a 96-DPI design value. The Lenovo menus contain only one-line
+# items and separators; choose their immutable 96-DPI design heights here.
+function Get-LenovoMenuDesignItemHeight {
+    param([Parameter(Mandatory=$true)][System.Windows.Forms.ToolStripItem]$Item)
+    if ($Item -is [System.Windows.Forms.ToolStripSeparator]) { return [int]6 }
+    return [int]24
+}
+
 function Set-LenovoMenuDpiLayout {
     param(
         [Parameter(Mandatory=$true)][System.Windows.Forms.ToolStripDropDown]$Menu,
@@ -31,7 +40,7 @@ function Set-LenovoMenuDpiLayout {
             Width = $width
             Padding = $Menu.Padding
             ItemBases = (New-Object 'System.Collections.Generic.Dictionary[System.Windows.Forms.ToolStripItem,System.Object]')
-            Scale = [double]1.0
+            Scale = [double]0.0
         }
         $script:LenovoMenuDesignBaselines.Add($Menu,$state)
         $Menu.Add_Disposed({
@@ -44,7 +53,7 @@ function Set-LenovoMenuDpiLayout {
     foreach ($item in $Menu.Items) {
         if (-not $state.ItemBases.ContainsKey($item)) {
             $state.ItemBases.Add($item,[pscustomobject]@{
-                Height = [Math]::Max(1,[int]$item.Height)
+                Height = Get-LenovoMenuDesignItemHeight -Item $item
                 Padding = $item.Padding
                 FontStyle = $item.Font.Style
             })
