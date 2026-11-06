@@ -69,6 +69,9 @@ function Update-PopupRows {
     $statusLabel = if ($statusMatches.Count -gt 0) { $statusMatches[0] } else { $null }
     if (-not $listPanel -or -not $contentPanel) { return }
 
+    # Apply the current mode/DPI viewport before computing content and scroll range.
+    Update-ManageEntriesUiState
+
     $contentPanel.SuspendLayout()
     $contentPanel.Controls.Clear()
 
@@ -99,7 +102,6 @@ function Update-PopupRows {
     if ($statusLabel) { $statusLabel.Text = $script:LastStatusText }
     Update-DefaultUi
     Update-RestartTargetUi
-    Update-ManageEntriesUiState
     Update-ManageSaveButtonState
     $contentPanel.ResumeLayout()
     Update-MaintenanceUi
