@@ -2060,7 +2060,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.1.14.3'
+$script:AppVersion = '1.1.14.4'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -2887,7 +2887,7 @@ function Initialize-LenovoMenuAppearance {
         try {
             $script:LenovoDpiMenuPaintRecorded[$this] = $false
             $screen = [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position)
-            $factor = (Get-PopupMonitorDpiScale -Screen $screen).Factor
+            $factor = (Get-LenovoUiCoordinateScale -Screen $screen).Factor
             [void](Set-LenovoMenuDpiLayout -Menu $this -Scale ([double]$factor))
             $this.Region = $null
             [LenovoMenuLayout]::PrepareItems($this)
@@ -5654,7 +5654,7 @@ function Prepare-LenovoDialogDpiLayout {
     }
     else { [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position) }
     if (-not $screen) { $screen = [System.Windows.Forms.Screen]::PrimaryScreen }
-    $scale = Get-PopupMonitorDpiScale -Screen $screen
+    $scale = Get-LenovoUiCoordinateScale -Screen $screen
     Set-LenovoDialogDpiLayout -Form $Form -Scale ([double]$scale.Factor) -WorkingArea $screen.WorkingArea
     Register-LenovoDialogDpiWindowDiagnostics -Form $Form -Role $Role -Screen $screen -RequestedScale ([double]$scale.Factor)
 }
@@ -8213,6 +8213,95 @@ function Get-EntryByGuid([string]$Guid) {
     return $script:CurrentEntries | Where-Object { $_.Guid -eq $Guid.ToLowerInvariant() } | Select-Object -First 1
 }
 
+# LBS-144: establish one DPI-aware WinForms UI thread BEFORE its first HWND.
+# SystemAware matches the owner's post-popup context in PowerShell 5.1.
+# Do not request PMv2 here: native ToolStrip and manually scaled WinForms
+# controls have not been validated for that different awareness contract.
+function Initialize-LenovoUiDpiAwareness {
+    if (-not ('LenovoUiDpiAwarenessNative' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class LenovoUiDpiAwarenessNative {
+    [DllImport("user32.dll", SetLastError=true)]
+    private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetThreadDpiAwarenessContext();
+    [DllImport("user32.dll")]
+    private static extern int GetAwarenessFromDpiAwarenessContext(IntPtr context);
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForSystem();
+    public static bool MakeSystemAware() {
+        return SetThreadDpiAwarenessContext(new IntPtr(-2)) != IntPtr.Zero;
+    }
+    public static string ReadThreadAwareness() {
+        IntPtr context = GetThreadDpiAwarenessContext();
+        if (context == IntPtr.Zero) return "Unavailable";
+        switch (GetAwarenessFromDpiAwarenessContext(context)) {
+            case 0: return "Unaware";
+            case 1: return "SystemAware";
+            case 2: return "PerMonitorAware";
+            default: return "Unavailable";
+        }
+    }
+    public static int ReadSystemDpi() { return checked((int)GetDpiForSystem()); }
+}
+'@ -ErrorAction Stop
+    }
+    $enabled = $false
+    try { $enabled = [LenovoUiDpiAwarenessNative]::MakeSystemAware() }
+    catch [System.EntryPointNotFoundException] { }
+    catch [System.DllNotFoundException] { }
+    $awareness = 'Unavailable'
+    try { $awareness = [LenovoUiDpiAwarenessNative]::ReadThreadAwareness() } catch { }
+    return [pscustomobject]@{
+        Success = [bool]($enabled -and $awareness -eq 'SystemAware')
+        Awareness = [string]$awareness
+    }
+}
+
+# The layout units depend on CURRENT thread DPI awareness, not just the
+# target monitor's physical scale. SystemAware windows use system-DPI
+# coordinates even on a secondary screen; Windows maps them to that screen.
+function Resolve-LenovoDpiCoordinateScale {
+    param(
+        [Parameter(Mandatory=$true)][string]$Awareness,
+        [Parameter(Mandatory=$true)][double]$SystemDpi,
+        [Parameter(Mandatory=$true)][double]$MonitorScale
+    )
+    if ($SystemDpi -lt 96 -or $SystemDpi -gt 480) { throw 'System DPI outside supported range.' }
+    if ($MonitorScale -lt 1 -or $MonitorScale -gt 5) { throw 'Monitor scale outside supported range.' }
+    switch ($Awareness) {
+        'Unaware' { return [double]1.0 }
+        'SystemAware' { return [double]($SystemDpi / 96.0) }
+        'PerMonitorAware' { return [double]$MonitorScale }
+        default { throw "Unsupported UI thread DPI awareness: $Awareness" }
+    }
+}
+
+function Get-LenovoUiCoordinateScale {
+    param([System.Windows.Forms.Screen]$Screen)
+    if (-not $Screen) { $Screen = [System.Windows.Forms.Screen]::PrimaryScreen }
+    $monitor = Get-PopupMonitorDpiScale -Screen $Screen
+    $awareness = [LenovoUiDpiAwarenessNative]::ReadThreadAwareness()
+    $systemDpi = 0
+    try { $systemDpi = [int][LenovoUiDpiAwarenessNative]::ReadSystemDpi() } catch { }
+    if ($systemDpi -lt 96 -or $systemDpi -gt 480) {
+        $graphics = [Drawing.Graphics]::FromHwnd([IntPtr]::Zero)
+        try { $systemDpi = [int][Math]::Round($graphics.DpiX) }
+        finally { $graphics.Dispose() }
+    }
+    $factor = Resolve-LenovoDpiCoordinateScale -Awareness $awareness -SystemDpi $systemDpi -MonitorScale ([double]$monitor.Factor)
+    return [pscustomobject]@{
+        Factor = [double]$factor
+        Percent = [int][Math]::Round($factor * 100)
+        Awareness = [string]$awareness
+        SystemDpi = [int]$systemDpi
+        MonitorPercent = [int]$monitor.Percent
+        Source = ('{0};systemDpi={1};monitor={2}' -f $awareness,$systemDpi,$monitor.Source)
+    }
+}
+
 # LBS-144: use one WinForms-effective logical coordinate space across
 # mixed-DPI monitors. The operating system's reported monitor scale is
 # diagnostic metadata, not a second layout multiplier. A previous manual
@@ -8283,11 +8372,8 @@ public static class LenovoPopupScaleNative {
     return [pscustomobject]@{ Factor = 1.0; Source = 'unavailable'; Percent = 100 }
 }
 
-# LBS-144: the 250% laptop reports a virtualized 1536x912 working area
-# until the first popup HWND is created; then Screen.WorkingArea reports the
-# physical 3840x2280 size. The tray menu must never be the first HWND user.
-# Materialize the already-constructed invisible popup's handle during startup
-# (no Show/Activate/firmware action). Repeated calls are idempotent.
+# Materialize the invisible popup HWND only after the UI thread's DPI
+# awareness has been fixed. Handle creation alone cannot change awareness.
 function Initialize-LenovoTrayDpiContext {
     param([Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Popup)
     if ($Popup.IsDisposed) { throw 'Cannot initialize DPI context for a disposed popup.' }
@@ -9894,7 +9980,7 @@ function Position-Popup {
     }
 
     if ($null -eq $screen) { return }
-    $monitorScale = Get-PopupMonitorDpiScale -Screen $screen
+    $monitorScale = Get-LenovoUiCoordinateScale -Screen $screen
     $monitorChanged = Set-PopupDpiLayoutScale -Form $script:Popup -Scale ([double]$monitorScale.Factor)
     $viewportChanged = Set-PopupViewportForWorkingArea -Form $script:Popup -WorkingArea $screen.WorkingArea
     if ($monitorChanged -or $viewportChanged) { Update-PopupRows }
@@ -9907,7 +9993,7 @@ function Show-OrTogglePopup {
     param([switch]$FromTrayClick)
     if (-not $script:Popup -or $script:Popup.IsDisposed) {
         $initialScreen = [System.Windows.Forms.Screen]::PrimaryScreen
-        $initialScale = Get-PopupMonitorDpiScale -Screen $initialScreen
+        $initialScale = Get-LenovoUiCoordinateScale -Screen $initialScreen
         $script:Popup = New-PopupForm -TargetScale ([double]$initialScale.Factor) -ScaleSource ([string]$initialScale.Source)
     }
 
@@ -10018,13 +10104,18 @@ try {
             Write-RuntimeDiagnosticEvent -Event 'APPDOMAIN_UNHANDLED_EXCEPTION' -Stage 'runtime' -Success $false -ErrorRecord $eventArgs.ExceptionObject -Level error
         })
     } catch { }
+    # Establish the DPI context before constructing the first WinForms HWND.
+    $uiDpi = Initialize-LenovoUiDpiAwareness
+    Write-RuntimeDiagnosticEvent -Event 'UI_DPI_AWARENESS_INITIALIZED' -Stage 'ui-layout' -Success ([bool]$uiDpi.Success) -Data (New-RuntimeDiagnosticData @{
+        awareness = [string]$uiDpi.Awareness
+    }) -Level $(if ($uiDpi.Success) { 'info' } else { 'warning' })
     Write-RuntimeDiagnosticEvent -Event 'TRAY_STARTUP' -Stage 'startup' -Success $true
     Load-AppSettings
     [void](Resolve-PendingLocalePreference)
     $script:LastStatusText = Get-LocalizedString -Key 'Status.Ready'
     Repair-AutostartLauncherIfNeeded
 
-    $initialPopupScale = Get-PopupMonitorDpiScale -Screen ([System.Windows.Forms.Screen]::PrimaryScreen)
+    $initialPopupScale = Get-LenovoUiCoordinateScale -Screen ([System.Windows.Forms.Screen]::PrimaryScreen)
     $script:Popup = New-PopupForm -TargetScale ([double]$initialPopupScale.Factor) -ScaleSource ([string]$initialPopupScale.Source)
     # The pre-handle Screen.WorkingArea can be DPI-virtualized at 250%.
     # Capture both sides to distinguish DPI initialization from menu geometry.
@@ -10224,7 +10315,7 @@ try {
             $screen = [System.Windows.Forms.Screen]::FromPoint($point)
             if ($script:TrayContextMenu -and $screen) {
                 Initialize-LenovoMenuAppearance -Menu $script:TrayContextMenu
-                $factor = (Get-PopupMonitorDpiScale -Screen $screen).Factor
+                $factor = (Get-LenovoUiCoordinateScale -Screen $screen).Factor
                 [void](Set-LenovoMenuDpiLayout -Menu $script:TrayContextMenu -Scale ([double]$factor))
                 $size = $script:TrayContextMenu.GetPreferredSize([Drawing.Size]::Empty)
                 $location = Get-TrayContextMenuLocation -ClickPoint $point -MenuSize $size -WorkingArea $screen.WorkingArea -DisplayBounds $screen.Bounds

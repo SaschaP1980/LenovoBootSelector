@@ -1821,13 +1821,18 @@ try {
             Write-RuntimeDiagnosticEvent -Event 'APPDOMAIN_UNHANDLED_EXCEPTION' -Stage 'runtime' -Success $false -ErrorRecord $eventArgs.ExceptionObject -Level error
         })
     } catch { }
+    # Establish the DPI context before constructing the first WinForms HWND.
+    $uiDpi = Initialize-LenovoUiDpiAwareness
+    Write-RuntimeDiagnosticEvent -Event 'UI_DPI_AWARENESS_INITIALIZED' -Stage 'ui-layout' -Success ([bool]$uiDpi.Success) -Data (New-RuntimeDiagnosticData @{
+        awareness = [string]$uiDpi.Awareness
+    }) -Level $(if ($uiDpi.Success) { 'info' } else { 'warning' })
     Write-RuntimeDiagnosticEvent -Event 'TRAY_STARTUP' -Stage 'startup' -Success $true
     Load-AppSettings
     [void](Resolve-PendingLocalePreference)
     $script:LastStatusText = Get-LocalizedString -Key 'Status.Ready'
     Repair-AutostartLauncherIfNeeded
 
-    $initialPopupScale = Get-PopupMonitorDpiScale -Screen ([System.Windows.Forms.Screen]::PrimaryScreen)
+    $initialPopupScale = Get-LenovoUiCoordinateScale -Screen ([System.Windows.Forms.Screen]::PrimaryScreen)
     $script:Popup = New-PopupForm -TargetScale ([double]$initialPopupScale.Factor) -ScaleSource ([string]$initialPopupScale.Source)
     # The pre-handle Screen.WorkingArea can be DPI-virtualized at 250%.
     # Capture both sides to distinguish DPI initialization from menu geometry.
@@ -2027,7 +2032,7 @@ try {
             $screen = [System.Windows.Forms.Screen]::FromPoint($point)
             if ($script:TrayContextMenu -and $screen) {
                 Initialize-LenovoMenuAppearance -Menu $script:TrayContextMenu
-                $factor = (Get-PopupMonitorDpiScale -Screen $screen).Factor
+                $factor = (Get-LenovoUiCoordinateScale -Screen $screen).Factor
                 [void](Set-LenovoMenuDpiLayout -Menu $script:TrayContextMenu -Scale ([double]$factor))
                 $size = $script:TrayContextMenu.GetPreferredSize([Drawing.Size]::Empty)
                 $location = Get-TrayContextMenuLocation -ClickPoint $point -MenuSize $size -WorkingArea $screen.WorkingArea -DisplayBounds $screen.Bounds
