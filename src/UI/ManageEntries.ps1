@@ -100,6 +100,19 @@ function Update-ManageEntriesUiState {
     $restartPanel = $script:Popup.Controls.Find('RestartPanel', $true) | Select-Object -First 1
     $footerPanel = $script:Popup.Controls.Find('FooterPanel', $true) | Select-Object -First 1
 
+    # LBS-157: manage mode claims the 34 design pixels recovered below its
+    # action buttons. This live size must be re-applied after every monitor DPI
+    # rescale, before Update-BootEntryScrollLayout calculates the scroll range.
+    $entryList = $script:Popup.Controls.Find('EntryList', $true) | Select-Object -First 1
+    if ($entryList) {
+        $scale = Get-PopupDpiLayoutScale -Popup $script:Popup
+        $designHeight = if ($script:IsManageEntriesMode) { 436 } else { 402 }
+        $height = [Math]::Max(1,[int][Math]::Round($designHeight * $scale))
+        if ($entryList.Height -ne $height) { $entryList.Height = $height }
+        $scrollBar = $entryList.Controls['EntryScroll']
+        if ($scrollBar -and $scrollBar.Height -ne $height) { $scrollBar.Height = $height }
+    }
+
     if ($sectionLabel) { $sectionLabel.Text = if ($script:IsManageEntriesMode) { Get-LocalizedString -Key 'Manage.Section' } else { Get-LocalizedString -Key 'Popup.NextBootSection' } }
     if ($manageButton) {
         $manageButton.Visible = -not $script:IsManageEntriesMode

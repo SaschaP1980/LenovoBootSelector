@@ -2090,7 +2090,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.1.14.8'
+$script:AppVersion = '1.1.15.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -5438,6 +5438,19 @@ function Update-ManageEntriesUiState {
     $settingsDivider = $script:Popup.Controls.Find('SettingsDivider', $true) | Select-Object -First 1
     $restartPanel = $script:Popup.Controls.Find('RestartPanel', $true) | Select-Object -First 1
     $footerPanel = $script:Popup.Controls.Find('FooterPanel', $true) | Select-Object -First 1
+
+    # LBS-157: manage mode claims the 34 design pixels recovered below its
+    # action buttons. This live size must be re-applied after every monitor DPI
+    # rescale, before Update-BootEntryScrollLayout calculates the scroll range.
+    $entryList = $script:Popup.Controls.Find('EntryList', $true) | Select-Object -First 1
+    if ($entryList) {
+        $scale = Get-PopupDpiLayoutScale -Popup $script:Popup
+        $designHeight = if ($script:IsManageEntriesMode) { 436 } else { 402 }
+        $height = [Math]::Max(1,[int][Math]::Round($designHeight * $scale))
+        if ($entryList.Height -ne $height) { $entryList.Height = $height }
+        $scrollBar = $entryList.Controls['EntryScroll']
+        if ($scrollBar -and $scrollBar.Height -ne $height) { $scrollBar.Height = $height }
+    }
 
     if ($sectionLabel) { $sectionLabel.Text = if ($script:IsManageEntriesMode) { Get-LocalizedString -Key 'Manage.Section' } else { Get-LocalizedString -Key 'Popup.NextBootSection' } }
     if ($manageButton) {
@@ -9446,6 +9459,9 @@ function Update-PopupRows {
     $statusLabel = if ($statusMatches.Count -gt 0) { $statusMatches[0] } else { $null }
     if (-not $listPanel -or -not $contentPanel) { return }
 
+    # Apply the current mode/DPI viewport before computing content and scroll range.
+    Update-ManageEntriesUiState
+
     $contentPanel.SuspendLayout()
     $contentPanel.Controls.Clear()
 
@@ -9476,7 +9492,6 @@ function Update-PopupRows {
     if ($statusLabel) { $statusLabel.Text = $script:LastStatusText }
     Update-DefaultUi
     Update-RestartTargetUi
-    Update-ManageEntriesUiState
     Update-ManageSaveButtonState
     $contentPanel.ResumeLayout()
     Update-MaintenanceUi
@@ -9871,10 +9886,12 @@ function Add-PopupManageEntriesSection {
 
     # Entry-management overlay. It temporarily replaces the normal settings/footer
     # while the same boot list switches into edit mode.
+    # LBS-157: move this panel 34 design pixels down, leaving only 4px
+    # between Save/Cancel and the footer; the edit-mode list uses that space.
     $managePanel = New-Object System.Windows.Forms.Panel
     $managePanel.Name = 'ManageEntriesPanel'
-    $managePanel.Location = New-Object Drawing.Point(0, 490)
-    $managePanel.Size = New-Object Drawing.Size(390, 182)
+    $managePanel.Location = New-Object Drawing.Point(0, 524)
+    $managePanel.Size = New-Object Drawing.Size(390, 148)
     $managePanel.BackColor = $script:ColorSurface
     $managePanel.Visible = $false
 
@@ -9931,7 +9948,7 @@ function Add-PopupManageEntriesSection {
     $script:ManageSaveButton = $saveManage
 
     $manageFooter = New-Object System.Windows.Forms.Panel
-    $manageFooter.Location = New-Object Drawing.Point(0, 150)
+    $manageFooter.Location = New-Object Drawing.Point(0, 116)
     $manageFooter.Size = New-Object Drawing.Size(390, 32)
     $manageFooter.BackColor = $script:ColorSurface
     $manageVersion = New-Label -Text ("v{0}" -f $script:AppVersion) -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Regular)) `

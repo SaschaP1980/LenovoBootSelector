@@ -1,6 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.1.15.0 – Recover unused Manage Entries viewport space (LBS-157)
+
+- Reclaim 34 of 38 otherwise-unused 96-DPI design pixels between the Manage Entries action buttons and footer, leaving a 4-pixel clearance, without increasing the popup size.
+- Extend only the management-mode boot-target scroll viewport from 402 to 436 design pixels and compact the lower panel. Restore the original 402-pixel viewport on exiting management mode.
+- Recompute the live viewport and scrollbar height from the immutable 96-DPI baseline before calculating scroll range on each DPI transition, preserving native 100–300% layouts and existing row interactions.
+- Add 51 native Windows PowerShell 5.1 regression checks for real WinForms geometry, scroll range, footer/button clearance, reversible mode changes, and short/tall work areas; propagate the total into the mandatory Windows gate. Document bug-specific RED on 1.1.14.8 and focused GREEN on the corrected code.
+- Preserve the normal popup's settings, restart and footer, fixed action hit targets, one-shot BootNext, firmware, TaskBroker security, updater and Diagnostics Worker contracts. Physical owner visual acceptance remains separate from hosted Windows testing.
+
 ## v1.1.14.8 – Refine Manage Entries visibility eye proportions (LBS-144)
 
 - Reduce only the owner-drawn visible and hidden eye glyph baseline from 24x14 to 20x12 design pixels so it better matches the neighboring pencil and reorder icons.
