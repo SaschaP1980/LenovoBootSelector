@@ -217,3 +217,67 @@ function Register-LenovoDialogDpiWindowDiagnostics {
         }
     }.GetNewClosure())
 }
+
+# LBS-144 P3: every active display, not just the selected monitor.
+# Read-only; no display reconfiguration and no full device serial numbers.
+function Get-LenovoMonitorTopologySnapshot {
+    $items = @()
+    foreach ($monitor in [System.Windows.Forms.Screen]::AllScreens) {
+        $bounds = $monitor.Bounds
+        $work = $monitor.WorkingArea
+        $reportedPercent = 0
+        $scaleSource = 'unavailable'
+        if (Get-Command Get-PopupMonitorDpiScale -CommandType Function -ErrorAction SilentlyContinue) {
+            try {
+                $reported = Get-PopupMonitorDpiScale -Screen $monitor
+                $reportedPercent = [int]$reported.Percent
+                $scaleSource = [string]$reported.Source
+            } catch { }
+        }
+        $items += [ordered]@{
+            deviceName = [string]$monitor.DeviceName
+            isPrimary = [bool]$monitor.Primary
+            boundsLeft = [int]$bounds.Left
+            boundsTop = [int]$bounds.Top
+            boundsWidth = [int]$bounds.Width
+            boundsHeight = [int]$bounds.Height
+            workLeft = [int]$work.Left
+            workTop = [int]$work.Top
+            workWidth = [int]$work.Width
+            workHeight = [int]$work.Height
+            reportedScalePercent = [int]$reportedPercent
+            scaleSource = [string]$scaleSource
+        }
+    }
+    return $items
+}
+
+function Write-LenovoMonitorTopologyEvent {
+    param(
+        [Parameter(Mandatory=$true)][string]$Phase,
+        [System.Windows.Forms.Screen]$Screen
+    )
+    if (-not $script:RuntimeDiagnosticsAvailable) { return }
+    try {
+        $monitors = @(Get-LenovoMonitorTopologySnapshot)
+        $cursor = [System.Windows.Forms.Cursor]::Position
+        $selectedName = if ($Screen) { [string]$Screen.DeviceName } else { '' }
+        $awareness = if ('LenovoUiDpiAwarenessNative' -as [type]) {
+            [LenovoUiDpiAwarenessNative]::ReadThreadAwareness()
+        } else { 'unavailable' }
+        $systemDpi = if ('LenovoUiDpiAwarenessNative' -as [type]) {
+            [LenovoUiDpiAwarenessNative]::ReadSystemDpi()
+        } else { 0 }
+        Write-RuntimeDiagnosticEvent -Event 'MONITOR_TOPOLOGY_SNAPSHOT' -Stage 'ui-layout' -Success $true -Data (New-RuntimeDiagnosticData -Values @{
+            schemaVersion = 1
+            phase = [string]$Phase
+            screenCount = [int]$monitors.Count
+            monitors = $monitors
+            selectedDeviceName = $selectedName
+            cursorX = [int]$cursor.X
+            cursorY = [int]$cursor.Y
+            threadAwareness = [string]$awareness
+            systemDpi = [int]$systemDpi
+        })
+    } catch { } # Read-only telemetry cannot block UI or boot actions.
+}

@@ -1847,6 +1847,7 @@ try {
         popupHandleCreated = [bool]$script:Popup.IsHandleCreated
         popupVisible = [bool]$script:Popup.Visible
     })
+    Write-LenovoMonitorTopologyEvent -Phase 'startup' -Screen ([System.Windows.Forms.Screen]::PrimaryScreen)
     $activationListener = Start-LbsActivationListener -Signal $activationEvent -OnActivate {
         try {
             Show-OrActivatePopup
@@ -2031,6 +2032,7 @@ try {
             $point = $script:TrayPopupClickPoint
             $screen = [System.Windows.Forms.Screen]::FromPoint($point)
             if ($script:TrayContextMenu -and $screen) {
+                Write-LenovoMonitorTopologyEvent -Phase 'tray-click' -Screen $screen
                 Initialize-LenovoMenuAppearance -Menu $script:TrayContextMenu
                 $factor = (Get-LenovoUiCoordinateScale -Screen $screen).Factor
                 [void](Set-LenovoMenuDpiLayout -Menu $script:TrayContextMenu -Scale ([double]$factor))
