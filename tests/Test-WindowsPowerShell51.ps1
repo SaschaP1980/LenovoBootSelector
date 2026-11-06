@@ -53,3 +53,5 @@ $menuInkProbe = Join-Path $root 'tests\Test-LBS144-MenuInkRaster.ps1'
 if ($LASTEXITCODE -ne 0) { throw 'LBS-144 menu text raster regression failed' }
 # Read-only DPI window diagnostic, including real Win32/DWM metrics and arbitrary scale values.
 & (Join-Path $root 'tests\Test-LBS144-DpiWindowDiagnostics.ps1')
+# LBS-144: first native UI HWND and mixed-coordinate awareness contracts.
+& (Join-Path $root 'tests\Test-LBS144-DpiAwarenessStartup.ps1')

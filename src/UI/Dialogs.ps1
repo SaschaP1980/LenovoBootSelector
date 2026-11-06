@@ -103,7 +103,7 @@ function Prepare-LenovoDialogDpiLayout {
     }
     else { [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position) }
     if (-not $screen) { $screen = [System.Windows.Forms.Screen]::PrimaryScreen }
-    $scale = Get-PopupMonitorDpiScale -Screen $screen
+    $scale = Get-LenovoUiCoordinateScale -Screen $screen
     Set-LenovoDialogDpiLayout -Form $Form -Scale ([double]$scale.Factor) -WorkingArea $screen.WorkingArea
     Register-LenovoDialogDpiWindowDiagnostics -Form $Form -Role $Role -Screen $screen -RequestedScale ([double]$scale.Factor)
 }

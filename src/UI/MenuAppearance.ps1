@@ -106,7 +106,7 @@ function Initialize-LenovoMenuAppearance {
         try {
             $script:LenovoDpiMenuPaintRecorded[$this] = $false
             $screen = [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position)
-            $factor = (Get-PopupMonitorDpiScale -Screen $screen).Factor
+            $factor = (Get-LenovoUiCoordinateScale -Screen $screen).Factor
             [void](Set-LenovoMenuDpiLayout -Menu $this -Scale ([double]$factor))
             $this.Region = $null
             [LenovoMenuLayout]::PrepareItems($this)

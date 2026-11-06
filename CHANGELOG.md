@@ -1,6 +1,15 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.1.14.4 – Correct first-tray DPI context and mixed-monitor scaling (LBS-144)
+
+- Fix the physical 250% laptop first-tray failure verified in v1.1.14.3: the DPI-Unaware root menu's 650 logical pixels were inflated by Windows into 1625 physical pixels, until the main popup was shown.
+- Explicitly establish SystemAware WinForms UI-thread awareness before constructing the first popup handle, tray menu or dialog; report initialization status in read-only runtime diagnostics.
+- Use one awareness-dependent layout-coordinate factor for the main popup, root and child ToolStrip menus and the four regular dialogs. DPI-Unaware uses a 96-DPI logical baseline, SystemAware uses system DPI, and PerMonitorAware uses target-monitor DPI; never multiply by the target display scale a second time in SystemAware coordinates.
+- Preserve independent physical monitor percentage reporting, immutable design metrics, typographic point-unit fonts, menu rendering and safe work-area positioning across mismatched primary/secondary display scales.
+- Add 23 permanent hosted native Windows PowerShell 5.1 tests with focused RED-to-GREEN evidence, a real first-HWND awareness check and numeric 100/125/150/200/250/300% and mixed-monitor layout contracts. Full native Windows regression suite passed in development.
+- Preserve boot, firmware, TaskBroker privileges, self-update and Worker functionality. Hosted checks cannot substitute for owner visual confirmation at 250% and external-display scaling; LBS-144 stays open until native owner acceptance.
+
 ## v1.1.14.3 – Extend native DPI window diagnostics for mixed-scale displays (LBS-144)
 
 - Add a read-only Win32/DWM DPI snapshot for the initial tray context menu, subsequent opens, language and maintenance submenus, and four standard modal dialogs.

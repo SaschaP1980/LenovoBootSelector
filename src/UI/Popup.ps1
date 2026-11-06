@@ -81,7 +81,7 @@ function Position-Popup {
     }
 
     if ($null -eq $screen) { return }
-    $monitorScale = Get-PopupMonitorDpiScale -Screen $screen
+    $monitorScale = Get-LenovoUiCoordinateScale -Screen $screen
     $monitorChanged = Set-PopupDpiLayoutScale -Form $script:Popup -Scale ([double]$monitorScale.Factor)
     $viewportChanged = Set-PopupViewportForWorkingArea -Form $script:Popup -WorkingArea $screen.WorkingArea
     if ($monitorChanged -or $viewportChanged) { Update-PopupRows }
@@ -94,7 +94,7 @@ function Show-OrTogglePopup {
     param([switch]$FromTrayClick)
     if (-not $script:Popup -or $script:Popup.IsDisposed) {
         $initialScreen = [System.Windows.Forms.Screen]::PrimaryScreen
-        $initialScale = Get-PopupMonitorDpiScale -Screen $initialScreen
+        $initialScale = Get-LenovoUiCoordinateScale -Screen $initialScreen
         $script:Popup = New-PopupForm -TargetScale ([double]$initialScale.Factor) -ScaleSource ([string]$initialScale.Source)
     }
 
