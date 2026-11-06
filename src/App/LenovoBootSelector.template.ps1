@@ -692,24 +692,54 @@ public sealed class LenovoCheckBox : CheckBox
     protected override void OnMouseEnter(EventArgs e) { hovering = true; Invalidate(); base.OnMouseEnter(e); }
     protected override void OnMouseLeave(EventArgs e) { hovering = false; Invalidate(); base.OnMouseLeave(e); }
 
+    // The popup scales the control bounds from immutable 96-DPI geometry.
+    // Scale this owner-drawn glyph exactly once from its paint-surface DPI;
+    // the Windows SystemAware host will map the resulting pixels to a 100%
+    // secondary display. Neither OS display position nor Font.Size is scaled.
+    public static Rectangle GetGlyphBounds(Size clientSize, float dpi)
+    {
+        if (clientSize.Width <= 0 || clientSize.Height <= 0) return Rectangle.Empty;
+        float scale = dpi > 0f ? Math.Max(1f, Math.Min(5f, dpi / 96f)) : 1f;
+        int designSide = (int)Math.Round(18f * scale, MidpointRounding.AwayFromZero);
+        int availableSide = Math.Min(clientSize.Width - 2, clientSize.Height - 2);
+        if (availableSide < 1) return Rectangle.Empty;
+        int side = Math.Min(designSide, availableSide);
+        return new Rectangle((clientSize.Width - side) / 2,
+                             (clientSize.Height - side) / 2, side, side);
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
         e.Graphics.Clear(BackColor);
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        Rectangle box = new Rectangle(1, Math.Max(1, (Height - 15) / 2), 14, 14);
-        Color fill = Checked ? (hovering ? HoverColor : AccentColor) : BoxBackColor;
-        using (Brush b = new SolidBrush(fill)) e.Graphics.FillRectangle(b, box);
-        using (Pen p = new Pen(Checked ? AccentColor : BoxBorderColor, 1f)) e.Graphics.DrawRectangle(p, box);
-        if (Checked)
+        float scale = e.Graphics.DpiX > 0f ? Math.Max(1f, Math.Min(5f, e.Graphics.DpiX / 96f)) : 1f;
+        Rectangle box = GetGlyphBounds(ClientSize, e.Graphics.DpiX);
+        if (!box.IsEmpty)
         {
-            using (Pen p = new Pen(Color.White, 1.8f))
+            Color fill = Checked ? (hovering ? HoverColor : AccentColor) : BoxBackColor;
+            using (Brush b = new SolidBrush(fill)) e.Graphics.FillRectangle(b, box);
+            using (Pen p = new Pen(Checked ? AccentColor : BoxBorderColor, Math.Max(1f, scale)))
+                e.Graphics.DrawRectangle(p, box);
+            if (Checked)
             {
-                p.StartCap = System.Drawing.Drawing2D.LineCap.Round;
-                p.EndCap = System.Drawing.Drawing2D.LineCap.Round;
-                e.Graphics.DrawLines(p, new Point[] { new Point(4, box.Top + 7), new Point(7, box.Top + 10), new Point(12, box.Top + 4) });
+                using (Pen p = new Pen(Color.White, 1.8f * scale))
+                {
+                    p.StartCap = System.Drawing.Drawing2D.LineCap.Round;
+                    p.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                    e.Graphics.DrawLines(p, new PointF[] {
+                        new PointF(box.Left + box.Width * 0.24f, box.Top + box.Height * 0.52f),
+                        new PointF(box.Left + box.Width * 0.42f, box.Top + box.Height * 0.72f),
+                        new PointF(box.Left + box.Width * 0.76f, box.Top + box.Height * 0.29f)
+                    });
+                }
             }
         }
-        TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(23, 0, Math.Max(0, Width - 23), Height), Enabled ? ForeColor : Color.FromArgb(105,105,105), TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+        int textLeft = (int)Math.Round(24f * scale, MidpointRounding.AwayFromZero);
+        if (!String.IsNullOrEmpty(Text))
+            TextRenderer.DrawText(e.Graphics, Text, Font,
+                new Rectangle(textLeft, 0, Math.Max(0, Width - textLeft), Height),
+                Enabled ? ForeColor : Color.FromArgb(105,105,105),
+                TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
     }
 }
 

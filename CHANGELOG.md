@@ -1,6 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.1.14.6 – Scale custom Autostart checkbox glyph on Windows (LBS-144)
+
+- Fix the too-small "Start with Windows" checkbox visible at both 100% external and 250% internal Lenovo laptop scaling.
+- Correct the owner-drawn `LenovoCheckBox` C# renderer to compute its glyph bounds from the active paint-surface DPI rather than fixed 14×14 pixels. Keep the 96-DPI design glyph at 18×18 pixels, proportionally scale to 45×45 pixels at 250%, and center/clamp within the existing control.
+- Scale the checkmark path and stroke with the same DPI factor while retaining the original colors, pointer hit target, label click action, CheckedChanged event, Autostart registration behavior, and other popup geometry.
+- Add 18 permanent native Windows PowerShell 5.1 checks covering 100/125/150/200/250/300% layout, clipping, real checked glyph bitmap and toggle source contracts. Verify focused RED against v1.1.14.5 then GREEN with the fix and the full Windows native suite.
+- Preserve all previous multi-monitor DPI fixes and firmware/BootNext, TaskBroker privileges, updater, Cloudflare Worker and release-process boundaries. Physical owner visual acceptance remains necessary.
+
 ## v1.1.14.5 – Recover update notices and correct mixed-monitor ToolStrip sizing (LBS-144)
 
 - Correct ownerless update-result notice placement on two active displays by targeting the stable primary WinForms work area instead of a potentially virtualized cursor position, and re-center/clamp each regular modal after its native HWND is shown. Preserve visible-owner dialog targeting and existing keyboard OK/Cancel behavior.
