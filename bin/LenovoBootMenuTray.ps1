@@ -84,6 +84,16 @@ function Get-LocalizationCatalogCore {
             'Settings.DefaultTarget' = 'Default boot target'
             'Settings.NoDefaultTarget' = 'No default target'
             'Settings.DefaultTargetUnavailable' = 'Boot target unavailable'
+            'BootNext.Unknown' = 'Next boot target unknown'
+            'BootNext.UnknownLine' = 'Next restart: unknown · check before restarting'
+            'BootNext.FirmwareOrderLine' = 'Next: firmware order · default: {Default}'
+            'BootNext.AlignedLine' = 'Next: {Next} · matches default'
+            'BootNext.DifferentLine' = 'Next: {Next} · default: {Default} (change)'
+            'BootNext.UnavailableLine' = 'Next boot target unavailable'
+            'BootNext.UseDefaultHint' = 'Set {Default} as the one-time target for the next restart'
+            'BootNext.DefaultApplied' = 'Stored default selected for the next restart.'
+            'BootNext.DefaultApplyFailed' = 'The next restart target could not be changed. Please check the actual target.'
+            'BootNext.CheckFailed' = 'The current firmware next-boot target could not be verified. No restart was started.'
             'Status.Checking' = 'Checking …'
             'Action.RestartWindows' = 'Restart Windows'
             'Status.NextTargetDefaultOrder' = 'Next target: default order'
@@ -350,6 +360,16 @@ function Get-LocalizationCatalogCore {
             'Settings.DefaultTarget' = 'Standard-Startziel'
             'Settings.NoDefaultTarget' = 'Kein Standardziel'
             'Settings.DefaultTargetUnavailable' = 'Nicht verfügbares Startziel'
+            'BootNext.Unknown' = 'Nächstes Startziel unbekannt'
+            'BootNext.UnknownLine' = 'Nächster Neustart: unbekannt · bitte prüfen'
+            'BootNext.FirmwareOrderLine' = 'Nächstes Ziel: Firmware-Reihenfolge · Standard: {Default}'
+            'BootNext.AlignedLine' = 'Nächstes Ziel: {Next} · entspricht Standard'
+            'BootNext.DifferentLine' = 'Nächstes Ziel: {Next} · Standard: {Default} (ändern)'
+            'BootNext.UnavailableLine' = 'Nächstes Startziel nicht verfügbar'
+            'BootNext.UseDefaultHint' = '{Default} einmalig für den nächsten Neustart vormerken'
+            'BootNext.DefaultApplied' = 'Standardziel wurde für den nächsten Neustart vorgemerkt.'
+            'BootNext.DefaultApplyFailed' = 'Das nächste Startziel konnte nicht geändert werden. Bitte das tatsächliche Ziel prüfen.'
+            'BootNext.CheckFailed' = 'Das nächste Startziel der Firmware konnte nicht verifiziert werden. Es wurde kein Neustart ausgelöst.'
             'Status.Checking' = 'Wird geprüft …'
             'Action.RestartWindows' = 'Windows neu starten'
             'Status.NextTargetDefaultOrder' = 'Nächstes Ziel: Standardreihenfolge'
@@ -880,6 +900,77 @@ function Get-OrderedEntriesCore {
     }
 
     return @($result.ToArray())
+}
+
+# LBS-143: pure, fail-closed boot ownership decision core.
+# No firmware I/O, storage, system tasks, or process-local provenance assertions.
+function Resolve-BootNextSynchronizationCore {
+    param(
+        [AllowNull()][string]$PreviousDefaultGuid,
+        [AllowNull()][string]$NewDefaultGuid,
+        [AllowNull()][string]$EffectiveNextGuid,
+        [AllowNull()][string]$OriginGuid,
+        [AllowNull()][string]$OriginBootId,
+        [AllowNull()][string]$CurrentBootId,
+        [AllowEmptyString()][string]$OriginKind = '',
+        [bool]$FirmwareReadSucceeded = $false
+    )
+    $decision = 'Preserve'
+    $reason = 'unknown-provenance'
+    if (-not $NewDefaultGuid) {
+        $reason = 'default-cleared'
+    }
+    elseif ($PreviousDefaultGuid -eq $NewDefaultGuid) {
+        $reason = 'default-unchanged'
+    }
+    elseif (-not $FirmwareReadSucceeded) {
+        $reason = 'firmware-unverified'
+    }
+    elseif (-not $EffectiveNextGuid) {
+        $reason = 'firmware-default-order'
+    }
+    elseif ($OriginKind -eq 'manual' -or $OriginKind -eq 'pending-manual') {
+        $reason = 'explicit-lfs-selection'
+    }
+    elseif ($OriginKind -eq 'auto' -and $OriginGuid -and $OriginBootId -and $CurrentBootId -and
+            $OriginBootId -ceq $CurrentBootId -and $OriginGuid -eq $PreviousDefaultGuid -and
+            $OriginGuid -eq $EffectiveNextGuid) {
+        $decision = 'Synchronize'
+        $reason = 'verified-lfs-auto-origin'
+    }
+    elseif ($OriginKind -eq 'auto' -and $OriginGuid -and $EffectiveNextGuid -and
+            $OriginGuid -ne $EffectiveNextGuid) {
+        $reason = 'observed-external-mismatch'
+    }
+    elseif ($OriginKind -eq 'pending-auto') {
+        $reason = 'interrupted-auto-write'
+    }
+    elseif ($OriginBootId -and $CurrentBootId -and $OriginBootId -cne $CurrentBootId) {
+        $reason = 'stale-boot-cycle'
+    }
+    [pscustomobject]@{
+        Decision = $decision
+        Reason = $reason
+        RequiresExplicitSelection = ($decision -ne 'Synchronize' -and
+            $NewDefaultGuid -and $PreviousDefaultGuid -ne $NewDefaultGuid -and
+            $FirmwareReadSucceeded -and $EffectiveNextGuid -and $EffectiveNextGuid -ne $NewDefaultGuid)
+    }
+}
+
+function Resolve-BootNextDisplayStateCore {
+    param(
+        [AllowNull()][string]$DefaultGuid,
+        [AllowNull()][string]$EffectiveNextGuid,
+        [bool]$FirmwareReadSucceeded,
+        [bool]$Checking,
+        [bool]$EffectiveTargetKnown = $true
+    )
+    if ($Checking) { return 'checking' }
+    if (-not $FirmwareReadSucceeded) { return 'unknown' }
+    if (-not $EffectiveNextGuid) { return 'firmware-order' }
+    if (-not $EffectiveTargetKnown) { return 'unavailable' }
+    if ($DefaultGuid -and $DefaultGuid -eq $EffectiveNextGuid) { return 'aligned' }
+    return 'different'
 }
 
 function Get-StartupRecoveryLocale {
@@ -2090,11 +2181,12 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.1.15.0'
+$script:AppVersion = '1.2.0.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
 $script:SelectedGuid = $null
+$script:NextBootFirmwareReadVerified = $false
 $script:LastStatusText = ''
 $script:ExitRequested = $false
 $script:StorageContext = $null
@@ -2121,7 +2213,7 @@ $script:DiagnosticsUploadMenuItem = $null
 $script:DiagnosticsUploadState = $null
 $script:DiagnosticsUploadTimer = $null
 
-$script:SupportedTaskBrokerVersions = @('0.2.14')
+$script:SupportedTaskBrokerVersions = @('0.2.15')
 $script:TaskBrokerStateDir = Join-Path $env:ProgramData 'Lenovo Boot Selector\TaskBroker'
 $script:TaskBrokerMetadataPath = Join-Path $script:TaskBrokerStateDir 'task-broker.json'
 $script:LegacyTaskBrokerStateDir = Join-Path $env:ProgramData 'Lenovo Boot Menu\TaskBroker'
@@ -5600,6 +5692,13 @@ function Set-DefaultGuid {
             $script:LastStatusText = Get-LocalizedString -Key 'Default.SystemDisabledStatus'
         }
 
+        # DefaultSet may have synchronized the effective next-boot target inside
+        # the privileged SYSTEM task. Re-read firmware before showing success.
+        try { [void](Refresh-EffectiveNextBootState) }
+        catch {
+            $script:NextBootFirmwareReadVerified = $false
+            Update-RestartTargetUi
+        }
         Complete-LegacyDefaultMigration
         if ($script:Popup -and -not $script:Popup.IsDisposed) {
             $matches = $script:Popup.Controls.Find('StatusLabel', $true)
@@ -5609,6 +5708,11 @@ function Set-DefaultGuid {
         Write-RuntimeDiagnosticEvent -Event 'DEFAULT_TARGET_CHANGE' -Stage 'default' -Success $true -DurationMs $sw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{ operation = $operation; guid = $(if ($Guid) { $Guid.ToLowerInvariant() } else { $null }) })
     }
     catch {
+        # Default persistence can succeed before a subsequent BootNext verification
+        # fails. Reflect both authoritative states rather than claiming a rollback.
+        try { [void](Refresh-SystemDefaultState) } catch { }
+        try { [void](Refresh-EffectiveNextBootState) } catch { $script:NextBootFirmwareReadVerified = $false }
+        Update-RestartTargetUi
         $sw.Stop()
         Write-RuntimeDiagnosticEvent -Event 'DEFAULT_TARGET_CHANGE' -Stage 'default' -Success $false -DurationMs $sw.ElapsedMilliseconds -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ operation = $operation; guid = $(if ($Guid) { $Guid.ToLowerInvariant() } else { $null }) }) -Level error
         throw
@@ -6371,23 +6475,86 @@ function Show-MaintenanceSuccessDialog {
 }
 
 
+function Refresh-EffectiveNextBootState {
+    try {
+        $managerText = Get-TaskBrokerFirmwareManagerText -Force
+        $manager = ConvertFrom-FirmwareManagerText -Text ([string]$managerText)
+        $script:SelectedGuid = if ($manager.SelectedGuid) { ([string]$manager.SelectedGuid).ToLowerInvariant() } else { $null }
+        $script:NextBootFirmwareReadVerified = $true
+        Update-RestartTargetUi
+        return $script:SelectedGuid
+    }
+    catch {
+        $script:NextBootFirmwareReadVerified = $false
+        $script:SelectedGuid = $null
+        Update-RestartTargetUi
+        throw
+    }
+}
+
 function Get-NextBootTargetDisplayName {
+    if (-not $script:NextBootFirmwareReadVerified) { return (Get-LocalizedString -Key 'BootNext.Unknown') }
     if ($script:SelectedGuid) {
         $selectedEntry = Get-EntryByGuid $script:SelectedGuid
         if ($selectedEntry) { return [string](Get-EntryDisplayTitle -Entry $selectedEntry) }
+        return (Get-LocalizedString -Key 'Settings.DefaultTargetUnavailable')
     }
     return (Get-LocalizedString -Key 'Boot.DefaultOrder')
 }
 
-function Update-RestartTargetUi {
-    if ($script:RestartTargetLabel -and -not $script:RestartTargetLabel.IsDisposed) {
-        $script:RestartTargetLabel.Text = Get-LocalizedString -Key 'Status.NextTargetLabel' -Values @{ Title=(Get-NextBootTargetDisplayName) }
+function Use-DefaultForNextRestart {
+    $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
+    if (-not $capabilities.CanSetBootNext -or -not $script:DefaultGuid) { return }
+    try {
+        [void](Refresh-EffectiveNextBootState)
+        if ($script:SelectedGuid -eq $script:DefaultGuid) { return }
+        $requested = [string]$script:DefaultGuid
+        Set-BootNextTarget -Guid $requested
+        [void](Refresh-EffectiveNextBootState)
+        if ($script:SelectedGuid -ne $requested) { throw 'Manual next boot target verification failed.' }
+        $script:LastStatusText = Get-LocalizedString -Key 'BootNext.DefaultApplied'
+        Update-PopupRows
     }
+    catch {
+        $script:LastStatusText = Get-LocalizedString -Key 'BootNext.DefaultApplyFailed'
+        Update-PopupRows
+    }
+}
+
+function Update-RestartTargetUi {
+    if (-not $script:RestartTargetLabel -or $script:RestartTargetLabel.IsDisposed) { return }
+    $hasTarget = (-not $script:SelectedGuid -or $null -ne (Get-EntryByGuid $script:SelectedGuid))
+    $model = Resolve-BootNextDisplayStateCore -DefaultGuid $script:DefaultGuid -EffectiveNextGuid $script:SelectedGuid -FirmwareReadSucceeded ([bool]$script:NextBootFirmwareReadVerified) -Checking $false -EffectiveTargetKnown $hasTarget
+    $next = Get-NextBootTargetDisplayName
+    $default = Get-DefaultEntryTitle
+    $canApply = ($model -eq 'different' -or $model -eq 'firmware-order') -and [bool]$script:DefaultGuid
+    switch ($model) {
+        'unknown'        { $labelKey = 'BootNext.UnknownLine' }
+        'firmware-order' { $labelKey = 'BootNext.FirmwareOrderLine' }
+        'aligned'        { $labelKey = 'BootNext.AlignedLine' }
+        'different'      { $labelKey = 'BootNext.DifferentLine' }
+        'unavailable'    { $labelKey = 'BootNext.UnavailableLine' }
+        default          { $labelKey = 'BootNext.UnknownLine' }
+    }
+    $label = Get-LocalizedString -Key $labelKey -Values @{ Next=$next; Default=$default }
+    $script:RestartTargetLabel.Text = $label
+    $script:RestartTargetLabel.Enabled = $true
+    $script:RestartTargetLabel.Cursor = if ($canApply) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
+    $script:RestartTargetLabel.TabStop = [bool]$canApply
+    $script:RestartTargetLabel.ForeColor = if ($canApply) { $script:ColorAccent } else { $script:ColorSecondary }
+    $script:RestartTargetLabel.AccessibleDescription = if ($canApply) { Get-LocalizedString -Key 'BootNext.UseDefaultHint' -Values @{ Default=$default } } else { $label }
+    $script:RestartTargetLabel.FlatAppearance.MouseOverBackColor = if ($canApply) { $script:ColorSelectedRow } else { $script:ColorSurface }
 }
 
 function Restart-Windows {
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     if (-not $capabilities.CanRestart) { return }
+    # A cached SelectedGuid must never be the sole evidence in a restart dialog.
+    try { [void](Refresh-EffectiveNextBootState) }
+    catch {
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Restart.FailedTitle') -Heading (Get-LocalizedString -Key 'BootNext.Unknown') -Message (Get-LocalizedString -Key 'BootNext.CheckFailed') -Kind Error
+        return
+    }
     $targetName = Get-NextBootTargetDisplayName
     $choice = Show-LenovoRestartDialog -TargetName $targetName
     if ($choice -ne [System.Windows.Forms.DialogResult]::Yes) {
@@ -6446,9 +6613,11 @@ function Test-TaskBrokerMetadataContract {
         $expectedManagerFile = Join-Path $script:TaskBrokerStateDir 'fwbootmgr.txt'
         $expectedFirmwareFile = Join-Path $script:TaskBrokerStateDir 'firmware.txt'
         $expectedDefaultFile = Join-Path (Join-Path $script:TaskBrokerStateDir 'Default') 'default-guid.txt'
+        $expectedOriginFile = Join-Path (Join-Path $script:TaskBrokerStateDir 'Default') 'bootnext-origin.json'
         if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$Metadata.managerFile),[System.IO.Path]::GetFullPath($expectedManagerFile),[System.StringComparison]::OrdinalIgnoreCase)) { return $false }
         if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$Metadata.firmwareFile),[System.IO.Path]::GetFullPath($expectedFirmwareFile),[System.StringComparison]::OrdinalIgnoreCase)) { return $false }
         if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$Metadata.defaultFile),[System.IO.Path]::GetFullPath($expectedDefaultFile),[System.StringComparison]::OrdinalIgnoreCase)) { return $false }
+        if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$Metadata.bootNextOriginFile),[System.IO.Path]::GetFullPath($expectedOriginFile),[System.StringComparison]::OrdinalIgnoreCase)) { return $false }
 
         $targets = @($Metadata.targets)
         if ($targets.Count -lt 1) { return $false }
@@ -6821,6 +6990,28 @@ function Get-TaskBrokerDefaultTargetGuid {
 }
 
 
+function Get-TaskBrokerBootNextOwnership {
+    $meta = Get-TaskBrokerMetadata
+    if (-not $meta) { return $null }
+    $path = [string]$meta.bootNextOriginFile
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
+    try {
+        $record = [System.IO.File]::ReadAllText($path,[System.Text.Encoding]::UTF8) | ConvertFrom-Json -ErrorAction Stop
+        if ([int]$record.schema -ne 1) { return $null }
+        $guid = Normalize-TaskBrokerGuid -Guid ([string]$record.guid)
+        if (-not $guid -or -not (Get-TaskBrokerTarget -Guid $guid)) { return $null }
+        if ([string]$record.kind -notin @('auto','manual','pending-auto','pending-manual')) { return $null }
+        $sequence = [int64]$record.seq
+        if ($sequence -lt 1) { return $null }
+        $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+        if (-not $os -or -not $os.LastBootUpTime) { return $null }
+        $cycle = [string]([datetime]$os.LastBootUpTime).ToUniversalTime().Ticks
+        if ([string]$record.bootId -cne $cycle) { return $null }
+        return [pscustomobject]@{ Kind = [string]$record.kind; Guid = $guid; BootId = $cycle; Sequence = $sequence }
+    }
+    catch { return $null }
+}
+
 function Set-TaskBrokerBootNextTarget {
     param([Parameter(Mandatory=$true)][string]$Guid)
 
@@ -6830,7 +7021,19 @@ function Set-TaskBrokerBootNextTarget {
         throw "Für dieses Firmware-Ziel ist keine vorab autorisierte Windows-Aufgabe vorhanden: $normalized"
     }
 
-    Invoke-AuthorizedTask -Operation 'BootNext' -Guid $normalized | Out-Null
+    # Do not acknowledge a previous run of the same fixed Scheduled Task.
+    # The only acceptable completion evidence is an advanced, boot-bound,
+    # SYSTEM-written manual provenance sequence for this exact allowlisted GUID.
+    $before = Get-TaskBrokerBootNextOwnership
+    Invoke-AuthorizedTask -Operation 'BootNext' -Guid $normalized -TimeoutMs 30000 | Out-Null
+    $after = Get-TaskBrokerBootNextOwnership
+    if (-not $after -or $after.Kind -ne 'manual' -or $after.Guid -ne $normalized) {
+        throw 'BootNext task has no verified completed manual provenance.'
+    }
+    if ($before -and $before.BootId -eq $after.BootId -and
+        [int64]$after.Sequence -le [int64]$before.Sequence) {
+        throw 'BootNext task returned without advancing protected completion evidence.'
+    }
     return (Get-TaskBrokerFirmwareManagerText -Force)
 }
 
@@ -6843,12 +7046,12 @@ function Set-TaskBrokerDefaultTarget {
         throw 'Für dieses Firmwareziel existiert keine autorisierte Standardziel-Aufgabe.'
     }
 
-    Invoke-AuthorizedTask -Operation 'DefaultSet' -Guid $normalized | Out-Null
+    Invoke-AuthorizedTask -Operation 'DefaultSet' -Guid $normalized -TimeoutMs 30000 | Out-Null
 }
 
 function Clear-TaskBrokerDefaultTarget {
     if (-not (Test-TaskBrokerMetadataCompatible)) { throw 'TaskBroker-Metadaten verletzen den festen Boundary-Vertrag.' }
-    Invoke-AuthorizedTask -Operation 'DefaultClear' | Out-Null
+    Invoke-AuthorizedTask -Operation 'DefaultClear' -TimeoutMs 30000 | Out-Null
 }
 
 function Resolve-SystemFunctionsCapabilities {
@@ -7839,9 +8042,14 @@ function Compare-BootTargetDriftCore {
 
 
 function Get-BootServiceFirmwareSnapshot {
-    param([switch]$UseExistingCache)
+    param([switch]$UseExistingCache, [switch]$ForceManagerRefresh)
 
-    $managerText = Get-TaskBrokerFirmwareManagerText -UseExistingCache:$UseExistingCache
+    if ($UseExistingCache -and $ForceManagerRefresh) {
+        throw 'Cannot combine cached firmware state with a forced firmware-manager refresh.'
+    }
+    # A snapshot later labelled freshly verified must bypass the short manager
+    # cache. A cached popup-open snapshot must never be labelled verified.
+    $managerText = Get-TaskBrokerFirmwareManagerText -UseExistingCache:$UseExistingCache -Force:$ForceManagerRefresh
     $firmwareText = Get-TaskBrokerFirmwareEntriesText -UseExistingCache:$UseExistingCache
 
     [pscustomobject]@{
@@ -8151,7 +8359,7 @@ function Apply-BackgroundRefreshResult {
     }
 
     $state = Get-FirmwareBootState -UseExistingCache
-    Apply-FirmwareBootState -State $state
+    Apply-FirmwareBootState -State $state -VerifiedFresh
     Update-TaskBrokerUiState -Fast | Out-Null
     Show-BootTargetDriftNotificationIfNeeded
     return $true
@@ -8296,10 +8504,11 @@ $script:BackgroundRefreshState = New-BackgroundRefreshRuntimeState
 function Get-FirmwareBootState {
     param(
         [switch]$RefreshStorage,
-        [switch]$UseExistingCache
+        [switch]$UseExistingCache,
+        [switch]$ForceManagerRefresh
     )
 
-    $snapshot = Get-BootServiceFirmwareSnapshot -UseExistingCache:$UseExistingCache
+    $snapshot = Get-BootServiceFirmwareSnapshot -UseExistingCache:$UseExistingCache -ForceManagerRefresh:$ForceManagerRefresh
     $descriptions = $snapshot.Descriptions
     $managerState = $snapshot.ManagerState
     $displayOrder = @($managerState.DisplayOrder)
@@ -9500,10 +9709,11 @@ function Update-PopupRows {
 
 
 function Apply-FirmwareBootState {
-    param([Parameter(Mandatory=$true)]$State)
+    param([Parameter(Mandatory=$true)]$State, [switch]$VerifiedFresh)
 
     $script:CurrentEntries = @($State.Entries)
     $script:SelectedGuid = if ($State.SelectedGuid) { $State.SelectedGuid.ToLowerInvariant() } else { $null }
+    $script:NextBootFirmwareReadVerified = [bool]$VerifiedFresh
 
     if ($script:SelectedGuid) {
         $selected = Get-EntryByGuid $script:SelectedGuid
@@ -9526,13 +9736,14 @@ function Refresh-BootState {
         $script:FirmwareCacheText = $null
     }
     try {
-        $state = Get-FirmwareBootState -RefreshStorage:$RefreshStorage
+        $state = Get-FirmwareBootState -RefreshStorage:$RefreshStorage -ForceManagerRefresh
         [void](Update-BootTargetDriftState)
-        Apply-FirmwareBootState -State $state
+        Apply-FirmwareBootState -State $state -VerifiedFresh
         $sw.Stop()
         Write-RuntimeDiagnosticEvent -Event 'BOOT_STATE_REFRESH' -Stage 'boot-state' -Success $true -DurationMs $sw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{ refreshStorage = [bool]$RefreshStorage; entryCount = @($state.Entries).Count; selectedGuid = $state.SelectedGuid })
     }
     catch {
+        $script:NextBootFirmwareReadVerified = $false
         $sw.Stop()
         Write-RuntimeDiagnosticEvent -Event 'BOOT_STATE_REFRESH' -Stage 'boot-state' -Success $false -DurationMs $sw.ElapsedMilliseconds -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ refreshStorage = [bool]$RefreshStorage }) -Level error
         $script:LastStatusText = Get-LocalizedString -Key 'Status.BootTargetsReadFailed'
@@ -9860,10 +10071,24 @@ function Add-PopupRestartSection {
     $restartButton.Add_Click({ Restart-Windows })
     $restartPanel.Controls.Add($restartButton)
 
-    $restartTarget = New-Label -Text (Get-LocalizedString -Key 'Status.NextTargetDefaultOrder') -Font (New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Regular)) `
-        -ForeColor ([Drawing.Color]::FromArgb(155,155,155)) -X 16 -Y 39 -Width 358 -Height 18
+    # The secondary line remains compact, but is a keyboard-focusable action
+    # whenever the stored default differs from the next effective boot target.
+    $restartTarget = New-Object System.Windows.Forms.Button
+    $restartTarget.Text = Get-LocalizedString -Key 'Status.NextTargetDefaultOrder'
+    $restartTarget.Font = New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Regular)
+    $restartTarget.ForeColor = [Drawing.Color]::FromArgb(155,155,155)
+    $restartTarget.BackColor = $script:ColorSurface
+    $restartTarget.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $restartTarget.FlatAppearance.BorderSize = 0
+    $restartTarget.FlatAppearance.MouseOverBackColor = $script:ColorSurface
+    $restartTarget.FlatAppearance.MouseDownBackColor = $script:ColorSelectedRow
     $restartTarget.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+    $restartTarget.AutoEllipsis = $true
+    $restartTarget.TabStop = $false
+    $restartTarget.Location = New-Object Drawing.Point(16, 38)
+    $restartTarget.Size = New-Object Drawing.Size(358, 20)
     $restartTarget.Name = 'RestartTargetLabel'
+    $restartTarget.Add_Click({ if ($script:RestartTargetLabel -and $script:RestartTargetLabel.TabStop) { Use-DefaultForNextRestart } })
     $restartPanel.Controls.Add($restartTarget)
     $script:RestartTargetLabel = $restartTarget
     $Root.Controls.Add($restartPanel)

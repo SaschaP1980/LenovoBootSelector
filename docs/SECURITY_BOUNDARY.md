@@ -44,11 +44,13 @@ The runtime never accepts a task name supplied by UI state, user input or arbitr
 
 ## Metadata contract
 
-TaskBroker schema 0.2.14 introduces the explicit boundary marker:
+TaskBroker schema 0.2.15 introduces the explicit boundary marker:
 
 `boundaryContract = fixed-task-v2`
 
 Runtime metadata is accepted only when all of the following are true:
+
+- protected boot provenance path is fixed within the TaskBroker Default directory;
 
 - schema version is explicitly supported;
 - boundary marker is exact;
@@ -116,3 +118,13 @@ The canonical gates must continue to verify at least:
 - updater isolation from TaskBroker.
 
 Native Windows testing remains required before claiming actual Task Scheduler ACL behavior as natively proven.
+
+## LBS-143 — coordinated LBS writer priority
+
+From schema 0.2.15, the fixed SYSTEM tasks for `BootNext`, `DefaultSet`, `DefaultClear`, and delayed `DefaultRestore` coordinate within a **single exclusive file lock** under the protected TaskBroker `Default` directory. The elevated installer pre-creates `bootnext-writer.lock` with only SYSTEM and Administrators FullControl. The writer uses `FileMode.Open` with `FileShare.None`, never `OpenOrCreate`, and a bounded 8-second contention wait; missing, malformed, unopenable, or incorrectly protected lock state fails closed. The lock handle is released when its process terminates. All writer task registrations explicitly use Task Scheduler `MultipleInstances = Queue`; reconfiguration requires elevated Repair, not runtime task mutation. The installed task specifications independently verify both exact encoded actions and Queue policy.
+
+SYSTEM-owned boot provenance persists a protected, real-boot-cycle-bound increasing sequence through `pending-manual` and successful `manual` records. A manual BootNext caller requires a new verified manual sequence for the requested allowlisted GUID plus a fresh firmware readback before reporting success; it cannot trust an older Scheduled Task `LastTaskResult` alone. The later completed manual state takes priority over delayed LBS automatic Default Restore. Default synchronization is permitted only when both current LBS-auto origin and a fresh firmware GUID match the old default while the privileged lock is held. The authority boundary and task names remain unchanged. The writer lock is not an externally enforced transaction against unrelated privileged firmware tools.
+
+This is **LBS-owned writer precedence**, not a claim of controlling independent privileged firmware writers. External writes are neither synchronized by this lock nor intrinsically attributable when they reuse the same target GUID. Observable external mismatch is preserved where the current state reveals it. Where provenance is unknown or stale, no silent automatic default-change synchronization is permitted. Failed/partial actions are not reported as atomic success. The existing runtime operation whitelist, deterministic task names, SYSTEM/no-admin-UI boundary and one-shot `bootsequence` limit remain mandatory.
+
+Upgrading older 0.2.14 SYSTEM task installations to 0.2.15 requires the explicit elevated Repair system functions flow. No unelevated automatic task reconfiguration is allowed; old metadata fails compatibility checks.

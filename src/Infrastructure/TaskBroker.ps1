@@ -31,9 +31,11 @@ function Test-TaskBrokerMetadataContract {
         $expectedManagerFile = Join-Path $script:TaskBrokerStateDir 'fwbootmgr.txt'
         $expectedFirmwareFile = Join-Path $script:TaskBrokerStateDir 'firmware.txt'
         $expectedDefaultFile = Join-Path (Join-Path $script:TaskBrokerStateDir 'Default') 'default-guid.txt'
+        $expectedOriginFile = Join-Path (Join-Path $script:TaskBrokerStateDir 'Default') 'bootnext-origin.json'
         if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$Metadata.managerFile),[System.IO.Path]::GetFullPath($expectedManagerFile),[System.StringComparison]::OrdinalIgnoreCase)) { return $false }
         if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$Metadata.firmwareFile),[System.IO.Path]::GetFullPath($expectedFirmwareFile),[System.StringComparison]::OrdinalIgnoreCase)) { return $false }
         if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$Metadata.defaultFile),[System.IO.Path]::GetFullPath($expectedDefaultFile),[System.StringComparison]::OrdinalIgnoreCase)) { return $false }
+        if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$Metadata.bootNextOriginFile),[System.IO.Path]::GetFullPath($expectedOriginFile),[System.StringComparison]::OrdinalIgnoreCase)) { return $false }
 
         $targets = @($Metadata.targets)
         if ($targets.Count -lt 1) { return $false }
@@ -406,6 +408,28 @@ function Get-TaskBrokerDefaultTargetGuid {
 }
 
 
+function Get-TaskBrokerBootNextOwnership {
+    $meta = Get-TaskBrokerMetadata
+    if (-not $meta) { return $null }
+    $path = [string]$meta.bootNextOriginFile
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
+    try {
+        $record = [System.IO.File]::ReadAllText($path,[System.Text.Encoding]::UTF8) | ConvertFrom-Json -ErrorAction Stop
+        if ([int]$record.schema -ne 1) { return $null }
+        $guid = Normalize-TaskBrokerGuid -Guid ([string]$record.guid)
+        if (-not $guid -or -not (Get-TaskBrokerTarget -Guid $guid)) { return $null }
+        if ([string]$record.kind -notin @('auto','manual','pending-auto','pending-manual')) { return $null }
+        $sequence = [int64]$record.seq
+        if ($sequence -lt 1) { return $null }
+        $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+        if (-not $os -or -not $os.LastBootUpTime) { return $null }
+        $cycle = [string]([datetime]$os.LastBootUpTime).ToUniversalTime().Ticks
+        if ([string]$record.bootId -cne $cycle) { return $null }
+        return [pscustomobject]@{ Kind = [string]$record.kind; Guid = $guid; BootId = $cycle; Sequence = $sequence }
+    }
+    catch { return $null }
+}
+
 function Set-TaskBrokerBootNextTarget {
     param([Parameter(Mandatory=$true)][string]$Guid)
 
@@ -415,7 +439,19 @@ function Set-TaskBrokerBootNextTarget {
         throw "Für dieses Firmware-Ziel ist keine vorab autorisierte Windows-Aufgabe vorhanden: $normalized"
     }
 
-    Invoke-AuthorizedTask -Operation 'BootNext' -Guid $normalized | Out-Null
+    # Do not acknowledge a previous run of the same fixed Scheduled Task.
+    # The only acceptable completion evidence is an advanced, boot-bound,
+    # SYSTEM-written manual provenance sequence for this exact allowlisted GUID.
+    $before = Get-TaskBrokerBootNextOwnership
+    Invoke-AuthorizedTask -Operation 'BootNext' -Guid $normalized -TimeoutMs 30000 | Out-Null
+    $after = Get-TaskBrokerBootNextOwnership
+    if (-not $after -or $after.Kind -ne 'manual' -or $after.Guid -ne $normalized) {
+        throw 'BootNext task has no verified completed manual provenance.'
+    }
+    if ($before -and $before.BootId -eq $after.BootId -and
+        [int64]$after.Sequence -le [int64]$before.Sequence) {
+        throw 'BootNext task returned without advancing protected completion evidence.'
+    }
     return (Get-TaskBrokerFirmwareManagerText -Force)
 }
 
@@ -428,10 +464,10 @@ function Set-TaskBrokerDefaultTarget {
         throw 'Für dieses Firmwareziel existiert keine autorisierte Standardziel-Aufgabe.'
     }
 
-    Invoke-AuthorizedTask -Operation 'DefaultSet' -Guid $normalized | Out-Null
+    Invoke-AuthorizedTask -Operation 'DefaultSet' -Guid $normalized -TimeoutMs 30000 | Out-Null
 }
 
 function Clear-TaskBrokerDefaultTarget {
     if (-not (Test-TaskBrokerMetadataCompatible)) { throw 'TaskBroker-Metadaten verletzen den festen Boundary-Vertrag.' }
-    Invoke-AuthorizedTask -Operation 'DefaultClear' | Out-Null
+    Invoke-AuthorizedTask -Operation 'DefaultClear' -TimeoutMs 30000 | Out-Null
 }
