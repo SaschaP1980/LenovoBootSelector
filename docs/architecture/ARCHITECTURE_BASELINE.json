@@ -1,8 +1,8 @@
 {
-  "version": "1.1.14.6",
+  "version": "1.1.14.7",
   "runtime": {
-    "lines": 10594,
-    "functions": 323,
+    "lines": 10641,
+    "functions": 324,
     "scriptReferences": 1164,
     "scriptVariables": 135,
     "catchBlocks": 224,
@@ -28,8 +28,8 @@
   },
   "ui": {
     "files": 20,
-    "lines": 3951,
-    "functions": 113,
+    "lines": 3998,
+    "functions": 114,
     "scriptReferences": 602
   },
   "appTemplate": {

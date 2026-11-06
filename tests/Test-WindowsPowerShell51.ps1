@@ -63,3 +63,7 @@ if ($LASTEXITCODE -ne 0) { throw 'LBS-144 menu text raster regression failed' }
 $hotfixProbe = Join-Path $root 'tests\Test-LBS144-MixedMonitorHotfix.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $hotfixProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-144 P123 isolated native regression failed' }
+# LBS-144: isolate painted eye DrawToBitmap and local UI test stubs.
+$eyeGlyphProbe = Join-Path $root 'tests\Test-LBS144-ManageEyeDpi.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $eyeGlyphProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-144 visibility eye/refresh DPI regression failed' }
