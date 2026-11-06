@@ -9,7 +9,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $script:CurrentStep = 'init'
-$version = '0.2.14'
+$version = '0.2.15'
 $taskPrefix = 'LenovoBootSelector-Set-'
 $defaultTaskPrefix = 'LenovoBootSelector-Default-Set-'
 $managerRefreshTask = 'LenovoBootSelector-RefreshManager'
@@ -25,6 +25,8 @@ $firmwareFile = Join-Path $StateDir 'firmware.txt'
 $metadataFile = Join-Path $StateDir 'task-broker.json'
 $defaultStateDir = Join-Path $StateDir 'Default'
 $defaultFile = Join-Path $defaultStateDir 'default-guid.txt'
+$bootNextOriginFile = Join-Path $defaultStateDir 'bootnext-origin.json'
+$bootWriterLockFile = Join-Path $defaultStateDir 'bootnext-writer.lock'
 $installLog = Join-Path $UserStateDir 'task-broker-install.log'
 $diagPointer = Join-Path $UserStateDir 'latest-install-diagnostic.txt'
 $bcdedit = Join-Path $env:SystemRoot 'System32\bcdedit.exe'
@@ -421,6 +423,10 @@ function Grant-TaskReadExecute([string]$TaskName, [string]$Sid) {
     }
 }
 function New-SystemTaskSettings {
+    param([switch]$SerializedWriter)
+    if ($SerializedWriter) {
+        return New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 1) -MultipleInstances Queue
+    }
     return New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 1)
 }
 
@@ -429,6 +435,7 @@ function Register-FixedSystemTask {
         [Parameter(Mandatory=$true)][string]$TaskName,
         [Parameter(Mandatory=$true)]$Action,
         $Trigger = $null,
+        [switch]$SerializedWriter,
         [switch]$ReplaceDefinition
     )
 
@@ -441,7 +448,7 @@ function Register-FixedSystemTask {
 
     if (-not $exists -or $ReplaceDefinition) {
         $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
-        $settings = New-SystemTaskSettings
+        $settings = New-SystemTaskSettings -SerializedWriter:$SerializedWriter
         if ($Trigger) {
             Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Principal $principal -Settings $settings -Force | Out-Null
         }
@@ -553,6 +560,13 @@ function Assert-CanonicalTaskSpec {
         throw "Task trigger contract mismatch: $($Spec.Name)"
     }
 
+    if ([bool]$Spec.SerializedWriter) {
+        [xml]$taskXml = [string]$task.Xml
+        $policy = $taskXml.SelectSingleNode("/*[local-name()='Task']/*[local-name()='Settings']/*[local-name()='MultipleInstancesPolicy']")
+        if (-not $policy -or [string]$policy.InnerText -ne 'Queue') {
+            throw "Serialized writer task is not configured to queue repeated invocations: $($Spec.Name)"
+        }
+    }
     $sddl = $task.GetSecurityDescriptor(0x7)
     if (-not (Test-SddlReadExecuteAce -Sddl $sddl -Sid $UserSid)) {
         throw "Task DACL violates Read+Execute-only contract: $($Spec.Name)"
@@ -565,13 +579,14 @@ function Assert-CanonicalTaskSpec {
 function Assert-CanonicalTaskBrokerMetadata {
     if (-not (Test-Path -LiteralPath $metadataFile -PathType Leaf)) { throw 'Canonical TaskBroker metadata is missing.' }
     $meta = ([System.IO.File]::ReadAllText($metadataFile,[System.Text.Encoding]::UTF8) | ConvertFrom-Json)
-    if ([string]$meta.version -ne '0.2.14') { throw 'Canonical metadata version mismatch.' }
+    if ([string]$meta.version -ne '0.2.15') { throw 'Canonical metadata version mismatch.' }
     if ([string]$meta.boundaryContract -ne 'fixed-task-v2') { throw 'Canonical metadata boundary contract mismatch.' }
     if ([string]$meta.userSid -ne $UserSid) { throw 'Canonical metadata user SID mismatch.' }
     if ([string]$meta.managerRefreshTask -ne $managerRefreshTask) { throw 'Canonical manager task mismatch.' }
     if ([string]$meta.firmwareRefreshTask -ne $firmwareRefreshTask) { throw 'Canonical firmware task mismatch.' }
     if ([string]$meta.defaultClearTask -ne $defaultClearTask) { throw 'Canonical default-clear task mismatch.' }
     if ([string]$meta.defaultRestoreTask -ne $defaultRestoreTask) { throw 'Canonical default-restore task mismatch.' }
+    if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$meta.bootNextOriginFile),[System.IO.Path]::GetFullPath($bootNextOriginFile),[System.StringComparison]::OrdinalIgnoreCase)) { throw 'Canonical origin path mismatch.' }
 
     foreach ($pair in @(
         @([string]$meta.managerFile,$managerFile),
@@ -633,6 +648,54 @@ function Protect-DefaultStateFile {
     $acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($usersSid,[System.Security.AccessControl.FileSystemRights]::ReadAndExecute,$allow))
     Set-Acl -LiteralPath $defaultFile -AclObject $acl
     Write-InstallLog 'Default-state file ACL set to SYSTEM/Admin write + Users read/execute.'
+}
+
+# This is a SYSTEM/Admin-only guard in the already protected Default directory.
+# Lock acquisition uses FileMode.Open, never OpenOrCreate, so an unelevated
+# process cannot create, claim or mutate the lock object used by task writers.
+function Protect-BootWriterLockFile {
+    if (Test-Path -LiteralPath $bootWriterLockFile) {
+        if (([int](Get-Item -LiteralPath $bootWriterLockFile -Force).Attributes -band [int][IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw 'Boot writer lock must not be a reparse point.'
+        }
+    }
+    else {
+        [IO.File]::WriteAllBytes($bootWriterLockFile,[byte[]]@())
+    }
+    $acl = New-Object System.Security.AccessControl.FileSecurity
+    $acl.SetAccessRuleProtection($true,$false)
+    $allow = [Security.AccessControl.AccessControlType]::Allow
+    $system = [Security.Principal.SecurityIdentifier]::new('S-1-5-18')
+    $admins = [Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
+    $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($system,[Security.AccessControl.FileSystemRights]::FullControl,$allow))
+    $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($admins,[Security.AccessControl.FileSystemRights]::FullControl,$allow))
+    Set-Acl -LiteralPath $bootWriterLockFile -AclObject $acl
+    Assert-BootWriterLockFile
+}
+
+function Assert-BootWriterLockFile {
+    if (-not (Test-Path -LiteralPath $bootWriterLockFile -PathType Leaf)) {
+        throw 'Protected boot writer lock file missing.'
+    }
+    $item = Get-Item -LiteralPath $bootWriterLockFile -Force
+    if (([int]$item.Attributes -band [int][IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw 'Protected boot writer lock may not be a reparse point.'
+    }
+    $actual = Get-Acl -LiteralPath $bootWriterLockFile
+    $rules = @($actual.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier]))
+    $expected = @('S-1-5-18','S-1-5-32-544')
+    if ($rules.Count -ne 2) { throw 'Boot writer lock DACL must have exactly two explicit rules.' }
+    foreach ($rule in $rules) {
+        if ($rule.IsInherited -or [string]$rule.AccessControlType -ne 'Allow' -or
+            $expected -notcontains [string]$rule.IdentityReference.Value -or
+            ([int]$rule.FileSystemRights -band [int][Security.AccessControl.FileSystemRights]::FullControl) -ne [int][Security.AccessControl.FileSystemRights]::FullControl) {
+            throw 'Boot writer lock DACL permits an unexpected principal or access mask.'
+        }
+    }
+    if (@($rules | Where-Object { $_.IdentityReference.Value -eq 'S-1-5-18' }).Count -ne 1 -or
+        @($rules | Where-Object { $_.IdentityReference.Value -eq 'S-1-5-32-544' }).Count -ne 1) {
+        throw 'Boot writer lock must grant exactly SYSTEM and Administrators.'
+    }
 }
 
 function Get-ExistingSystemDefault([string[]]$AllowedGuids) {
@@ -745,6 +808,7 @@ try {
     $model.ManagerText | Set-Content -LiteralPath $managerFile -Encoding UTF8
     $model.FirmwareText | Set-Content -LiteralPath $firmwareFile -Encoding UTF8
     Protect-DefaultStateDirectory
+    Protect-BootWriterLockFile
     $defaultFileEscaped = $defaultFile.Replace("'","''")
     $bcdeditEscaped = $bcdedit.Replace("'","''")
 
@@ -788,6 +852,149 @@ try {
     Register-FixedSystemTask -TaskName $firmwareRefreshTask -Action $fwAction -ReplaceDefinition
     $taskSpecs += [pscustomobject]@{ Name=$firmwareRefreshTask; Execute=$cmd; Arguments=$fwCmd; StartupDelay='' }
 
+# LBS-143: All LBS firmware/default writers use one fixed, allowlisted,
+# privileged and cross-process serialized SYSTEM task code path.
+# This is expanded once at explicit elevated setup, never assembled from UI input.
+$allowedLiteral = (@($model.AllowedGuids) | ForEach-Object { "'$_'" }) -join ','
+$coordinatedTaskTemplate = @'
+$ErrorActionPreference = 'Stop'
+$operation = '__OP__'
+$target = '__GUID__'
+$allowed = @(__ALLOWED__)
+$defaultPath = '__DEFAULT__'
+$originPath = '__ORIGIN__'
+$lockPath = '__LOCK__'
+$bcd = '__BCDEDIT__'
+function BootId {
+    $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+    if (-not $os -or -not $os.LastBootUpTime) { throw 'Windows boot identity unavailable.' }
+    $ticks = ([datetime]$os.LastBootUpTime).ToUniversalTime().Ticks
+    if ($ticks -lt 630000000000000000) { throw 'Invalid Windows boot identity.' }
+    return [string]$ticks
+}
+function OriginRead([string]$cycle) {
+    if (-not [IO.File]::Exists($originPath)) { return $null }
+    $s = [IO.File]::ReadAllText($originPath,[Text.Encoding]::UTF8) | ConvertFrom-Json -ErrorAction Stop
+    if ([int]$s.schema -ne 1 -or $s.kind -notin @('auto','manual','pending-auto','pending-manual')) {
+        throw 'Untrusted origin record.'
+    }
+    if ([string]$s.guid -notin $allowed) { throw 'Unknown origin target.' }
+    # A valid record from an older real boot never suppresses this boot's restore,
+    # even when its older sequence field is absent.
+    if ([string]$s.bootId -ne $cycle) { return $null }
+    if ($null -eq $s.seq -or [int64]$s.seq -lt 1) { throw 'Missing or invalid protected origin sequence.' }
+    return $s
+}
+function OriginWrite([string]$cycle,[string]$kind,[string]$guid) {
+    $script:writerSeq = [int64]$script:writerSeq + 1
+    $data = [ordered]@{ schema=1; bootId=$cycle; kind=$kind; guid=$guid; seq = $script:writerSeq }
+    $tmp = $originPath + '.' + [guid]::NewGuid().ToString('N') + '.tmp'
+    $backup = $originPath + '.' + [guid]::NewGuid().ToString('N') + '.bak'
+    try {
+        [IO.File]::WriteAllText($tmp,($data | ConvertTo-Json -Compress),[Text.Encoding]::UTF8)
+        if ([IO.File]::Exists($originPath)) { [IO.File]::Replace($tmp,$originPath,$backup) }
+        else { [IO.File]::Move($tmp,$originPath) }
+    }
+    finally {
+        if ([IO.File]::Exists($tmp)) { [IO.File]::Delete($tmp) }
+        if ([IO.File]::Exists($backup)) { [IO.File]::Delete($backup) }
+    }
+}
+function DefaultRead {
+    if (-not [IO.File]::Exists($defaultPath)) { return $null }
+    $value = [IO.File]::ReadAllText($defaultPath).Trim().ToLowerInvariant()
+    if ($value -notin $allowed) { throw 'Untrusted default target.' }
+    return $value
+}
+function FirmwareNext {
+    $out = (& $bcd /enum '{fwbootmgr}' /v 2>&1 | Out-String)
+    if ($LASTEXITCODE -ne 0) { throw 'Firmware manager read failed.' }
+    if ($out -match '(?im)^\s*bootsequence\s+(\{[a-fA-F0-9-]{36}\})') {
+        return $Matches[1].ToLowerInvariant()
+    }
+    return $null
+}
+function FirmwareSet([string]$guid) {
+    & $bcd /set '{fwbootmgr}' bootsequence $guid | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'One-shot firmware write failed.' }
+    if ((FirmwareNext) -ne $guid) { throw 'One-shot firmware readback mismatch.' }
+}
+# All LBS-owned writer tasks acquire the same existing SYSTEM-only file.
+# FileShare.None serializes processes and automatically releases on a crash.
+$lock = $null
+$lockWait = [Diagnostics.Stopwatch]::StartNew()
+try {
+    while (-not $lock) {
+        try {
+            $lock = [IO.File]::Open($lockPath,[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
+        }
+        catch [IO.IOException] {
+            # Retry only Windows sharing/locking violations, never missing files.
+            if ([int]$_.Exception.HResult -notin @(-2147024864,-2147024863)) { throw }
+            if ($lockWait.ElapsedMilliseconds -ge 8000) { throw 'Boot writer lock unavailable (timeout).' }
+            [Threading.Thread]::Sleep(80)
+        }
+    }
+    $cycle = BootId
+    $origin = OriginRead $cycle
+    $script:writerSeq = if ($origin) { [int64]$origin.seq } else { [int64]0 }
+    if ($operation -eq 'BootNext') {
+        if ($target -notin $allowed) { throw 'BootNext not allowlisted.' }
+        OriginWrite $cycle 'pending-manual' $target
+        FirmwareSet $target
+        OriginWrite $cycle 'manual' $target
+    }
+    elseif ($operation -eq 'DefaultRestore') {
+        if ($origin -and $origin.kind -in @('manual','pending-manual','pending-auto')) { return }
+        if ($origin -and $origin.kind -eq 'auto') {
+            # Preserve an observable external change made after LBS auto restore.
+            if ((FirmwareNext) -ne [string]$origin.guid) { return }
+        }
+        $configured = DefaultRead
+        if ($configured) {
+            OriginWrite $cycle 'pending-auto' $configured
+            FirmwareSet $configured
+            OriginWrite $cycle 'auto' $configured
+        }
+    }
+    elseif ($operation -eq 'DefaultSet') {
+        if ($target -notin $allowed) { throw 'Default target not allowlisted.' }
+        $old = DefaultRead
+        $next = $null
+        $firmwareConfirmed = $false
+        try { $next = FirmwareNext; $firmwareConfirmed = $true }
+        catch { $firmwareConfirmed = $false }
+        # The stored default remains changeable when firmware read is unavailable,
+        # but automatic BootNext writes are categorically disabled in that case.
+        $sync = ($target -ne $old -and $firmwareConfirmed -and $origin -and $origin.kind -eq 'auto' -and $old -and
+                 $origin.guid -eq $old -and $next -eq $old)
+        if ($sync) { OriginWrite $cycle 'pending-auto' $target }
+        [IO.File]::WriteAllText($defaultPath,$target,[Text.Encoding]::ASCII)
+        if ($sync) {
+            FirmwareSet $target
+            OriginWrite $cycle 'auto' $target
+        }
+    }
+    elseif ($operation -eq 'DefaultClear') {
+        if ([IO.File]::Exists($defaultPath)) { [IO.File]::Delete($defaultPath) }
+    }
+    else { throw 'Unsupported operation.' }
+}
+finally {
+    if ($lock) { $lock.Dispose() }
+}
+'@
+function New-CoordinatedBootAction {
+    param([Parameter(Mandatory=$true)][string]$Operation,[string]$Guid = '')
+    if ($Operation -notin @('BootNext','DefaultSet','DefaultClear','DefaultRestore')) { throw 'Invalid coordinated operation.' }
+    if ($Guid -and $model.AllowedGuids -notcontains $Guid) { throw 'Invalid coordinated task GUID.' }
+    $s = $coordinatedTaskTemplate.Replace('__OP__',$Operation).Replace('__GUID__',$Guid)
+    $s = $s.Replace('__ALLOWED__',$allowedLiteral).Replace('__DEFAULT__',$defaultFile.Replace("'","''"))
+    $s = $s.Replace('__ORIGIN__',$bootNextOriginFile.Replace("'","''")).Replace('__LOCK__',$bootWriterLockFile.Replace("'","''")).Replace('__BCDEDIT__',$bcdedit.Replace("'","''"))
+    if ($s.Length -gt 6500) { throw 'Fixed coordinated task script exceeds safe encoded-command budget.' }
+    return New-EncodedPowerShellAction $s
+}
+
     Set-Step 'register-target-tasks'
     $targets = @()
     foreach ($guid in $model.AllowedGuids) {
@@ -795,43 +1002,30 @@ try {
         $taskName = $taskPrefix + $compact
         $defaultTaskName = $defaultTaskPrefix + $compact
 
-        $bootArgs = '/set "{{fwbootmgr}}" bootsequence "{0}"' -f $guid
-        $bootAction = New-ScheduledTaskAction -Execute $bcdedit -Argument $bootArgs
-        Register-FixedSystemTask -TaskName $taskName -Action $bootAction -ReplaceDefinition
-        $taskSpecs += [pscustomobject]@{ Name=$taskName; Execute=$bcdedit; Arguments=$bootArgs; StartupDelay='' }
+        $bootAction = New-CoordinatedBootAction -Operation 'BootNext' -Guid $guid
+        Register-FixedSystemTask -TaskName $taskName -Action $bootAction -SerializedWriter -ReplaceDefinition
+        $taskSpecs += [pscustomobject]@{ Name=$taskName; Execute=$powershell; Arguments=[string]$bootAction.Arguments; StartupDelay=''; SerializedWriter=$true }
 
-        $setDefaultScript = "[System.IO.File]::WriteAllText('$defaultFileEscaped','$guid',[System.Text.Encoding]::ASCII); exit 0"
-        $setDefaultAction = New-EncodedPowerShellAction $setDefaultScript
-        Register-FixedSystemTask -TaskName $defaultTaskName -Action $setDefaultAction -ReplaceDefinition
-        $taskSpecs += [pscustomobject]@{ Name=$defaultTaskName; Execute=$powershell; Arguments=[string]$setDefaultAction.Arguments; StartupDelay='' }
+        $setDefaultAction = New-CoordinatedBootAction -Operation 'DefaultSet' -Guid $guid
+        Register-FixedSystemTask -TaskName $defaultTaskName -Action $setDefaultAction -SerializedWriter -ReplaceDefinition
+        $taskSpecs += [pscustomobject]@{ Name=$defaultTaskName; Execute=$powershell; Arguments=[string]$setDefaultAction.Arguments; StartupDelay=''; SerializedWriter=$true }
 
         $desc = if ($model.Descriptions.ContainsKey($guid)) { [string]$model.Descriptions[$guid] } else { 'Firmware-Startziel' }
         $targets += [pscustomobject]@{ guid=$guid; taskName=$taskName; defaultTaskName=$defaultTaskName; description=$desc }
     }
 
     Set-Step 'register-default-clear'
-    $clearDefaultScript = "Remove-Item -LiteralPath '$defaultFileEscaped' -Force -ErrorAction SilentlyContinue; exit 0"
-    $clearAction = New-EncodedPowerShellAction $clearDefaultScript
-    Register-FixedSystemTask -TaskName $defaultClearTask -Action $clearAction -ReplaceDefinition
-    $taskSpecs += [pscustomobject]@{ Name=$defaultClearTask; Execute=$powershell; Arguments=[string]$clearAction.Arguments; StartupDelay='' }
+    $clearAction = New-CoordinatedBootAction -Operation 'DefaultClear'
+    Register-FixedSystemTask -TaskName $defaultClearTask -Action $clearAction -SerializedWriter -ReplaceDefinition
+    $taskSpecs += [pscustomobject]@{ Name=$defaultClearTask; Execute=$powershell; Arguments=[string]$clearAction.Arguments; StartupDelay=''; SerializedWriter=$true }
 
     Set-Step 'register-default-restore-disabled'
-    $allowedLiteral = (@($model.AllowedGuids) | ForEach-Object { "'$_'" }) -join ','
-    $restoreScript = @"
-`$allowed = @($allowedLiteral)
-`$path = '$defaultFileEscaped'
-if (-not (Test-Path -LiteralPath `$path)) { exit 0 }
-try { `$guid = [System.IO.File]::ReadAllText(`$path).Trim().ToLowerInvariant() } catch { exit 0 }
-if (`$allowed -notcontains `$guid) { exit 0 }
-& '$bcdeditEscaped' /set '{fwbootmgr}' bootsequence `$guid
-exit `$LASTEXITCODE
-"@
     $startupTrigger = New-ScheduledTaskTrigger -AtStartup
     $startupTrigger.Delay = 'PT30S'
-    $restoreAction = New-EncodedPowerShellAction $restoreScript
-    Register-FixedSystemTask -TaskName $defaultRestoreTask -Action $restoreAction -Trigger $startupTrigger -ReplaceDefinition
+    $restoreAction = New-CoordinatedBootAction -Operation 'DefaultRestore'
+    Register-FixedSystemTask -TaskName $defaultRestoreTask -Action $restoreAction -Trigger $startupTrigger -SerializedWriter -ReplaceDefinition
     Disable-ScheduledTask -TaskName $defaultRestoreTask -ErrorAction Stop | Out-Null
-    $taskSpecs += [pscustomobject]@{ Name=$defaultRestoreTask; Execute=$powershell; Arguments=[string]$restoreAction.Arguments; StartupDelay='PT30S' }
+    $taskSpecs += [pscustomobject]@{ Name=$defaultRestoreTask; Execute=$powershell; Arguments=[string]$restoreAction.Arguments; StartupDelay='PT30S'; SerializedWriter=$true }
     Write-InstallLog 'Canonical default restore registered with AtStartup + PT30S and temporarily disabled.'
 
     Set-Step 'persist-initial-default'
@@ -845,6 +1039,8 @@ exit `$LASTEXITCODE
         Write-InstallLog 'System default disabled (no default file).'
     }
 
+    if (Test-Path -LiteralPath $bootNextOriginFile) { Remove-Item -LiteralPath $bootNextOriginFile -Force -ErrorAction Stop }
+
     Set-Step 'write-metadata'
     $metadata = [ordered]@{
         version = $version
@@ -856,6 +1052,7 @@ exit `$LASTEXITCODE
         managerFile = $managerFile
         firmwareFile = $firmwareFile
         defaultFile = $defaultFile
+        bootNextOriginFile = $bootNextOriginFile
         defaultClearTask = $defaultClearTask
         defaultRestoreTask = $defaultRestoreTask
         defaultRestoreDelaySeconds = 30
@@ -874,6 +1071,7 @@ exit `$LASTEXITCODE
     if (-not (Test-TaskBrokerStatePathLeastPrivilege -Path $defaultStateDir)) {
         throw 'Canonical default-state directory ACL verification failed.'
     }
+    Assert-BootWriterLockFile
     if ($initialDefault -and -not (Test-TaskBrokerStatePathLeastPrivilege -Path $defaultFile)) {
         throw 'Canonical default-state file ACL verification failed.'
     }

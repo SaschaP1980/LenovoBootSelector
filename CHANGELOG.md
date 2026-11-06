@@ -1,6 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.2.0.0 – Provenance-aware BootNext synchronization (LBS-143)
+
+- Synchronize a changed persistent default with the effective next boot only when protected, current-boot LBS automatic provenance and a freshly read firmware target both authorize the change.
+- Preserve explicit manual BootNext choices over delayed Default Restore and other coordinated LBS writers. Use SYSTEM-controlled exclusive-file locking, queued fixed tasks and boot-bound completion sequences without introducing arbitrary privileged commands.
+- Distinguish the stored default from the effective next-restart selection; surface match, override and unknown states, with a deliberate action to use the new default for the next restart.
+- Require fail-closed behavior on ambiguous, corrupt, stale or externally contradicted provenance. Retain the one-shot firmware operation and documented limitations concerning independent privileged writers.
+- Add permanent native PowerShell 5.1 and hosted Windows SYSTEM-task regression coverage for writer ordering, lock ACLs, queue behavior and the TaskBroker boundary. Existing installations require explicit elevated System Functions Repair for the new task schema.
+
 ## v1.1.15.0 – Recover unused Manage Entries viewport space (LBS-157)
 
 - Reclaim 34 of 38 otherwise-unused 96-DPI design pixels between the Manage Entries action buttons and footer, leaving a 4-pixel clearance, without increasing the popup size.

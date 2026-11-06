@@ -302,10 +302,24 @@ function Add-PopupRestartSection {
     $restartButton.Add_Click({ Restart-Windows })
     $restartPanel.Controls.Add($restartButton)
 
-    $restartTarget = New-Label -Text (Get-LocalizedString -Key 'Status.NextTargetDefaultOrder') -Font (New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Regular)) `
-        -ForeColor ([Drawing.Color]::FromArgb(155,155,155)) -X 16 -Y 39 -Width 358 -Height 18
+    # The secondary line remains compact, but is a keyboard-focusable action
+    # whenever the stored default differs from the next effective boot target.
+    $restartTarget = New-Object System.Windows.Forms.Button
+    $restartTarget.Text = Get-LocalizedString -Key 'Status.NextTargetDefaultOrder'
+    $restartTarget.Font = New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Regular)
+    $restartTarget.ForeColor = [Drawing.Color]::FromArgb(155,155,155)
+    $restartTarget.BackColor = $script:ColorSurface
+    $restartTarget.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $restartTarget.FlatAppearance.BorderSize = 0
+    $restartTarget.FlatAppearance.MouseOverBackColor = $script:ColorSurface
+    $restartTarget.FlatAppearance.MouseDownBackColor = $script:ColorSelectedRow
     $restartTarget.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+    $restartTarget.AutoEllipsis = $true
+    $restartTarget.TabStop = $false
+    $restartTarget.Location = New-Object Drawing.Point(16, 38)
+    $restartTarget.Size = New-Object Drawing.Size(358, 20)
     $restartTarget.Name = 'RestartTargetLabel'
+    $restartTarget.Add_Click({ if ($script:RestartTargetLabel -and $script:RestartTargetLabel.TabStop) { Use-DefaultForNextRestart } })
     $restartPanel.Controls.Add($restartTarget)
     $script:RestartTargetLabel = $restartTarget
     $Root.Controls.Add($restartPanel)
