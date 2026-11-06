@@ -22,6 +22,7 @@ $fakeBcd = Join-Path $testRoot 'fake-bcdedit.ps1'
 $psExe = Join-Path $PSHOME 'powershell.exe'
 $prefix = 'LBS143-Smoke-' + $suffix + '-'
 $tasks = @()
+$script:TaskReceipts = @{}
 $checks = 0
 
 function Assert-True([string]$Label,[bool]$Value) {
@@ -54,9 +55,15 @@ function Register-TestWriter([string]$Operation,[string]$Guid='') {
     # The task runs as SYSTEM; capture its terminating error in a test-only file.
     $errorFile = Join-Path $testRoot ($Operation + '.error.log')
     $trap = 'trap { [IO.File]::WriteAllText(''' + $errorFile.Replace("'","''") + ''', ($_ | Out-String), [Text.Encoding]::UTF8); throw }'
-    $code = $trap + [Environment]::NewLine + $code
-    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))
     $name = $prefix + $Operation + '-' + $tasks.Count
+    # Test-only completion record is emitted from SYSTEM after the literal
+    # production writer leaves its try block (including its early returns).
+    # This avoids mistaking a previous run's Scheduler result for this call.
+    $receipt = Join-Path $testRoot ($name + '.completion.txt')
+    $script:TaskReceipts[$name] = $receipt
+    $completion = 'finally { [IO.File]::AppendAllText(''' + $receipt.Replace("'","''") + ''', ''done'' + [Environment]::NewLine, [Text.Encoding]::ASCII) }'
+    $code = $trap + [Environment]::NewLine + 'try {' + [Environment]::NewLine + $code + [Environment]::NewLine + '} ' + $completion
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))
     $action = New-ScheduledTaskAction -Execute $psExe -Argument ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ' + $encoded)
     $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 1) -MultipleInstances Queue
@@ -67,30 +74,47 @@ function Register-TestWriter([string]$Operation,[string]$Guid='') {
     Assert-True ("SYSTEM " + $Operation + " is Queue-enabled") ([string]$policy.InnerText -eq 'Queue')
     return $name
 }
-function Wait-Tasks([string[]]$Names,[datetime]$Earliest) {
+function Wait-Tasks([string[]]$Names,[hashtable]$ExpectedReceipts) {
     $end = (Get-Date).AddSeconds(60)
     foreach ($name in $Names) {
         $complete = $false
+        $receipt = [string]$script:TaskReceipts[$name]
+        if (-not $receipt) { throw "No registered task completion receipt for $name" }
         do {
             $info = Get-ScheduledTaskInfo -TaskName $name
             $task = Get-ScheduledTask -TaskName $name
-            if ($info.LastRunTime -ge $Earliest.AddSeconds(-2) -and [string]$task.State -ne 'Running') {
-                if ([uint32]$info.LastTaskResult -ne 0) {
+            $result = [uint32]$info.LastTaskResult
+            $transient = ($result -eq 0x00041301 -or $result -eq 0x00041325)
+            $running = ([string]$task.State -in @('Running','Queued'))
+            $done = if ([IO.File]::Exists($receipt)) { [IO.File]::ReadAllLines($receipt).Length } else { 0 }
+            # A new SYSTEM-owned receipt, plus a settled Scheduler state/result,
+            # proves this exact invocation completed. A previous successful run
+            # and RUNNING/QUEUED HRESULTs may never satisfy this predicate.
+            if ($done -gt [int]$ExpectedReceipts[$name] -and -not $running -and -not $transient) {
+                if ($result -ne 0) {
                     $errors = @(Get-ChildItem -LiteralPath $testRoot -Filter '*.error.log' -ErrorAction SilentlyContinue | ForEach-Object { [IO.File]::ReadAllText($_.FullName) })
-                    throw ("SYSTEM writer {0} exited with 0x{1:X8}; details={2}" -f $name,[uint32]$info.LastTaskResult,($errors -join ' | '))
+                    throw ("SYSTEM writer {0} exited with 0x{1:X8}; details={2}" -f $name,$result,($errors -join ' | '))
                 }
                 $complete = $true
                 break
             }
             Start-Sleep -Milliseconds 150
         } while ((Get-Date) -lt $end)
-        if (-not $complete) { throw "Timed out waiting for SYSTEM writer: $name" }
+        if (-not $complete) {
+            $errors = @(Get-ChildItem -LiteralPath $testRoot -Filter '*.error.log' -ErrorAction SilentlyContinue | ForEach-Object { [IO.File]::ReadAllText($_.FullName) })
+            throw ("SYSTEM writer {0} did not reach a new completed invocation; details={1}" -f $name,($errors -join ' | '))
+        }
     }
 }
 function Invoke-Tasks([string[]]$Names) {
-    $earliest = Get-Date
+    $expected = @{}
+    foreach ($name in $Names) {
+        $receipt = [string]$script:TaskReceipts[$name]
+        if (-not $receipt) { throw "No registered task completion receipt for $name" }
+        $expected[$name] = if ([IO.File]::Exists($receipt)) { [IO.File]::ReadAllLines($receipt).Length } else { 0 }
+    }
     foreach ($name in $Names) { Start-ScheduledTask -TaskName $name }
-    Wait-Tasks -Names $Names -Earliest $earliest
+    Wait-Tasks -Names $Names -ExpectedReceipts $expected
 }
 function Reset-Fixture {
     foreach ($path in @($originPath,$firmwarePath,$defaultPath)) {
