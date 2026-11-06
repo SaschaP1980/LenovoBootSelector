@@ -213,7 +213,13 @@ def main():
     taskbroker_migration_path=root/'tests/Test-TaskBrokerMigration.ps1'
     s.c('LBS-33 native TaskBroker migration test exists',taskbroker_migration_path.is_file())
     taskbroker_migration=txt(taskbroker_migration_path) if taskbroker_migration_path.is_file() else ''
-    s.has('LBS-35 migration suite keeps fixed total 42',taskbroker_migration,'Write-Host "TASKBROKER MIGRATION TOTAL $checks/42"')
+    s.has('LBS-143 migration suite keeps fixed total 43',taskbroker_migration,'Write-Host "TASKBROKER MIGRATION TOTAL $checks/43"')
+    boot_writer_priority = txt(root/'tests/Test-BootWriterPriority.ps1')
+    s.has('LBS-143 writer native suite keeps fixed total 24',boot_writer_priority,'Write-Host "BOOT WRITER PRIORITY TOTAL $checks/24"')
+    s.has('LBS-143 writer suite is executed in hosted Windows aggregate',windows_wrapper,"& (Join-Path $root 'tests\\Test-BootWriterPriority.ps1')")
+    boot_writer_system = txt(root/'tests/Test-BootWriterScheduledTasks.ps1')
+    s.has('LBS-143 native SYSTEM suite keeps fixed total 9',boot_writer_system,'Write-Host "BOOT WRITER SCHEDULED TOTAL $checks/9"')
+    s.has('LBS-143 SYSTEM suite executes from the Windows aggregate',windows_wrapper,"& (Join-Path $root 'tests\\Test-BootWriterScheduledTasks.ps1')")
     installer_trigger_source=txt(root/'bin/Install-LenovoBootMenuTasks.ps1')
     s.has('LBS-34 installer has authoritative XML trigger verifier',installer_trigger_source,'function Test-CanonicalTaskTriggerXml')
     s.has('LBS-34 canonical verification reads registered task XML',installer_trigger_source,'Test-CanonicalTaskTriggerXml -TaskXml ([string]$task.Xml)')
@@ -652,7 +658,7 @@ def main():
     refresh_native=txt(root/'tests/Test-RefreshRuntime.ps1')
     refresh_controller_native=txt(root/'tests/Test-RefreshController.ps1') if (root/'tests/Test-RefreshController.ps1').is_file() else ''
     s.c('LBS-27 native refresh controller test exists',bool(refresh_controller_native))
-    s.has('LBS-27 refresh controller suite keeps fixed total 38',refresh_controller_native,'Write-Host "REFRESH CONTROLLER TOTAL $script:checks/38"')
+    s.has('LBS-143 refresh controller suite keeps fixed total 39',refresh_controller_native,'Write-Host "REFRESH CONTROLLER TOTAL $script:checks/39"')
     s.has('LBS-27 native aggregate runner invokes refresh controller suite',windows_wrapper,"Test-RefreshController.ps1")
     inherited_capture='$script:InheritedRuntimeSessionId = [string]$RuntimeSessionId'
     active_reset='$script:RuntimeSessionId = $null'
@@ -669,8 +675,8 @@ def main():
     s.c('LBS-6 canonical security boundary document exists',(root/'docs/SECURITY_BOUNDARY.md').is_file())
     s.has('LBS-6 security document forbids free task names',boundary_doc,'No runtime API accepts a free Scheduled Task name.')
     s.has('LBS-6 security document preserves one-shot semantics',boundary_doc,'One-Shot Next Boot')
-    s.has('LBS-6 runtime supports hardened TaskBroker schema',template,"$script:SupportedTaskBrokerVersions = @('0.2.14')")
-    s.has('LBS-6 installer emits hardened TaskBroker schema',installer,"$version = '0.2.14'")
+    s.has('LBS-6 runtime supports hardened TaskBroker schema',template,"$script:SupportedTaskBrokerVersions = @('0.2.15')")
+    s.has('LBS-6 installer emits hardened TaskBroker schema',installer,"$version = '0.2.15'")
     s.has('LBS-6 installer emits fixed boundary marker',installer,"boundaryContract = 'fixed-task-v2'")
     s.no('LBS-6 runtime has no TaskName-based authorized invocation',taskbroker.lower(),'invoke-authorizedtask -taskname')
     s.has('LBS-6 runtime authorized runner is operation-only',taskbroker,"[ValidateSet('ManagerRefresh','FirmwareRefresh','BootNext','DefaultSet','DefaultClear')]")

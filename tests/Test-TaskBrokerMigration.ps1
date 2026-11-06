@@ -24,9 +24,9 @@ $uninstaller = [System.IO.File]::ReadAllText($uninstallerPath,[System.Text.Encod
 $template = [System.IO.File]::ReadAllText($templatePath,[System.Text.Encoding]::UTF8)
 $taskBroker = [System.IO.File]::ReadAllText($taskBrokerPath,[System.Text.Encoding]::UTF8)
 
-Assert-True 'Installer advances TaskBroker schema to 0.2.14' ($installer.Contains('$version = ''0.2.14'''))
+Assert-True 'Installer advances TaskBroker schema to 0.2.15' ($installer.Contains('$version = ''0.2.15'''))
 Assert-True 'Installer writes fixed-task-v2 metadata' ($installer.Contains("boundaryContract = 'fixed-task-v2'"))
-Assert-True 'Runtime accepts only TaskBroker schema 0.2.14' ($template.Contains('$script:SupportedTaskBrokerVersions = @(''0.2.14'')'))
+Assert-True 'Runtime accepts only TaskBroker schema 0.2.15' ($template.Contains('$script:SupportedTaskBrokerVersions = @(''0.2.15'')'))
 Assert-True 'Canonical ProgramData TaskBroker root uses Lenovo Boot Selector' ($template.Contains('Join-Path $env:ProgramData ''Lenovo Boot Selector\TaskBroker'''))
 Assert-True 'Legacy ProgramData root remains explicit migration input' ($template.Contains('Join-Path $env:ProgramData ''Lenovo Boot Menu\TaskBroker'''))
 Assert-True 'Canonical static task prefix is present' ($taskBroker.Contains('LenovoBootSelector-RefreshManager'))
@@ -48,6 +48,12 @@ Assert-True 'Canonical TaskBroker installation is detected' (Test-TaskBrokerInst
 $script:FakeExistingPaths = @()
 Assert-False 'Missing canonical and legacy TaskBroker state is not reported as installed' (Test-TaskBrokerInstallationPresent)
 Assert-True 'Repair deterministically replaces canonical task definitions' ($installer.Contains('Register-FixedSystemTask -TaskName $managerRefreshTask -Action $mgrAction -ReplaceDefinition'))
+# LBS-143: a canonical verifier must attest to the same encoded PowerShell
+# action actually registered for BootNext, never an undefined legacy variable.
+Assert-True 'BootNext task specification verifies its registered action' (
+    [regex]::IsMatch($installer,'Name=\$taskName;\s*Execute=\$powershell;\s*Arguments=\[string\]\$bootAction\.Arguments;') -and
+    -not $installer.Contains('Arguments=$bootArgs')
+)
 
 $tokens=$null; $errors=$null
 $ast=[System.Management.Automation.Language.Parser]::ParseFile($installerPath,[ref]$tokens,[ref]$errors)
@@ -123,5 +129,5 @@ Assert-True 'Uninstaller still recognizes legacy manager task' ($uninstaller.Con
 Assert-True 'Uninstaller removes canonical ProgramData root' ($uninstaller.Contains('Join-Path $env:ProgramData ''Lenovo Boot Selector\TaskBroker'''))
 Assert-True 'Uninstaller also removes exact legacy ProgramData root' ($uninstaller.Contains('Join-Path $env:ProgramData ''Lenovo Boot Menu\TaskBroker'''))
 
-Write-Host "TASKBROKER MIGRATION TOTAL $checks/42"
-if ($checks -ne 42) { throw "Unexpected TaskBroker migration test count $checks" }
+Write-Host "TASKBROKER MIGRATION TOTAL $checks/43"
+if ($checks -ne 43) { throw "Unexpected TaskBroker migration test count $checks" }
