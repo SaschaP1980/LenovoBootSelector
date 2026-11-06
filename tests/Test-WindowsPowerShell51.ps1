@@ -55,6 +55,8 @@ if ($LASTEXITCODE -ne 0) { throw 'LBS-144 menu text raster regression failed' }
 & (Join-Path $root 'tests\Test-LBS144-DpiWindowDiagnostics.ps1')
 # LBS-144: first native UI HWND and mixed-coordinate awareness contracts.
 & (Join-Path $root 'tests\Test-LBS144-DpiAwarenessStartup.ps1')
+# LBS-144 owner-drawn Autostart checkbox 96..288 DPI bounds and real paint.
+& (Join-Path $root 'tests\Test-LBS144-CheckboxDpi.ps1')
 
 # LBS-144 hotfix P1/P2/P3: native modal geometry, ToolStrip rows and monitor inventory.
 # Isolate WinForms Show/Shown from earlier resident test fixture HWNDs.
