@@ -282,10 +282,10 @@ function Get-LenovoManageEyeGlyphGeometry {
     $margin = [Math]::Max(1,[int][Math]::Round(2.0 * $scale,[MidpointRounding]::AwayFromZero))
     $eyeWidth = [Math]::Min(
         [Math]::Max(1,$ClientSize.Width - 2 * $margin),
-        [Math]::Max(1,[int][Math]::Round(24.0 * $scale,[MidpointRounding]::AwayFromZero)))
+        [Math]::Max(1,[int][Math]::Round(20.0 * $scale,[MidpointRounding]::AwayFromZero)))
     $eyeHeight = [Math]::Min(
         [Math]::Max(1,$ClientSize.Height - 2 * $margin),
-        [Math]::Max(1,[int][Math]::Round(14.0 * $scale,[MidpointRounding]::AwayFromZero)))
+        [Math]::Max(1,[int][Math]::Round(12.0 * $scale,[MidpointRounding]::AwayFromZero)))
     $left = [int][Math]::Floor(($ClientSize.Width - $eyeWidth) / 2.0)
     $top = [int][Math]::Floor(($ClientSize.Height - $eyeHeight) / 2.0)
     $eye = [Drawing.Rectangle]::new($left,$top,$eyeWidth,$eyeHeight)

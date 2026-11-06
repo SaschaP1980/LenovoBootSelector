@@ -13,12 +13,12 @@ function Check([string]$Name,[bool]$Good) {
 }
 Check 'DPI-relative geometry function exists' ($null -ne (Get-Command Get-LenovoManageEyeGlyphGeometry -ErrorAction SilentlyContinue))
 $cases=@(
-    @{P=100;Dpi=96;W=32;H=34;EyeW=24;EyeH=14},
-    @{P=125;Dpi=120;W=40;H=43;EyeW=30;EyeH=18},
-    @{P=150;Dpi=144;W=48;H=51;EyeW=36;EyeH=21},
-    @{P=200;Dpi=192;W=64;H=68;EyeW=48;EyeH=28},
-    @{P=250;Dpi=240;W=80;H=85;EyeW=60;EyeH=35},
-    @{P=300;Dpi=288;W=96;H=102;EyeW=72;EyeH=42}
+    @{P=100;Dpi=96;W=32;H=34;EyeW=20;EyeH=12},
+    @{P=125;Dpi=120;W=40;H=43;EyeW=25;EyeH=15},
+    @{P=150;Dpi=144;W=48;H=51;EyeW=30;EyeH=18},
+    @{P=200;Dpi=192;W=64;H=68;EyeW=40;EyeH=24},
+    @{P=250;Dpi=240;W=80;H=85;EyeW=50;EyeH=30},
+    @{P=300;Dpi=288;W=96;H=102;EyeW=60;EyeH=36}
 )
 foreach($c in $cases) {
     $g=Get-LenovoManageEyeGlyphGeometry -ClientSize ([Drawing.Size]::new($c.W,$c.H)) -Dpi ([double]$c.Dpi)
