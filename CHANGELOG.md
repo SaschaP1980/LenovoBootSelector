@@ -1,6 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.1.14.8 – Refine Manage Entries visibility eye proportions (LBS-144)
+
+- Reduce only the owner-drawn visible and hidden eye glyph baseline from 24x14 to 20x12 design pixels so it better matches the neighboring pencil and reorder icons.
+- Scale the eye proportionately to 50x30 physical pixels at 250% with the existing DPI-aware renderer. Preserve centering, pupil, hidden slash, stroke, color and the original 32x34 design-pixel interactive hit target.
+- Leave the 15-point header refresh arrow, edit pencil, sort grip, layout geometry, hover/tooltip/keyboard behavior and all previously accepted menu, modal, popup, checkbox and mixed-monitor DPI fixes untouched.
+- Update the existing native Windows PowerShell 5.1 test for all six display scale levels (100, 125, 150, 200, 250 and 300%) and retain real WinForms Paint raster checks for visible red and hidden gray eyes.
+- Confirm test-first RED on the previous version and GREEN at the new baseline; maintain privileged BootNext, firmware, TaskBroker, update and diagnostics Worker boundaries. The physical owner must still approve the final appearance.
+
 ## v1.1.14.7 – Improve Manage Entries visibility and refresh icon legibility (LBS-144)
 
 - Correct the very small owner-drawn visible (red) and hidden (gray, crossed-out) eye icons in the Manage Boot Entries popup on both 100% external and 250% laptop displays.
