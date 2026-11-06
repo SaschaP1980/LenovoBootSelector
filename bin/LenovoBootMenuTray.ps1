@@ -2090,7 +2090,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.1.14.6'
+$script:AppVersion = '1.1.14.7'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -9015,6 +9015,51 @@ function Add-BootEntryAliasEditor {
     $row.Controls.Add($originalHint)
 }
 
+# LBS-144: calculate visibility-eye paint geometry from the graphics surface
+# DPI, not from fixed pixels. The popup already scales the 32x34 design
+# hit target; keep that unchanged and derive a single-scale glyph.
+function Get-LenovoManageEyeGlyphGeometry {
+    param(
+        [Parameter(Mandatory=$true)][Drawing.Size]$ClientSize,
+        [Parameter(Mandatory=$true)][double]$Dpi
+    )
+    if ($ClientSize.Width -lt 1 -or $ClientSize.Height -lt 1) {
+        throw 'Visibility glyph requires positive client dimensions.'
+    }
+    $scale = if ($Dpi -gt 0) { [Math]::Min(5.0,[Math]::Max(1.0,$Dpi / 96.0)) } else { 1.0 }
+    $margin = [Math]::Max(1,[int][Math]::Round(2.0 * $scale,[MidpointRounding]::AwayFromZero))
+    $eyeWidth = [Math]::Min(
+        [Math]::Max(1,$ClientSize.Width - 2 * $margin),
+        [Math]::Max(1,[int][Math]::Round(24.0 * $scale,[MidpointRounding]::AwayFromZero)))
+    $eyeHeight = [Math]::Min(
+        [Math]::Max(1,$ClientSize.Height - 2 * $margin),
+        [Math]::Max(1,[int][Math]::Round(14.0 * $scale,[MidpointRounding]::AwayFromZero)))
+    $left = [int][Math]::Floor(($ClientSize.Width - $eyeWidth) / 2.0)
+    $top = [int][Math]::Floor(($ClientSize.Height - $eyeHeight) / 2.0)
+    $eye = [Drawing.Rectangle]::new($left,$top,$eyeWidth,$eyeHeight)
+    $pupilSide = [Math]::Min(
+        [Math]::Max(1,$eyeHeight - 2),
+        [Math]::Max(1,[int][Math]::Round(5.0 * $scale,[MidpointRounding]::AwayFromZero)))
+    $pupilSide = [Math]::Min($pupilSide,$eyeWidth)
+    $pupil = [Drawing.Rectangle]::new(
+        $left + [int][Math]::Floor(($eyeWidth - $pupilSide) / 2.0),
+        $top + [int][Math]::Floor(($eyeHeight - $pupilSide) / 2.0),
+        $pupilSide,$pupilSide)
+    $extension = [Math]::Max(1,[int][Math]::Round(1.0 * $scale,[MidpointRounding]::AwayFromZero))
+    return [pscustomobject]@{
+        Eye = $eye
+        Pupil = $pupil
+        SlashStart = [Drawing.Point]::new(
+            [Math]::Max(0,$eye.Left - $extension),
+            [Math]::Min($ClientSize.Height-1,$eye.Bottom + $extension))
+        SlashEnd = [Drawing.Point]::new(
+            [Math]::Min($ClientSize.Width-1,$eye.Right + $extension),
+            [Math]::Max(0,$eye.Top - $extension))
+        Stroke = [single](1.6 * $scale)
+        SlashStroke = [single](1.8 * $scale)
+    }
+}
+
 function Add-ManageBootEntryControls {
     param(
         [Parameter(Mandatory=$true)]$Row,
@@ -9039,16 +9084,18 @@ $state.Add_Paint({
     param($sender,$eventArgs)
     $hidden = ([string]$sender.AccessibleName -eq 'hidden')
     $color = if ($hidden) { [Drawing.Color]::FromArgb(115,115,115) } else { $script:ColorAccent }
+    $geometry = Get-LenovoManageEyeGlyphGeometry -ClientSize $sender.ClientSize -Dpi $eventArgs.Graphics.DpiX
     $eventArgs.Graphics.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    $pen = New-Object Drawing.Pen($color, 1.6)
+    $pen = New-Object Drawing.Pen($color, $geometry.Stroke)
     $pupil = New-Object Drawing.SolidBrush($color)
     try {
-        $eye = New-Object Drawing.Rectangle(7, 11, 18, 11)
-        $eventArgs.Graphics.DrawEllipse($pen, $eye)
-        $eventArgs.Graphics.FillEllipse($pupil, 14, 14, 4, 4)
+        $eventArgs.Graphics.DrawEllipse($pen, $geometry.Eye)
+        $eventArgs.Graphics.FillEllipse($pupil, $geometry.Pupil)
         if ($hidden) {
-            $slash = New-Object Drawing.Pen($color, 1.8)
-            try { $eventArgs.Graphics.DrawLine($slash, 6, 24, 26, 9) } finally { $slash.Dispose() }
+            $slash = New-Object Drawing.Pen($color, $geometry.SlashStroke)
+            try {
+                $eventArgs.Graphics.DrawLine($slash, $geometry.SlashStart, $geometry.SlashEnd)
+            } finally { $slash.Dispose() }
         }
     }
     finally {
@@ -9553,7 +9600,7 @@ function Add-PopupHeaderSection {
 
     $refresh = New-Object System.Windows.Forms.Button
     $refresh.Text = '↻'
-    $refresh.Font = New-Object Drawing.Font('Segoe UI Symbol', 11.5, [Drawing.FontStyle]::Regular)
+    $refresh.Font = New-Object Drawing.Font('Segoe UI Symbol', 15.0, [Drawing.FontStyle]::Regular)
     $refresh.ForeColor = $script:ColorSecondary
     $refresh.BackColor = $script:ColorHeader
     $refresh.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
