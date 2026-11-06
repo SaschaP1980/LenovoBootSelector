@@ -2060,7 +2060,7 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.1.14.4'
+$script:AppVersion = '1.1.14.5'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -2779,6 +2779,70 @@ function Register-LenovoDialogDpiWindowDiagnostics {
     }.GetNewClosure())
 }
 
+# LBS-144 P3: every active display, not just the selected monitor.
+# Read-only; no display reconfiguration and no full device serial numbers.
+function Get-LenovoMonitorTopologySnapshot {
+    $items = @()
+    foreach ($monitor in [System.Windows.Forms.Screen]::AllScreens) {
+        $bounds = $monitor.Bounds
+        $work = $monitor.WorkingArea
+        $reportedPercent = 0
+        $scaleSource = 'unavailable'
+        if (Get-Command Get-PopupMonitorDpiScale -CommandType Function -ErrorAction SilentlyContinue) {
+            try {
+                $reported = Get-PopupMonitorDpiScale -Screen $monitor
+                $reportedPercent = [int]$reported.Percent
+                $scaleSource = [string]$reported.Source
+            } catch { }
+        }
+        $items += [ordered]@{
+            deviceName = [string]$monitor.DeviceName
+            isPrimary = [bool]$monitor.Primary
+            boundsLeft = [int]$bounds.Left
+            boundsTop = [int]$bounds.Top
+            boundsWidth = [int]$bounds.Width
+            boundsHeight = [int]$bounds.Height
+            workLeft = [int]$work.Left
+            workTop = [int]$work.Top
+            workWidth = [int]$work.Width
+            workHeight = [int]$work.Height
+            reportedScalePercent = [int]$reportedPercent
+            scaleSource = [string]$scaleSource
+        }
+    }
+    return $items
+}
+
+function Write-LenovoMonitorTopologyEvent {
+    param(
+        [Parameter(Mandatory=$true)][string]$Phase,
+        [System.Windows.Forms.Screen]$Screen
+    )
+    if (-not $script:RuntimeDiagnosticsAvailable) { return }
+    try {
+        $monitors = @(Get-LenovoMonitorTopologySnapshot)
+        $cursor = [System.Windows.Forms.Cursor]::Position
+        $selectedName = if ($Screen) { [string]$Screen.DeviceName } else { '' }
+        $awareness = if ('LenovoUiDpiAwarenessNative' -as [type]) {
+            [LenovoUiDpiAwarenessNative]::ReadThreadAwareness()
+        } else { 'unavailable' }
+        $systemDpi = if ('LenovoUiDpiAwarenessNative' -as [type]) {
+            [LenovoUiDpiAwarenessNative]::ReadSystemDpi()
+        } else { 0 }
+        Write-RuntimeDiagnosticEvent -Event 'MONITOR_TOPOLOGY_SNAPSHOT' -Stage 'ui-layout' -Success $true -Data (New-RuntimeDiagnosticData -Values @{
+            schemaVersion = 1
+            phase = [string]$Phase
+            screenCount = [int]$monitors.Count
+            monitors = $monitors
+            selectedDeviceName = $selectedName
+            cursorX = [int]$cursor.X
+            cursorY = [int]$cursor.Y
+            threadAwareness = [string]$awareness
+            systemDpi = [int]$systemDpi
+        })
+    } catch { } # Read-only telemetry cannot block UI or boot actions.
+}
+
 # LBS-144: independent, physical-pixel DPI layout for ToolStrip menus.
 # A SystemAware PowerShell/WinForms host supplies the design 9pt text and
 # fixed 260px menu independently of its 96/240 system DPI. Keep immutable
@@ -2794,6 +2858,15 @@ function Get-LenovoScaledMenuPadding {
         [int][Math]::Round($Padding.Top * $Scale),
         [int][Math]::Round($Padding.Right * $Scale),
         [int][Math]::Round($Padding.Bottom * $Scale))
+}
+
+# ToolStripItem.Height is already dependent on the host's current DPI.
+# It is NOT a 96-DPI design value. The Lenovo menus contain only one-line
+# items and separators; choose their immutable 96-DPI design heights here.
+function Get-LenovoMenuDesignItemHeight {
+    param([Parameter(Mandatory=$true)][System.Windows.Forms.ToolStripItem]$Item)
+    if ($Item -is [System.Windows.Forms.ToolStripSeparator]) { return [int]6 }
+    return [int]24
 }
 
 function Set-LenovoMenuDpiLayout {
@@ -2812,7 +2885,7 @@ function Set-LenovoMenuDpiLayout {
             Width = $width
             Padding = $Menu.Padding
             ItemBases = (New-Object 'System.Collections.Generic.Dictionary[System.Windows.Forms.ToolStripItem,System.Object]')
-            Scale = [double]1.0
+            Scale = [double]0.0
         }
         $script:LenovoMenuDesignBaselines.Add($Menu,$state)
         $Menu.Add_Disposed({
@@ -2825,7 +2898,7 @@ function Set-LenovoMenuDpiLayout {
     foreach ($item in $Menu.Items) {
         if (-not $state.ItemBases.ContainsKey($item)) {
             $state.ItemBases.Add($item,[pscustomobject]@{
-                Height = [Math]::Max(1,[int]$item.Height)
+                Height = Get-LenovoMenuDesignItemHeight -Item $item
                 Padding = $item.Padding
                 FontStyle = $item.Font.Style
             })
@@ -5553,6 +5626,42 @@ function Show-DefaultTargetMenu {
 # typographic point-unit fonts. Do not reuse the popup's script-global
 # design metric cache and never multiply Font.Size by the monitor factor.
 # All controls are new and scaled exactly once before ShowDialog().
+# Calculate a visible top-left in the SAME WinForms coordinate space as the
+# selected Screen.WorkingArea, including negative-origin external displays.
+function Get-LenovoVisibleDialogLocation {
+    param(
+        [Parameter(Mandatory=$true)][Drawing.Rectangle]$WorkingArea,
+        [Parameter(Mandatory=$true)][Drawing.Size]$WindowSize
+    )
+    if ($WorkingArea.Width -le 0 -or $WorkingArea.Height -le 0 -or
+        $WindowSize.Width -le 0 -or $WindowSize.Height -le 0) {
+        throw 'Invalid dialog work-area or size.'
+    }
+    $centerX = [int][Math]::Floor($WorkingArea.Left + ($WorkingArea.Width - $WindowSize.Width) / 2.0)
+    $centerY = [int][Math]::Floor($WorkingArea.Top + ($WorkingArea.Height - $WindowSize.Height) / 2.0)
+    $maxX = [Math]::Max($WorkingArea.Left, $WorkingArea.Right - $WindowSize.Width)
+    $maxY = [Math]::Max($WorkingArea.Top, $WorkingArea.Bottom - $WindowSize.Height)
+    return [Drawing.Point]::new(
+        [int][Math]::Min($maxX,[Math]::Max($WorkingArea.Left,$centerX)),
+        [int][Math]::Min($maxY,[Math]::Max($WorkingArea.Top,$centerY)))
+}
+
+# The pre-Show WinForms size/position can change when the native HWND is
+# created (host MaxWindowTrackSize, mixed-DPI and monitor selection).
+# Clamp once again inside Shown, before the existing physical DWM snapshot.
+function Register-LenovoDialogVisibilityCorrection {
+    param(
+        [Parameter(Mandatory=$true)][System.Windows.Forms.Form]$Form,
+        [Parameter(Mandatory=$true)][System.Windows.Forms.Screen]$Screen
+    )
+    $screenCopy = $Screen
+    $Form.Add_Shown({
+        if ($this.IsDisposed) { return }
+        $this.Location = Get-LenovoVisibleDialogLocation -WorkingArea $screenCopy.WorkingArea -WindowSize $this.Size
+        if ($this.Visible) { [void]$this.Activate() }
+    }.GetNewClosure())
+}
+
 function Get-LenovoDialogScaledSize {
     param(
         [Parameter(Mandatory=$true)][Drawing.Size]$DesignSize,
@@ -5622,9 +5731,7 @@ function Set-LenovoDialogDpiLayout {
             }
         }
         $Form.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
-        $Form.Location = [Drawing.Point]::new(
-            [int]($WorkingArea.Left + [Math]::Floor(($WorkingArea.Width - $Form.Width) / 2.0)),
-            [int]($WorkingArea.Top + [Math]::Floor(($WorkingArea.Height - $Form.Height) / 2.0)))
+        $Form.Location = Get-LenovoVisibleDialogLocation -WorkingArea $WorkingArea -WindowSize $Form.Size
     }
     finally {
         for ($i = $entries.Count - 1; $i -ge 0; $i--) {
@@ -5652,10 +5759,14 @@ function Prepare-LenovoDialogDpiLayout {
     $screen = if ($Owner -and -not $Owner.IsDisposed -and $Owner.Visible) {
         [System.Windows.Forms.Screen]::FromControl($Owner)
     }
-    else { [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position) }
+    # Without a visible owner, use the stable primary display rather than
+    # a possibly DPI-virtualized cursor coordinate on a secondary monitor.
+    else { [System.Windows.Forms.Screen]::PrimaryScreen }
     if (-not $screen) { $screen = [System.Windows.Forms.Screen]::PrimaryScreen }
     $scale = Get-LenovoUiCoordinateScale -Screen $screen
     Set-LenovoDialogDpiLayout -Form $Form -Scale ([double]$scale.Factor) -WorkingArea $screen.WorkingArea
+    Register-LenovoDialogVisibilityCorrection -Form $Form -Screen $screen
+    Write-LenovoMonitorTopologyEvent -Phase ('before-' + $Role) -Screen $screen
     Register-LenovoDialogDpiWindowDiagnostics -Form $Form -Role $Role -Screen $screen -RequestedScale ([double]$scale.Factor)
 }
 
@@ -10130,6 +10241,7 @@ try {
         popupHandleCreated = [bool]$script:Popup.IsHandleCreated
         popupVisible = [bool]$script:Popup.Visible
     })
+    Write-LenovoMonitorTopologyEvent -Phase 'startup' -Screen ([System.Windows.Forms.Screen]::PrimaryScreen)
     $activationListener = Start-LbsActivationListener -Signal $activationEvent -OnActivate {
         try {
             Show-OrActivatePopup
@@ -10314,6 +10426,7 @@ try {
             $point = $script:TrayPopupClickPoint
             $screen = [System.Windows.Forms.Screen]::FromPoint($point)
             if ($script:TrayContextMenu -and $screen) {
+                Write-LenovoMonitorTopologyEvent -Phase 'tray-click' -Screen $screen
                 Initialize-LenovoMenuAppearance -Menu $script:TrayContextMenu
                 $factor = (Get-LenovoUiCoordinateScale -Screen $screen).Factor
                 [void](Set-LenovoMenuDpiLayout -Menu $script:TrayContextMenu -Scale ([double]$factor))
