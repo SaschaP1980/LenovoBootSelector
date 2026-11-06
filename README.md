@@ -4,203 +4,171 @@
   <img src="bin/icon-preview.png" alt="Lenovo Boot Selector" width="96">
 </p>
 
-## Overview
+**Lenovo Boot Selector** is a Windows tray application for choosing a supported Lenovo firmware boot target before restarting Windows. It offers two complementary modes:
 
-**Lenovo Boot Selector** is a Windows tray application for Lenovo systems with two complementary boot-selection modes: choose any existing firmware target as the **one-time target for the next boot**, or configure a **persistent default boot target** that is automatically prepared again for the following boot after every Windows system start.
+- **Next boot:** set one validated, existing firmware target for the next boot only.
+- **Persistent default:** configure a preferred target that a fixed SYSTEM Scheduled Task prepares again whenever a participating Windows installation starts, without requiring a user logon.
 
-The persistent default is restored by a fixed SYSTEM Scheduled Task and therefore does **not require a user to log on**. When every participating Windows installation is configured this way, a target such as the Lenovo Boot Menu can effectively become the recurring hand-off point for subsequent boots, without permanently rewriting the UEFI boot order.
+It changes the firmware's **one-time `bootsequence`**, not the permanent UEFI `BootOrder`. Boot targets must be supported by the installed TaskBroker configuration; the application cannot address arbitrary devices or independently select individual physical drives behind a generic firmware entry.
 
-## Motivation
+**Current development version:** v1.1.15.0  
+**Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`  
+**Releases:** [Downloads and version history](downloads/README.md) · [Latest published version metadata](downloads/latest.json) · [Changelog](CHANGELOG.md)
 
-The project was created to solve a very specific problem: on the Lenovo laptop used for development, **F12** and sometimes **Enter** are not always detected reliably during the early boot phase. This affects both the internal laptop keyboard and keyboards connected through a USB dongle. If the key press is missed during that short window, the expected boot menu does not appear—instead, the first regular boot target starts immediately, typically the Windows installation on the first NVMe SSD.
+## Why it exists
 
-When the intended target is an external USB HDD or another installed system, the worst case is frustrating: the wrong Windows installation boots, it must be shut down or restarted again, and the F12/Enter attempt starts over. In practice this sometimes required **up to ten restart attempts** before the keyboard was detected at the right moment.
+The project was created to solve a specific problem: on the Lenovo laptop used for development, **F12** and sometimes **Enter** are not always detected reliably during early boot, whether pressed on the internal keyboard or on a keyboard connected through a USB dongle.
 
-Lenovo Boot Selector was built to remove that dependency on keyboard timing. The desired boot can be prepared **from within Windows**:
+If the key press is missed during that short firmware window, the normal first boot target starts immediately, typically Windows on the internal NVMe SSD. Trying to start a different Windows installation on an external USB drive could require shutting down and repeating the process; in the original environment, as many as **ten restart attempts** were sometimes necessary.
 
-- an existing boot target can be selected as the **one-time target for the next boot**;
-- a **persistent default boot target** can be configured and is automatically restored after each Windows system start for the following boot;
-- this restore runs as SYSTEM and therefore does **not depend on a user logon**;
-- when all participating Windows installations use the same default, the existing **boot menu can act as the recurring default hand-off point**;
-- the next restart therefore no longer depends on F12 or Enter being detected within a few seconds of pre-boot time.
+Lenovo Boot Selector removes the dependency on that pre-boot keyboard timing. A user can prepare the intended firmware target **from within Windows**, then restart. When all participating Windows installations are configured with the same persistent default, an existing Lenovo Boot Menu entry can serve as a recurring hand-off point after those installations start.
 
-For the original use case, this means that when the external USB HDD should boot, the desired target is selected in advance and Windows is restarted. Accidentally booting the wrong NVMe Windows installation—and the resulting chain of repeated shutdowns and restarts—is avoided.
-
-Other systems can suffer from the same class of problem when keyboards are initialized too late or unreliably during the firmware phase, especially through USB, wireless dongles, docks, or other initialization paths. Lenovo Boot Selector provides a reproducible alternative to repeatedly trying to hit the right key at the right moment.
-
-The tool deliberately follows three technical goals:
-
-- **fast and deterministic switching:** select existing boot targets directly from the tray;
-- **no permanent change to the normal UEFI order:** the existing firmware configuration remains untouched;
-- **a minimal privilege boundary:** the UI runs unelevated and privileged actions are limited to fixed, validated operations.
-
-Lenovo Boot Selector is therefore not a BIOS/UEFI replacement and not a bootloader. It is a Windows interface for a controlled **One-Shot Next Boot** workflow and for systems where classic pre-boot keyboard selection is not reliable enough.
+Similar timing problems can occur with USB and wireless keyboards, docks, or firmware that initializes input devices late. The application provides a controlled alternative; it is **not a bootloader, BIOS/UEFI replacement, or tool for changing the permanent boot order**.
 
 ## Features
 
-- select an existing firmware boot target for the **next boot**
-- clear tray/popup UI in a Lenovo black/red visual style
-- friendly names for known firmware targets
-- persistent default boot target through the hardened TaskBroker, restored at Windows system startup without requiring user logon
-- restart Windows directly from the application
-- autostart without a visible PowerShell/CMD window
-- manage ordering and visibility of displayed boot targets
-- read-only firmware-target drift detection
-- read-only storage context for internal NVMe and USB media
-- diagnostic export and maintenance functions
-- English (`en-US`) UI by default, with fully selectable and persisted German (`de-DE`)
-- self-updater with an automatic read-only version check whenever the popup opens, plus localized manual check/install actions
+- **One-shot boot selection:** prepare a validated firmware target for the next boot through the tray application.
+- **Persistent boot default:** reapply a configured target at Windows startup through a hardened, predefined SYSTEM task, without a user session.
+- **Boot-target management:** drag to reorder entries, show or hide them, assign custom aliases, and save or discard changes. Clearing an alias restores the original name.
+- **Tray and popup UI:** open boot selection from the notification area, display the popup near the tray icon where Windows exposes a suitable anchor, and restart Windows from the application.
+- **High-DPI presentation:** DPI-aware WinForms controls, menus, dialogs, and boot-entry scrolling. The external 100% / internal 250% two-monitor configuration has been visually accepted on the development machine; this does not imply certification of every monitor layout or scaling value.
+- **Single-instance behavior:** an interactive second start activates the existing application/popup rather than launching a duplicate tray instance.
+- **Read-only discovery:** refresh firmware entries, detect boot-target drift, and show available NVMe/USB storage context without claiming unsupported physical-device-to-firmware mappings.
+- **Diagnostics:** save a local diagnostic ZIP or explicitly upload a diagnostic ZIP to the private diagnostics service and copy the returned Diagnosis ID.
+- **Localization:** English (`en-US`) UI by default, with selectable, persisted German (`de-DE`).
+- **Updates:** check for a newer version when opening the popup; installation remains a separate, explicit action with integrity verification and rollback handling.
+- **Convenience:** optional hidden autostart, maintenance/setup/repair actions, and localized status messages.
 
-## Language support
+## Requirements and installation
 
-Starting with v0.8.0.0, all product-controlled user-facing UI text is supplied through a central PowerShell-5.1-compatible localization layer. **English (`en-US`) is the default and fallback language**; **German (`de-DE`)** is available from the tray menu under **Language / Sprache** and the selection is persisted in the existing user settings.
+- A Lenovo Windows system with supported firmware boot entries exposed through Windows.
+- **Windows PowerShell 5.1**, .NET/Windows Forms, and Windows Task Scheduler.
+- A **writable user directory** for the extracted application and its unelevated self-updater.
+- Administrator rights **only when explicitly setting up, repairing, reinitializing, or removing** the privileged Scheduled Tasks.
 
-A new installation with no settings file starts in English. Existing pre-localization settings (schema versions below 5) migrate to German so an established German installation does not unexpectedly switch language during upgrade. Invalid or unknown stored locale values fail safely to English.
+The application is developed and tested on a Lenovo Windows system. Automated Windows PowerShell 5.1 checks cover additional UI and boundary contracts; they do not establish compatibility with every Lenovo firmware model or Windows hardware configuration.
 
-Changing the language updates the tray UI immediately and rebuilds a visible popup in the selected language. Firmware descriptions, drive model names, GUIDs, paths, diagnostic event codes, TaskBroker operations, and other externally supplied or technical identifiers are not translated.
+### Quick start
 
-The localization architecture, contribution rules, migration contract, and permanent gates are documented in [docs/LOCALIZATION.md](docs/LOCALIZATION.md).
+1. Download the current `LenovoBootMenuTray-v<version>.zip` from [downloads/](downloads/) (see the [release index](downloads/README.md)) and **extract the complete ZIP** into a writable user directory.
+2. Run `Start-LenovoBootMenuTray.cmd`. The included VBS launcher starts the tray application without leaving a visible PowerShell console.
+3. On first use, complete the offered **system-functions setup** through the maintenance menu and approve the UAC prompt. This installs the fixed, validated privileged tasks.
+4. Open the tray popup and choose a supported boot target for the next boot. Restart Windows when you want to use that target.
+5. Optionally configure the persistent default and **Start with Windows**. Set up the same default in each participating Windows installation if you want it restored after starting any of them.
+6. Use **Language / Sprache** in the tray menu to change between English and German.
 
-## Security and maintenance notes
+An interactive second launch reopens or activates the already-running instance. The application's ordinary tray-icon interaction remains unchanged.
 
-The application runs **unelevated** during normal operation. Privileged firmware mutations are executed only through fixed, allowlisted Windows Scheduled Tasks. Permanent changes to the UEFI boot order are explicitly outside the product model.
+## Boot selection and firmware limitations
 
-The TaskBroker boundary is hardened fail-closed: the runtime accepts only fixed operation types, target-specific task names are derived only from validated installed firmware GUIDs, TaskBroker state/metadata are read-only for normal users, and task DACLs are validated for Read+Execute only. If the installed privileged-task metadata is missing or incompatible, the application reports that setup or repair is required and keeps privileged actions closed until explicit maintenance succeeds. The canonical contract is documented in [docs/SECURITY_BOUNDARY.md](docs/SECURITY_BOUNDARY.md).
+### One-shot selection versus persistent default
 
-Starting with v0.10.0.0, the privileged TaskBroker installation uses `LenovoBootSelector-*` Scheduled Task names and `%ProgramData%\Lenovo Boot Selector\TaskBroker`. Upgrading from v0.9.x or earlier requires one explicit **Repair privileged tasks** action with UAC; the repair migrates a valid system-wide default and removes the exact old TaskBroker installation only after the new one has been fully verified.
+For one-shot selection, the fixed, allowlisted BootNext operation invokes Windows `bcdedit.exe` with the equivalent of:
 
-**Lenovo Boot Selector** is the only current product name. A small set of older-looking technical identifiers is deliberately retained for updater, package, persisted-state, singleton, or cleanup compatibility; pre-v0.10 TaskBroker identifiers are migration/cleanup inputs only and are no longer runtime authorization identifiers. The complete naming and migration policy is documented in [docs/IDENTIFIER_COMPATIBILITY.md](docs/IDENTIFIER_COMPATIBILITY.md).
+```text
+/set {fwbootmgr} bootsequence <validated installed target GUID>
+```
 
-Historical migration and repair details for v0.6.4.0/v0.6.4.1 are retained in [CHANGELOG.md](CHANGELOG.md) rather than presented as current maintenance instructions.
+This **temporarily modifies the firmware's next-boot selection**. It does **not** permanently rewrite `{fwbootmgr} displayorder` or UEFI `BootOrder`. The UI itself is not elevated; only the predefined Scheduled Task performs the privileged operation.
 
-**Current development version:** v1.1.15.0  
-**Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`
+The persistent default is different from permanently editing firmware boot order. A dedicated SYSTEM startup task restores the configured one-shot target **when Windows starts**. It does not independently run while the computer is powered off or while a non-Windows operating system is running. Missing, changed, or incompatible TaskBroker/firmware state may require explicit repair or reinitialization before privileged actions are available.
 
-## Downloads and revision history
+See [Security Boundary](docs/SECURITY_BOUNDARY.md) for the exact authorized operations and restrictions.
 
-Versioned builds are stored under [`downloads/`](downloads/). Every product source revision that requires a new build receives a new versioned release ZIP. Previously published builds remain available as immutable historical artifacts.
+### Storage information is context, not boot-target addressability
 
-The latest machine-readable update metadata is stored in [`downloads/latest.json`](downloads/latest.json). The product version history is maintained in [CHANGELOG.md](CHANGELOG.md).
+Firmware entries and physically connected storage devices are different kinds of information. Lenovo Boot Selector displays read-only storage context but does not invent a one-to-one mapping that firmware does not provide.
 
-Version format: **MAJOR.MINOR.PATCH.HOTFIX**. Historical three-component versions are compared as if `HOTFIX = 0`.
+- **Internal NVMe:** when exactly one internal NVMe drive is detected, the first internal entry can show its model (for example, `NVMe-SSD 1 / Interne SSD: KXG8AZNV2T04 LA KIOXIA`). A second entry may show `Kein Laufwerk erkannt`. With multiple internal NVMe drives, LBS deliberately does not guess which physical drive corresponds to firmware NVMe0/NVMe1.
+- **USB:** the firmware target remains the generic `USB HDD`. With exactly one detected USB boot candidate, its model may be shown as contextual text, for example `USB-Startmedium: SanDisk Extreme Pro USB4` (`USB boot medium: SanDisk Extreme Pro USB4` in English). This does **not** mean that LBS can individually address that physical USB drive through the generic firmware target.
 
-## Update function
+The drive names above are **examples from the development system**, not bundled devices or assumptions about another user's computer.
 
-Each transition from a hidden popup to the visible Lenovo Boot Selector UI starts one automatic read-only check for a newer app version, at the same lifecycle point as the existing fresh boot-target refresh. Starting the tray process alone does not perform that check; closing and later reopening the popup starts another one. If an update operation is already busy, the popup-open trigger does not start a competing second update worker. There is still **no periodic polling**. When a newer version is available, the popup header shows the localized update-available text (`New app version available` / `Neue App-Version verfügbar`) as long as no boot-target refresh is active. During a boot-target refresh, the localized refresh state takes precedence; the update indication returns afterward.
+## Localization
 
-The check reads `downloads/latest.json` from the fixed GitHub repository. A newer version is accepted only when manifest, semantic version, filename, tag, size, SHA-256, and package file list are valid. The automatic popup-open check does not download or install anything. Download and installation remain explicit user actions through the existing manual update path. The downloaded ZIP is checked again for size and SHA-256 before extraction. Installation runs unelevated with a local backup and rollback; the app then restarts through the existing VBS launcher.
+All product-controlled user-facing UI text uses a central PowerShell-5.1-compatible localization layer. **English (`en-US`) UI by default** applies to new installations and fallback behavior. **German (`de-DE`)** is available under **Language / Sprache**, and the setting persists.
 
-Since v0.6.3.1, the localized update-available status in the popup header is directly interactive. Hover and keyboard focus highlight the indicator in Lenovo red; click, Enter, or Space opens the existing update dialog. The header uses only the already validated update manifest and does not start another version check. The indicator is not interactive while a boot-target refresh or maintenance operation is active.
+Existing pre-localization settings are migrated to German to avoid unexpectedly changing the language of an established German installation. Invalid or unknown stored locales fall back to English. Changing the selected language updates the tray menu and rebuilds the visible popup.
 
-Since v0.6.3.0, updater networking is encapsulated in `src/Infrastructure/UpdateTransport.ps1`. Runtime diagnostics distinguish transport failures structurally from manifest, package, hash, installation, and restart failures. Network failures also retain the error class and `WebExceptionStatus`. The security contract remains unchanged: fixed HTTPS source, fail-closed manifest/package validation, unelevated execution, and no periodic polling.
+Firmware descriptions, device models, GUIDs, paths, diagnostic event codes, and other externally supplied technical identifiers are not translated. The full contract is documented in [docs/LOCALIZATION.md](docs/LOCALIZATION.md).
 
-Since v0.5.8.0, the result of an update attempt is persisted across process restart. The restarted app reports success only when the actually running version exactly matches the expected target version. The localized UI then reports update success once. On installation failure, the updater attempts to roll back to the previous version, restarts that version, and reports the failure/rollback state once in the selected language. The result is also copied into the runtime diagnostics of the new session. v0.5.8.1 adds one-time backward compatibility for the legacy `success/message/utc` result format written by older updater helpers; a legacy success is accepted only when `success` is a real Boolean, without inventing a target version that was never stored.
+## Updates
 
-Since v0.5.9.0, the available-update dialog also offers a localized manual install action. It uses the same existing update path as the localized maintenance action; no automatic or second update channel is introduced.
+Each transition from a hidden popup to a visible popup starts **one read-only version check** unless an update operation is already busy. Launching only the tray process does not trigger this check; closing and reopening the popup may trigger another. There is **no periodic polling**.
 
-The updater does not change firmware, BCD, or Scheduled Task configuration. Changes to privileged system functions remain exclusive to the existing explicit setup/repair/reinitialize path.
+The updater reads the fixed repository's [latest.json](downloads/latest.json) and validates the manifest, version, package filename, tag, size, SHA-256, and expected package contents. An automatic check **never downloads or installs** an update. If a new version is available, the localized popup header indicates this; the indicator can open the update dialog by click or keyboard activation when the UI is not busy.
 
-## Current storage presentation
+An explicitly requested update rechecks downloaded package size and SHA-256, installs **unelevated**, retains a local backup, and restarts through the VBS launcher. Success is reported only when the restarted process actually runs the expected version. Failed installations attempt rollback, with a localized result reported after restart. The updater does not edit firmware settings or Scheduled Tasks.
 
-### Internal NVMe SSDs
+See [Changelog](CHANGELOG.md) for version-specific updater fixes and compatibility handling.
 
-When exactly one internal NVMe device is detected, the current version shows its physical model for the first internal slot. On the confirmed target system, for example:
+## Diagnostics and privacy
 
-- **NVMe SSD 1** — `Internal SSD: KXG8AZNV2T04 LA KIOXIA`
-- **NVMe SSD 2** — `No drive detected`
+The maintenance menu supports two separate actions:
 
-With German selected, the same confirmed state is shown as `NVMe-SSD 1 / Interne SSD: …` and `NVMe-SSD 2 / Kein Laufwerk erkannt`.
+- **Save Diagnostics:** export a local ZIP for troubleshooting; it stays on the computer unless you choose to share it.
+- **Upload Diagnostics:** deliberately send a diagnostic ZIP via HTTPS to the project's private Cloudflare diagnostics service. **There is no automatic upload on launch, refresh, error, or update.** A confirmed successful upload returns a copyable, server-generated **Diagnosis ID** in the form `LBS-XXXXX-XXXXX-XXXXX-XXXXX`. If the response cannot confirm a valid receipt, the application does not invent an ID.
 
-When multiple internal NVMe devices are present, the application deliberately does not guess an unsupported physical NVMe0/NVMe1 mapping.
+The upload transport enforces a **2 MiB maximum ZIP size** and a **25-second timeout**. The server's documented retention policy is **up to 90 days**, with additional per-installation rotation and capacity limits that may delete older diagnostics sooner. A locally persisted random installation UUID supports correlation; it is not intended as a physical-device fingerprint. Diagnostic archives may contain technical details about the machine and should be treated as potentially sensitive.
 
-### USB boot media
+Uploads are separate from firmware/TaskBroker privileges. The Windows client does not contain an administrative archive-read token. Further backend, deployment, and operational details are documented in [DevOps Operations](docs/DEVOPS_OPERATIONS.md).
 
-The firmware target intentionally remains the generic **USB HDD**. The physical drive is shown only as read-only storage context. With exactly one detected USB boot candidate, for example, the default English UI shows `USB boot medium: SanDisk Extreme Pro USB4`; German shows `USB-Startmedium: SanDisk Extreme Pro USB4`.
+## Security and maintenance
 
-This presentation makes **no claim of direct 1:1 addressability** of the physical USB device through the generic firmware target `USB HDD`.
+Normal application operation is **unelevated**. Firmware mutations are restricted to a hardened, fail-closed TaskBroker boundary:
 
-## Security model
+- Only predefined operation types and exact task definitions are permitted; no arbitrary command strings, task names, raw `Boot####` identifiers, device paths, or freely supplied privileged GUIDs are accepted.
+- Per-target task names are derived from validated installed firmware GUIDs. SYSTEM owns the privileged task actions; normal-user access is constrained to the validated Read+Execute task permissions.
+- TaskBroker metadata and state in `%ProgramData%\Lenovo Boot Selector\TaskBroker` are protected against normal-user writes.
+- Missing, incompatible, or drifted state disables privileged actions until the user explicitly performs the required setup, repair, or reinitialization.
+- The updater runs separately and unelevated. No custom application executable runs as SYSTEM.
 
-- The tray application runs as a normal user.
-- Privileged changes run only through fixed SYSTEM Scheduled Tasks.
-- No free command text, task names, GUIDs, Boot#### numbers, or device paths cross the privilege boundary.
-- No custom application EXE runs as SYSTEM.
-- Boot mutations use only a **One-Shot Next Boot** path.
-- The application never permanently changes `{fwbootmgr} displayorder` or UEFI `BootOrder`.
-- The self-updater is fully unelevated and has no separate privileged update channel.
+Since v0.10.0.0 the canonical privileged tasks are named `LenovoBootSelector-*`. Upgrades from v0.9.x or earlier require an explicit elevated repair/migration step; the existing installation is not removed until the new installation passes validation. Some older-looking package filenames and local-state identifiers remain intentionally for backward compatibility, **not** because the product has reverted to its old name.
 
-## Requirements
+Read the authoritative [Security Boundary](docs/SECURITY_BOUNDARY.md) and [Identifier Compatibility](docs/IDENTIFIER_COMPATIBILITY.md) documents for exact task naming, migration, ACL, and safety rules.
 
-- Windows with **Windows PowerShell 5.1**
-- .NET/WinForms
-- Lenovo system with firmware boot targets visible through Windows
-- administrator rights only for the one-time setup or maintenance of the privileged Scheduled Tasks
+## Releases and development
 
-## Quick start
+Versioned, immutable historical release ZIPs are retained in [downloads/](downloads/). The current release pointer is [downloads/latest.json](downloads/latest.json); the release list is [downloads/README.md](downloads/README.md). Versions use **MAJOR.MINOR.PATCH.HOTFIX**; legacy three-component releases are compared with `HOTFIX = 0`.
 
-1. Download the release ZIP from `downloads/` and extract it completely into a **writable user directory**.
-2. Start `Start-LenovoBootMenuTray.cmd`.
-3. English is used by default; choose **Language / Sprache** in the tray menu if you want German.
-4. On first launch, run the offered system-functions setup through the maintenance menu and confirm the UAC prompt.
-5. Select the desired boot target in the popup.
-6. Opening the popup automatically performs a read-only version check. The existing maintenance action remains available for an explicit manual re-check or user-controlled update installation.
-
-## Project structure
+Project components are organized as follows:
 
 | Path | Purpose |
 | --- | --- |
-| `bin/` | release/package inputs and generated runtime artifacts; `version.json` is the authoritative release-version source |
-| `src/Core/` | stateless domain logic / Functional Core |
-| `src/Application/` | application and workflow logic |
-| `src/Infrastructure/` | Windows, storage, update, TaskBroker, and IO adapters |
-| `src/UI/` | WinForms presentation |
-| `tests/` | active canonical Python gates, native PowerShell tests, and baseline data |
-| `tests-history/` | frozen version-specific validators, named by category + version |
-| `docs/architecture/` | canonical and historical architecture baselines |
-| `docs/LOCALIZATION.md` | localization architecture, migration, contribution rules, and gates |
-| `docs/IDENTIFIER_COMPATIBILITY.md` | canonical product naming, retained compatibility IDs, and migration rules |
-| `docs/DEVELOPMENT_GUIDELINES.md` | Work-Path/checkpoint/heartbeat resilience, connector, and development-path rules |
-| `docs/INITIAL_PROMPT.md` | canonical new-session bootstrap |
-| `docs/GITHUB_HOWTO.md` / `docs/RELEASE_PROCESS.md` | GitHub operations and publication authority |
-| `docs/DEVOPS_OPERATIONS.md` | cross-system DevOps, deployments, health/evidence and recovery |
-| `docs/POPUP_ANCHORING.md` | WinForms popup anchoring and native desktop acceptance |
-| `docs/SECURITY_BOUNDARY.md` | fixed TaskBroker and firmware privilege boundary |
-| `audits/` | canonical and historical catch audits |
-| `tools/` | build, packaging, audit, and transition scripts |
-| `downloads/` | historical versioned release ZIPs and update manifests |
-
-## Development and tests
+| `bin/` | Release/package assets and generated runtime; `bin/version.json` is the canonical version source |
+| `src/Core/` | Pure domain logic / Functional Core |
+| `src/Application/` | Application services and workflow coordination |
+| `src/Infrastructure/` | Windows, storage, update, TaskBroker, and I/O adapters |
+| `src/UI/` | WinForms presentation, display scaling, menus, and interaction |
+| `tests/` / `tests-history/` | Active automated checks and archived version-specific tests |
+| `docs/architecture/` | Canonical and historical architecture baselines |
+| `audits/` | Current and historical catch-block classification audits |
+| `tools/` | Reproducible runtime generation, packaging, validation, and transition utilities |
+| `downloads/` | Versioned release ZIPs, download listing, and update manifests |
 
 The central native Windows PowerShell 5.1 test wrapper is:
 
-~~~powershell
+```powershell
 .\tests\Test-WindowsPowerShell51.ps1
-~~~
+```
 
-Build and packaging helpers live under `tools/`. Detailed version history is in [CHANGELOG.md](CHANGELOG.md). Localization development rules are in [docs/LOCALIZATION.md](docs/LOCALIZATION.md). Work-Path development—mandatory for Major/Minor work and used for an explicitly escalated Patch/Hotfix—follows [docs/DEVELOPMENT_GUIDELINES.md](docs/DEVELOPMENT_GUIDELINES.md).
+The project uses deterministic builds, permanent Release/Core/Boundary/Regression checks, native Windows PowerShell 5.1 tests, exact-SHA Candidate Preflight, reproducibility verification, and post-release validation. Hardware-specific behavior is additionally subject to explicit native owner acceptance. Its engineering rules favor Clean Code, SOLID, and limited, responsibility-aware DRY.
 
-The project's engineering baseline favors Clean Code and SOLID with explicit responsibility boundaries. DRY is applied to genuinely shared rules and knowledge, not mechanically to similar-looking code; limited duplication is preferred over coupling responsibilities that have different reasons to change. The detailed rule is canonical in [docs/DEVELOPMENT_GUIDELINES.md](docs/DEVELOPMENT_GUIDELINES.md).
+### Agentic software engineering and continuity
 
-### Agentic software engineering
+GitHub is the project's **single durable source of truth**: current code, Issues/comments, documentation, tests, workflows, and release evidence must be enough to continue work in a new session. Chats, local ZIPs, and model memory are not authoritative development records.
 
-Lenovo Boot Selector is developed as an **agentic software engineering** project. GitHub is the project's **single durable point of truth and continuity**: a fresh engineering agent must be able to reconstruct the complete current project state from the current repository, GitHub Issues/comments, workflows, tests, release metadata, and other tracked GitHub evidence alone.
+Small executable Patch/Hotfix changes normally use an atomic fast path. Major/Minor and specifically justified larger changes use an Issue-backed `work/LBS-<issue>` path with recoverable checkpoints and one cumulative rolling Issue comment. A Work tree must pass exact-SHA Development Completion before becoming a Candidate. A confirmed regression must be reproduced by a focused **RED** test on the unfixed baseline and proved **GREEN** after the fix, never by intentionally publishing a failing Candidate.
 
-No previous chat, chat summary, handover document or ZIP, model memory, stale local checkout, previous source ZIP, or other unpublished context is required or authoritative for continuing the project. Interactive chats are transient working sessions only. When a durable finding, decision, constraint, acceptance result, or operating rule emerges during a session, it must be captured in the appropriate GitHub artifact before future work depends on it.
+A Candidate is created as `candidate/v<version>` and must pass Linux and Windows gates before GitHub promotes it to `release/v<version>`. Official publication verifies the source tag, reproducible ZIP, integrity, PR squash merge, and post-release state. Separate Diagnostics Worker deployment or health verification has its own evidence and trust boundary. Repository and GitHub documentation use English.
 
-Development uses two persistence models. Small Patch/Hotfix work defaults to a short atomic branchless cycle. Major/Minor work, and an explicitly escalated Patch/Hotfix, uses `work/LBS-<github-issue-number>` with coherent product checkpoint commits and **exactly one cumulative, in-place updated GitHub Issue rolling recovery comment**. The Issue comment—not a tracked worklog file—is the canonical Work-Path Build & Release recovery ledger. While `Agent-State: ACTIVE`, `Last heartbeat` should remain within approximately three minutes; `WAITING_FOR_GITHUB` requires an exact, independently running GitHub Actions run. A roughly five-minute stale heartbeat indicates stopped interactive progress only after checking the referenced run.
+The operational rules and their detailed contracts are maintained in:
 
-**Do not create new `.chatgpt-work/LBS-*.md` files.** On older active work branches such files are **legacy only**: absorb their relevant recovery facts into the rolling Issue comment and remove them before freezing the final tree for exact-SHA Development Completion. That final clean Work SHA must pass `Candidate-Entry: PASS`; the Candidate is a clean commit based on current `main` with an identical qualified tree, without Work checkpoint history. After Candidate exposure GitHub Candidate/Actions/Release state owns publication recovery, while the same Issue comment preserves cumulative supervision and timing.
-
-The historical LBS-27/LBS-29/LBS-31 journal and interruption experiments remain useful historical observations, **not** authority to reinstate tracked journals. The current procedure belongs to [Development Guidelines](docs/DEVELOPMENT_GUIDELINES.md) and the [rolling Issue comment template](docs/templates/WORK_PATH_ROLLING_COMMENT.md); GitHub operations to [GitHub How-To](docs/GITHUB_HOWTO.md), release publication to [Release Process](docs/RELEASE_PROCESS.md), and cross-system operations to [DevOps Operations](docs/DEVOPS_OPERATIONS.md).
-
-Agentic work is constrained by the same engineering controls as any other contribution: Issue-backed scope where required, test-first regression handling, explicit safety boundaries, atomic candidate commits, deterministic builds, Linux and Windows PowerShell 5.1 gates, reproducibility checks, post-release verification, and native acceptance where hardware-specific behavior must be proven. Human direction remains authoritative for product intent, safety-sensitive decisions, and final acceptance.
-
-For confirmed bugs and regressions the rule is **failing test first, not failing candidate first**: add a focused permanent regression test, prove that it fails for the expected reason against the unfixed canonical basis, apply the minimal fix, and prove the same test GREEN before exposing a Candidate branch. An intentionally failing Candidate Preflight is not used as RED evidence.
-
-Since v0.6.5.0, a release is first validated as `candidate/v<version>`. A Candidate is release-ready and is created only when its mandatory gates are expected to pass. Only a completely green candidate may be promoted automatically to `release/v<version>` on the exact same commit. Protected runtime fragments use a release-specific `protectedFragmentIntent` instead of permanent exception lists; runtime modules are registered exclusively through template include markers.
-
-Since v0.6.6.0, there are only two active release profiles: `version-only` for unchanged product code under `src/**`, and `patch` for functional product-code changes. The historical `release-architecture` special profile has been removed.
-
-Since v0.6.7.0, the Release Orchestrator aggregates the complete post-release acceptance into a machine-readable `RELEASE_VERIFICATION_SUMMARY`. This allows interactive GitHub verification with far fewer individual queries without reducing Candidate Preflight, reproducibility, 8/8 gates, or source/ZIP integrity checks.
-
-From v0.6.8.0 onward, **English is the canonical language for repository and GitHub documentation**. All tracked Markdown files are maintained in English. Exact UI strings, identifiers, commands, paths, schemas, event codes, and other technical literals may remain in their original form when intentionally quoted. Interactive communication with the user remains separate from this repository policy.
+- [Initial Prompt](docs/INITIAL_PROMPT.md) – mandatory session bootstrap
+- [Development Guidelines](docs/DEVELOPMENT_GUIDELINES.md) – scope, development paths, checkpoints, and testing
+- [GitHub How-To](docs/GITHUB_HOWTO.md) – repository workflows and Issue lifecycle
+- [Release Process](docs/RELEASE_PROCESS.md) – Candidate, publication, and verification
+- [DevOps Operations](docs/DEVOPS_OPERATIONS.md) – GitHub/Cloudflare hand-offs and health evidence
+- [Build and Deployment Reporting](docs/BUILD_DEPLOYMENT_REPORTING.md) – reporting and provenance
+- [Popup Anchoring](docs/POPUP_ANCHORING.md) – positioning behavior and desktop acceptance
+- [Rolling Issue Comment Template](docs/templates/WORK_PATH_ROLLING_COMMENT.md) – Work-Path recovery contract
