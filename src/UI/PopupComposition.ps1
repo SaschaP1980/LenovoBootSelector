@@ -57,7 +57,7 @@ function Add-PopupHeaderSection {
 
     $refresh = New-Object System.Windows.Forms.Button
     $refresh.Text = '↻'
-    $refresh.Font = New-Object Drawing.Font('Segoe UI Symbol', 11.5, [Drawing.FontStyle]::Regular)
+    $refresh.Font = New-Object Drawing.Font('Segoe UI Symbol', 15.0, [Drawing.FontStyle]::Regular)
     $refresh.ForeColor = $script:ColorSecondary
     $refresh.BackColor = $script:ColorHeader
     $refresh.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat

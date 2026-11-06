@@ -1,6 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.1.14.7 – Improve Manage Entries visibility and refresh icon legibility (LBS-144)
+
+- Correct the very small owner-drawn visible (red) and hidden (gray, crossed-out) eye icons in the Manage Boot Entries popup on both 100% external and 250% laptop displays.
+- Replace fixed eye and pupil paint pixel coordinates with a single-scale layout derived from the actual Windows Forms paint surface DPI. Center and clamp the icon within its existing 32x34 design hit target. The eye uses a 24x14 design-pixel baseline and grows to 60x35 at 250% scaling; pupil, slash and stroke widths grow proportionally.
+- Increase only the top-right refresh arrow typography from 11.5pt to 15pt, retaining the existing 34x34 design-pixel button, tooltip, click handling, hover/disabled colors and busy-state protection.
+- Add 26 focused native Windows PowerShell 5.1 regression assertions covering actual red/gray WinForms raster paint, DPI-aware eye/disabled-slash dimensions and clipping for 100/125/150/200/250/300% scaling, refresh font size and unchanged action wiring. Document bug-specific RED followed by GREEN and full native Windows suite.
+- Do not modify the existing 1.1.14.4–1.1.14.6 DPI-awareness, menu sizing, modal positioning, checkbox fixes, autostart configuration or privileged BootNext/TaskBroker/firmware/update boundaries. The owner must still visually accept the result on both physical monitors.
+
 ## v1.1.14.6 – Scale custom Autostart checkbox glyph on Windows (LBS-144)
 
 - Fix the too-small "Start with Windows" checkbox visible at both 100% external and 250% internal Lenovo laptop scaling.
