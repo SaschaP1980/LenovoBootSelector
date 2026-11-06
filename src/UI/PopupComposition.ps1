@@ -328,10 +328,12 @@ function Add-PopupManageEntriesSection {
 
     # Entry-management overlay. It temporarily replaces the normal settings/footer
     # while the same boot list switches into edit mode.
+    # LBS-157: move this panel 34 design pixels down, leaving only 4px
+    # between Save/Cancel and the footer; the edit-mode list uses that space.
     $managePanel = New-Object System.Windows.Forms.Panel
     $managePanel.Name = 'ManageEntriesPanel'
-    $managePanel.Location = New-Object Drawing.Point(0, 490)
-    $managePanel.Size = New-Object Drawing.Size(390, 182)
+    $managePanel.Location = New-Object Drawing.Point(0, 524)
+    $managePanel.Size = New-Object Drawing.Size(390, 148)
     $managePanel.BackColor = $script:ColorSurface
     $managePanel.Visible = $false
 
@@ -388,7 +390,7 @@ function Add-PopupManageEntriesSection {
     $script:ManageSaveButton = $saveManage
 
     $manageFooter = New-Object System.Windows.Forms.Panel
-    $manageFooter.Location = New-Object Drawing.Point(0, 150)
+    $manageFooter.Location = New-Object Drawing.Point(0, 116)
     $manageFooter.Size = New-Object Drawing.Size(390, 32)
     $manageFooter.BackColor = $script:ColorSurface
     $manageVersion = New-Label -Text ("v{0}" -f $script:AppVersion) -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Regular)) `
