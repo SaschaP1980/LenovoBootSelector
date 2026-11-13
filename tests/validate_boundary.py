@@ -61,7 +61,7 @@ def main():
     s.absent('Historical Invoke-BcdEdit references removed',tray,'Invoke-BcdEdit')
     s.absent('Historical Set-BootSequence function removed',tray,'function Set-BootSequence')
     s.eq('Explicit Set-BootNextTarget shell once',len(re.findall(r'(?m)^function\s+Set-BootNextTarget\b',tray)),1)
-    s.contains('UI boot row uses Set-BootNextTarget',tray,'Set-BootNextTarget -Guid $guid')
+    s.contains('UI boot row uses nonblocking pending BootNext controller',tray,'Start-BootNextSelection -Guid $guid')
     # Infrastructure owns privileged mechanics; app/template cannot access the runner.
     runner=psfn(infra,'Invoke-AuthorizedTask'); resolver=psfn(infra,'Resolve-TaskBrokerAuthorizedTaskName'); contract=psfn(infra,'Test-TaskBrokerMetadataContract')
     s.contains('Infrastructure retains exact operation runner',infra,'function Invoke-AuthorizedTask')

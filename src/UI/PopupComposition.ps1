@@ -300,6 +300,7 @@ function Add-PopupRestartSection {
     $restartButton.Size = New-Object Drawing.Size(358, 31)
     $restartButton.Cursor = [System.Windows.Forms.Cursors]::Hand
     $restartButton.Add_Click({ Restart-Windows })
+    $script:RestartButton = $restartButton
     $restartPanel.Controls.Add($restartButton)
 
     # The secondary line remains compact, but is a keyboard-focusable action

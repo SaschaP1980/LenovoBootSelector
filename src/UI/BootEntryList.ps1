@@ -46,7 +46,9 @@ function Set-RowHoverState($Control, [bool]$Hover) {
     }
 
     $isSelected = $script:SelectedGuid -and ($rowGuid -eq $script:SelectedGuid)
-    if ($isSelected) {
+    $isPending = $script:BootNextPendingGuid -and ($rowGuid -eq $script:BootNextPendingGuid)
+    if ($isPending) { $row.BackColor = [Drawing.Color]::FromArgb(46,40,27) }
+    elseif ($isSelected) {
         $row.BackColor = $script:ColorSelectedRow
     }
     elseif ($Hover) {

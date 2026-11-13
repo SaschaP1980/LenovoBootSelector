@@ -184,6 +184,7 @@ jobs:
               taskBrokerBoundary = Get-TestTotal $logText '^TASKBROKER BOUNDARY TOTAL\s+(\d+)/(\d+)\s*$'
               bootServiceSnapshot = Get-TestTotal $logText '^BOOT SERVICE SNAPSHOT TOTAL\s+(\d+)/(\d+)\s*$'
               bootNextOwnership = Get-TestTotal $logText '^BOOTNEXT OWNERSHIP TOTAL\s+(\d+)/(\d+)\s*$'
+              bootNextSelectionUi = Get-TestTotal $logText '^BOOTNEXT SELECTION UI TOTAL\s+(\d+)/(\d+)\s*$'
               bootWriterPriority = Get-TestTotal $logText '^BOOT WRITER PRIORITY TOTAL\s+(\d+)/(\d+)\s*$'
               bootWriterScheduled = Get-TestTotal $logText '^BOOT WRITER SCHEDULED TOTAL\s+(\d+)/(\d+)\s*$'
               taskBrokerMigration = Get-TestTotal $logText '^TASKBROKER MIGRATION TOTAL\s+(\d+)/(\d+)\s*$'
@@ -211,6 +212,7 @@ jobs:
               'bootTargetDrift',
               'bootServiceSnapshot',
               'bootNextOwnership',
+              'bootNextSelectionUi',
               'bootWriterPriority',
               'bootWriterScheduled',
               'taskBrokerBoundary',
@@ -245,6 +247,7 @@ jobs:
               $totals.bootTargetDrift.passed +
               $totals.bootServiceSnapshot.passed +
               $totals.bootNextOwnership.passed +
+              $totals.bootNextSelectionUi.passed +
               $totals.bootWriterPriority.passed +
               $totals.bootWriterScheduled.passed +
               $totals.taskBrokerBoundary.passed +
@@ -270,6 +273,7 @@ jobs:
               $totals.bootTargetDrift.expected +
               $totals.bootServiceSnapshot.expected +
               $totals.bootNextOwnership.expected +
+              $totals.bootNextSelectionUi.expected +
               $totals.bootWriterPriority.expected +
               $totals.bootWriterScheduled.expected +
               $totals.taskBrokerBoundary.expected +
