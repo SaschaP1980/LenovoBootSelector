@@ -93,7 +93,7 @@ exit 3
     $duplicateCase = $template.IndexOf('if (Send-LbsActivationRequest) { exit 0 }')
     $legacyDialog = $template.IndexOf('Show-FatalMessage (Get-LocalizedStringCore -Key ''Startup.AlreadyRunningMessage''')
     Assert-LbsActivation ($duplicateCase -ge 0 -and $legacyDialog -gt $duplicateCase) 'Successful duplicate returns before genuine-failure recovery'
-    Assert-LbsActivation ($template.Contains('if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare)')) 'Workers bypass single-instance control'
+    Assert-LbsActivation ($template.Contains('if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare)')) 'Workers bypass single-instance control'
 }
 finally {
     if ($listener) { Stop-LbsActivationListener -Listener $listener }

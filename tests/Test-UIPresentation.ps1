@@ -4,6 +4,7 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 
+. (Join-Path $root 'src\Core\BootNextSelectionState.ps1')
 . (Join-Path $root 'src\UI\BootEntryList.ps1')
 . (Join-Path $root 'src\UI\BootEntryRows.ps1')
 . (Join-Path $root 'src\UI\PopupPosition.ps1')
@@ -50,7 +51,7 @@ function Commit-ActiveManageAliasEditor { }
 function Toggle-ManageEntryVisibility { param([string]$Guid) }
 function Get-EntryByGuid { param([string]$Guid) return $null }
 $script:BootNextCalls = 0
-function Set-BootNextTarget { param([string]$Guid) $script:BootNextCalls++ }
+function Start-BootNextSelection { param([string]$Guid) $script:BootNextCalls++ }
 function Move-ManageEntry { param([string]$MovedGuid,[string]$TargetGuid,[bool]$After) }
 function Show-LenovoNoticeDialog { }
 

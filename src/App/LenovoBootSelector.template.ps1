@@ -3,6 +3,9 @@
 param(
     [switch]$HideConsole,
     [switch]$BackgroundRefresh,
+    [switch]$BootNextWorker,
+    [string]$BootNextGuid,
+    [string]$BootNextResultPath,
     [string]$BackgroundResultPath,
     [switch]$BackgroundRefreshStorage,
     [switch]$BackgroundRefreshFirmware,
@@ -39,6 +42,7 @@ function Start-LenovoBootSelectorHidden {
 # @include src/Core/Localization.ps1
 # @include src/Core/EntryPreferences.ps1
 # @include src/Core/BootNextOwnership.ps1
+# @include src/Core/BootNextSelectionState.ps1
 # @include src/UI/StartupRecoveryDialog.ps1
 # @include src/Infrastructure/InstanceActivation.ps1
 
@@ -902,7 +906,7 @@ $activationEvent = $null
 $activationListener = $null
 $singleInstanceMutexState = 'not-applicable'
 $singleInstanceGraceMs = 500
-if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
+if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     $singleInstanceMutexState = 'busy'
     $mutex = [System.Threading.Mutex]::new($false, 'Local\LenovoBootMenuTray')
     try {
@@ -956,6 +960,12 @@ $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
 $script:SelectedGuid = $null
+$script:BootNextPendingGuid = $null
+$script:BootNextSelectionStartedUtc = [datetime]::MinValue
+$script:BootNextSelectionResultPath = $null
+$script:BootNextSelectionProcess = $null
+$script:BootNextSelectionTimer = $null
+$script:RestartButton = $null
 $script:NextBootFirmwareReadVerified = $false
 $script:LastStatusText = ''
 $script:ExitRequested = $false
@@ -1172,6 +1182,7 @@ function Complete-LegacyDefaultMigration {
 
 function Set-DefaultGuid {
     param([AllowNull()][string]$Guid)
+    if ($script:BootNextPendingGuid) { throw 'Eine manuelle BootNext-Auswahl wird noch verifiziert.' }
     $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
     if ([string]$capabilities.State -eq 'Busy') { throw 'Während der Wartung kann das Standard-Startziel nicht geändert werden.' }
     if ([string]$capabilities.State -eq 'ReinitializeRequired') { throw 'Nach einer Änderung der Startziele müssen die Systemfunktionen zuerst neu initialisiert werden.' }
@@ -1259,6 +1270,7 @@ function Get-NextBootTargetDisplayName {
 }
 
 function Use-DefaultForNextRestart {
+    if ($script:BootNextPendingGuid) { return }
     $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
     if (-not $capabilities.CanSetBootNext -or -not $script:DefaultGuid) { return }
     try {
@@ -1300,9 +1312,11 @@ function Update-RestartTargetUi {
     $script:RestartTargetLabel.ForeColor = if ($canApply) { $script:ColorAccent } else { $script:ColorSecondary }
     $script:RestartTargetLabel.AccessibleDescription = if ($canApply) { Get-LocalizedString -Key 'BootNext.UseDefaultHint' -Values @{ Default=$default } } else { $label }
     $script:RestartTargetLabel.FlatAppearance.MouseOverBackColor = if ($canApply) { $script:ColorSelectedRow } else { $script:ColorSurface }
+    Update-BootNextRestartInterlock
 }
 
 function Restart-Windows {
+    if ($script:BootNextPendingGuid) { return }
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     if (-not $capabilities.CanRestart) { return }
     # A cached SelectedGuid must never be the sole evidence in a restart dialog.
@@ -1741,7 +1755,9 @@ function Get-FriendlyBootEntry {
 
 # @include src/Application/BootService.ps1
 # @include src/Infrastructure/BackgroundRefreshWorker.ps1
+# @include src/Infrastructure/BootNextSelectionWorker.ps1
 # @include src/Application/RefreshRuntime.ps1
+# @include src/Application/BootNextSelectionController.ps1
 # @include src/Application/RefreshController.ps1
 
 $script:BackgroundRefreshState = New-BackgroundRefreshRuntimeState
@@ -1829,6 +1845,10 @@ function Get-EntryByGuid([string]$Guid) {
 
 function Apply-FirmwareBootState {
     param([Parameter(Mandatory=$true)]$State, [switch]$VerifiedFresh)
+    if ($script:BootNextPendingGuid) {
+        Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_RESULT_DEFERRED_FOR_BOOTNEXT' -Stage 'bootnext' -Success $true
+        return
+    }
 
     $script:CurrentEntries = @($State.Entries)
     $script:SelectedGuid = if ($State.SelectedGuid) { $State.SelectedGuid.ToLowerInvariant() } else { $null }
@@ -1891,7 +1911,7 @@ function Load-BootStateFromExistingCache {
 # @include src/UI/Popup.ps1
 
 Initialize-RuntimeDiagnostics
-if (-not ($BackgroundRefresh -or $UpdateCheck -or $UpdatePrepare)) {
+if (-not ($BootNextWorker -or $BackgroundRefresh -or $UpdateCheck -or $UpdatePrepare)) {
     try { [void](Get-DiagnosticsInstallationId -SettingsDirectory $script:SettingsDir) }
     catch { Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_INSTALLATION_ID_UNAVAILABLE' -Stage 'startup' -Success $false -ErrorRecord $_ -Level warning }
 }
@@ -1904,6 +1924,10 @@ if (-not $BackgroundRefresh) {
     }
 }
 
+if ($BootNextWorker) {
+    $exitCode = Invoke-BootNextSelectionWorker -Guid $BootNextGuid -ResultPath $BootNextResultPath
+    exit $exitCode
+}
 if ($BackgroundRefresh) {
     $exitCode = Invoke-BackgroundRefreshWorker -RefreshStorage ([bool]$BackgroundRefreshStorage) -RefreshFirmware ([bool]$BackgroundRefreshFirmware) -ResultPath $BackgroundResultPath
     exit $exitCode
@@ -2220,6 +2244,7 @@ finally {
         try { Stop-UpdateCheckWorkflow -State $script:UpdateState } catch { }
         try { Stop-UpdatePrepareWorkflow -State $script:UpdateState } catch { }
     }
+    Stop-BootNextSelectionWorker -Reason 'shutdown'
     $backgroundRefreshContext = $null
     if ($script:BackgroundRefreshState) {
         $backgroundRefreshContext = Take-BackgroundRefreshCompletionContext -State $script:BackgroundRefreshState

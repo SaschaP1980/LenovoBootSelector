@@ -1,6 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.2.1.0 – Immediate, verified BootNext selection feedback
+
+- Show a separate unverified "Setting next boot target" indicator immediately after a boot-target click, without falsely marking it as the confirmed firmware selection.
+- Run the existing allowlisted SYSTEM TaskBroker request through a separate unelevated PowerShell worker so the WinForms UI remains responsive during the operation.
+- Keep the previously verified selection visible and prevent a Windows restart while the change is pending. Confirm the new selection only after successful worker result and a fresh firmware-manager readback.
+- Preserve safe error handling, guard duplicate clicks, discard stale background refresh snapshots, and support both German and English labels.
+- Extend permanent Windows PowerShell 5.1 coverage with 30 core, source-wiring and mocked worker/restart-interlock checks.
+
 ## v1.2.0.0 – Provenance-aware BootNext synchronization (LBS-143)
 
 - Synchronize a changed persistent default with the effective next boot only when protected, current-boot LBS automatic provenance and a freshly read firmware target both authorize the change.

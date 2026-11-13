@@ -214,6 +214,9 @@ def main():
     s.c('LBS-33 native TaskBroker migration test exists',taskbroker_migration_path.is_file())
     taskbroker_migration=txt(taskbroker_migration_path) if taskbroker_migration_path.is_file() else ''
     s.has('LBS-143 migration suite keeps fixed total 43',taskbroker_migration,'Write-Host "TASKBROKER MIGRATION TOTAL $checks/43"')
+    selection_ui = txt(root/'tests/Test-BootNextSelectionUi.ps1')
+    s.has('LBS-143 patch pending selection suite keeps fixed total 30',selection_ui,'Write-Host "BOOTNEXT SELECTION UI TOTAL $checks/30"')
+    s.has('LBS-143 patch selection suite runs in native Windows aggregate',windows_wrapper,"& (Join-Path $root 'tests\\Test-BootNextSelectionUi.ps1')")
     boot_writer_priority = txt(root/'tests/Test-BootWriterPriority.ps1')
     s.has('LBS-143 writer native suite keeps fixed total 24',boot_writer_priority,'Write-Host "BOOT WRITER PRIORITY TOTAL $checks/24"')
     s.has('LBS-143 writer suite is executed in hosted Windows aggregate',windows_wrapper,"& (Join-Path $root 'tests\\Test-BootWriterPriority.ps1')")
