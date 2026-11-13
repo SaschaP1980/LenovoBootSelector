@@ -41,6 +41,7 @@ Write-Host "PARSER TOTAL $pass/$($files.Count)"
 & (Join-Path $root 'tests\Test-BootTargetDrift.ps1')
 & (Join-Path $root 'tests\Test-BootServiceSnapshot.ps1')
 & (Join-Path $root 'tests\Test-BootNextOwnership.ps1')
+& (Join-Path $root 'tests\Test-BootNextSelectionUi.ps1')
 & (Join-Path $root 'tests\Test-BootWriterPriority.ps1')
 # LBS-143: actual temporary SYSTEM tasks with isolated fake firmware state.
 & (Join-Path $root 'tests\Test-BootWriterScheduledTasks.ps1')

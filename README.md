@@ -11,7 +11,7 @@
 
 It changes the firmware's **one-time `bootsequence`**, not the permanent UEFI `BootOrder`. Boot targets must be supported by the installed TaskBroker configuration; the application cannot address arbitrary devices or independently select individual physical drives behind a generic firmware entry.
 
-**Current development version:** v1.2.0.0  
+**Current development version:** v1.2.1.0  
 **Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`  
 **Releases:** [Downloads and version history](downloads/README.md) · [Latest published version metadata](downloads/latest.json) · [Changelog](CHANGELOG.md)
 

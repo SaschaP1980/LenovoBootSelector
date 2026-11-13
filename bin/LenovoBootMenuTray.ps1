@@ -3,6 +3,9 @@
 param(
     [switch]$HideConsole,
     [switch]$BackgroundRefresh,
+    [switch]$BootNextWorker,
+    [string]$BootNextGuid,
+    [string]$BootNextResultPath,
     [string]$BackgroundResultPath,
     [switch]$BackgroundRefreshStorage,
     [switch]$BackgroundRefreshFirmware,
@@ -93,6 +96,9 @@ function Get-LocalizationCatalogCore {
             'BootNext.UseDefaultHint' = 'Set {Default} as the one-time target for the next restart'
             'BootNext.DefaultApplied' = 'Stored default selected for the next restart.'
             'BootNext.DefaultApplyFailed' = 'The next restart target could not be changed. Please check the actual target.'
+            'BootNext.SelectionPending' = 'Setting next boot target…'
+            'BootNext.SelectionPendingFooter' = 'Setting {Target} · not yet verified'
+            'BootNext.SelectionFailed' = 'Boot target was not confirmed. Please check the actual next boot.'
             'BootNext.CheckFailed' = 'The current firmware next-boot target could not be verified. No restart was started.'
             'Status.Checking' = 'Checking …'
             'Action.RestartWindows' = 'Restart Windows'
@@ -369,6 +375,9 @@ function Get-LocalizationCatalogCore {
             'BootNext.UseDefaultHint' = '{Default} einmalig für den nächsten Neustart vormerken'
             'BootNext.DefaultApplied' = 'Standardziel wurde für den nächsten Neustart vorgemerkt.'
             'BootNext.DefaultApplyFailed' = 'Das nächste Startziel konnte nicht geändert werden. Bitte das tatsächliche Ziel prüfen.'
+            'BootNext.SelectionPending' = 'Wird gesetzt …'
+            'BootNext.SelectionPendingFooter' = '{Target} wird gesetzt · noch nicht bestätigt'
+            'BootNext.SelectionFailed' = 'Bootziel nicht bestätigt. Bitte den tatsächlichen nächsten Start prüfen.'
             'BootNext.CheckFailed' = 'Das nächste Startziel der Firmware konnte nicht verifiziert werden. Es wurde kein Neustart ausgelöst.'
             'Status.Checking' = 'Wird geprüft …'
             'Action.RestartWindows' = 'Windows neu starten'
@@ -971,6 +980,23 @@ function Resolve-BootNextDisplayStateCore {
     if (-not $EffectiveTargetKnown) { return 'unavailable' }
     if ($DefaultGuid -and $DefaultGuid -eq $EffectiveNextGuid) { return 'aligned' }
     return 'different'
+}
+
+# Pure BootNext selection display/verification contract.
+# A pending user request must never be represented as an effective one-shot
+# firmware selection until the protected writer and firmware readback succeed.
+function Resolve-BootNextRowDisplayCore {
+    param([AllowNull()][string]$EntryGuid,[AllowNull()][string]$ConfirmedGuid,[AllowNull()][string]$PendingGuid)
+    if (-not $EntryGuid) { return 'idle' }
+    if ($PendingGuid -and $EntryGuid -eq $PendingGuid) { return 'pending' }
+    if ($ConfirmedGuid -and $EntryGuid -eq $ConfirmedGuid) { return 'selected' }
+    return 'idle'
+}
+
+function Test-BootNextWorkerResultCore {
+    param([AllowNull()][string]$RequestedGuid,[AllowNull()][string]$ReturnedGuid,[bool]$Success)
+    return ([bool]$Success -and [bool]$RequestedGuid -and
+        [bool]$ReturnedGuid -and $RequestedGuid -eq $ReturnedGuid)
 }
 
 function Get-StartupRecoveryLocale {
@@ -2132,7 +2158,7 @@ $activationEvent = $null
 $activationListener = $null
 $singleInstanceMutexState = 'not-applicable'
 $singleInstanceGraceMs = 500
-if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
+if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     $singleInstanceMutexState = 'busy'
     $mutex = [System.Threading.Mutex]::new($false, 'Local\LenovoBootMenuTray')
     try {
@@ -2181,11 +2207,17 @@ if (-not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.2.0.0'
+$script:AppVersion = '1.2.1.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
 $script:SelectedGuid = $null
+$script:BootNextPendingGuid = $null
+$script:BootNextSelectionStartedUtc = [datetime]::MinValue
+$script:BootNextSelectionResultPath = $null
+$script:BootNextSelectionProcess = $null
+$script:BootNextSelectionTimer = $null
+$script:RestartButton = $null
 $script:NextBootFirmwareReadVerified = $false
 $script:LastStatusText = ''
 $script:ExitRequested = $false
@@ -5666,6 +5698,7 @@ function Complete-LegacyDefaultMigration {
 
 function Set-DefaultGuid {
     param([AllowNull()][string]$Guid)
+    if ($script:BootNextPendingGuid) { throw 'Eine manuelle BootNext-Auswahl wird noch verifiziert.' }
     $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
     if ([string]$capabilities.State -eq 'Busy') { throw 'Während der Wartung kann das Standard-Startziel nicht geändert werden.' }
     if ([string]$capabilities.State -eq 'ReinitializeRequired') { throw 'Nach einer Änderung der Startziele müssen die Systemfunktionen zuerst neu initialisiert werden.' }
@@ -6503,6 +6536,7 @@ function Get-NextBootTargetDisplayName {
 }
 
 function Use-DefaultForNextRestart {
+    if ($script:BootNextPendingGuid) { return }
     $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
     if (-not $capabilities.CanSetBootNext -or -not $script:DefaultGuid) { return }
     try {
@@ -6544,9 +6578,11 @@ function Update-RestartTargetUi {
     $script:RestartTargetLabel.ForeColor = if ($canApply) { $script:ColorAccent } else { $script:ColorSecondary }
     $script:RestartTargetLabel.AccessibleDescription = if ($canApply) { Get-LocalizedString -Key 'BootNext.UseDefaultHint' -Values @{ Default=$default } } else { $label }
     $script:RestartTargetLabel.FlatAppearance.MouseOverBackColor = if ($canApply) { $script:ColorSelectedRow } else { $script:ColorSurface }
+    Update-BootNextRestartInterlock
 }
 
 function Restart-Windows {
+    if ($script:BootNextPendingGuid) { return }
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     if (-not $capabilities.CanRestart) { return }
     # A cached SelectedGuid must never be the sole evidence in a restart dialog.
@@ -8176,6 +8212,76 @@ function Invoke-BackgroundRefreshWorker {
     return 1
 }
 
+# A separate UNELEVATED PowerShell process executes one allowlisted BootNext
+# request. The fixed SYSTEM TaskBroker remains the ONLY privileged writer.
+function Start-BootNextSelectionWorkerProcess {
+    param(
+        [Parameter(Mandatory=$true)][string]$ScriptPath,
+        [Parameter(Mandatory=$true)][string]$Guid,
+        [Parameter(Mandatory=$true)][string]$ResultPath,
+        [AllowNull()][string]$RuntimeSessionId
+    )
+    $normalized = Normalize-TaskBrokerGuid -Guid $Guid
+    if (-not $normalized -or -not (Get-TaskBrokerTarget -Guid $normalized)) {
+        throw 'BootNext worker target is not on the installed firmware allowlist.'
+    }
+    $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $parts = @(
+        '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass',
+        '-File', ('"{0}"' -f $ScriptPath),
+        '-BootNextWorker', '-BootNextGuid', ('"{0}"' -f $normalized),
+        '-BootNextResultPath', ('"{0}"' -f $ResultPath)
+    )
+    if ($RuntimeSessionId) { $parts += @('-RuntimeSessionId', ('"{0}"' -f $RuntimeSessionId)) }
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $psExe
+    $psi.Arguments = ($parts -join ' ')
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
+    $process = [Diagnostics.Process]::Start($psi)
+    if (-not $process) { throw 'BootNext worker could not start.' }
+    return $process
+}
+
+function Invoke-BootNextSelectionWorker {
+    param(
+        [Parameter(Mandatory=$true)][string]$Guid,
+        [Parameter(Mandatory=$true)][string]$ResultPath
+    )
+    $stopwatch = [Diagnostics.Stopwatch]::StartNew()
+    $normalized = Normalize-TaskBrokerGuid -Guid $Guid
+    $result = [ordered]@{ Success=$false; Guid=[string]$normalized; Error='' }
+    try {
+        if (-not $normalized) { throw 'Invalid BootNext worker GUID.' }
+        $verified = Set-BootNextTargetService -Guid $normalized
+        if ([int]$verified.ExitCode -ne 0 -or [string]$verified.Guid -ne $normalized) {
+            throw 'BootNext worker did not verify the selected firmware target.'
+        }
+        $result.Success = $true
+    }
+    catch {
+        $result.Error = $_.Exception.Message
+    }
+    finally {
+        $stopwatch.Stop()
+        try {
+            $parent = Split-Path -Parent $ResultPath
+            if (-not (Test-Path -LiteralPath $parent -PathType Container)) {
+                throw 'BootNext worker result directory is missing.'
+            }
+            $json = $result | ConvertTo-Json -Compress -Depth 4
+            [IO.File]::WriteAllText($ResultPath,$json,(New-Object Text.UTF8Encoding($false)))
+        }
+        catch { $result.Success = $false }
+        Write-RuntimeDiagnosticEvent -Event 'BOOTNEXT_WORKER_COMPLETED' -Stage 'bootnext' -Success ([bool]$result.Success) -DurationMs $stopwatch.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{
+            guid=$normalized; workerError=[string]$result.Error
+        }) -Level $(if ($result.Success) { 'info' } else { 'error' })
+    }
+    if ($result.Success) { return 0 }
+    return 1
+}
+
 function New-BackgroundRefreshRequest {
     param(
         [bool]$RefreshStorage,
@@ -8306,6 +8412,142 @@ function ConvertFrom-BackgroundRefreshResultText {
         throw 'Der Hintergrund-Refresh hat ein leeres Ergebnis geliefert.'
     }
     return ($Text | ConvertFrom-Json)
+}
+
+# LBS-143 follow-up: keep WinForms responsive while the fixed SYSTEM
+# BootNext task and authoritative firmware verification execute off-thread.
+# All UI state changes occur on the original WinForms message-loop thread.
+function Update-BootNextRestartInterlock {
+    $pending = [bool]$script:BootNextPendingGuid
+    if ($script:RestartButton -and -not $script:RestartButton.IsDisposed) {
+        $script:RestartButton.Enabled = -not $pending
+    }
+    if ($script:RestartTargetLabel -and -not $script:RestartTargetLabel.IsDisposed -and $pending) {
+        $entry = Get-EntryByGuid ([string]$script:BootNextPendingGuid)
+        $title = if ($entry) { Get-EntryDisplayTitle -Entry $entry } else { Get-LocalizedString -Key 'BootNext.Unknown' }
+        $text = Get-LocalizedString -Key 'BootNext.SelectionPendingFooter' -Values @{ Target=$title }
+        $script:RestartTargetLabel.Text = $text
+        $script:RestartTargetLabel.Enabled = $false
+        $script:RestartTargetLabel.TabStop = $false
+        $script:RestartTargetLabel.Cursor = [Windows.Forms.Cursors]::Default
+        $script:RestartTargetLabel.AccessibleDescription = $text
+    }
+}
+
+function Stop-BootNextSelectionWorker {
+    param([string]$Reason = 'completed')
+    if ($script:BootNextSelectionTimer) {
+        try { $script:BootNextSelectionTimer.Stop(); $script:BootNextSelectionTimer.Dispose() } catch { }
+        $script:BootNextSelectionTimer = $null
+    }
+    if ($script:BootNextSelectionProcess) {
+        try {
+            $script:BootNextSelectionProcess.Refresh()
+            if (-not $script:BootNextSelectionProcess.HasExited) {
+                $script:BootNextSelectionProcess.Kill()
+                $script:BootNextSelectionProcess.WaitForExit(3000) | Out-Null
+            }
+            $script:BootNextSelectionProcess.Dispose()
+        } catch { }
+        $script:BootNextSelectionProcess = $null
+    }
+    if ($script:BootNextSelectionResultPath) {
+        Remove-BackgroundRefreshResultFile -Path ([string]$script:BootNextSelectionResultPath)
+        $script:BootNextSelectionResultPath = $null
+    }
+    $script:BootNextPendingGuid = $null
+    $script:BootNextSelectionStartedUtc = [datetime]::MinValue
+}
+
+function Start-BootNextSelection {
+    param([Parameter(Mandatory=$true)][string]$Guid)
+    if ($script:BootNextPendingGuid) { return }
+    if ($script:IsManageEntriesMode -or (Test-MaintenanceBusy)) { return }
+    $normalized = Normalize-TaskBrokerGuid -Guid $Guid
+    $entry = if ($normalized) { Get-EntryByGuid $normalized } else { $null }
+    if (-not $entry -or -not (Get-TaskBrokerTarget -Guid $normalized)) { return }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    if (-not $capabilities.CanSetBootNext) { return }
+    try {
+        # Discard older background refresh results before manual writer starts.
+        if ($script:BackgroundRefreshState -and
+            (Test-BackgroundRefreshActive -State $script:BackgroundRefreshState)) {
+            Stop-BackgroundBootRefreshForMaintenance -Reason 'bootnext-selection'
+        }
+        if (-not (Test-Path -LiteralPath $script:TaskBrokerLocalDir -PathType Container)) {
+            [void](New-Item -ItemType Directory -Path $script:TaskBrokerLocalDir -Force)
+        }
+        $script:BootNextPendingGuid = $normalized
+        $script:BootNextSelectionStartedUtc = [datetime]::UtcNow
+        $script:LastStatusText = Get-LocalizedString -Key 'BootNext.SelectionPending'
+        Update-PopupRows
+        Update-BootNextRestartInterlock
+
+        $script:BootNextSelectionResultPath = Join-Path $script:TaskBrokerLocalDir ("runtime-bootnext-{0}.json" -f [guid]::NewGuid().ToString('N'))
+        $script:BootNextSelectionProcess = Start-BootNextSelectionWorkerProcess -ScriptPath $script:ScriptPath -Guid $normalized -ResultPath $script:BootNextSelectionResultPath -RuntimeSessionId $script:RuntimeSessionId
+        $timer = New-Object Windows.Forms.Timer
+        $timer.Interval = 120
+        $timer.Add_Tick({ Complete-BootNextSelection })
+        $script:BootNextSelectionTimer = $timer
+        $timer.Start()
+    }
+    catch {
+        Write-RuntimeDiagnosticEvent -Event 'BOOTNEXT_SELECTION_START_FAILED' -Stage 'bootnext' -Success $false -ErrorRecord $_ -Level error
+        Stop-BootNextSelectionWorker -Reason 'start-failed'
+        $script:LastStatusText = Get-LocalizedString -Key 'BootNext.SelectionFailed'
+        Update-PopupRows
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Boot.ChangeErrorTitle') -Heading (Get-LocalizedString -Key 'Boot.ChangeErrorHeading') -Message (Get-LocalizedString -Key 'Boot.ChangeErrorMessage') -Kind Error
+    }
+}
+
+function Complete-BootNextSelection {
+    if (-not $script:BootNextPendingGuid -or -not $script:BootNextSelectionProcess) { return }
+    $process = $script:BootNextSelectionProcess
+    try { $process.Refresh() } catch { }
+    if (-not $process.HasExited) {
+        if (([datetime]::UtcNow - $script:BootNextSelectionStartedUtc).TotalSeconds -lt 75) { return }
+    }
+    $requested = [string]$script:BootNextPendingGuid
+    $verified = $false
+    try {
+        if (-not $process.HasExited) { throw 'BootNext worker timed out before a verified result.' }
+        $path = [string]$script:BootNextSelectionResultPath
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw 'BootNext worker produced no completion record.'
+        }
+        $result = ([IO.File]::ReadAllText($path,[Text.Encoding]::UTF8) | ConvertFrom-Json -ErrorAction Stop)
+        if ($process.ExitCode -ne 0 -or
+            -not (Test-BootNextWorkerResultCore -RequestedGuid $requested -ReturnedGuid ([string]$result.Guid) -Success ([bool]$result.Success))) {
+            throw ('BootNext worker failed: ' + [string]$result.Error)
+        }
+        [void](Refresh-EffectiveNextBootState)
+        if ($script:SelectedGuid -ne $requested) {
+            throw 'Firmware next-boot target changed after worker verification.'
+        }
+        $verified = $true
+    }
+    catch {
+        Write-RuntimeDiagnosticEvent -Event 'BOOTNEXT_SELECTION_COMPLETED' -Stage 'bootnext' -Success $false -ErrorRecord $_ -Level error
+        try { [void](Refresh-EffectiveNextBootState) }
+        catch { $script:SelectedGuid = $null; $script:NextBootFirmwareReadVerified = $false }
+    }
+    finally {
+        Stop-BootNextSelectionWorker -Reason 'completed'
+        if ($verified) {
+            $entry = Get-EntryByGuid $requested
+            $script:LastStatusText = if ($entry) {
+                Get-LocalizedString -Key 'Status.NextBootTarget' -Values @{ Title=(Get-EntryDisplayTitle -Entry $entry) }
+            } else { Get-LocalizedString -Key 'Status.NextBootSet' }
+            Write-RuntimeDiagnosticEvent -Event 'BOOTNEXT_SET' -Stage 'bootnext' -Success $true -Data (New-RuntimeDiagnosticData @{ guid=$requested; source='async-worker' })
+        }
+        else {
+            $script:LastStatusText = Get-LocalizedString -Key 'BootNext.SelectionFailed'
+        }
+        Update-PopupRows
+    }
+    if (-not $verified) {
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Boot.ChangeErrorTitle') -Heading (Get-LocalizedString -Key 'Boot.ChangeErrorHeading') -Message (Get-LocalizedString -Key 'Boot.ChangeErrorMessage') -Kind Error
+    }
 }
 
 # Background-refresh lifecycle orchestration.
@@ -8999,10 +9241,7 @@ function New-BootEntryInteractionHandlers {
 
         try {
             $entry = Get-EntryByGuid $guid
-            Set-BootNextTarget -Guid $guid
-            $script:SelectedGuid = $guid.ToLowerInvariant()
-            $script:LastStatusText = if ($entry) { Get-LocalizedString -Key 'Status.NextBootTarget' -Values @{ Title=(Get-EntryDisplayTitle -Entry $entry) } } else { Get-LocalizedString -Key 'Status.NextBootSet' }
-            Update-PopupRows
+            Start-BootNextSelection -Guid $guid
         }
         catch {
             Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Boot.ChangeErrorTitle') -Heading (Get-LocalizedString -Key 'Boot.ChangeErrorHeading') -Message (Get-LocalizedString -Key 'Boot.ChangeErrorMessage') -Kind Error
@@ -9394,10 +9633,10 @@ function Add-NormalBootEntryControls {
         $Subtitle
     )
 
-    $checkText = if ($isSelected) { '✓' } else { '' }
+    $checkText = if ($script:BootNextPendingGuid -and ([string]$entry.Guid -eq [string]$script:BootNextPendingGuid)) { '…' } elseif ($isSelected) { '✓' } else { '' }
     $check = New-Label -Text $checkText `
         -Font (New-Object Drawing.Font('Segoe UI Symbol', 12, [Drawing.FontStyle]::Bold)) `
-        -ForeColor $script:ColorAccent -X 354 -Y 12 -Width 24 -Height 34
+        -ForeColor $(if ($script:BootNextPendingGuid -and ([string]$entry.Guid -eq [string]$script:BootNextPendingGuid)) { $script:ColorWarning } else { $script:ColorAccent }) -X 354 -Y 12 -Width 24 -Height 34
     $check.Tag = $entry.Guid
     $check.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $check.Cursor = [System.Windows.Forms.Cursors]::Hand
@@ -9456,15 +9695,19 @@ $row.Cursor = if ($aliasEditActive) { [System.Windows.Forms.Cursors]::Default } 
 $row.AllowDrop = ($script:IsManageEntriesMode -and -not $aliasEditActive)
 
 $isHidden = $script:IsManageEntriesMode -and (Test-ManageEntryHidden -Guid $entry.Guid)
-$isSelected = (-not $script:IsManageEntriesMode) -and $script:SelectedGuid -and ($entry.Guid -eq $script:SelectedGuid)
-if ($isSelected) { $row.BackColor = $script:ColorSelectedRow }
+$rowDisplay = if ($script:IsManageEntriesMode) { 'idle' } else { Resolve-BootNextRowDisplayCore -EntryGuid $entry.Guid -ConfirmedGuid $script:SelectedGuid -PendingGuid $script:BootNextPendingGuid }
+$isSelected = ($rowDisplay -eq 'selected')
+$isPending = ($rowDisplay -eq 'pending')
+if ($isPending) { $row.BackColor = [Drawing.Color]::FromArgb(46,40,27) }
+elseif ($isSelected) { $row.BackColor = $script:ColorSelectedRow }
 elseif ($isHidden) { $row.BackColor = [Drawing.Color]::FromArgb(27,27,27) }
 
 $marker = New-Object System.Windows.Forms.Panel
 $marker.Location = New-Object Drawing.Point(0, 0)
 $marker.Size = New-Object Drawing.Size(3, $rowHeight)
 $marker.BackColor = $script:ColorRow
-if ($isSelected -or ($script:IsManageEntriesMode -and -not $isHidden)) { $marker.BackColor = $script:ColorAccent }
+if ($isPending) { $marker.BackColor = $script:ColorWarning }
+elseif ($isSelected -or ($script:IsManageEntriesMode -and -not $isHidden)) { $marker.BackColor = $script:ColorAccent }
 elseif ($isHidden) { $marker.BackColor = [Drawing.Color]::FromArgb(70,70,70) }
 $marker.Tag = $entry.Guid
 $marker.AllowDrop = $script:IsManageEntriesMode
@@ -9533,6 +9776,9 @@ if (-not $aliasEditActive) {
     }
     elseif ($script:IsManageEntriesMode -and ([string]$entry.RawDescription -eq 'Boot Menu')) {
         Get-LocalizedString -Key 'Boot.MenuManageSubtitle'
+    }
+    elseif ($isPending) {
+        Get-LocalizedString -Key 'BootNext.SelectionPending'
     }
     else {
         [string]$entry.Subtitle
@@ -9645,7 +9891,9 @@ function Set-RowHoverState($Control, [bool]$Hover) {
     }
 
     $isSelected = $script:SelectedGuid -and ($rowGuid -eq $script:SelectedGuid)
-    if ($isSelected) {
+    $isPending = $script:BootNextPendingGuid -and ($rowGuid -eq $script:BootNextPendingGuid)
+    if ($isPending) { $row.BackColor = [Drawing.Color]::FromArgb(46,40,27) }
+    elseif ($isSelected) {
         $row.BackColor = $script:ColorSelectedRow
     }
     elseif ($Hover) {
@@ -9710,6 +9958,10 @@ function Update-PopupRows {
 
 function Apply-FirmwareBootState {
     param([Parameter(Mandatory=$true)]$State, [switch]$VerifiedFresh)
+    if ($script:BootNextPendingGuid) {
+        Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_RESULT_DEFERRED_FOR_BOOTNEXT' -Stage 'bootnext' -Success $true
+        return
+    }
 
     $script:CurrentEntries = @($State.Entries)
     $script:SelectedGuid = if ($State.SelectedGuid) { $State.SelectedGuid.ToLowerInvariant() } else { $null }
@@ -10069,6 +10321,7 @@ function Add-PopupRestartSection {
     $restartButton.Size = New-Object Drawing.Size(358, 31)
     $restartButton.Cursor = [System.Windows.Forms.Cursors]::Hand
     $restartButton.Add_Click({ Restart-Windows })
+    $script:RestartButton = $restartButton
     $restartPanel.Controls.Add($restartButton)
 
     # The secondary line remains compact, but is a keyboard-focusable action
@@ -10494,7 +10747,7 @@ function Load-TrayIcon {
 
 
 Initialize-RuntimeDiagnostics
-if (-not ($BackgroundRefresh -or $UpdateCheck -or $UpdatePrepare)) {
+if (-not ($BootNextWorker -or $BackgroundRefresh -or $UpdateCheck -or $UpdatePrepare)) {
     try { [void](Get-DiagnosticsInstallationId -SettingsDirectory $script:SettingsDir) }
     catch { Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_INSTALLATION_ID_UNAVAILABLE' -Stage 'startup' -Success $false -ErrorRecord $_ -Level warning }
 }
@@ -10507,6 +10760,10 @@ if (-not $BackgroundRefresh) {
     }
 }
 
+if ($BootNextWorker) {
+    $exitCode = Invoke-BootNextSelectionWorker -Guid $BootNextGuid -ResultPath $BootNextResultPath
+    exit $exitCode
+}
 if ($BackgroundRefresh) {
     $exitCode = Invoke-BackgroundRefreshWorker -RefreshStorage ([bool]$BackgroundRefreshStorage) -RefreshFirmware ([bool]$BackgroundRefreshFirmware) -ResultPath $BackgroundResultPath
     exit $exitCode
@@ -10823,6 +11080,7 @@ finally {
         try { Stop-UpdateCheckWorkflow -State $script:UpdateState } catch { }
         try { Stop-UpdatePrepareWorkflow -State $script:UpdateState } catch { }
     }
+    Stop-BootNextSelectionWorker -Reason 'shutdown'
     $backgroundRefreshContext = $null
     if ($script:BackgroundRefreshState) {
         $backgroundRefreshContext = Take-BackgroundRefreshCompletionContext -State $script:BackgroundRefreshState

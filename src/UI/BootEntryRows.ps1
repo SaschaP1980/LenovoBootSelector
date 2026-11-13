@@ -29,10 +29,7 @@ function New-BootEntryInteractionHandlers {
 
         try {
             $entry = Get-EntryByGuid $guid
-            Set-BootNextTarget -Guid $guid
-            $script:SelectedGuid = $guid.ToLowerInvariant()
-            $script:LastStatusText = if ($entry) { Get-LocalizedString -Key 'Status.NextBootTarget' -Values @{ Title=(Get-EntryDisplayTitle -Entry $entry) } } else { Get-LocalizedString -Key 'Status.NextBootSet' }
-            Update-PopupRows
+            Start-BootNextSelection -Guid $guid
         }
         catch {
             Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Boot.ChangeErrorTitle') -Heading (Get-LocalizedString -Key 'Boot.ChangeErrorHeading') -Message (Get-LocalizedString -Key 'Boot.ChangeErrorMessage') -Kind Error
@@ -424,10 +421,10 @@ function Add-NormalBootEntryControls {
         $Subtitle
     )
 
-    $checkText = if ($isSelected) { '✓' } else { '' }
+    $checkText = if ($script:BootNextPendingGuid -and ([string]$entry.Guid -eq [string]$script:BootNextPendingGuid)) { '…' } elseif ($isSelected) { '✓' } else { '' }
     $check = New-Label -Text $checkText `
         -Font (New-Object Drawing.Font('Segoe UI Symbol', 12, [Drawing.FontStyle]::Bold)) `
-        -ForeColor $script:ColorAccent -X 354 -Y 12 -Width 24 -Height 34
+        -ForeColor $(if ($script:BootNextPendingGuid -and ([string]$entry.Guid -eq [string]$script:BootNextPendingGuid)) { $script:ColorWarning } else { $script:ColorAccent }) -X 354 -Y 12 -Width 24 -Height 34
     $check.Tag = $entry.Guid
     $check.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $check.Cursor = [System.Windows.Forms.Cursors]::Hand
@@ -486,15 +483,19 @@ $row.Cursor = if ($aliasEditActive) { [System.Windows.Forms.Cursors]::Default } 
 $row.AllowDrop = ($script:IsManageEntriesMode -and -not $aliasEditActive)
 
 $isHidden = $script:IsManageEntriesMode -and (Test-ManageEntryHidden -Guid $entry.Guid)
-$isSelected = (-not $script:IsManageEntriesMode) -and $script:SelectedGuid -and ($entry.Guid -eq $script:SelectedGuid)
-if ($isSelected) { $row.BackColor = $script:ColorSelectedRow }
+$rowDisplay = if ($script:IsManageEntriesMode) { 'idle' } else { Resolve-BootNextRowDisplayCore -EntryGuid $entry.Guid -ConfirmedGuid $script:SelectedGuid -PendingGuid $script:BootNextPendingGuid }
+$isSelected = ($rowDisplay -eq 'selected')
+$isPending = ($rowDisplay -eq 'pending')
+if ($isPending) { $row.BackColor = [Drawing.Color]::FromArgb(46,40,27) }
+elseif ($isSelected) { $row.BackColor = $script:ColorSelectedRow }
 elseif ($isHidden) { $row.BackColor = [Drawing.Color]::FromArgb(27,27,27) }
 
 $marker = New-Object System.Windows.Forms.Panel
 $marker.Location = New-Object Drawing.Point(0, 0)
 $marker.Size = New-Object Drawing.Size(3, $rowHeight)
 $marker.BackColor = $script:ColorRow
-if ($isSelected -or ($script:IsManageEntriesMode -and -not $isHidden)) { $marker.BackColor = $script:ColorAccent }
+if ($isPending) { $marker.BackColor = $script:ColorWarning }
+elseif ($isSelected -or ($script:IsManageEntriesMode -and -not $isHidden)) { $marker.BackColor = $script:ColorAccent }
 elseif ($isHidden) { $marker.BackColor = [Drawing.Color]::FromArgb(70,70,70) }
 $marker.Tag = $entry.Guid
 $marker.AllowDrop = $script:IsManageEntriesMode
@@ -563,6 +564,9 @@ if (-not $aliasEditActive) {
     }
     elseif ($script:IsManageEntriesMode -and ([string]$entry.RawDescription -eq 'Boot Menu')) {
         Get-LocalizedString -Key 'Boot.MenuManageSubtitle'
+    }
+    elseif ($isPending) {
+        Get-LocalizedString -Key 'BootNext.SelectionPending'
     }
     else {
         [string]$entry.Subtitle

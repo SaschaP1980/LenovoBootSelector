@@ -121,6 +121,7 @@ LBS-40 adds `../tools/validate_test_contracts.py` as a shared preflight contract
 | `Test-BootTargetDrift.ps1` | Safety | Drift detection and fail-closed states |
 | `Test-TaskBrokerBoundary.ps1` | Safety | Fixed-task / metadata privilege boundary without privileged execution |
 | `Test-BootNextOwnership.ps1` | Functional core | 20 case fail-closed provenance and next-boot presentation decision matrix |
+| `Test-BootNextSelectionUi.ps1` | Functional UI contract | 30 native checks for pending versus firmware-confirmed selection, worker result identity, async dispatch, restart interlock, refresh isolation and cleanup |
 | `Test-BootWriterPriority.ps1` | Safety / Native integration | 24 checks: fixed privileged writer contracts plus isolated WinPS5.1 cross-process behavior with fake BCDEdit and no firmware mutation |
 | `Test-BootWriterScheduledTasks.ps1` | Safety / Native SYSTEM integration | 9 checks using temporary SYSTEM Scheduler tasks with the actual writer, Windows Queue, protected file lock and fake PowerShell BCDEdit; no real firmware mutation |
 | `Test-TaskBrokerMigration.ps1` | Safety / Migration | LBS-33 canonical privileged identifiers, migration ordering, legacy cleanup ownership, and default-state precedence |
@@ -154,6 +155,7 @@ Native PowerShell suites intentionally use different count strategies; one gener
 | `Test-RefreshController.ps1` | Straight-line: fixed runtime count of 39 covering LBS-27 lifecycle orchestration, the explicit Infrastructure worker boundary and LBS-143's freshly verified firmware-state propagation. |
 | `Test-BootServiceSnapshot.ps1` | Straight-line: fixed runtime count of 10 covering forced manager refresh, cached-view separation, parser results and incompatible snapshot options. |
 | `Test-BootNextOwnership.ps1` | Straight-line: fixed runtime count of 20 including manual precedence, same-cycle auto restore, absent/stale/observable external state and next-boot display cases. |
+| `Test-BootNextSelectionUi.ps1` | Straight-line: fixed runtime count of 30 for pending-row presentation, exact worker completion and source-level nonblocking, fail-closed UI contracts. |
 | `Test-BootWriterPriority.ps1` | Fixed runtime count of 24 for privilege-safe file locking, queued writers, sequential provenance, fail-closed loss/contestion and manual precedence with a fake firmware manager; runs only on Windows PS5.1. |
 | `Test-BootWriterScheduledTasks.ps1` | Fixed runtime count of 9 for actual temporary SYSTEM scheduled-task execution, serialized writer priority, ACL protection and fake-BCDEdit semantics; no real firmware operation. |
 | `Test-TaskBrokerBoundary.ps1` | Straight-line: fixed runtime count of 25, including rejection of the v1 boundary and legacy fixed task names. |
