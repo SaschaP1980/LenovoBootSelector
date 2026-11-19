@@ -4,13 +4,12 @@
 function New-BootEntryInteractionHandlers {
     $clickHandler = {
         param($sender, $eventArgs)
-        $capabilities = Get-CurrentSystemFunctionsCapabilities
         if ($script:IsManageEntriesMode) {
+            $capabilities = Get-CurrentSystemFunctionsCapabilities
             if (-not $capabilities.CanManageEntries) { return }
         }
-        elseif (-not $capabilities.CanSetBootNext) {
-            return
-        }
+        # BootNext controller owns both Ready and cold-start Checking admission.
+        # Do not silently discard the first click before pending feedback.
         $guid = [string]$sender.Tag
         if (-not $guid) {
             $row = Get-BootRowFromControl $sender
