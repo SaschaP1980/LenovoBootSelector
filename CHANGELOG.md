@@ -1,6 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.2.1.1 – Cold-start pending BootNext feedback (LBS-143)
+
+- Honor the first click on a known, authorized boot target while TaskBroker readiness is still Checking during the initial background refresh.
+- Immediately display an explicitly unverified amber pending target, retaining the previous confirmed selection and disabling restart.
+- Preserve the readiness-producing background worker and defer the fixed allowlisted BootNext operation until readiness, target identity and permissions are verified again.
+- Fail closed with a visible error on failed initialization, drift, maintenance, invalid target or bounded timeout; never show an unverified target as firmware-confirmed.
+- Add first-click admission, deferred worker handoff, repeated-click and recovery regression checks plus diagnostic evidence for pending and worker start.
+
 ## v1.2.1.0 – Immediate, verified BootNext selection feedback
 
 - Show a separate unverified "Setting next boot target" indicator immediately after a boot-target click, without falsely marking it as the confirmed firmware selection.

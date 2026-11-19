@@ -14,3 +14,21 @@ function Test-BootNextWorkerResultCore {
     return ([bool]$Success -and [bool]$RequestedGuid -and
         [bool]$ReturnedGuid -and $RequestedGuid -eq $ReturnedGuid)
 }
+
+# Distinguish a safe, visibly deferred cold-start intent from authorization
+# to execute the fixed SYSTEM BootNext writer. This decision never mutates EFI.
+function Resolve-BootNextSelectionAdmissionCore {
+    param(
+        [AllowEmptyString()][string]$CapabilityState,
+        [bool]$CanSetBootNext,
+        [bool]$CanUseCachedBootState,
+        [bool]$RefreshActive,
+        [bool]$TargetAllowlisted
+    )
+    if (-not $TargetAllowlisted) { return 'reject' }
+    if ($CapabilityState -eq 'Ready' -and $CanSetBootNext) { return 'start' }
+    if ($CapabilityState -eq 'Checking' -and $CanUseCachedBootState -and $RefreshActive) {
+        return 'deferred'
+    }
+    return 'reject'
+}

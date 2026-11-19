@@ -98,5 +98,103 @@ finally {
     if ($script:RestartTargetLabel) { $script:RestartTargetLabel.Dispose() }
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 }
-Write-Host "BOOTNEXT SELECTION UI TOTAL $checks/30"
-if ($checks -ne 30) { throw "Unexpected pending selection count $checks" }
+# Cold-open regression: an already known/allowlisted boot target must be
+# visibly queued while the first cached-readiness background worker is active.
+# These decisions are pure and never invoke any privileged BootNext action.
+Assert-Selection 'Cold Checking with prior cached/allowed target and active refresh defers' ((Resolve-BootNextSelectionAdmissionCore -CapabilityState 'Checking' -CanSetBootNext $false -CanUseCachedBootState $true -RefreshActive $true -TargetAllowlisted $true) -eq 'deferred')
+Assert-Selection 'Cold Checking without verified cached capability fails closed' ((Resolve-BootNextSelectionAdmissionCore -CapabilityState 'Checking' -CanSetBootNext $false -CanUseCachedBootState $false -RefreshActive $true -TargetAllowlisted $true) -eq 'reject')
+Assert-Selection 'Cold Checking without an active readiness refresh fails closed' ((Resolve-BootNextSelectionAdmissionCore -CapabilityState 'Checking' -CanSetBootNext $false -CanUseCachedBootState $true -RefreshActive $false -TargetAllowlisted $true) -eq 'reject')
+Assert-Selection 'Cold Checking never defers an unallowlisted target' ((Resolve-BootNextSelectionAdmissionCore -CapabilityState 'Checking' -CanSetBootNext $false -CanUseCachedBootState $true -RefreshActive $true -TargetAllowlisted $false) -eq 'reject')
+Assert-Selection 'Warm Ready and authorized target starts immediately' ((Resolve-BootNextSelectionAdmissionCore -CapabilityState 'Ready' -CanSetBootNext $true -CanUseCachedBootState $true -RefreshActive $false -TargetAllowlisted $true) -eq 'start')
+Assert-Selection 'Ready without BootNext capability fails closed' ((Resolve-BootNextSelectionAdmissionCore -CapabilityState 'Ready' -CanSetBootNext $false -CanUseCachedBootState $true -RefreshActive $false -TargetAllowlisted $true) -eq 'reject')
+Assert-Selection 'Missing target never starts even when ready' ((Resolve-BootNextSelectionAdmissionCore -CapabilityState 'Ready' -CanSetBootNext $true -CanUseCachedBootState $true -RefreshActive $false -TargetAllowlisted $false) -eq 'reject')
+Assert-Selection 'RepairRequired never starts' ((Resolve-BootNextSelectionAdmissionCore -CapabilityState 'RepairRequired' -CanSetBootNext $false -CanUseCachedBootState $false -RefreshActive $true -TargetAllowlisted $true) -eq 'reject')
+Assert-Selection 'Maintenance Busy never queues a request' ((Resolve-BootNextSelectionAdmissionCore -CapabilityState 'Busy' -CanSetBootNext $false -CanUseCachedBootState $true -RefreshActive $true -TargetAllowlisted $true) -eq 'reject')
+Assert-Selection 'Firmware drift ReinitializeRequired never queues a request' ((Resolve-BootNextSelectionAdmissionCore -CapabilityState 'ReinitializeRequired' -CanSetBootNext $false -CanUseCachedBootState $false -RefreshActive $true -TargetAllowlisted $true) -eq 'reject')
+$sourceController = [IO.File]::ReadAllText($controllerPath)
+Assert-Selection 'Boot click reaches guarded controller during Checking' ($ui.Contains('Start-BootNextSelection -Guid $guid') -and -not $ui.Contains('elseif (-not $capabilities.CanSetBootNext)'))
+Assert-Selection 'Controller evaluates explicit cold readiness disposition' ($sourceController.Contains('Resolve-BootNextSelectionAdmissionCore') -and $sourceController.Contains("'deferred'"))
+Assert-Selection 'Cold intent keeps independent deferred state while pending is visible' ($sourceController.Contains('$script:BootNextSelectionDeferred') -and $sourceController.Contains('Update-PopupRows'))
+Assert-Selection 'Cold intent does not cancel the readiness-producing refresh first' ($sourceController.Contains('BOOTNEXT_CLICK_DEFERRED') -and $sourceController.Contains('if (-not $deferred'))
+Assert-Selection 'Deferred request has bounded timeout and a visible failure path' ($sourceController.Contains('BOOTNEXT_DEFERRED_TIMEOUT') -and $sourceController.Contains('Fail-DeferredBootNextSelection'))
+Assert-Selection 'Telemetry separates pending display and actual authorized worker start' ($sourceController.Contains('BOOTNEXT_PENDING_SHOWN') -and $sourceController.Contains('BOOTNEXT_WORKER_STARTED'))
+# Simulate the real WinForms controller during the first (cold) popup open.
+# These mocks replace ALL task/firmware writes with in-process observations.
+$script:MockReadiness = 'Checking'
+$script:MockRefreshActive = $true
+$script:MockWorkerStarts = 0
+$script:MockRefreshStops = 0
+$script:MockRowsDrawn = 0
+$script:MockNotices = 0
+$script:TaskBrokerLocalDir = $temp
+$script:ScriptPath = 'isolated-test-application.ps1'
+$script:RuntimeSessionId = 'focused-native-mock'
+$script:BackgroundRefreshState = [pscustomobject]@{ Active=$true }
+$script:IsManageEntriesMode = $false
+$script:BootNextPendingGuid = $null
+$script:BootNextSelectionDeferred = $false
+$script:BootNextSelectionStartedUtc = [datetime]::MinValue
+$script:BootNextSelectionProcess = $null
+$script:BootNextSelectionTimer = $null
+$script:RestartButton = New-Object System.Windows.Forms.Button
+$script:RestartTargetLabel = New-Object System.Windows.Forms.Button
+function Get-TaskBrokerTarget { param([string]$Guid) return [pscustomobject]@{ Guid=$Guid } }
+function Test-MaintenanceBusy { return $false }
+function Test-BackgroundRefreshActive { param($State) return [bool]$script:MockRefreshActive }
+function Stop-BackgroundBootRefreshForMaintenance { param([string]$Reason) $script:MockRefreshStops++ }
+function Remove-BackgroundRefreshResultFile { param([string]$Path) if ($Path -and (Test-Path -LiteralPath $Path)) { Remove-Item -LiteralPath $Path -Force } }
+function Get-CurrentSystemFunctionsCapabilities {
+    return [pscustomobject]@{
+        State=$script:MockReadiness
+        CanUseCachedBootState=($script:MockReadiness -eq 'Checking' -or $script:MockReadiness -eq 'Ready')
+        CanSetBootNext=($script:MockReadiness -eq 'Ready')
+    }
+}
+function Update-PopupRows { $script:MockRowsDrawn++ }
+function Show-LenovoNoticeDialog { param($Title,$Heading,$Message,$Kind) $script:MockNotices++ }
+function Start-BootNextSelectionWorkerProcess {
+    param($ScriptPath,$Guid,$ResultPath,$RuntimeSessionId)
+    $script:MockWorkerStarts++
+    return [pscustomobject]@{ Id=4242; HasExited=$false }
+}
+try {
+    Start-BootNextSelection -Guid $b
+    Assert-Selection 'First click during Checking creates deferred pending GUID' ($script:BootNextPendingGuid -eq $b -and $script:BootNextSelectionDeferred)
+    Assert-Selection 'First click paints pending marker and blocks restart' ($script:MockRowsDrawn -gt 0 -and -not $script:RestartButton.Enabled)
+    Assert-Selection 'First click does not cancel readiness-producing refresh or start writer' ($script:MockRefreshStops -eq 0 -and $script:MockWorkerStarts -eq 0)
+    Complete-BootNextSelection
+    Assert-Selection 'Repeated Checking timer tick does not start worker' ($script:MockWorkerStarts -eq 0 -and $script:BootNextSelectionDeferred)
+    Start-BootNextSelection -Guid $c
+    Assert-Selection 'Second click cannot replace queued first target' ($script:BootNextPendingGuid -eq $b -and $script:MockWorkerStarts -eq 0)
+    $script:MockRefreshActive = $false
+    $script:MockReadiness = 'Ready'
+    Complete-BootNextSelection
+    Assert-Selection 'Readiness transition starts exactly one verified-path worker' ($script:MockWorkerStarts -eq 1 -and -not $script:BootNextSelectionDeferred)
+    Assert-Selection 'Worker start still retains unverified pending marker' ($script:BootNextPendingGuid -eq $b -and -not $script:RestartButton.Enabled)
+    Complete-BootNextSelection
+    Assert-Selection 'Repeated timer cannot launch a second privileged request' ($script:MockWorkerStarts -eq 1)
+    Stop-BootNextSelectionWorker -Reason 'mock-finished'
+    Assert-Selection 'Test controller cleanup clears pending and deferred state' (-not $script:BootNextPendingGuid -and -not $script:BootNextSelectionDeferred)
+
+    $script:MockReadiness = 'Checking'
+    $script:MockRefreshActive = $true
+    Start-BootNextSelection -Guid $b
+    $script:MockReadiness = 'RepairRequired'
+    Complete-BootNextSelection
+    Assert-Selection 'Failed startup readiness clears pending and reports error' (-not $script:BootNextPendingGuid -and $script:MockNotices -ge 1 -and $script:MockWorkerStarts -eq 1)
+
+    $script:MockReadiness = 'Checking'
+    $script:MockRefreshActive = $true
+    Start-BootNextSelection -Guid $b
+    $script:BootNextSelectionStartedUtc = [datetime]::UtcNow.AddSeconds(-47)
+    Complete-BootNextSelection
+    Assert-Selection 'Stalled cold startup expires pending without starting writer' (-not $script:BootNextPendingGuid -and $script:MockWorkerStarts -eq 1 -and $script:MockNotices -ge 2)
+}
+finally {
+    Stop-BootNextSelectionWorker -Reason 'focused-native-cleanup'
+    $script:RestartButton.Dispose()
+    $script:RestartTargetLabel.Dispose()
+    Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
+}
+Write-Host "BOOTNEXT SELECTION UI TOTAL $checks/57"
+if ($checks -ne 57) { throw "Unexpected pending selection count $checks" }

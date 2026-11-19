@@ -51,7 +51,9 @@ function Commit-ActiveManageAliasEditor { }
 function Toggle-ManageEntryVisibility { param([string]$Guid) }
 function Get-EntryByGuid { param([string]$Guid) return $null }
 $script:BootNextCalls = 0
-function Start-BootNextSelection { param([string]$Guid) $script:BootNextCalls++ }
+# The real controller (not the UI row) owns admission. Mock its Ready-path
+# decision here; cold Checking admission is covered by Test-BootNextSelectionUi.
+function Start-BootNextSelection { param([string]$Guid) if ($script:TestCapabilities.CanSetBootNext) { $script:BootNextCalls++ } }
 function Move-ManageEntry { param([string]$MovedGuid,[string]$TargetGuid,[bool]$After) }
 function Show-LenovoNoticeDialog { }
 

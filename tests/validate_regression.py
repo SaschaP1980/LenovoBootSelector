@@ -128,7 +128,9 @@ def main():
     system_capabilities=txt(root/'src/Application/SystemCapabilities.ps1') if (root/'src/Application/SystemCapabilities.ps1').is_file() else ''
     s.no('LBS-28 removed duplicated presentation-state function stays removed',maintenance_capability_ui,'function Get-SystemFunctionsPresentationState')
     s.no('LBS-28 default target no longer derives readiness from TaskBrokerReadyCached',default_target_ui,'TaskBrokerReadyCached')
-    s.has('LBS-28 boot row consumes canonical BootNext capability',boot_entry_rows,'$capabilities.CanSetBootNext')
+    bootnext_selection_controller=txt(root/'src/Application/BootNextSelectionController.ps1')
+    s.has('LBS-28 selection controller consumes canonical BootNext capability',bootnext_selection_controller,'$capabilities.CanSetBootNext')
+    s.no('LBS-143 cold-open click is not silently gated by Ready-only UI',boot_entry_rows,'elseif (-not $capabilities.CanSetBootNext)')
     s.has('LBS-17 template ready status remains localized',app_template,"Get-LocalizedString -Key 'Status.Ready'")
     s.has('LBS-17 template maintenance launch errors remain localized',app_template,"Get-LocalizedString -Key 'Maintenance.SetupNotStartedTitle'")
     s.has('LBS-17 entry visibility accessibility remains localized',boot_entry_surface,"Get-LocalizedString -Key 'Manage.HiddenAccessible'")
