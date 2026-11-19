@@ -961,6 +961,7 @@ $script:TrayIcon = $null
 $script:CurrentEntries = @()
 $script:SelectedGuid = $null
 $script:BootNextPendingGuid = $null
+$script:BootNextSelectionDeferred = $false
 $script:BootNextSelectionStartedUtc = [datetime]::MinValue
 $script:BootNextSelectionResultPath = $null
 $script:BootNextSelectionProcess = $null
