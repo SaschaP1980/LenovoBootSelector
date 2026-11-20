@@ -834,6 +834,50 @@ foreach ($control in $RowControls) {
 }
 }
 
+# Initial construction and metadata-only refresh share one text/locale rule.
+function Get-BootEntryRowText {
+    param([Parameter(Mandatory=$true)]$Entry)
+    $manage = [bool]$script:IsManageEntriesMode
+    $guid = ([string]$Entry.Guid).ToLowerInvariant()
+    $alias = Get-EntryAlias -Guid $guid -UseManageDraft:$manage
+    $displayTitle = Get-EntryDisplayTitle -Entry $Entry -UseManageDraft:$manage
+    $editing = $manage -and $script:ManageAliasEditGuid -and $guid -eq $script:ManageAliasEditGuid
+    $pending = -not $manage -and (Resolve-BootNextRowDisplayCore -EntryGuid $guid -ConfirmedGuid $script:SelectedGuid -PendingGuid $script:BootNextPendingGuid) -eq 'pending'
+    $titleText = if ($editing) { [string]$Entry.Title } else { [string]$displayTitle }
+    $subtitleText = if ($editing) { '' }
+        elseif ($manage -and $alias) { Get-LocalizedString -Key 'Manage.OriginalName' -Values @{ Name=[string]$Entry.Title } }
+        elseif ($manage -and ([string]$Entry.RawDescription -eq 'Boot Menu')) { Get-LocalizedString -Key 'Boot.MenuManageSubtitle' }
+        elseif ($pending) { Get-LocalizedString -Key 'BootNext.SelectionPending' }
+        else { [string]$Entry.Subtitle }
+    return [pscustomobject]@{ Title = [string]$titleText; Subtitle = [string]$subtitleText }
+}
+
+# The caller must first prove GUID/order/mode/DPI and structural-signature parity.
+# Keep live WinForms controls, handlers and scroll context intact.
+function Update-BootEntryRowText {
+    param([Parameter(Mandatory=$true)]$Row,[Parameter(Mandatory=$true)]$Entry)
+    $title = $Row.Controls['BootTitleLabel']
+    $subtitle = $Row.Controls['BootSubtitleLabel']
+    if (-not $title -or -not $subtitle -or $title.IsDisposed -or $subtitle.IsDisposed) {
+        throw 'Metadata-only row update requires existing title and subtitle controls.'
+    }
+    $text = Get-BootEntryRowText -Entry $Entry
+    $changed = $false
+    if ([string]$title.Text -cne [string]$text.Title) {
+        $title.Text = [string]$text.Title
+        $title.AccessibleDescription = [string]$text.Title
+        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($title,[string]$text.Title) }
+        $changed = $true
+    }
+    if ([string]$subtitle.Text -cne [string]$text.Subtitle) {
+        $subtitle.Text = [string]$text.Subtitle
+        $subtitle.AccessibleDescription = [string]$text.Subtitle
+        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($subtitle,[string]$text.Subtitle) }
+        $changed = $true
+    }
+    return [bool]$changed
+}
+
 function New-BootEntryRow {
     param(
         [Parameter(Mandatory=$true)]$Entry,
@@ -907,15 +951,9 @@ $alias = if ($script:IsManageEntriesMode) {
 else {
     Get-EntryAlias -Guid ([string]$entry.Guid)
 }
-$displayTitle = if ($script:IsManageEntriesMode) {
-    Get-EntryDisplayTitle -Entry $entry -UseManageDraft
-}
-else {
-    Get-EntryDisplayTitle -Entry $entry
-}
-
+$rowText = Get-BootEntryRowText -Entry $entry
 $titleWidth = if ($script:IsManageEntriesMode) { if ($aliasEditActive) { 318 } else { 220 } } else { 284 }
-$titleText = if ($aliasEditActive) { [string]$entry.Title } else { $displayTitle }
+$titleText = [string]$rowText.Title
 $title = New-Label -Text $titleText -Font (New-Object Drawing.Font('Segoe UI', 10.0, [Drawing.FontStyle]::Bold)) `
     -ForeColor $titleColor -X 58 -Y 6 -Width $titleWidth -Height 21
 $title.Name = 'BootTitleLabel'
@@ -933,18 +971,7 @@ $row.Controls.Add($title)
 $subtitle = $null
 if (-not $aliasEditActive) {
     $subtitleWidth = if ($script:IsManageEntriesMode) { 220 } else { 284 }
-    $subtitleText = if ($script:IsManageEntriesMode -and $alias) {
-        Get-LocalizedString -Key 'Manage.OriginalName' -Values @{ Name=[string]$entry.Title }
-    }
-    elseif ($script:IsManageEntriesMode -and ([string]$entry.RawDescription -eq 'Boot Menu')) {
-        Get-LocalizedString -Key 'Boot.MenuManageSubtitle'
-    }
-    elseif ($isPending) {
-        Get-LocalizedString -Key 'BootNext.SelectionPending'
-    }
-    else {
-        [string]$entry.Subtitle
-    }
+    $subtitleText = [string]$rowText.Subtitle
     $subtitle = New-Label -Text $subtitleText -Font (New-Object Drawing.Font('Segoe UI', 8.3, [Drawing.FontStyle]::Regular)) `
         -ForeColor $subtitleColor -X 58 -Y 27 -Width $subtitleWidth -Height 27
     $subtitle.Name = 'BootSubtitleLabel'
