@@ -48,6 +48,8 @@ Before planning or implementing a product change:
 8. Only for executable/product release work determine target version, release profile, development path, and concrete file set.
 9. For cross-system deployment, monitoring-evidence, incident, or operations questions, consult `docs/DEVOPS_OPERATIONS.md` as an overview. It does not replace the complete mandatory bootstrap or executable/normative owners.
 
+**Before substantive Issue-bearing Work-Path work:** once the GitHub Issue number is known and Work-Path has been selected, generate a fresh `Work-Chat-ID`, post its exact literal in a normal user-visible chat message, and record that same marker in the single rolling Issue comment. The [rolling-comment template](templates/WORK_PATH_ROLLING_COMMENT.md) owns its format, timing, provenance and `not issued` fallback; never invent a marker for an earlier chat. This is not required for documentation-only or branchless Patch/Hotfix work.
+
 If the user only asks you to read this file and has not yet provided a concrete task, perform the complete bootstrap and then report briefly:
 - current `main` SHA;
 - current version;
@@ -449,7 +451,8 @@ For Issue-backed work:
 3. document materially important root-cause/scope/migration findings in concise Issue comments;
 4. keep the Issue open during implementation;
 5. after successful publication and post-release verification, ensure the Issue contains the final version/PR record; for Work-Path work, the terminal `Agent-State: COMPLETED` update of the canonical rolling comment is that record;
-6. only then close it as `completed`.
+6. satisfy and document any **Issue-specific** native, physical hardware, or explicit owner-acceptance requirement before closing; publication alone does not fulfill a pending acceptance gate;
+7. only then close it as `completed`. Documentation-only Issues instead follow the verified direct-`main` documentation completion path without a product release.
 
 A release is not successful merely because the Issue was closed; technical release verification comes first.
 
@@ -497,8 +500,9 @@ After complete implementation, report precisely:
 - release ZIP size + SHA-256;
 - source ZIP SHA-256;
 - candidate/release branch cleanup;
-- Issue state;
-- which native Windows tests were actually executed.
+- Issue state and any outstanding Issue-specific owner/native/physical acceptance, explicitly distinguishing release publication from final Issue acceptance;
+- which native Windows tests were actually executed;
+- where a separate Diagnostics Worker verification/deployment was dispatched, its independently verified `HEALTH_ONLY_PASS` / `DEPLOYED_AND_HEALTHY` / failed or blocked outcome, or `pending` / `NOT RUN` / `unknown` when no terminal evidence is available. Do not infer Worker success from source `RELEASE_VERIFICATION_SUMMARY=PASS`.
 
 Do not claim any test, branch, hash, tag, or release fact without direct verification.
 

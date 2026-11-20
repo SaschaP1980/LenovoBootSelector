@@ -108,6 +108,8 @@ For Patch/Hotfix effort/risk escalation, indicators include multiple independent
 
 For Issue-backed executable/product work, record the selected development model before implementation using exactly one mutually exclusive label from the canonical taxonomy in `docs/GITHUB_HOWTO.md`: `dev-path: work-branch` for this Work-Path model, or `dev-path: fast` for the branchless atomic Patch/Hotfix path. A backlog Issue may remain without a development-path label until this selection gate is actually performed. Documentation-only/process-guidance Issues remain outside this label dimension.
 
+**Work-Path early chat provenance:** after the Issue number is known and Work-Path is selected, but **before substantive Issue work**, issue the user-visible `Work-Chat-ID` required by the [canonical rolling-comment template](templates/WORK_PATH_ROLLING_COMMENT.md) and preserve it in the single Issue ledger. The template exclusively defines its format and honest `not issued` / `unverified` handling; never fabricate an ID for prior work. No such ID is required for documentation-only or branchless work.
+
 When a Patch/Hotfix uses Work-Path by exception, record the concise reason in the Issue when Issue-backed (or equivalent durable release history for an Issue-less Hotfix) and later include the same decision as `Work-Branch-Reason: <reason>` in the Candidate history. The reason must distinguish an effort/risk escalation from an explicit process-validation/benchmark exercise.
 
 ### GitHub Issue identity and Work-Branch naming

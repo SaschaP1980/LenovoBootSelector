@@ -15,8 +15,8 @@ The repository and durable GitHub prose remain **English**; the interactive user
 3. **Performance visualization:** horizontal bars for Development Completion, Candidate Preflight and Release Orchestrator when those stages actually ran, with clearly labeled seconds and a brief explanation for each. Use one consistent scale. Differentiate overall run wall time from measured gate execution, queue time and overlapping jobs. If a stage is not part of the chosen development path, mark it N/A instead of displaying a fabricated zero. If graphic bars are unavailable, use a compact Markdown table.
 4. **Validation table:** show applicable exact PASS/FAIL/BLOCKED/NOT RUN outcomes and available counts for Development Completion, 3/3 Candidate contexts, Windows PowerShell 5.1 parser and functional tests, 8/8 Release contexts, reproducibility, historical ZIP integrity, post-release verification, and branch cleanup. Include other relevant checks when meaningful. Do not claim all gate categories ran merely because the workflow was green.
 5. **Findings and bottlenecks:** report observed errors, failed/retried gates, corrective loops, setup/environment limitations, queue delays, and measured critical path; distinguish pipeline defects, external infrastructure, and harmless performance bottlenecks. Explicitly say when no failure was observed. Never treat a local tool limitation as a hosted deployment failure without evidence.
-6. **Publication identifiers:** provide version, Issue, PR, source tag/commit, final `main` SHA, release ZIP filename, size and SHA-256, and source ZIP SHA-256 when verified. Link to real GitHub resources. Put long hashes in readable monospace text, rather than stuffing metrics into cards.
-7. **Concise conclusion:** state verified success or the exact outstanding blocker, and the operational significance. For an Issue-backed Work-Path, link its canonical cumulative rolling recovery comment/Issue; it remains the durable detail record.
+6. **Publication identifiers:** provide version, Issue, PR, source tag/commit, final `main` SHA, release ZIP filename, size and SHA-256, and source ZIP SHA-256 when verified. Link to real GitHub resources. Put long hashes in readable monospace text, rather than stuffing metrics into cards. Report any independently dispatched Diagnostics Worker job as a **separate** result: verified `HEALTH_ONLY_PASS` / `DEPLOYED_AND_HEALTHY` / failure or `BLOCKED`, or explicitly pending / `NOT RUN` / unknown if terminal evidence is unavailable. Source release PASS is not Worker success.
+7. **Concise conclusion:** state verified source-release success or the exact outstanding blocker, and the operational significance. Report Issue-specific owner/native/physical acceptance as **accepted, pending or not required**, backed by its own evidence; a successful release does not automatically close an Issue with pending acceptance. Do not impose physical testing where the Issue has no such criterion. For an Issue-backed Work-Path, link its canonical cumulative rolling recovery comment/Issue; it remains the durable detail record.
 
 ## Visual design preferences
 
@@ -46,6 +46,8 @@ Performance: Development Completion | Candidate Preflight | Release Orchestrator
 Validation: concise PASS/FAIL/NOT RUN table with actual counts
 Findings: issues, remediation, bottlenecks and remaining risks
 Publication: Issue | PR | tag | main SHA | ZIP size/hash | branch cleanup
+Separate Worker result (when dispatched): verified outcome | pending | NOT RUN | unknown
+Issue-specific owner/native acceptance: accepted | pending | not required
 Conclusion: operational result + durable GitHub evidence link
 ```
 

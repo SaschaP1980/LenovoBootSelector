@@ -2225,7 +2225,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.2.3.0'
+$script:AppVersion = '1.3.0.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -5630,13 +5630,15 @@ function Start-ManageEntriesMode {
     $script:IsManageEntriesMode = $true
     $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusEditing'
     Update-ManageEntriesUiState
-    Update-PopupRows
+    Update-PopupRows -Reason 'manage-enter'
     Update-ManageSaveButtonState
 }
 
 function Stop-ManageEntriesMode {
     param([switch]$Save)
     if (-not $script:IsManageEntriesMode) { return }
+    # Explicit mode exit supersedes any deferred in-mode presentation refresh.
+    $script:PopupRowsRefreshPending = $false
     Reset-ManageDragPreview
 
     if ($Save) {
@@ -5660,7 +5662,7 @@ function Stop-ManageEntriesMode {
     $script:ManageBaselineEntryAliases = @{}
     $script:ManageAliasEditGuid = $null
     Update-ManageEntriesUiState
-    Update-PopupRows
+    Update-PopupRows -Reason 'manage-exit'
 }
 
 
@@ -8682,7 +8684,7 @@ function Apply-BackgroundRefreshResult {
             }
             Update-TaskBrokerUiState -Fast | Out-Null
             Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_COMPLETED' -Stage 'ready' -Success $false -DurationMs $Result.Timings.TotalMs -Data (New-RuntimeDiagnosticData @{ workerError = [string]$Result.Error }) -Level error
-            if ($script:Popup -and -not $script:Popup.IsDisposed) { Update-PopupRows }
+            if ($script:Popup -and -not $script:Popup.IsDisposed) { Update-PopupRows -Reason 'readiness-failed' }
             return $false
         }
         throw ("Hintergrund-Refresh ({0}) fehlgeschlagen: {1}" -f ([string]$Result.Stage), ([string]$Result.Error))
@@ -9556,6 +9558,10 @@ function Reset-ManageDragPreview {
     if ($script:Popup -and -not $script:Popup.IsDisposed) {
         foreach ($row in @($script:Popup.Controls.Find('BootRow',$true))) { $row.Invalidate() }
     }
+    # Apply a real firmware/label change once DoDragDrop has released its rows.
+    if ($script:PopupRowsRefreshPending -or $script:PopupRowsViewportPending) {
+        Update-PopupRows -Reason 'drag-ended'
+    }
 }
 # Lightweight row-painted cue: no extra WinForms controls intercept pointer events.
 function Paint-ManageDropCue {
@@ -10316,8 +10322,217 @@ function Set-RowHoverState($Control, [bool]$Hover) {
     $row.Invalidate($true)
 }
 
+# A row's presentation identity deliberately excludes refresh timestamps, diagnostics and
+# status text. Firmware metadata matters only when it can affect a rendered row.
+# The raw canonical data never leaves this function; diagnostics use SHA-256 only.
+function Get-PopupRowsPresentationState {
+    param([Parameter(Mandatory=$true)][double]$Scale)
+
+    $manage = [bool]$script:IsManageEntriesMode
+    $entries = if ($manage) { @(Get-OrderedEntriesForUi -IncludeHidden -UseManageDraft) } else { @(Get-OrderedEntriesForUi) }
+    $rows = New-Object 'System.Collections.Generic.List[object]'
+    foreach ($entry in $entries) {
+        $guid = ([string]$entry.Guid).ToLowerInvariant()
+        $alias = Get-EntryAlias -Guid $guid -UseManageDraft:$manage
+        $title = Get-EntryDisplayTitle -Entry $entry -UseManageDraft:$manage
+        $accent = if ($null -ne $entry.Accent) { [int]$entry.Accent.ToArgb() } else { 0 }
+        [void]$rows.Add([ordered]@{
+            guid = $guid
+            title = [string]$entry.Title
+            subtitle = [string]$entry.Subtitle
+            rawDescription = [string]$entry.RawDescription
+            symbol = [string]$entry.Symbol
+            typeTooltip = [string]$entry.TypeTooltip
+            accent = $accent
+            displayTitle = [string]$title
+            alias = [string]$alias
+            hidden = [bool]($manage -and (Test-ManageEntryHidden -Guid $guid))
+            selected = [bool](-not $manage -and $script:SelectedGuid -and $guid -eq $script:SelectedGuid)
+            pending = [bool](-not $manage -and $script:BootNextPendingGuid -and $guid -eq $script:BootNextPendingGuid)
+            editing = [bool]($manage -and $script:ManageAliasEditGuid -and $guid -eq $script:ManageAliasEditGuid)
+        })
+    }
+    # These translated strings appear within rows and may change without a
+    # firmware data change. The status/header themselves are updated separately.
+    $localized = @(
+        (Get-LocalizedString -Key 'Manage.OriginalName' -Values @{ Name = '' }),
+        (Get-LocalizedString -Key 'Manage.OriginalNameHint'),
+        (Get-LocalizedString -Key 'Manage.HiddenAccessible'),
+        (Get-LocalizedString -Key 'Manage.VisibleAccessible'),
+        (Get-LocalizedString -Key 'Boot.MenuManageSubtitle'),
+        (Get-LocalizedString -Key 'BootNext.SelectionPending')
+    )
+    $presentation = [ordered]@{
+        scale = [Math]::Round($Scale, 4)
+        manage = $manage
+        selectedGuid = if ($manage) { '' } else { [string]$script:SelectedGuid }
+        pendingGuid = if ($manage) { '' } else { [string]$script:BootNextPendingGuid }
+        aliasEditGuid = if ($manage) { [string]$script:ManageAliasEditGuid } else { '' }
+        localized = $localized
+        rows = $rows.ToArray()
+    }
+    $identity = ConvertTo-Json -InputObject $presentation -Depth 6 -Compress
+    $rowSignatures = @{}
+    foreach ($row in $rows.ToArray()) {
+        $rowSignatures[[string]$row.guid] = ConvertTo-Json -InputObject ([ordered]@{
+            manage = $manage
+            localized = $localized
+            row = $row
+        }) -Depth 6 -Compress
+    }
+    $hash = [Security.Cryptography.SHA256]::Create()
+    try {
+        $fingerprint = ([BitConverter]::ToString($hash.ComputeHash([Text.Encoding]::UTF8.GetBytes($identity)))).Replace('-', '')
+    }
+    finally { $hash.Dispose() }
+    return [pscustomobject]@{
+        Identity = $identity
+        Fingerprint = $fingerprint
+        Entries = $entries
+        EntryCount = $entries.Count
+        RowSignatures = $rowSignatures
+        Mode = $manage
+        Scale = $Scale
+    }
+}
+
+function Update-PopupRowsPeripheralUi {
+    param($StatusLabel)
+    if ($StatusLabel) { $StatusLabel.Text = $script:LastStatusText }
+    Update-DefaultUi
+    Update-RestartTargetUi
+    Update-ManageSaveButtonState
+    Update-MaintenanceUi
+}
+
+function Write-PopupRowsRenderDiagnostic {
+    param([string]$Reason, [string]$Before, [string]$After, [int]$EntryCount,
+          [bool]$ActiveDrag, [bool]$Skipped, [bool]$Deferred,
+          [int]$AffectedCount = 0, [bool]$LayoutUpdated = $false)
+    try {
+        Write-RuntimeDiagnosticEvent -Event 'POPUP_ROWS_PRESENTATION' -Stage 'presentation' -Success $true -Data (New-RuntimeDiagnosticData @{
+            reason = $Reason
+            beforeFingerprint = $Before
+            afterFingerprint = $After
+            entryCount = $EntryCount
+            affectedEntryCount = $AffectedCount
+            layoutUpdated = $LayoutUpdated
+            activeDrag = $ActiveDrag
+            skipped = $Skipped
+            deferred = $Deferred
+            rebuilt = (-not $Skipped -and -not $Deferred -and $AffectedCount -gt 0)
+        })
+    }
+    catch { Write-Verbose 'Popup row presentation diagnostic unavailable.' }
+}
+
+function Invoke-PopupRowsReconciliation {
+    param(
+        $ListPanel, $ContentPanel, $ScrollBar, $Snapshot,
+        [double]$Scale, [object[]]$ExistingRows, [bool]$ActiveDrag
+    )
+
+    $script:PopupRowsRefreshPending = $false
+    $script:PopupRowsViewportPending = $false
+    if ($activeDrag) { Reset-ManageDragPreview }
+    $previousSignatures = $script:PopupRowsRowSignatures
+    $canReconcile = [object]::ReferenceEquals($script:PopupRowsContentPanel, $contentPanel) -and
+        ([bool]$script:PopupRowsRenderedMode -eq $snapshot.Mode) -and
+        ([double]$script:PopupRowsRenderedScale -eq $snapshot.Scale) -and
+        ($previousSignatures -is [hashtable])
+    $oldRows = @{}
+    if ($canReconcile) {
+        foreach ($row in $existingRows) {
+            $guid = ([string]$row.Tag).ToLowerInvariant()
+            if ($oldRows.ContainsKey($guid)) { $canReconcile = $false; break }
+            $oldRows[$guid] = $row
+        }
+    }
+
+    $affected = 0
+    $contentPanel.SuspendLayout()
+    try {
+        if (-not $canReconcile) {
+            $affected = $existingRows.Count
+            $contentPanel.Controls.Clear()
+        }
+        $baseRowHeight = 60
+        $scaledRowHeight = [int][Math]::Round($baseRowHeight * $scale)
+        $rowGap = [int][Math]::Round(4 * $scale)
+        $y = 0
+        $handlers = New-BootEntryInteractionHandlers
+        if ($script:ManageContentDropPanel -ne $contentPanel) {
+            $contentPanel.Add_DragEnter($handlers.DragEnter)
+            $contentPanel.Add_DragOver($handlers.DragOver)
+            $contentPanel.Add_DragLeave($handlers.DragLeave)
+            $contentPanel.Add_DragDrop($handlers.DragDrop)
+            $script:ManageContentDropPanel = $contentPanel
+        }
+        $contentPanel.AllowDrop = [bool]$script:IsManageEntriesMode
+
+        foreach ($entry in $snapshot.Entries) {
+            $guid = ([string]$entry.Guid).ToLowerInvariant()
+            $row = $null
+            if ($canReconcile -and $oldRows.ContainsKey($guid)) {
+                $prior = $oldRows[$guid]
+                if ($previousSignatures.ContainsKey($guid) -and
+                    [string]$previousSignatures[$guid] -ceq [string]$snapshot.RowSignatures[$guid]) {
+                    $row = $prior
+                }
+                else {
+                    $contentPanel.Controls.Remove($prior)
+                    $prior.Dispose()
+                    $affected++
+                }
+                [void]$oldRows.Remove($guid)
+            }
+            if ($null -eq $row) {
+                $rendered = New-BootEntryRow -Entry $entry -Y 0 -BaseRowHeight $baseRowHeight -Handlers $handlers
+                $row = $rendered.Row
+                $height = Set-PopupBootRowDpiLayout -Row $row -Scale $scale -Y $y
+                $contentPanel.Controls.Add($row)
+                $affected++
+            }
+            else {
+                # Reused rows are already physically scaled; never scale twice.
+                $row.Location = [Drawing.Point]::new(0, $y)
+                $height = $row.Height
+            }
+            $y += ($height + $rowGap)
+        }
+        if ($canReconcile) {
+            foreach ($orphan in @($oldRows.Values)) {
+                $contentPanel.Controls.Remove($orphan)
+                $orphan.Dispose()
+                $affected++
+            }
+        }
+
+        Update-BootEntryScrollLayout -ListPanel $listPanel -ContentPanel $contentPanel -ScrollBar $scrollBar -ContentBottom $y -BaseRowHeight $scaledRowHeight -RowGap $rowGap
+
+        $script:PopupRowsContentPanel = $contentPanel
+        $script:PopupRowsIdentity = $snapshot.Identity
+        $script:PopupRowsFingerprint = $snapshot.Fingerprint
+        $script:PopupRowsRowSignatures = $snapshot.RowSignatures
+        $script:PopupRowsRenderedMode = $snapshot.Mode
+        $script:PopupRowsRenderedScale = $snapshot.Scale
+        $script:PopupRowsViewportHeight = $listPanel.ClientSize.Height
+        $script:PopupRowsRenderedAliasEditGuid = if ($script:IsManageEntriesMode) { [string]$script:ManageAliasEditGuid } else { '' }
+    }
+    finally { $contentPanel.ResumeLayout() }
+    return [int]$affected
+}
+
 function Update-PopupRows {
+    param([string]$Reason = 'caller')
     if (-not $script:Popup -or $script:Popup.IsDisposed) { return }
+    if ($Reason -eq 'caller') {
+        # Resolve unannotated legacy callers without modifying protected sources.
+        $callerFrame = @(Get-PSCallStack | Select-Object -Skip 1 -First 1)
+        if ($callerFrame.Count -gt 0 -and $callerFrame[0].Command) {
+            $Reason = [string]$callerFrame[0].Command
+        }
+    }
 
     $listMatches = $script:Popup.Controls.Find('EntryList', $true)
     $listPanel = if ($listMatches.Count -gt 0) { $listMatches[0] } else { $null }
@@ -10327,52 +10542,52 @@ function Update-PopupRows {
     $statusLabel = if ($statusMatches.Count -gt 0) { $statusMatches[0] } else { $null }
     if (-not $listPanel -or -not $contentPanel) { return }
 
-    if ($script:ManageActiveDragGuid) { Reset-ManageDragPreview }
-    # Apply the current mode/DPI viewport before computing content and scroll range.
+    # The current mode/viewport can change without invalidating any row.
     Update-ManageEntriesUiState
-
-    $contentPanel.SuspendLayout()
-    $contentPanel.Controls.Clear()
-
-    $baseRowHeight = 60
-    # Rows created after Form autoscaling need the form's live pixel factor.
-    $dpiScale = Get-PopupDpiLayoutScale -Popup $script:Popup
-    $scaledRowHeight = [int][Math]::Round($baseRowHeight * $dpiScale)
-    $rowGap = [int][Math]::Round(4 * $dpiScale)
-    $y = 0
-    $displayEntries = if ($script:IsManageEntriesMode) {
-        @(Get-OrderedEntriesForUi -IncludeHidden -UseManageDraft)
-    }
-    else {
-        @(Get-OrderedEntriesForUi)
-    }
-    $handlers = New-BootEntryInteractionHandlers
-    # Also accept drops over the live placeholder/gaps, not only over row controls.
-    # Attach just once to the persistent content panel across row refreshes.
-    if ($script:ManageContentDropPanel -ne $contentPanel) {
-        $contentPanel.Add_DragEnter($handlers.DragEnter)
-        $contentPanel.Add_DragOver($handlers.DragOver)
-        $contentPanel.Add_DragLeave($handlers.DragLeave)
-        $contentPanel.Add_DragDrop($handlers.DragDrop)
-        $script:ManageContentDropPanel = $contentPanel
-    }
-    $contentPanel.AllowDrop = [bool]$script:IsManageEntriesMode
-
-    foreach ($entry in $displayEntries) {
-        $rendered = New-BootEntryRow -Entry $entry -Y 0 -BaseRowHeight $baseRowHeight -Handlers $handlers
-        $height = Set-PopupBootRowDpiLayout -Row $rendered.Row -Scale $dpiScale -Y $y
-        $contentPanel.Controls.Add($rendered.Row)
-        $y += ($height + $rowGap)
+    $scale = Get-PopupDpiLayoutScale -Popup $script:Popup
+    $snapshot = Get-PopupRowsPresentationState -Scale $scale
+    $before = [string]$script:PopupRowsFingerprint
+    $activeDrag = [bool]$script:ManageActiveDragGuid
+    $existingRows = @($contentPanel.Controls | Where-Object { $_.Name -eq 'BootRow' -and -not $_.IsDisposed })
+    $same = [object]::ReferenceEquals($script:PopupRowsContentPanel, $contentPanel) -and
+            ([string]$script:PopupRowsIdentity -ceq $snapshot.Identity) -and
+            $existingRows.Count -eq $snapshot.EntryCount
+    if ($same) {
+        $script:PopupRowsRefreshPending = $false
+        $viewportChanged = ($script:PopupRowsViewportHeight -ne $listPanel.ClientSize.Height)
+        if ($viewportChanged -and $activeDrag) {
+            # Do not disturb an animated placeholder with a scroll range change.
+            $script:PopupRowsViewportPending = $true
+        }
+        elseif ($viewportChanged) {
+            $gap = [int][Math]::Round(4 * $scale)
+            $bottom = 0
+            foreach ($row in $existingRows) { $bottom = [Math]::Max($bottom, $row.Bottom + $gap) }
+            Update-BootEntryScrollLayout -ListPanel $listPanel -ContentPanel $contentPanel -ScrollBar $scrollBar -ContentBottom $bottom -BaseRowHeight ([int][Math]::Round(60 * $scale)) -RowGap $gap
+            $script:PopupRowsViewportHeight = $listPanel.ClientSize.Height
+            $script:PopupRowsViewportPending = $false
+        }
+        Update-PopupRowsPeripheralUi -StatusLabel $statusLabel
+        Write-PopupRowsRenderDiagnostic -Reason $Reason -Before $before -After $snapshot.Fingerprint -EntryCount $snapshot.EntryCount -ActiveDrag $activeDrag -Skipped $true -Deferred $false -LayoutUpdated ($viewportChanged -and -not $activeDrag)
+        return
     }
 
-    Update-BootEntryScrollLayout -ListPanel $listPanel -ContentPanel $contentPanel -ScrollBar $scrollBar -ContentBottom $y -BaseRowHeight $scaledRowHeight -RowGap $rowGap
+    # WinForms DoDragDrop uses nested message processing. A worker completion can
+    # arrive while the source row and animated placeholder are still in use.
+    # Never dispose/recreate those controls until the interaction has ended.
+    $editingExistingAlias = $script:IsManageEntriesMode -and $script:ManageAliasEditGuid -and
+        ([string]$script:PopupRowsRenderedAliasEditGuid -eq [string]$script:ManageAliasEditGuid)
+    if ($script:IsManageEntriesMode -and ($activeDrag -or $editingExistingAlias) -and
+        [object]::ReferenceEquals($script:PopupRowsContentPanel, $contentPanel)) {
+        $script:PopupRowsRefreshPending = $true
+        Update-PopupRowsPeripheralUi -StatusLabel $statusLabel
+        Write-PopupRowsRenderDiagnostic -Reason $Reason -Before $before -After $snapshot.Fingerprint -EntryCount $snapshot.EntryCount -ActiveDrag $activeDrag -Skipped $false -Deferred $true
+        return
+    }
 
-    if ($statusLabel) { $statusLabel.Text = $script:LastStatusText }
-    Update-DefaultUi
-    Update-RestartTargetUi
-    Update-ManageSaveButtonState
-    $contentPanel.ResumeLayout()
-    Update-MaintenanceUi
+    $affected = Invoke-PopupRowsReconciliation -ListPanel $listPanel -ContentPanel $contentPanel -ScrollBar $scrollBar -Snapshot $snapshot -Scale $scale -ExistingRows $existingRows -ActiveDrag $activeDrag
+    Update-PopupRowsPeripheralUi -StatusLabel $statusLabel
+    Write-PopupRowsRenderDiagnostic -Reason $Reason -Before $before -After $snapshot.Fingerprint -EntryCount $snapshot.EntryCount -ActiveDrag $activeDrag -Skipped $false -Deferred $false -AffectedCount $affected -LayoutUpdated $true
 }
 
 
@@ -10398,7 +10613,7 @@ function Apply-FirmwareBootState {
 
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     if ($capabilities.CanUseCachedBootState) { [void](Refresh-SystemDefaultState) }
-    Update-PopupRows
+    Update-PopupRows -Reason 'firmware-state'
 }
 
 function Refresh-BootState {
@@ -10521,7 +10736,7 @@ function Add-PopupHeaderSection {
     $refresh.Add_Click({
         if (Test-MaintenanceBusy) { return }
         $script:LastStatusText = Get-LocalizedString -Key 'Status.BootTargetsRefreshing'
-        Update-PopupRows
+        Update-PopupRows -Reason 'manual-refresh-start'
         Start-BackgroundBootRefresh -RefreshStorage
         Update-RefreshButtonVisual
     })
@@ -11087,7 +11302,7 @@ function Position-Popup {
     $monitorScale = Get-LenovoUiCoordinateScale -Screen $screen
     $monitorChanged = Set-PopupDpiLayoutScale -Form $script:Popup -Scale ([double]$monitorScale.Factor)
     $viewportChanged = Set-PopupViewportForWorkingArea -Form $script:Popup -WorkingArea $screen.WorkingArea
-    if ($monitorChanged -or $viewportChanged) { Update-PopupRows }
+    if ($monitorChanged -or $viewportChanged) { Update-PopupRows -Reason $(if ($monitorChanged) { 'dpi-changed' } else { 'viewport-changed' }) }
     Write-PopupDpiLayoutDiagnostic -Form $script:Popup -Phase 'positioned' -MonitorSource ([string]$monitorScale.Source)
     $location = Get-PopupLocationFromAnchor -WorkingArea $screen.WorkingArea -DisplayBounds $screen.Bounds -AnchorRect $iconRect -PopupSize $script:Popup.Size -HasAnchor:($null -ne $iconRect)
     $script:Popup.Location = $location

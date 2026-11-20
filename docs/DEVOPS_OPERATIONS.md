@@ -25,7 +25,7 @@ Repository executable code/workflows have primary authority. Normative procedura
 | [Development Completion](../.github/workflows/development-completion.yml) | Push to `work/LBS-*` with exact `Development-Completion: requested` trailer runs hosted full-worktree qualification | Work-Path development only; not a source release |
 | [Candidate Preflight](../.github/workflows/candidate-preflight.yml) | `candidate/**` push executes Linux and called Windows qualification and promotes only when green | One exact Candidate SHA, three preflight statuses |
 | [Windows PowerShell 5.1 Gate](../.github/workflows/windows-powershell51.yml) | Reusable `workflow_call` plus supported manual benchmark mode | Genuine hosted Windows contract suite, **not** physical Lenovo E2E |
-| [Release](../.github/workflows/release.yml) | Explicit `workflow_dispatch` for qualified `release/v<version>` | Publication authority, verified single PR/merge and source tag |
+| [Release](../.github/workflows/release.yml) | Declares both `push` on `release/**` and `workflow_dispatch`; normal Candidate promotion **explicitly dispatches** the qualified release because `GITHUB_TOKEN`-generated pushes do not recursively start workflows | Publication authority; either trigger still enforces same-SHA Candidate authorization and release gates, verified single PR/merge and source tag |
 | [Diagnostics Worker CI](../.github/workflows/diagnostics-worker-ci.yml) | Relevant `work/LBS-*` pushes, Node/Wrangler and hosted Windows checks | No general `pull_request` trigger, no production deployment |
 | [Deploy Diagnostics Worker](../.github/workflows/deploy-diagnostics-worker.yml) | Validated `workflow_dispatch` on trusted `main` | Health-only versus actual Cloudflare production deployment |
 

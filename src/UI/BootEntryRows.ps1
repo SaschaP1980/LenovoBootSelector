@@ -244,6 +244,10 @@ function Reset-ManageDragPreview {
     if ($script:Popup -and -not $script:Popup.IsDisposed) {
         foreach ($row in @($script:Popup.Controls.Find('BootRow',$true))) { $row.Invalidate() }
     }
+    # Apply a real firmware/label change once DoDragDrop has released its rows.
+    if ($script:PopupRowsRefreshPending -or $script:PopupRowsViewportPending) {
+        Update-PopupRows -Reason 'drag-ended'
+    }
 }
 # Lightweight row-painted cue: no extra WinForms controls intercept pointer events.
 function Paint-ManageDropCue {

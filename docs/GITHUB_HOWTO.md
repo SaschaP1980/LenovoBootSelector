@@ -548,8 +548,8 @@ When work is backed by an Issue, keep that Issue as the durable lifecycle record
 2. Keep/reopen the Issue while its implementation or a directly related corrective Hotfix is actively unresolved.
 3. Preserve the Issue's type/status labels and maintain exactly one current `priority:*` label.
 4. During implementation or corrective work, add concise comments for materially important findings such as confirmed root cause, changed scope, migration impact or the planned Hotfix version.
-5. Close the Issue as `completed` **only after** the implementing release is successfully published and post-release verification is complete.
-6. Before closing, ensure the Issue contains a final implementation/release record with at least the released version and relevant release PR; include important migration/testing notes when applicable. For Work-Path work, the terminal `Agent-State: COMPLETED` update of the canonical rolling recovery comment is this final record; do not duplicate it with a second closure comment unless materially new information is added.
+5. For executable release work, close the Issue as `completed` **only after** the implementing release is successfully published, post-release verification is complete, **and any explicit Issue-specific owner, native or physical acceptance criteria have been met and recorded**. A green release is not itself evidence of the user's acceptance; leave the Issue open while required acceptance is pending. Do not impose physical testing on Issues that do not require it.
+6. Before closing, ensure the Issue contains a final implementation/release record with at least the released version and relevant release PR; include important migration/testing notes and recorded acceptance where applicable. For Work-Path work, the terminal `Agent-State: COMPLETED` update of the canonical rolling recovery comment is this final record; do not duplicate it with a second closure comment unless materially new information is added. Documentation-only Issues instead follow the verified direct-`main` completion rule below, without a product release.
 
 If a released implementation later proves defective and the defect is a **direct regression or incomplete fulfillment of that same Issue**, reopen the original Issue instead of silently fixing around it. Add a comment with the confirmed failure/root cause and Hotfix plan, reassess its priority for the active incident, and keep it open until the corrective release is published and verified. Then add the Hotfix release result and close it again as `completed`.
 
@@ -792,8 +792,9 @@ A release report should distinguish:
 - exact version, PR, `main` SHA and source-tag commit;
 - release ZIP size/SHA-256;
 - whether candidate, release, and declared work branches were removed;
-- whether the implementation Issue was closed;
-- which native Windows tests were actually executed versus only represented by source/static contracts.
+- whether the implementation Issue was closed, and whether any Issue-specific owner/native/physical acceptance remains outstanding;
+- which native Windows tests were actually executed versus only represented by source/static contracts;
+- the independently verified Diagnostics Worker result after a separate Worker dispatch, or an explicit pending / `NOT RUN` / unknown qualification when not verified. Do not equate source Release Verification with Worker health or deployment.
 
 Prefer the verified `RELEASE_VERIFICATION_SUMMARY` as the single source for aggregated post-release facts instead of reconstructing them through multiple connector calls.
 
