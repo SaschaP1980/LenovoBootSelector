@@ -24,9 +24,9 @@ $uninstaller = [System.IO.File]::ReadAllText($uninstallerPath,[System.Text.Encod
 $template = [System.IO.File]::ReadAllText($templatePath,[System.Text.Encoding]::UTF8)
 $taskBroker = [System.IO.File]::ReadAllText($taskBrokerPath,[System.Text.Encoding]::UTF8)
 
-Assert-True 'Installer advances TaskBroker schema to 0.2.15' ($installer.Contains('$version = ''0.2.15'''))
+Assert-True 'Installer advances TaskBroker schema to 0.2.16' ($installer.Contains('$version = ''0.2.16'''))
 Assert-True 'Installer writes fixed-task-v2 metadata' ($installer.Contains("boundaryContract = 'fixed-task-v2'"))
-Assert-True 'Runtime accepts only TaskBroker schema 0.2.15' ($template.Contains('$script:SupportedTaskBrokerVersions = @(''0.2.15'')'))
+Assert-True 'Runtime accepts only TaskBroker schema 0.2.16' ($template.Contains('$script:SupportedTaskBrokerVersions = @(''0.2.16'')'))
 Assert-True 'Canonical ProgramData TaskBroker root uses Lenovo Boot Selector' ($template.Contains('Join-Path $env:ProgramData ''Lenovo Boot Selector\TaskBroker'''))
 Assert-True 'Legacy ProgramData root remains explicit migration input' ($template.Contains('Join-Path $env:ProgramData ''Lenovo Boot Menu\TaskBroker'''))
 Assert-True 'Canonical static task prefix is present' ($taskBroker.Contains('LenovoBootSelector-RefreshManager'))
@@ -92,16 +92,20 @@ Assert-True 'Installer emits per-step duration diagnostics' ($installer.Contains
 $taskNs = 'http://schemas.microsoft.com/windows/2004/02/mit/task'
 $noTriggerXml = "<Task xmlns='$taskNs'><Triggers /></Task>"
 $timeTriggerXml = "<Task xmlns='$taskNs'><Triggers><TimeTrigger><StartBoundary>2026-10-07T09:00:00</StartBoundary><Enabled>true</Enabled></TimeTrigger></Triggers></Task>"
+$bootNoDelayXml = "<Task xmlns='$taskNs'><Triggers><BootTrigger><Enabled>true</Enabled></BootTrigger></Triggers></Task>"
+$bootZeroXml = "<Task xmlns='$taskNs'><Triggers><BootTrigger><Enabled>true</Enabled><Delay>PT0S</Delay></BootTrigger></Triggers></Task>"
 $boot30Xml = "<Task xmlns='$taskNs'><Triggers><BootTrigger><Enabled>true</Enabled><Delay>PT30S</Delay></BootTrigger></Triggers></Task>"
 $boot20Xml = "<Task xmlns='$taskNs'><Triggers><BootTrigger><Enabled>true</Enabled><Delay>PT20S</Delay></BootTrigger></Triggers></Task>"
 $twoBootXml = "<Task xmlns='$taskNs'><Triggers><BootTrigger><Delay>PT30S</Delay></BootTrigger><BootTrigger><Delay>PT30S</Delay></BootTrigger></Triggers></Task>"
 
 Assert-True 'Triggerless task XML is accepted for non-startup tasks' (Test-CanonicalTaskTriggerXml -TaskXml $noTriggerXml)
 Assert-False 'Triggered task XML is rejected for non-startup tasks' (Test-CanonicalTaskTriggerXml -TaskXml $timeTriggerXml)
-Assert-True 'Default Restore accepts one 30-second BootTrigger' (Test-CanonicalTaskTriggerXml -TaskXml $boot30Xml -StartupDelay 'PT30S')
-Assert-False 'Default Restore rejects wrong BootTrigger delay' (Test-CanonicalTaskTriggerXml -TaskXml $boot20Xml -StartupDelay 'PT30S')
-Assert-False 'Default Restore rejects wrong trigger type' (Test-CanonicalTaskTriggerXml -TaskXml $timeTriggerXml -StartupDelay 'PT30S')
-Assert-False 'Default Restore rejects multiple triggers' (Test-CanonicalTaskTriggerXml -TaskXml $twoBootXml -StartupDelay 'PT30S')
+Assert-True 'LBS-3 Default Restore accepts exactly one undelayed BootTrigger' (Test-CanonicalTaskTriggerXml -TaskXml $bootNoDelayXml -StartupWithoutDelay)
+Assert-False 'LBS-3 Default Restore rejects old 30-second delay' (Test-CanonicalTaskTriggerXml -TaskXml $boot30Xml -StartupWithoutDelay)
+Assert-False 'LBS-3 Default Restore rejects explicit zero Delay' (Test-CanonicalTaskTriggerXml -TaskXml $bootZeroXml -StartupWithoutDelay)
+Assert-False 'LBS-3 Default Restore rejects non-BootTrigger' (Test-CanonicalTaskTriggerXml -TaskXml $timeTriggerXml -StartupWithoutDelay)
+Assert-False 'LBS-3 Default Restore rejects multiple triggers' (Test-CanonicalTaskTriggerXml -TaskXml $twoBootXml -StartupWithoutDelay)
+Assert-True 'LBS-3 metadata records zero additional startup seconds' ($installer.Contains('defaultRestoreDelaySeconds = 0'))
 
 $g1='{11111111-1111-1111-1111-111111111111}'
 $g2='{22222222-2222-2222-2222-222222222222}'
@@ -129,5 +133,5 @@ Assert-True 'Uninstaller still recognizes legacy manager task' ($uninstaller.Con
 Assert-True 'Uninstaller removes canonical ProgramData root' ($uninstaller.Contains('Join-Path $env:ProgramData ''Lenovo Boot Selector\TaskBroker'''))
 Assert-True 'Uninstaller also removes exact legacy ProgramData root' ($uninstaller.Contains('Join-Path $env:ProgramData ''Lenovo Boot Menu\TaskBroker'''))
 
-Write-Host "TASKBROKER MIGRATION TOTAL $checks/43"
-if ($checks -ne 43) { throw "Unexpected TaskBroker migration test count $checks" }
+Write-Host "TASKBROKER MIGRATION TOTAL $checks/45"
+if ($checks -ne 45) { throw "Unexpected TaskBroker migration test count $checks" }

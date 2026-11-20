@@ -286,7 +286,7 @@ function Get-LocalizationCatalogCore {
             'Startup.FallbackError' = 'Lenovo Boot Selector could not be started.'
             'Startup.AlreadyRunningMessage' = 'Lenovo Boot Selector is already running.'
             'Status.Ready' = 'Ready.'
-            'Default.SystemSavedStatus' = 'System default saved: {Name} · applied 30 s after the next Windows system startup.'
+            'Default.SystemSavedStatus' = 'System default saved: {Name} · restored at the next Windows system startup (no extra delay).'
             'Default.SystemDisabledStatus' = 'Automatic system-wide default boot target is disabled.'
             'Status.NextTargetLabel' = 'Next target: {Title}'
             'Boot.DefaultOrder' = 'Default order'
@@ -565,7 +565,7 @@ function Get-LocalizationCatalogCore {
             'Startup.FallbackError' = 'Lenovo Boot Selector konnte nicht gestartet werden.'
             'Startup.AlreadyRunningMessage' = 'Lenovo Boot Selector läuft bereits.'
             'Status.Ready' = 'Bereit.'
-            'Default.SystemSavedStatus' = 'Systemstandard gespeichert: {Name} · wird 30 s nach dem nächsten Windows-Systemstart gesetzt.'
+            'Default.SystemSavedStatus' = 'Systemstandard gespeichert: {Name} · wird beim nächsten Windows-Systemstart ohne zusätzliche Wartezeit gesetzt.'
             'Default.SystemDisabledStatus' = 'Automatisches systemweites Standard-Startziel ist deaktiviert.'
             'Status.NextTargetLabel' = 'Nächstes Ziel: {Title}'
             'Boot.DefaultOrder' = 'Standardreihenfolge'
@@ -2225,7 +2225,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.4.0.0'
+$script:AppVersion = '1.5.0.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -2264,7 +2264,7 @@ $script:DiagnosticsUploadMenuItem = $null
 $script:DiagnosticsUploadState = $null
 $script:DiagnosticsUploadTimer = $null
 
-$script:SupportedTaskBrokerVersions = @('0.2.15')
+$script:SupportedTaskBrokerVersions = @('0.2.16')
 $script:TaskBrokerStateDir = Join-Path $env:ProgramData 'Lenovo Boot Selector\TaskBroker'
 $script:TaskBrokerMetadataPath = Join-Path $script:TaskBrokerStateDir 'task-broker.json'
 $script:LegacyTaskBrokerStateDir = Join-Path $env:ProgramData 'Lenovo Boot Menu\TaskBroker'
@@ -6662,6 +6662,7 @@ function Test-TaskBrokerMetadataContract {
         if ([string]$Metadata.firmwareRefreshTask -ne 'LenovoBootSelector-RefreshFirmware') { return $false }
         if ([string]$Metadata.defaultClearTask -ne 'LenovoBootSelector-Default-Clear') { return $false }
         if ([string]$Metadata.defaultRestoreTask -ne 'LenovoBootSelector-Default-Restore') { return $false }
+        if ($null -eq $Metadata.PSObject.Properties['defaultRestoreDelaySeconds'] -or [int]$Metadata.defaultRestoreDelaySeconds -ne 0) { return $false }
 
         $expectedManagerFile = Join-Path $script:TaskBrokerStateDir 'fwbootmgr.txt'
         $expectedFirmwareFile = Join-Path $script:TaskBrokerStateDir 'firmware.txt'

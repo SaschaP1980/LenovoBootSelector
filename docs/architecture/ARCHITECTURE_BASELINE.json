@@ -1,7 +1,7 @@
 {
-  "version": "1.4.0.0",
+  "version": "1.5.0.0",
   "runtime": {
-    "lines": 12107,
+    "lines": 12108,
     "functions": 359,
     "scriptReferences": 1552,
     "scriptVariables": 180,
@@ -22,7 +22,7 @@
   },
   "infrastructure": {
     "files": 12,
-    "lines": 1952,
+    "lines": 1953,
     "functions": 96,
     "scriptReferences": 116
   },

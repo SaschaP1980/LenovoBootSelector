@@ -994,7 +994,7 @@ $script:DiagnosticsUploadMenuItem = $null
 $script:DiagnosticsUploadState = $null
 $script:DiagnosticsUploadTimer = $null
 
-$script:SupportedTaskBrokerVersions = @('0.2.15')
+$script:SupportedTaskBrokerVersions = @('0.2.16')
 $script:TaskBrokerStateDir = Join-Path $env:ProgramData 'Lenovo Boot Selector\TaskBroker'
 $script:TaskBrokerMetadataPath = Join-Path $script:TaskBrokerStateDir 'task-broker.json'
 $script:LegacyTaskBrokerStateDir = Join-Path $env:ProgramData 'Lenovo Boot Menu\TaskBroker'

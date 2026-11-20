@@ -15,7 +15,7 @@ function Assert-Equal([string]$Name,$Expected,$Actual) {
     Write-Host "PASS  $Name"
 }
 
-$script:SupportedTaskBrokerVersions = @('0.2.15')
+$script:SupportedTaskBrokerVersions = @('0.2.16')
 $script:TaskBrokerStateDir = Join-Path ([System.IO.Path]::GetTempPath()) 'LenovoBootSelector-LBS6-Boundary'
 $script:TaskBrokerMetadataPath = Join-Path $script:TaskBrokerStateDir 'task-broker.json'
 $script:TaskBrokerMetadata = $null
@@ -26,7 +26,7 @@ $guid = '{11111111-2222-3333-4444-555555555555}'
 $compact = '11111111222233334444555555555555'
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $meta = [pscustomobject]@{
-    version = '0.2.15'
+    version = '0.2.16'
     boundaryContract = 'fixed-task-v2'
     userSid = $sid
     managerRefreshTask = 'LenovoBootSelector-RefreshManager'
@@ -37,6 +37,7 @@ $meta = [pscustomobject]@{
     bootNextOriginFile = (Join-Path (Join-Path $script:TaskBrokerStateDir 'Default') 'bootnext-origin.json')
     defaultClearTask = 'LenovoBootSelector-Default-Clear'
     defaultRestoreTask = 'LenovoBootSelector-Default-Restore'
+    defaultRestoreDelaySeconds = 0
     targets = @([pscustomobject]@{
         guid = $guid
         taskName = ('LenovoBootSelector-Set-' + $compact)
@@ -50,6 +51,9 @@ Assert-True 'Malformed GUID rejected' ($null -eq (Normalize-TaskBrokerGuid -Guid
 Assert-Equal 'BootNext task name derived from GUID' ('LenovoBootSelector-Set-' + $compact) (Get-TaskBrokerExpectedTargetTaskName -Guid $guid)
 Assert-Equal 'Default task name derived from GUID' ('LenovoBootSelector-Default-Set-' + $compact) (Get-TaskBrokerExpectedTargetTaskName -Guid $guid -DefaultTarget)
 Assert-True 'Valid fixed-task-v2 metadata accepted' (Test-TaskBrokerMetadataContract -Metadata $meta)
+$badDelay = $meta | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+$badDelay.defaultRestoreDelaySeconds = 30
+Assert-False 'LBS-3 nonzero default restore delay rejected' (Test-TaskBrokerMetadataContract -Metadata $badDelay)
 
 $script:TaskBrokerMetadata = $meta
 Assert-Equal 'Manager refresh resolves fixed task' 'LenovoBootSelector-RefreshManager' (Resolve-TaskBrokerAuthorizedTaskName -Operation ManagerRefresh)
@@ -113,5 +117,5 @@ Assert-False 'Legacy fixed task name rejected by fixed-task-v2 metadata' (Test-T
 $legacyBoundary = $meta | ConvertTo-Json -Depth 6 | ConvertFrom-Json
 $legacyBoundary.boundaryContract = 'fixed-task-v1'
 Assert-False 'Legacy fixed-task-v1 boundary marker rejected' (Test-TaskBrokerMetadataContract -Metadata $legacyBoundary)
-Write-Host "TASKBROKER BOUNDARY TOTAL $checks/25"
-if ($checks -ne 25) { throw "Unexpected TaskBroker boundary test count $checks" }
+Write-Host "TASKBROKER BOUNDARY TOTAL $checks/26"
+if ($checks -ne 26) { throw "Unexpected TaskBroker boundary test count $checks" }

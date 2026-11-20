@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0.0",
+  "version": "1.5.0.0",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
@@ -543,21 +543,21 @@
     },
     {
       "source": "src/Infrastructure/TaskBroker.ps1",
-      "line": 338,
+      "line": 339,
       "category": "cache_metadata_best_effort",
       "reason": "Optional cache timestamp/diagnostic metadata failure is tolerated.",
       "code": "try { return ([System.IO.File]::ReadAllText($diagPointer)).Trim() } catch { }"
     },
     {
       "source": "src/Infrastructure/TaskBroker.ps1",
-      "line": 354,
+      "line": 355,
       "category": "cache_metadata_best_effort",
       "reason": "Optional cache timestamp/diagnostic metadata failure is tolerated.",
       "code": "try { $script:ManagerCacheUtc = (Get-Item -LiteralPath ([string]$meta.managerFile)).LastWriteTimeUtc } catch { }"
     },
     {
       "source": "src/Infrastructure/TaskBroker.ps1",
-      "line": 373,
+      "line": 374,
       "category": "cache_metadata_best_effort",
       "reason": "Optional cache timestamp/diagnostic metadata failure is tolerated.",
       "code": "try { $script:FirmwareCacheUtc = (Get-Item -LiteralPath ([string]$meta.firmwareFile)).LastWriteTimeUtc } catch { }"

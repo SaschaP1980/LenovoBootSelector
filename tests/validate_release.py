@@ -213,7 +213,7 @@ def main():
     taskbroker_migration_path=root/'tests/Test-TaskBrokerMigration.ps1'
     s.c('LBS-33 native TaskBroker migration test exists',taskbroker_migration_path.is_file())
     taskbroker_migration=txt(taskbroker_migration_path) if taskbroker_migration_path.is_file() else ''
-    s.has('LBS-143 migration suite keeps fixed total 43',taskbroker_migration,'Write-Host "TASKBROKER MIGRATION TOTAL $checks/43"')
+    s.has('LBS-3 migration suite keeps fixed total 45',taskbroker_migration,'Write-Host "TASKBROKER MIGRATION TOTAL $checks/45"')
     selection_ui = txt(root/'tests/Test-BootNextSelectionUi.ps1')
     s.has('LBS-143 hotfix pending and cold-start selection suite keeps fixed total 57',selection_ui,'Write-Host "BOOTNEXT SELECTION UI TOTAL $checks/57"')
     s.has('LBS-143 patch selection suite runs in native Windows aggregate',windows_wrapper,"& (Join-Path $root 'tests\\Test-BootNextSelectionUi.ps1')")
@@ -678,8 +678,8 @@ def main():
     s.c('LBS-6 canonical security boundary document exists',(root/'docs/SECURITY_BOUNDARY.md').is_file())
     s.has('LBS-6 security document forbids free task names',boundary_doc,'No runtime API accepts a free Scheduled Task name.')
     s.has('LBS-6 security document preserves one-shot semantics',boundary_doc,'One-Shot Next Boot')
-    s.has('LBS-6 runtime supports hardened TaskBroker schema',template,"$script:SupportedTaskBrokerVersions = @('0.2.15')")
-    s.has('LBS-6 installer emits hardened TaskBroker schema',installer,"$version = '0.2.15'")
+    s.has('LBS-6 runtime supports hardened TaskBroker schema',template,"$script:SupportedTaskBrokerVersions = @('0.2.16')")
+    s.has('LBS-6 installer emits hardened TaskBroker schema',installer,"$version = '0.2.16'")
     s.has('LBS-6 installer emits fixed boundary marker',installer,"boundaryContract = 'fixed-task-v2'")
     s.no('LBS-6 runtime has no TaskName-based authorized invocation',taskbroker.lower(),'invoke-authorizedtask -taskname')
     s.has('LBS-6 runtime authorized runner is operation-only',taskbroker,"[ValidateSet('ManagerRefresh','FirmwareRefresh','BootNext','DefaultSet','DefaultClear')]")
