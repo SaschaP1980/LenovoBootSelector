@@ -171,6 +171,7 @@ jobs:
               storageInfrastructure = Get-TestTotal $logText '^STORAGE INFRA TOTAL\s+(\d+)/(\d+)\s*$'
               uiPresentation = Get-TestTotal $logText '^UI PRESENTATION TOTAL\s+(\d+)/(\d+)\s*$'
               popupDpiLayout = Get-TestTotal $logText '^POPUP DPI TOTAL\s+(\d+)/(\d+)\s*$'
+              manageGrip = Get-TestTotal $logText '^LBS166 GRIP TOTAL\s+(\d+)/(\d+)\s*$'
               manageViewport = Get-TestTotal $logText '^LBS157 VIEWPORT TOTAL\s+(\d+)/(\d+)\s*$'
               localizationRuntime = Get-TestTotal $logText '^LOCALIZATION TOTAL\s+(\d+)/(\d+)\s*$'
               refreshRuntime = Get-TestTotal $logText '^REFRESH TOTAL\s+(\d+)/(\d+)\s*$'
@@ -200,6 +201,7 @@ jobs:
               'storageInfrastructure',
               'uiPresentation',
               'popupDpiLayout',
+              'manageGrip',
               'manageViewport',
               'localizationRuntime',
               'refreshRuntime',
@@ -235,6 +237,7 @@ jobs:
               $totals.storageInfrastructure.passed +
               $totals.uiPresentation.passed +
               $totals.popupDpiLayout.passed +
+              $totals.manageGrip.passed +
               $totals.manageViewport.passed +
               $totals.localizationRuntime.passed +
               $totals.refreshRuntime.passed +
@@ -261,6 +264,7 @@ jobs:
               $totals.storageInfrastructure.expected +
               $totals.uiPresentation.expected +
               $totals.popupDpiLayout.expected +
+              $totals.manageGrip.expected +
               $totals.manageViewport.expected +
               $totals.localizationRuntime.expected +
               $totals.refreshRuntime.expected +
