@@ -71,6 +71,7 @@ function Update-PopupRows {
     $statusLabel = if ($statusMatches.Count -gt 0) { $statusMatches[0] } else { $null }
     if (-not $listPanel -or -not $contentPanel) { return }
 
+    if ($script:ManageActiveDragGuid) { Reset-ManageDragPreview }
     # Apply the current mode/DPI viewport before computing content and scroll range.
     Update-ManageEntriesUiState
 
