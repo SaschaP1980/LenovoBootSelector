@@ -1,6 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.2.3.0 – Animated Manage Entries drag reordering (LBS-163)
+
+- Replace the strong red insertion bar with a subdued full-height destination placeholder and smooth in-place movement of neighboring boot-target rows during a drag.
+- Keep the dragged row visually raised under the pointer, with a restrained neutral outline and shadow; reflow the existing WinForms controls instead of rebuilding the list on every mouse movement.
+- Resolve insertion decisions against immutable drag-start slots so animated positions, nested controls and scrolling cannot cause the preview/drop destination to disagree.
+- Preserve explicit manage-mode save/cancel and draft-only ordering; reset all transient row positions, placeholder and timer on invalid drop, cancellation, refresh and mode exit.
+- Extend native Windows PowerShell 5.1 geometry and animation regression coverage for 100% and 250% simulated scaling. Real Lenovo/multi-monitor UX acceptance remains pending.
+
 ## v1.2.2.0 – Preview Manage Entries drag destinations (LBS-163)
 
 - Show a live, DPI-scaled red between-row insertion cue while dragging a boot entry; outline the dragged source independently without intercepting hit-testing or rebuilding the list.

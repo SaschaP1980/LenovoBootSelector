@@ -5,30 +5,230 @@
 # LBS-163: shared candidate resolver for preview and committed drop.
 function Get-ManageDropDecision {
     param($Control,[Drawing.Point]$ScreenPoint,[string]$MovedGuid)
-    if (-not $script:IsManageEntriesMode) { return $null }
-    $row = Get-BootRowFromControl $Control
-    if (-not $row -or $row.IsDisposed -or -not $row.Parent -or $row.Parent.Name -ne 'EntryContent') { return $null }
-    $point = $row.PointToClient($ScreenPoint)
-    if ($point.X -lt 0 -or $point.X -ge $row.Width -or $point.Y -lt 0 -or $point.Y -ge $row.Height) { return $null }
+    if (-not $script:IsManageEntriesMode -or -not $MovedGuid) { return $null }
     $moved = $MovedGuid.ToLowerInvariant()
-    $target = ([string]$row.Tag).ToLowerInvariant()
     $order = @($script:ManageEntryOrder | ForEach-Object { ([string]$_).ToLowerInvariant() })
     $originalIndex = [array]::IndexOf($order,$moved)
-    if ($originalIndex -lt 0 -or -not $target -or $target -eq $moved) { return $null }
+    if ($originalIndex -lt 0) { return $null }
+
+    $target = ''
+    $after = $false
+    # During live reflow the physical rows move. Resolve pointer coordinates
+    # against immutable drag-start slots, never against their animated bounds.
+    if ($script:ManageDragLayout -and $script:ManageDragContent -and -not $script:ManageDragContent.IsDisposed) {
+        $point = $script:ManageDragContent.PointToClient($ScreenPoint)
+        $slots = @($script:ManageDragLayout)
+        if ($slots.Count -eq 0 -or $point.X -lt 0 -or $point.X -ge $script:ManageDragContent.ClientSize.Width) { return $null }
+        if ($point.Y -lt $slots[0].Top -or $point.Y -ge ($slots[$slots.Count-1].Top + $slots[$slots.Count-1].Height)) { return $null }
+        foreach ($slot in $slots) {
+            $edge = $slot.Top + $slot.Height + [Math]::Floor($script:ManageDragRowGap / 2.0)
+            if ($point.Y -lt $edge) {
+                $target = $slot.Guid
+                $after = ($point.Y -gt ($slot.Top + $slot.Height / 2.0))
+                break
+            }
+        }
+        if (-not $target) {
+            $target = $slots[$slots.Count-1].Guid
+            $after = $true
+        }
+    }
+    else {
+        $row = Get-BootRowFromControl $Control
+        if (-not $row -or $row.IsDisposed -or -not $row.Parent -or $row.Parent.Name -ne 'EntryContent') { return $null }
+        $point = $row.PointToClient($ScreenPoint)
+        if ($point.X -lt 0 -or $point.X -ge $row.Width -or $point.Y -lt 0 -or $point.Y -ge $row.Height) { return $null }
+        $target = ([string]$row.Tag).ToLowerInvariant()
+        $after = ($point.Y -gt ($row.Height / 2.0))
+    }
     $remaining = @($order | Where-Object { $_ -ne $moved })
     $targetIndex = [array]::IndexOf($remaining,$target)
-    if ($targetIndex -lt 0) { return $null }
-    $after = $point.Y -gt ($row.Height / 2.0)
+    if (-not $target -or $target -eq $moved -or $targetIndex -lt 0) { return $null }
     $index = $targetIndex + $(if ($after) { 1 } else { 0 })
     if ($index -eq $originalIndex) { return $null }
     return [pscustomobject]@{ MovedGuid=$moved; TargetGuid=$target; After=[bool]$after; InsertIndex=[int]$index }
 }
+# LBS-163 iteration 2: animate existing WinForms rows; no rows are rebuilt in a drag.
+# Slots are captured once, so the pointer decision never depends on animation frames.
+function Start-ManageDragReflow {
+    param($SourceRow)
+    if (-not $SourceRow -or -not $SourceRow.Parent -or -not $script:IsManageEntriesMode) { return }
+    Stop-ManageDragReflow
+    $content = $SourceRow.Parent
+    $rows = @($content.Controls | Where-Object { $_.Name -eq 'BootRow' } | Sort-Object Top)
+    $slots = @()
+    foreach ($row in $rows) {
+        $slots += [pscustomobject]@{
+            Guid=([string]$row.Tag).ToLowerInvariant()
+            Row=$row
+            Top=[int]$row.Top
+            Height=[int]$row.Height
+        }
+    }
+    if ($slots.Count -lt 2) { return }
+    $script:ManageDragContent = $content
+    $script:ManageDragLayout = $slots
+    $script:ManageDragRowGap = [Math]::Max(0,$slots[1].Top - ($slots[0].Top+$slots[0].Height))
+    $script:ManageDragRow = $SourceRow
+    $script:ManageDragOriginalColor = $SourceRow.BackColor
+    $grab = $SourceRow.PointToClient([System.Windows.Forms.Control]::MousePosition)
+    $script:ManageDragGrabY = [Math]::Max(0,[Math]::Min($SourceRow.Height-1,$grab.Y))
+    $shadow = New-Object System.Windows.Forms.Panel
+    $shadow.Name = 'ManageDragShadow'
+    $shadow.Size = $SourceRow.Size
+    $shadow.BackColor = [Drawing.Color]::FromArgb(12,12,16)
+    $shadow.Enabled = $false
+    $content.Controls.Add($shadow)
+    $script:ManageDragShadow = $shadow
+    $placeholder = New-Object System.Windows.Forms.Panel
+    $placeholder.Name = 'ManageDragPlaceholder'
+    $placeholder.Size = $SourceRow.Size
+    $placeholder.BackColor = [Drawing.Color]::FromArgb(34,36,41)
+    $placeholder.Enabled = $false
+    $placeholder.Visible = $false
+    $placeholder.Add_Paint({
+        param($sender,$eventArgs)
+        $pen = New-Object Drawing.Pen([Drawing.Color]::FromArgb(83,88,98),1.0)
+        $pen.DashStyle = [Drawing.Drawing2D.DashStyle]::Dash
+        try { $eventArgs.Graphics.DrawRectangle($pen,1,1,[Math]::Max(1,$sender.Width-3),[Math]::Max(1,$sender.Height-3)) }
+        finally { $pen.Dispose() }
+    })
+    $content.Controls.Add($placeholder)
+    $placeholder.SendToBack()
+    $script:ManageDragPlaceholder = $placeholder
+    $shadow.BringToFront()
+    $SourceRow.BringToFront()
+    $SourceRow.BackColor = [Drawing.Color]::FromArgb(48,48,54)
+    $SourceRow.Invalidate($true)
+    $script:ManageDragTargets = @{}
+    $script:ManageDragStarts = @{}
+    $timer = New-Object System.Windows.Forms.Timer
+    $timer.Interval = 16
+    $timer.Add_Tick({ Advance-ManageDragReflow })
+    $script:ManageDragTimer = $timer
+    Set-ManageDragReflowTargets -Decision $null
+    Set-ManageDragFloatLocation -ScreenPoint ([System.Windows.Forms.Control]::MousePosition)
+}
+
+function Set-ManageDragFloatLocation {
+    param([Drawing.Point]$ScreenPoint)
+    if (-not $script:ManageDragRow -or $script:ManageDragRow.IsDisposed -or
+        -not $script:ManageDragContent -or $script:ManageDragContent.IsDisposed) { return }
+    $point = $script:ManageDragContent.PointToClient($ScreenPoint)
+    $y = [int]($point.Y - $script:ManageDragGrabY)
+    if ($script:ManageDragRow.Top -ne $y) { $script:ManageDragRow.Top = $y }
+    if ($script:ManageDragShadow -and -not $script:ManageDragShadow.IsDisposed) {
+        $script:ManageDragShadow.Location = [Drawing.Point]::new($script:ManageDragRow.Left+4,$y+5)
+    }
+}
+
+function Set-ManageDragReflowTargets {
+    param($Decision)
+    if (-not $script:ManageDragLayout) { return }
+    $slots = @($script:ManageDragLayout)
+    $moved = ([string]$script:ManageActiveDragGuid).ToLowerInvariant()
+    $sequence = New-Object System.Collections.ArrayList
+    foreach ($slot in $slots) {
+        if ($slot.Guid -ne $moved) { [void]$sequence.Add($slot.Guid) }
+    }
+    if ($Decision) {
+        $index = [Math]::Max(0,[Math]::Min($sequence.Count,[int]$Decision.InsertIndex))
+        $sequence.Insert($index,$moved)
+    }
+    else {
+        $original = [array]::IndexOf(@($slots | ForEach-Object { $_.Guid }),$moved)
+        $sequence.Insert([Math]::Max(0,$original),$moved)
+    }
+    $targets = @{}
+    $y = [int]$slots[0].Top
+    foreach ($guid in $sequence) {
+        $slot = $slots | Where-Object { $_.Guid -eq $guid } | Select-Object -First 1
+        $targets[$guid] = $y
+        $y += $slot.Height + $script:ManageDragRowGap
+    }
+    $script:ManageDragStarts = @{}
+    foreach ($slot in $slots) {
+        if ($slot.Guid -ne $moved -and -not $slot.Row.IsDisposed) {
+            $script:ManageDragStarts[$slot.Guid] = [int]$slot.Row.Top
+        }
+    }
+    $script:ManageDragTargets = $targets
+    if ($script:ManageDragPlaceholder -and -not $script:ManageDragPlaceholder.IsDisposed) {
+        $script:ManageDragPlaceholder.Top = [int]$targets[$moved]
+        $script:ManageDragPlaceholder.Visible = ($null -ne $Decision)
+        $script:ManageDragPlaceholder.SendToBack()
+    }
+    $script:ManageDragAnimationStartUtc = [datetime]::UtcNow
+    if ($script:ManageDragTimer) { $script:ManageDragTimer.Start() }
+}
+
+function Advance-ManageDragReflow {
+    param([double]$Progress = -1)
+    if (-not $script:ManageDragLayout -or -not $script:ManageDragContent -or $script:ManageDragContent.IsDisposed) { return }
+    $t = if ($Progress -ge 0) { [Math]::Min(1.0,[Math]::Max(0.0,$Progress)) }
+         else { [Math]::Min(1.0,([datetime]::UtcNow-$script:ManageDragAnimationStartUtc).TotalMilliseconds/150.0) }
+    $ease = 1.0 - [Math]::Pow(1.0-$t,3.0)
+    $script:ManageDragContent.SuspendLayout()
+    try {
+        foreach ($slot in @($script:ManageDragLayout)) {
+            if ($slot.Guid -eq $script:ManageActiveDragGuid -or $slot.Row.IsDisposed) { continue }
+            $start = [int]$script:ManageDragStarts[$slot.Guid]
+            $target = [int]$script:ManageDragTargets[$slot.Guid]
+            $top = [int][Math]::Round($start + (($target-$start)*$ease))
+            if ($slot.Row.Top -ne $top) { $slot.Row.Top = $top }
+        }
+    }
+    finally { $script:ManageDragContent.ResumeLayout($false) }
+    if ($t -ge 1.0 -and $script:ManageDragTimer) { $script:ManageDragTimer.Stop() }
+}
+
+function Stop-ManageDragReflow {
+    param([switch]$KeepPositions)
+    if ($script:ManageDragPlaceholder) {
+        if (-not $script:ManageDragPlaceholder.IsDisposed) {
+            if ($script:ManageDragPlaceholder.Parent) { $script:ManageDragPlaceholder.Parent.Controls.Remove($script:ManageDragPlaceholder) }
+            $script:ManageDragPlaceholder.Dispose()
+        }
+        $script:ManageDragPlaceholder = $null
+    }
+    if ($script:ManageDragTimer) {
+        $script:ManageDragTimer.Stop()
+        $script:ManageDragTimer.Dispose()
+        $script:ManageDragTimer = $null
+    }
+    if ($script:ManageDragShadow) {
+        if (-not $script:ManageDragShadow.IsDisposed) {
+            if ($script:ManageDragShadow.Parent) { $script:ManageDragShadow.Parent.Controls.Remove($script:ManageDragShadow) }
+            $script:ManageDragShadow.Dispose()
+        }
+        $script:ManageDragShadow = $null
+    }
+    if ($script:ManageDragLayout -and -not $KeepPositions) {
+        foreach ($slot in @($script:ManageDragLayout)) {
+            if (-not $slot.Row.IsDisposed) { $slot.Row.Top = [int]$slot.Top }
+        }
+    }
+    if ($script:ManageDragRow -and -not $script:ManageDragRow.IsDisposed) {
+        $script:ManageDragRow.BackColor = $script:ManageDragOriginalColor
+        $script:ManageDragRow.Invalidate($true)
+    }
+    $script:ManageDragLayout = $null
+    $script:ManageDragContent = $null
+    $script:ManageDragRow = $null
+    $script:ManageDragTargets = $null
+    $script:ManageDragStarts = $null
+    $script:ManageDragOriginalColor = $null
+    $script:ManageDragRowGap = 0
+    $script:ManageDragGrabY = 0
+}
+
 function Set-ManageDropPreview {
     param($Decision)
     $prior = $script:ManageDropPreview
     if ($prior -and $Decision -and $prior.TargetGuid -eq $Decision.TargetGuid -and $prior.After -eq $Decision.After) { return }
     if (-not $prior -and -not $Decision) { return }
     $script:ManageDropPreview = $Decision
+    if ($script:ManageDragLayout) { Set-ManageDragReflowTargets -Decision $Decision; return }
     if (-not $script:Popup -or $script:Popup.IsDisposed) { return }
     foreach ($row in @($script:Popup.Controls.Find('BootRow',$true))) {
         if (($prior -and [string]$row.Tag -eq $prior.TargetGuid) -or
@@ -36,6 +236,8 @@ function Set-ManageDropPreview {
     }
 }
 function Reset-ManageDragPreview {
+    param([switch]$KeepPositions)
+    Stop-ManageDragReflow -KeepPositions:$KeepPositions
     Set-ManageDropPreview -Decision $null
     $script:ManageActiveDragGuid = $null
     $script:ManageDragGuid = $null
@@ -53,6 +255,7 @@ function Paint-ManageDropCue {
         try { $Graphics.DrawRectangle($pen,1,1,[Math]::Max(1,$Row.Width-3),[Math]::Max(1,$Row.Height-3)) }
         finally { $pen.Dispose() }
     }
+    if ($script:ManageDragLayout) { return } # Full-height gap replaces the old red line.
     $cue = $script:ManageDropPreview
     if (-not $cue -or $cue.TargetGuid -ne $guid) { return }
     $thickness = [Math]::Max(3,[int][Math]::Round($Row.Height/20.0))
@@ -138,7 +341,7 @@ function New-BootEntryInteractionHandlers {
         $script:ManageLastDragUtc = [datetime]::UtcNow
         $script:ManageActiveDragGuid = ([string]$guid).ToLowerInvariant()
         $sourceRow = Get-BootRowFromControl $sender
-        if ($sourceRow) { $sourceRow.Invalidate() }
+        if ($sourceRow) { Start-ManageDragReflow -SourceRow $sourceRow }
         try { [void]$sender.DoDragDrop($guid, [System.Windows.Forms.DragDropEffects]::Move) }
         catch { }
         finally { Reset-ManageDragPreview }
@@ -152,6 +355,7 @@ function New-BootEntryInteractionHandlers {
         if ($guid -ne $script:ManageActiveDragGuid) { Set-ManageDropPreview -Decision $null; return }
         $decision = Get-ManageDropDecision -Control $sender -ScreenPoint ([Drawing.Point]::new($eventArgs.X,$eventArgs.Y)) -MovedGuid $guid
         Set-ManageDropPreview -Decision $decision
+        if ($script:ManageDragLayout) { Set-ManageDragFloatLocation -ScreenPoint ([Drawing.Point]::new($eventArgs.X,$eventArgs.Y)) }
         if ($decision) { $eventArgs.Effect = [System.Windows.Forms.DragDropEffects]::Move }
     }
     $dragEnterHandler = $dragOverHandler
@@ -172,10 +376,23 @@ function New-BootEntryInteractionHandlers {
         $decision = Get-ManageDropDecision -Control $sender -ScreenPoint ([Drawing.Point]::new($eventArgs.X,$eventArgs.Y)) -MovedGuid $guid
         if (-not $decision) { Reset-ManageDragPreview; return }
         $movedGuid = $decision.MovedGuid
-        $targetRow = Get-BootRowFromControl $sender
+        $targetRow = $null
+        if ($script:ManageDragLayout) {
+            $targetSlot = $script:ManageDragLayout | Where-Object { $_.Guid -eq $decision.TargetGuid } | Select-Object -First 1
+            if ($targetSlot) { $targetRow = $targetSlot.Row }
+        }
+        else {
+            $targetRow = Get-BootRowFromControl $sender
+        }
+        if (-not $targetRow -or $targetRow.IsDisposed -or ([string]$targetRow.Tag).ToLowerInvariant() -ne $decision.TargetGuid) {
+            Reset-ManageDragPreview
+            return
+        }
         $after = $decision.After
         Move-ManageEntry -MovedGuid $movedGuid -TargetGuid ([string]$targetRow.Tag) -After:$after
-        Reset-ManageDragPreview
+        # The rows already occupy their preview positions; do not briefly snap
+        # them back to the obsolete order before the committed render.
+        Reset-ManageDragPreview -KeepPositions
         $script:ManageLastDragUtc = [datetime]::UtcNow
         $script:LastStatusText = Get-LocalizedString -Key 'Manage.OrderChanged'
         Update-PopupRows
