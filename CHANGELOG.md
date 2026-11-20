@@ -1,5 +1,13 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.3.3.0 – Stable popup header and more balanced typography (LBS-174)
+
+- Keep the Lenovo Boot Selector title at one fixed design-space position across background refresh, idle, maintenance Busy and available-update states instead of shifting it vertically by nine pixels as status visibility changes.
+- Rebalance the existing fixed 390×60 WinForms header as a two-line layout: a larger 11.5 pt Segoe UI Bold title at (16,8) and 8.25 pt status text at (16,36). Reserve the secondary row even while the transient status is hidden, without moving the title; preserve update notification, keyboard/click action and refresh control.
+- Historical comparison: v0.2.29 explicitly introduced moving the title for transient status; v0.2.17 describes a more spacious design but does not document exact earlier point sizes. The new sizes are a reviewed design improvement, not a claimed exact historical restoration.
+- Add 44 isolated native Windows PowerShell 5.1 WinForms header checks for status transitions, title identity, German/English text, 100%/250% DPI geometry, physical font fit, update-interaction state, and fresh popup creation. Confirm the focused title-jump regression RED on unfixed v1.3.2.0 before applying this fix.
+- Keep the existing LBS-144, LBS-167 and LBS-171 UI checks and their single-pass DPI baselines, with the header-only synthetic fixtures brought into parity. No firmware, BootOrder/BootNext, privileged TaskBroker, settings, USB mapping, updater or Diagnostics Worker changes. Physical Lenovo visual acceptance at relevant DPI remains owner-required.
+
 
 ## v1.3.2.0 – Preserve boot rows during cold-start storage metadata enrichment (LBS-171)
 

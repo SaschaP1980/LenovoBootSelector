@@ -89,3 +89,9 @@ if ($LASTEXITCODE -ne 0) { throw 'LBS-157 Manage Entries viewport regression fai
 $refreshRowsProbe = Join-Path $root 'tests\Test-LBS167-RefreshRendering.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $refreshRowsProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-167 popup refresh/drag regression failed' }
+
+# LBS-174: isolate real WinForms header typography, refresh/update/Busy states and mixed DPI.
+$headerProbe = Join-Path $root 'tests\Test-LBS174-HeaderStability.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $headerProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-174 native popup header regression failed' }
+
