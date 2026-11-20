@@ -1,6 +1,13 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.3.1.0 – Make Manage Entries reorder handle optically consistent (LBS-166)
+
+- Replace the undersized font-dependent reorder symbol with three antialiased, round-ended strokes sized from the WinForms paint-surface DPI, with a visual footprint comparable to the neighboring eye and pencil.
+- Preserve the exact 26x34 design hit area, column alignment, neutral color, drag cursor, drop handlers, live reorder animation and Save/Cancel behavior.
+- Add six-scale (100–300%) geometry checks and 100%/250% raster coverage, including actual native WinForms Paint and grip interaction contracts; retain all previous LBS-144/163/167 regression gates.
+- Do not change firmware, BootOrder, persistence, privileged TaskBroker, updater, Diagnostics Worker or unrelated layout. Physical Lenovo visual acceptance remains separate.
+
 ## v1.3.0.0 – Stable boot-target presentation and refresh-safe Manage Entries drag (LBS-167)
 
 - Compare canonical display-relevant entry metadata, aliases, hidden state, order, selection, translations and DPI before rebuilding WinForms boot rows; skip a destructive redraw when firmware refresh data is unchanged.

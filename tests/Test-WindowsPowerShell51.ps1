@@ -75,6 +75,11 @@ $eyeGlyphProbe = Join-Path $root 'tests\Test-LBS144-ManageEyeDpi.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $eyeGlyphProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-144 visibility eye/refresh DPI regression failed' }
 
+# LBS-166: owner-drawn reorder grip DPI, ink and interaction contract.
+$gripGlyphProbe = Join-Path $root 'tests\Test-LBS166-ManageGripDpi.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $gripGlyphProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-166 Manage Entries grip DPI regression failed' }
+
 # LBS-157: real WinForms Manage Entries viewport across six DPI scales.
 $manageViewportProbe = Join-Path $root 'tests\Test-LBS157-ManageViewport.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $manageViewportProbe

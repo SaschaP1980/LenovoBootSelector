@@ -2225,7 +2225,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.3.0.0'
+$script:AppVersion = '1.3.1.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -9929,6 +9929,63 @@ function Get-LenovoManageEyeGlyphGeometry {
     }
 }
 
+# LBS-166: draw the reorder affordance at paint-surface DPI, not font size.
+# Preserve its existing 26x34 design-unit hit area.
+function Get-LenovoManageGripGlyphGeometry {
+    param(
+        [Parameter(Mandatory=$true)][Drawing.Size]$ClientSize,
+        [Parameter(Mandatory=$true)][double]$Dpi
+    )
+    if ($ClientSize.Width -lt 1 -or $ClientSize.Height -lt 1) {
+        throw 'Reorder grip requires positive client dimensions.'
+    }
+    $scale = if ($Dpi -gt 0) { [Math]::Min(5.0,[Math]::Max(1.0,$Dpi / 96.0)) } else { 1.0 }
+    $margin = [Math]::Max(1,[int][Math]::Round(2.0 * $scale,[MidpointRounding]::AwayFromZero))
+    $width = [Math]::Min(
+        [Math]::Max(1,$ClientSize.Width - 2 * $margin),
+        [Math]::Max(1,[int][Math]::Round(18.0 * $scale,[MidpointRounding]::AwayFromZero)))
+    $stroke = [single][Math]::Min(2.4 * $scale,[double]$width)
+    $span = [Math]::Min(
+        [Math]::Max(0,$ClientSize.Height - 2 * $margin - [int][Math]::Ceiling($stroke)),
+        [Math]::Max(0,[int][Math]::Round(12.0 * $scale,[MidpointRounding]::AwayFromZero)))
+    $centerX = ($ClientSize.Width - 1) / 2.0
+    $centerY = ($ClientSize.Height - 1) / 2.0
+    $halfLine = ($width - $stroke) / 2.0
+    return [pscustomobject]@{
+        Width = [int]$width
+        Span = [int]$span
+        Stroke = [single]$stroke
+        StartX = [single]($centerX - $halfLine)
+        EndX = [single]($centerX + $halfLine)
+        TopY = [single]($centerY - $span / 2.0)
+        MiddleY = [single]$centerY
+        BottomY = [single]($centerY + $span / 2.0)
+    }
+}
+
+function Paint-LenovoManageGripGlyph {
+    param(
+        [Parameter(Mandatory=$true)][Drawing.Graphics]$Graphics,
+        [Parameter(Mandatory=$true)][Drawing.Size]$ClientSize,
+        [Parameter(Mandatory=$true)][Drawing.Color]$Color
+    )
+    $geometry = Get-LenovoManageGripGlyphGeometry -ClientSize $ClientSize -Dpi $Graphics.DpiX
+    $smoothing = $Graphics.SmoothingMode
+    $pen = New-Object Drawing.Pen($Color,$geometry.Stroke)
+    try {
+        $pen.StartCap = [Drawing.Drawing2D.LineCap]::Round
+        $pen.EndCap = [Drawing.Drawing2D.LineCap]::Round
+        $Graphics.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        foreach ($y in @($geometry.TopY,$geometry.MiddleY,$geometry.BottomY)) {
+            $Graphics.DrawLine($pen,$geometry.StartX,[single]$y,$geometry.EndX,[single]$y)
+        }
+    }
+    finally {
+        $Graphics.SmoothingMode = $smoothing
+        $pen.Dispose()
+    }
+}
+
 function Add-ManageBootEntryControls {
     param(
         [Parameter(Mandatory=$true)]$Row,
@@ -10019,12 +10076,18 @@ $editAlias.Add_Click({
 })
 $row.Controls.Add($editAlias)
 
-$grip = New-Label -Text '≡' -Font (New-Object Drawing.Font('Segoe UI Symbol', 13, [Drawing.FontStyle]::Regular)) `
-    -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 350 -Y 12 -Width 26 -Height 34
+$grip = New-Object System.Windows.Forms.Panel
+$grip.Name = 'ManageReorderGrip'
 $grip.Tag = $entry.Guid
-$grip.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+$grip.Location = New-Object Drawing.Point(350, 12)
+$grip.Size = New-Object Drawing.Size(26, 34)
+$grip.BackColor = [Drawing.Color]::Transparent
 $grip.Cursor = [System.Windows.Forms.Cursors]::SizeAll
 $grip.AllowDrop = $true
+$grip.Add_Paint({
+    param($sender,$eventArgs)
+    Paint-LenovoManageGripGlyph -Graphics $eventArgs.Graphics -ClientSize $sender.ClientSize -Color ([Drawing.Color]::FromArgb(145,145,145))
+})
 $row.Controls.Add($grip)
 
 return @($row, $marker, $icon, $title, $subtitle, $state, $grip)
