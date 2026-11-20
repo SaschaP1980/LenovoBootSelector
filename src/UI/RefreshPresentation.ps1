@@ -16,7 +16,6 @@ function Set-HeaderUpdateInteractionState {
 function Update-HeaderRefreshStatus {
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     if ([string]$capabilities.State -eq 'Busy') {
-        if ($script:HeaderTitleLabel -and -not $script:HeaderTitleLabel.IsDisposed) { $script:HeaderTitleLabel.Location = New-Object Drawing.Point(16, 10) }
         if ($script:HeaderStatusLabel -and -not $script:HeaderStatusLabel.IsDisposed) {
             $script:HeaderStatusLabel.Text = Get-MaintenanceBusyStatusText
             $script:HeaderStatusLabel.Visible = $true
@@ -33,14 +32,8 @@ function Update-HeaderRefreshStatus {
     } catch { }
     $showStatus = ($active -or $updateAvailable)
 
-    if ($script:HeaderTitleLabel -and -not $script:HeaderTitleLabel.IsDisposed) {
-        $script:HeaderTitleLabel.Location = if ($showStatus) {
-            New-Object Drawing.Point(16, 10)
-        }
-        else {
-            New-Object Drawing.Point(16, 19)
-        }
-    }
+    # LBS-174: status may appear/disappear, but title geometry belongs only
+    # to Add-PopupHeaderSection and must not be mutated by refresh state.
 
     if ($script:HeaderStatusLabel -and -not $script:HeaderStatusLabel.IsDisposed) {
         $script:HeaderStatusLabel.Text = if ($active) {

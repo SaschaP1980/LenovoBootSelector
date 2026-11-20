@@ -31,15 +31,15 @@ try {
     $form.Controls.Add($rootPanel)
     $header = New-Object System.Windows.Forms.Label
     $header.Name = 'HeaderTitleLabel'
-    $header.Location = [Drawing.Point]::new(16,19)
-    $header.Size = [Drawing.Size]::new(285,22)
-    $header.Font = New-Object Drawing.Font('Segoe UI',10.2,[Drawing.FontStyle]::Bold)
+    $header.Location = [Drawing.Point]::new(16,8)
+    $header.Size = [Drawing.Size]::new(285,25)
+    $header.Font = New-Object Drawing.Font('Segoe UI',11.5,[Drawing.FontStyle]::Bold)
     $rootPanel.Controls.Add($header)
     Complete-PopupDpiLayout -Form $form -Scale 1.0
     Assert-TextHeightFit -Name '96 DPI header line fits design label' -Font $header.Font -MaxPixels $header.Height -Dpi ([single]96)
     [void](Set-PopupDpiLayoutScale -Form $form -Scale 2.5)
-    Assert-Lbs144FontFit '240 DPI popup geometry scaled' ($form.ClientSize.Width -eq 975 -and $header.Height -eq 55)
-    Assert-TextHeightFit -Name '240 DPI header line fits 55px label' -Font $header.Font -MaxPixels $header.Height -Dpi ([single]240)
+    Assert-Lbs144FontFit '240 DPI popup geometry scaled' ($form.ClientSize.Width -eq 975 -and $header.Height -eq 62)
+    Assert-TextHeightFit -Name '240 DPI header line fits 62px label' -Font $header.Font -MaxPixels $header.Height -Dpi ([single]240)
     $row = New-Object System.Windows.Forms.Panel
     $row.Size = [Drawing.Size]::new(390,60)
     $title = New-Object System.Windows.Forms.Label
