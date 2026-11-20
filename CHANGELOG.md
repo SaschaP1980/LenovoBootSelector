@@ -1,5 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.4.0.0 – Smooth Manage Entries drag reordering (LBS-172)
+
+- Capture the dragged row once into a full-size WinForms bitmap, including its pencil, eye, grip, title and other children. During the OLE drag, move only one disabled PictureBox visual while keeping the real row and its handlers parked; restore the original controls on drop/cancel. Retain the existing live-row path as a nonfatal fallback if the visual snapshot cannot be captured.
+- Keep a stable dashed full-height placeholder at the source/destination slot even for an invalid or no-op pointer target while the source is hidden; retain the restrained drag shadow without separately repainting the active source's children on every pointer movement.
+- Coalesce multiple DragOver insertion changes into one retarget per 16ms WinForms timer frame. Preserve the 150ms easing of neighboring rows, immutable drag-start slots and exact destination/index agreement; flush pending targets synchronously before committing a drop, so the visual never snaps back to an obsolete position.
+- Preserve stable row/control identities, the accepted Segoe UI Symbol 14pt pencil and unchanged 25×34 hit target, owner-drawn eye/grip size and behavior, hover/tooltip/edit controls, scroll and 100%/250% geometry. Keep the UI-only draft order until the existing explicit Save/Cancel path.
+- Add a permanent isolated native Windows PowerShell 5.1 regression for snapshot capture, pencil raster, target coalescing, rapid reversals, placeholder lifecycle, cancellation, successful destination parity, source/child identity, and safe disposal at 100%/250% DPI. The pre-fix first failure was verified as RED on v1.3.3.0 in Actions run 44749999390.
+- Collect only bounded per-drag visual counters through the existing opt-in runtime diagnostics; no per-pointer logging, GUID/alias leakage, settings write or privileged firmware operation. Keep BootNext, BootOrder, TaskBroker, storage discovery, updater and Diagnostics Worker unchanged. Owner visual acceptance on actual Lenovo hardware remains separate from CI.
+
 ## v1.3.3.0 – Stable popup header and more balanced typography (LBS-174)
 
 - Keep the Lenovo Boot Selector title at one fixed design-space position across background refresh, idle, maintenance Busy and available-update states instead of shifting it vertically by nine pixels as status visibility changes.
