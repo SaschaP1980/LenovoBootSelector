@@ -143,6 +143,8 @@ function Start-ManageEntriesMode {
     $script:ManageBaselineHiddenEntryGuids = @($script:ManageHiddenEntryGuids)
     $script:ManageBaselineEntryAliases = Copy-EntryAliasMap $script:ManageEntryAliases
     $script:ManageAliasEditGuid = $null
+    $script:ManageDropPreview = $null
+    $script:ManageActiveDragGuid = $null
     $script:IsManageEntriesMode = $true
     $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusEditing'
     Update-ManageEntriesUiState
@@ -153,6 +155,7 @@ function Start-ManageEntriesMode {
 function Stop-ManageEntriesMode {
     param([switch]$Save)
     if (-not $script:IsManageEntriesMode) { return }
+    Reset-ManageDragPreview
 
     if ($Save) {
         Commit-ActiveManageAliasEditor

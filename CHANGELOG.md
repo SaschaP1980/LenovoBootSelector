@@ -1,6 +1,13 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.2.2.0 – Preview Manage Entries drag destinations (LBS-163)
+
+- Show a live, DPI-scaled red between-row insertion cue while dragging a boot entry; outline the dragged source independently without intercepting hit-testing or rebuilding the list.
+- Share the exact row-half and resulting insertion-index decision between DragOver and DragDrop, including no-op, first/last, nested row controls and out-of-bounds rejection.
+- Clear transient drag visuals on cancellation, invalid drop, full row refresh and exit from Manage Entries. Keep the existing explicit save/cancel draft behavior; do not change BootNext, BootOrder or privileged TaskBroker operations.
+- Add focused native Windows PowerShell 5.1 destination/preview regression coverage. Native visual acceptance at 100% and 250% DPI remains a separate final check.
+
 ## v1.2.1.1 – Cold-start pending BootNext feedback (LBS-143)
 
 - Honor the first click on a known, authorized boot target while TaskBroker readiness is still Checking during the initial background refresh.

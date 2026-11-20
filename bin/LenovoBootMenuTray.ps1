@@ -2225,7 +2225,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.2.1.1'
+$script:AppVersion = '1.2.2.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -5625,6 +5625,8 @@ function Start-ManageEntriesMode {
     $script:ManageBaselineHiddenEntryGuids = @($script:ManageHiddenEntryGuids)
     $script:ManageBaselineEntryAliases = Copy-EntryAliasMap $script:ManageEntryAliases
     $script:ManageAliasEditGuid = $null
+    $script:ManageDropPreview = $null
+    $script:ManageActiveDragGuid = $null
     $script:IsManageEntriesMode = $true
     $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusEditing'
     Update-ManageEntriesUiState
@@ -5635,6 +5637,7 @@ function Start-ManageEntriesMode {
 function Stop-ManageEntriesMode {
     param([switch]$Save)
     if (-not $script:IsManageEntriesMode) { return }
+    Reset-ManageDragPreview
 
     if ($Save) {
         Commit-ActiveManageAliasEditor
@@ -9310,6 +9313,70 @@ function Write-PopupDpiLayoutDiagnostic {
 # Lenovo Boot Selector - boot-entry row presentation helpers.
 # LBS-29 separates row rendering and interaction responsibilities from list refresh orchestration.
 
+
+# LBS-163: shared candidate resolver for preview and committed drop.
+function Get-ManageDropDecision {
+    param($Control,[Drawing.Point]$ScreenPoint,[string]$MovedGuid)
+    if (-not $script:IsManageEntriesMode) { return $null }
+    $row = Get-BootRowFromControl $Control
+    if (-not $row -or $row.IsDisposed -or -not $row.Parent -or $row.Parent.Name -ne 'EntryContent') { return $null }
+    $point = $row.PointToClient($ScreenPoint)
+    if ($point.X -lt 0 -or $point.X -ge $row.Width -or $point.Y -lt 0 -or $point.Y -ge $row.Height) { return $null }
+    $moved = $MovedGuid.ToLowerInvariant()
+    $target = ([string]$row.Tag).ToLowerInvariant()
+    $order = @($script:ManageEntryOrder | ForEach-Object { ([string]$_).ToLowerInvariant() })
+    $originalIndex = [array]::IndexOf($order,$moved)
+    if ($originalIndex -lt 0 -or -not $target -or $target -eq $moved) { return $null }
+    $remaining = @($order | Where-Object { $_ -ne $moved })
+    $targetIndex = [array]::IndexOf($remaining,$target)
+    if ($targetIndex -lt 0) { return $null }
+    $after = $point.Y -gt ($row.Height / 2.0)
+    $index = $targetIndex + $(if ($after) { 1 } else { 0 })
+    if ($index -eq $originalIndex) { return $null }
+    return [pscustomobject]@{ MovedGuid=$moved; TargetGuid=$target; After=[bool]$after; InsertIndex=[int]$index }
+}
+function Set-ManageDropPreview {
+    param($Decision)
+    $prior = $script:ManageDropPreview
+    if ($prior -and $Decision -and $prior.TargetGuid -eq $Decision.TargetGuid -and $prior.After -eq $Decision.After) { return }
+    if (-not $prior -and -not $Decision) { return }
+    $script:ManageDropPreview = $Decision
+    if (-not $script:Popup -or $script:Popup.IsDisposed) { return }
+    foreach ($row in @($script:Popup.Controls.Find('BootRow',$true))) {
+        if (($prior -and [string]$row.Tag -eq $prior.TargetGuid) -or
+            ($Decision -and [string]$row.Tag -eq $Decision.TargetGuid)) { $row.Invalidate() }
+    }
+}
+function Reset-ManageDragPreview {
+    Set-ManageDropPreview -Decision $null
+    $script:ManageActiveDragGuid = $null
+    $script:ManageDragGuid = $null
+    if ($script:Popup -and -not $script:Popup.IsDisposed) {
+        foreach ($row in @($script:Popup.Controls.Find('BootRow',$true))) { $row.Invalidate() }
+    }
+}
+# Lightweight row-painted cue: no extra WinForms controls intercept pointer events.
+function Paint-ManageDropCue {
+    param($Row,$Graphics)
+    if (-not $script:IsManageEntriesMode) { return }
+    $guid = ([string]$Row.Tag).ToLowerInvariant()
+    if ($script:ManageActiveDragGuid -and $guid -eq $script:ManageActiveDragGuid) {
+        $pen = New-Object Drawing.Pen([Drawing.Color]::FromArgb(155,155,155),1.0)
+        try { $Graphics.DrawRectangle($pen,1,1,[Math]::Max(1,$Row.Width-3),[Math]::Max(1,$Row.Height-3)) }
+        finally { $pen.Dispose() }
+    }
+    $cue = $script:ManageDropPreview
+    if (-not $cue -or $cue.TargetGuid -ne $guid) { return }
+    $thickness = [Math]::Max(3,[int][Math]::Round($Row.Height/20.0))
+    $y = if ($cue.After) { $Row.Height-$thickness } else { 0 }
+    $brush = New-Object Drawing.SolidBrush($script:ColorAccent)
+    try {
+        $Graphics.FillRectangle($brush,0,$y,$Row.Width,$thickness)
+        $Graphics.FillRectangle($brush,0,[Math]::Max(0,$y-$thickness),[Math]::Max(6,$thickness*2),[Math]::Min($Row.Height,$thickness*3))
+    }
+    finally { $brush.Dispose() }
+}
+
 function New-BootEntryInteractionHandlers {
     $clickHandler = {
         param($sender, $eventArgs)
@@ -9381,26 +9448,46 @@ function New-BootEntryInteractionHandlers {
         $guid = $script:ManageDragGuid
         $script:ManageDragGuid = $null
         $script:ManageLastDragUtc = [datetime]::UtcNow
-        try { [void]$sender.DoDragDrop($guid, [System.Windows.Forms.DragDropEffects]::Move) } catch { }
+        $script:ManageActiveDragGuid = ([string]$guid).ToLowerInvariant()
+        $sourceRow = Get-BootRowFromControl $sender
+        if ($sourceRow) { $sourceRow.Invalidate() }
+        try { [void]$sender.DoDragDrop($guid, [System.Windows.Forms.DragDropEffects]::Move) }
+        catch { }
+        finally { Reset-ManageDragPreview }
     }
-    $dragEnterHandler = {
-        param($sender, $eventArgs)
-        if ($script:IsManageEntriesMode -and $eventArgs.Data.GetDataPresent([string])) {
-            $eventArgs.Effect = [System.Windows.Forms.DragDropEffects]::Move
-        }
-        else {
-            $eventArgs.Effect = [System.Windows.Forms.DragDropEffects]::None
-        }
+    $dragOverHandler = {
+        param($sender,$eventArgs)
+        $eventArgs.Effect = [System.Windows.Forms.DragDropEffects]::None
+        if (-not $script:IsManageEntriesMode -or -not $script:ManageActiveDragGuid -or
+            -not $eventArgs.Data.GetDataPresent([string])) { Set-ManageDropPreview -Decision $null; return }
+        $guid = ([string]$eventArgs.Data.GetData([string])).ToLowerInvariant()
+        if ($guid -ne $script:ManageActiveDragGuid) { Set-ManageDropPreview -Decision $null; return }
+        $decision = Get-ManageDropDecision -Control $sender -ScreenPoint ([Drawing.Point]::new($eventArgs.X,$eventArgs.Y)) -MovedGuid $guid
+        Set-ManageDropPreview -Decision $decision
+        if ($decision) { $eventArgs.Effect = [System.Windows.Forms.DragDropEffects]::Move }
+    }
+    $dragEnterHandler = $dragOverHandler
+    $dragLeaveHandler = {
+        param($sender,$eventArgs)
+        if (-not $script:Popup -or $script:Popup.IsDisposed) { Reset-ManageDragPreview; return }
+        $matches = @($script:Popup.Controls.Find('EntryList',$true))
+        if ($matches.Count -eq 0) { Set-ManageDropPreview -Decision $null; return }
+        $point = $matches[0].PointToClient([System.Windows.Forms.Control]::MousePosition)
+        if (-not $matches[0].ClientRectangle.Contains($point)) { Set-ManageDropPreview -Decision $null }
     }
     $dragDropHandler = {
-        param($sender, $eventArgs)
-        if (-not $script:IsManageEntriesMode -or -not $eventArgs.Data.GetDataPresent([string])) { return }
-        $movedGuid = [string]$eventArgs.Data.GetData([string])
+        param($sender,$eventArgs)
+        if (-not $script:IsManageEntriesMode -or -not $script:ManageActiveDragGuid -or
+            -not $eventArgs.Data.GetDataPresent([string])) { Reset-ManageDragPreview; return }
+        $guid = ([string]$eventArgs.Data.GetData([string])).ToLowerInvariant()
+        if ($guid -ne $script:ManageActiveDragGuid) { Reset-ManageDragPreview; return }
+        $decision = Get-ManageDropDecision -Control $sender -ScreenPoint ([Drawing.Point]::new($eventArgs.X,$eventArgs.Y)) -MovedGuid $guid
+        if (-not $decision) { Reset-ManageDragPreview; return }
+        $movedGuid = $decision.MovedGuid
         $targetRow = Get-BootRowFromControl $sender
-        if (-not $targetRow) { return }
-        $point = $targetRow.PointToClient((New-Object Drawing.Point($eventArgs.X, $eventArgs.Y)))
-        $after = ($point.Y -gt ($targetRow.Height / 2))
+        $after = $decision.After
         Move-ManageEntry -MovedGuid $movedGuid -TargetGuid ([string]$targetRow.Tag) -After:$after
+        Reset-ManageDragPreview
         $script:ManageLastDragUtc = [datetime]::UtcNow
         $script:LastStatusText = Get-LocalizedString -Key 'Manage.OrderChanged'
         Update-PopupRows
@@ -9414,6 +9501,8 @@ function New-BootEntryInteractionHandlers {
         MouseDown = $mouseDownHandler
         MouseMove = $mouseMoveHandler
         DragEnter = $dragEnterHandler
+        DragOver = $dragOverHandler
+        DragLeave = $dragLeaveHandler
         DragDrop = $dragDropHandler
     }
 }
@@ -9753,6 +9842,8 @@ function Connect-BootEntryRowInteractions {
     $mouseDownHandler = $Handlers.MouseDown
     $mouseMoveHandler = $Handlers.MouseMove
     $dragEnterHandler = $Handlers.DragEnter
+    $dragOverHandler = $Handlers.DragOver
+    $dragLeaveHandler = $Handlers.DragLeave
     $dragDropHandler = $Handlers.DragDrop
 
 foreach ($control in $RowControls) {
@@ -9764,6 +9855,8 @@ foreach ($control in $RowControls) {
         $control.Add_MouseDown($mouseDownHandler)
         $control.Add_MouseMove($mouseMoveHandler)
         $control.Add_DragEnter($dragEnterHandler)
+        $control.Add_DragOver($dragOverHandler)
+        $control.Add_DragLeave($dragLeaveHandler)
         $control.Add_DragDrop($dragDropHandler)
     }
 }
@@ -9789,6 +9882,7 @@ $row.Size = New-Object Drawing.Size(390, $rowHeight)
 $row.BackColor = $script:ColorRow
 $row.Cursor = if ($aliasEditActive) { [System.Windows.Forms.Cursors]::Default } else { [System.Windows.Forms.Cursors]::Hand }
 $row.AllowDrop = ($script:IsManageEntriesMode -and -not $aliasEditActive)
+if ($script:IsManageEntriesMode) { $row.Add_Paint({ param($sender,$eventArgs) Paint-ManageDropCue -Row $sender -Graphics $eventArgs.Graphics }) }
 
 $isHidden = $script:IsManageEntriesMode -and (Test-ManageEntryHidden -Guid $entry.Guid)
 $rowDisplay = if ($script:IsManageEntriesMode) { 'idle' } else { Resolve-BootNextRowDisplayCore -EntryGuid $entry.Guid -ConfirmedGuid $script:SelectedGuid -PendingGuid $script:BootNextPendingGuid }
@@ -10012,6 +10106,7 @@ function Update-PopupRows {
     $statusLabel = if ($statusMatches.Count -gt 0) { $statusMatches[0] } else { $null }
     if (-not $listPanel -or -not $contentPanel) { return }
 
+    if ($script:ManageActiveDragGuid) { Reset-ManageDragPreview }
     # Apply the current mode/DPI viewport before computing content and scroll range.
     Update-ManageEntriesUiState
 
