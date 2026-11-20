@@ -9,7 +9,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $script:CurrentStep = 'init'
-$version = '0.2.15'
+$version = '0.2.16'
 $taskPrefix = 'LenovoBootSelector-Set-'
 $defaultTaskPrefix = 'LenovoBootSelector-Default-Set-'
 $managerRefreshTask = 'LenovoBootSelector-RefreshManager'
@@ -468,12 +468,21 @@ function Register-FixedSystemTask {
 function Test-CanonicalTaskTriggerXml {
     param(
         [Parameter(Mandatory=$true)][AllowEmptyString()][string]$TaskXml,
-        [AllowEmptyString()][string]$StartupDelay = ''
+        [AllowEmptyString()][string]$StartupDelay = '',
+        [switch]$StartupWithoutDelay
     )
 
     try {
         [xml]$xml = $TaskXml
         $triggerNodes = @($xml.SelectNodes("/*[local-name()='Task']/*[local-name()='Triggers']/*"))
+
+        if ($StartupWithoutDelay) {
+            if (-not [string]::IsNullOrWhiteSpace($StartupDelay)) { return $false }
+            if ($triggerNodes.Count -ne 1) { return $false }
+            if ([string]$triggerNodes[0].LocalName -ne 'BootTrigger') { return $false }
+            # An explicit PT0S child is not the canonical no-delay contract.
+            return ($null -eq $triggerNodes[0].SelectSingleNode("./*[local-name()='Delay']"))
+        }
 
         if ([string]::IsNullOrWhiteSpace($StartupDelay)) {
             return ($triggerNodes.Count -eq 0)
@@ -556,7 +565,7 @@ function Assert-CanonicalTaskSpec {
     }
 
     $task = (Get-ScheduleRootFolder).GetTask("\$($Spec.Name)")
-    if (-not (Test-CanonicalTaskTriggerXml -TaskXml ([string]$task.Xml) -StartupDelay ([string]$Spec.StartupDelay))) {
+    if (-not (Test-CanonicalTaskTriggerXml -TaskXml ([string]$task.Xml) -StartupDelay ([string]$Spec.StartupDelay) -StartupWithoutDelay:([bool]$Spec.StartupWithoutDelay))) {
         throw "Task trigger contract mismatch: $($Spec.Name)"
     }
 
@@ -579,13 +588,14 @@ function Assert-CanonicalTaskSpec {
 function Assert-CanonicalTaskBrokerMetadata {
     if (-not (Test-Path -LiteralPath $metadataFile -PathType Leaf)) { throw 'Canonical TaskBroker metadata is missing.' }
     $meta = ([System.IO.File]::ReadAllText($metadataFile,[System.Text.Encoding]::UTF8) | ConvertFrom-Json)
-    if ([string]$meta.version -ne '0.2.15') { throw 'Canonical metadata version mismatch.' }
+    if ([string]$meta.version -ne '0.2.16') { throw 'Canonical metadata version mismatch.' }
     if ([string]$meta.boundaryContract -ne 'fixed-task-v2') { throw 'Canonical metadata boundary contract mismatch.' }
     if ([string]$meta.userSid -ne $UserSid) { throw 'Canonical metadata user SID mismatch.' }
     if ([string]$meta.managerRefreshTask -ne $managerRefreshTask) { throw 'Canonical manager task mismatch.' }
     if ([string]$meta.firmwareRefreshTask -ne $firmwareRefreshTask) { throw 'Canonical firmware task mismatch.' }
     if ([string]$meta.defaultClearTask -ne $defaultClearTask) { throw 'Canonical default-clear task mismatch.' }
     if ([string]$meta.defaultRestoreTask -ne $defaultRestoreTask) { throw 'Canonical default-restore task mismatch.' }
+    if ($null -eq $meta.PSObject.Properties['defaultRestoreDelaySeconds'] -or [int]$meta.defaultRestoreDelaySeconds -ne 0) { throw 'Canonical default-restore delay metadata mismatch.' }
     if (-not [string]::Equals([System.IO.Path]::GetFullPath([string]$meta.bootNextOriginFile),[System.IO.Path]::GetFullPath($bootNextOriginFile),[System.StringComparison]::OrdinalIgnoreCase)) { throw 'Canonical origin path mismatch.' }
 
     foreach ($pair in @(
@@ -1021,12 +1031,11 @@ function New-CoordinatedBootAction {
 
     Set-Step 'register-default-restore-disabled'
     $startupTrigger = New-ScheduledTaskTrigger -AtStartup
-    $startupTrigger.Delay = 'PT30S'
     $restoreAction = New-CoordinatedBootAction -Operation 'DefaultRestore'
     Register-FixedSystemTask -TaskName $defaultRestoreTask -Action $restoreAction -Trigger $startupTrigger -SerializedWriter -ReplaceDefinition
     Disable-ScheduledTask -TaskName $defaultRestoreTask -ErrorAction Stop | Out-Null
-    $taskSpecs += [pscustomobject]@{ Name=$defaultRestoreTask; Execute=$powershell; Arguments=[string]$restoreAction.Arguments; StartupDelay='PT30S'; SerializedWriter=$true }
-    Write-InstallLog 'Canonical default restore registered with AtStartup + PT30S and temporarily disabled.'
+    $taskSpecs += [pscustomobject]@{ Name=$defaultRestoreTask; Execute=$powershell; Arguments=[string]$restoreAction.Arguments; StartupDelay=''; StartupWithoutDelay=$true; SerializedWriter=$true }
+    Write-InstallLog 'Canonical default restore registered with AtStartup and no configured Delay; temporarily disabled.'
 
     Set-Step 'persist-initial-default'
     if ($initialDefault) {
@@ -1055,7 +1064,7 @@ function New-CoordinatedBootAction {
         bootNextOriginFile = $bootNextOriginFile
         defaultClearTask = $defaultClearTask
         defaultRestoreTask = $defaultRestoreTask
-        defaultRestoreDelaySeconds = 30
+        defaultRestoreDelaySeconds = 0
         targets = $targets
     }
     $metadata | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $metadataFile -Encoding UTF8
