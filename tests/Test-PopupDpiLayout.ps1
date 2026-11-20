@@ -35,9 +35,9 @@ try {
     $form.Controls.Add($rootPanel)
     $header = New-Object System.Windows.Forms.Label
     $header.Text = 'Lenovo Boot Selector'
-    $header.Location = [Drawing.Point]::new(16,19)
-    $header.Size = [Drawing.Size]::new(285,22)
-    $header.Font = New-Object Drawing.Font('Segoe UI',10.2,[Drawing.FontStyle]::Bold)
+    $header.Location = [Drawing.Point]::new(16,8)
+    $header.Size = [Drawing.Size]::new(285,25)
+    $header.Font = New-Object Drawing.Font('Segoe UI',11.5,[Drawing.FontStyle]::Bold)
     $rootPanel.Controls.Add($header)
     $restart = New-Object System.Windows.Forms.Button
     $restart.Location = [Drawing.Point]::new(16,593)
@@ -57,7 +57,7 @@ try {
     Assert-PopupDpi '100%-250% monitor transition observed' $changed
     Assert-PopupDpi 'Native 250% is applied monitor scale' ([Math]::Abs([double]$form.Tag - 2.5) -lt .001)
     Assert-PopupDpi 'Native 250% scales physical form client' ($form.ClientSize.Width -eq 975 -and $form.ClientSize.Height -eq 1680)
-    Assert-PopupDpi 'Native 250% scales header bounds' ($header.Width -ge 712 -and $header.Height -ge 55)
+    Assert-PopupDpi 'Native 250% scales header bounds' ($header.Width -ge 712 -and $header.Height -ge 62)
     Assert-PopupDpi 'Native 250% preserves typographic point font' ($header.Font.Height -eq $fontHeight)
     Assert-PopupDpi 'New boot rows use live physical scale' ([Math]::Abs((Get-PopupDpiLayoutScale -Popup $form)-2.5) -lt .001)
     Assert-PopupDpi 'Same-monitor placement is idempotent' (-not (Set-PopupDpiLayoutScale -Form $form -Scale 2.5))

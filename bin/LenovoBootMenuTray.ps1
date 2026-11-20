@@ -2225,7 +2225,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.3.2.0'
+$script:AppVersion = '1.3.3.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -3282,7 +3282,6 @@ function Set-HeaderUpdateInteractionState {
 function Update-HeaderRefreshStatus {
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     if ([string]$capabilities.State -eq 'Busy') {
-        if ($script:HeaderTitleLabel -and -not $script:HeaderTitleLabel.IsDisposed) { $script:HeaderTitleLabel.Location = New-Object Drawing.Point(16, 10) }
         if ($script:HeaderStatusLabel -and -not $script:HeaderStatusLabel.IsDisposed) {
             $script:HeaderStatusLabel.Text = Get-MaintenanceBusyStatusText
             $script:HeaderStatusLabel.Visible = $true
@@ -3299,14 +3298,8 @@ function Update-HeaderRefreshStatus {
     } catch { }
     $showStatus = ($active -or $updateAvailable)
 
-    if ($script:HeaderTitleLabel -and -not $script:HeaderTitleLabel.IsDisposed) {
-        $script:HeaderTitleLabel.Location = if ($showStatus) {
-            New-Object Drawing.Point(16, 10)
-        }
-        else {
-            New-Object Drawing.Point(16, 19)
-        }
-    }
+    # LBS-174: status may appear/disappear, but title geometry belongs only
+    # to Add-PopupHeaderSection and must not be mutated by refresh state.
 
     if ($script:HeaderStatusLabel -and -not $script:HeaderStatusLabel.IsDisposed) {
         $script:HeaderStatusLabel.Text = if ($active) {
@@ -10834,15 +10827,15 @@ function Load-BootStateFromExistingCache {
 function Add-PopupHeaderSection {
     param([Parameter(Mandatory=$true)]$Root)
 
-    # v0.2.29: compact brand header. No decorative status dot and no permanent
-    # subtitle. A status line appears only while the background refresh is active.
+    # LBS-174: fixed two-line header geometry. A reserved status row remains
+    # in place even when no status is visible; the brand title never moves.
     $header = New-Object System.Windows.Forms.Panel
     $header.Location = New-Object Drawing.Point(0, 0)
     $header.Size = New-Object Drawing.Size(390, 60)
     $header.BackColor = $script:ColorHeader
 
-    $headerTitle = New-Label -Text 'Lenovo Boot Selector' -Font (New-Object Drawing.Font('Segoe UI', 10.2, [Drawing.FontStyle]::Bold)) `
-        -ForeColor $script:ColorAccent -X 16 -Y 19 -Width 285 -Height 22
+    $headerTitle = New-Label -Text 'Lenovo Boot Selector' -Font (New-Object Drawing.Font('Segoe UI', 11.5, [Drawing.FontStyle]::Bold)) `
+        -ForeColor $script:ColorAccent -X 16 -Y 8 -Width 285 -Height 25
     $headerTitle.Name = 'HeaderTitleLabel'
     $script:HeaderTitleLabel = $headerTitle
     $header.Controls.Add($headerTitle)
@@ -10851,7 +10844,7 @@ function Add-PopupHeaderSection {
     # providing native Enter/Space activation and keyboard focus semantics.
     $headerSub = New-Object System.Windows.Forms.Button
     $headerSub.Text = ''
-    $headerSub.Font = New-Object Drawing.Font('Segoe UI', 7.8, [Drawing.FontStyle]::Regular)
+    $headerSub.Font = New-Object Drawing.Font('Segoe UI', 8.25, [Drawing.FontStyle]::Regular)
     $headerSub.ForeColor = $script:ColorSecondary
     $headerSub.BackColor = $script:ColorHeader
     $headerSub.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
@@ -10861,8 +10854,8 @@ function Add-PopupHeaderSection {
     $headerSub.UseVisualStyleBackColor = $false
     $headerSub.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
     $headerSub.Padding = New-Object System.Windows.Forms.Padding(0)
-    $headerSub.Location = New-Object Drawing.Point(13, 28)
-    $headerSub.Size = New-Object Drawing.Size(300, 21)
+    $headerSub.Location = New-Object Drawing.Point(16, 36)
+    $headerSub.Size = New-Object Drawing.Size(300, 18)
     $headerSub.TabStop = $false
     $headerSub.Cursor = [System.Windows.Forms.Cursors]::Default
     $headerSub.Name = 'HeaderStatusLabel'
