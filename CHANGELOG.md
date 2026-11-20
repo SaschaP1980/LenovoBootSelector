@@ -1,6 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.3.2.0 – Preserve boot rows during cold-start storage metadata enrichment (LBS-171)
+
+- Reconcile title, subtitle and raw-description enrichment against stable boot-target GUIDs and order by updating the existing WinForms title/subtitle controls in place, without clearing the list, replacing row handles, or disturbing scroll position.
+- Require exact mode, selection/pending state, localization, DPI, row structure and inactive drag/alias-editor context before taking the text-only path; preserve keyed reconciliation for actual firmware-target, icon, visibility, alias, mode or layout changes.
+- Extend presentation diagnostics to distinguish `updatedInPlaceCount` and `rebuiltEntryCount` while retaining SHA-256-only fingerprints and `affectedEntryCount`. Nonvisual-only enrichment can skip visual row updates.
+- Add permanent native Windows PowerShell 5.1 WinForms coverage for cold-start empty-to-populated state, metadata-only row/label identity, real row text updates, target add/remove, visibility, selection, drag/editor deferral and DPI. Focused test-first RED was confirmed on the unmodified product source in Actions run 44730812740.
+- No changes to BootOrder, BootNext authorization, privileged TaskBroker, storage persistence, USB-detection architecture, updater or Diagnostics Worker. Physical Lenovo visual acceptance at 100%/250% DPI remains owner-required.
+
 ## v1.3.1.1 – Improve Manage Entries pencil optical size (LBS-166)
 
 - Increase only the alias-edit pencil glyph from 12.0 pt to 14.0 pt (+16.7% nominal) in Segoe UI Symbol so its visual prominence better matches the already accepted eye and owner-drawn reorder grip.
