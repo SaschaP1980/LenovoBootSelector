@@ -115,13 +115,36 @@ function Get-PopupRowsPresentationState {
     }
     $identity = ConvertTo-Json -InputObject $presentation -Depth 6 -Compress
     $rowSignatures = @{}
+    $rowStructureSignatures = @{}
     foreach ($row in $rows.ToArray()) {
         $rowSignatures[[string]$row.guid] = ConvertTo-Json -InputObject ([ordered]@{
             manage = $manage
             localized = $localized
             row = $row
         }) -Depth 6 -Compress
+        # Title, subtitle, raw description and computed display title are text-only.
+        $rowStructureSignatures[[string]$row.guid] = ConvertTo-Json -InputObject ([ordered]@{
+            manage = $manage
+            localized = $localized
+            guid = $row.guid
+            symbol = $row.symbol
+            typeTooltip = $row.typeTooltip
+            accent = $row.accent
+            alias = $row.alias
+            hidden = $row.hidden
+            selected = $row.selected
+            pending = $row.pending
+            editing = $row.editing
+        }) -Depth 6 -Compress
     }
+    $globalSignature = ConvertTo-Json -InputObject ([ordered]@{
+        scale = $presentation.scale
+        manage = $presentation.manage
+        selectedGuid = $presentation.selectedGuid
+        pendingGuid = $presentation.pendingGuid
+        aliasEditGuid = $presentation.aliasEditGuid
+        localized = $localized
+    }) -Depth 6 -Compress
     $hash = [Security.Cryptography.SHA256]::Create()
     try {
         $fingerprint = ([BitConverter]::ToString($hash.ComputeHash([Text.Encoding]::UTF8.GetBytes($identity)))).Replace('-', '')
@@ -133,6 +156,8 @@ function Get-PopupRowsPresentationState {
         Entries = $entries
         EntryCount = $entries.Count
         RowSignatures = $rowSignatures
+        RowStructureSignatures = $rowStructureSignatures
+        GlobalSignature = $globalSignature
         Mode = $manage
         Scale = $Scale
     }
@@ -150,7 +175,8 @@ function Update-PopupRowsPeripheralUi {
 function Write-PopupRowsRenderDiagnostic {
     param([string]$Reason, [string]$Before, [string]$After, [int]$EntryCount,
           [bool]$ActiveDrag, [bool]$Skipped, [bool]$Deferred,
-          [int]$AffectedCount = 0, [bool]$LayoutUpdated = $false)
+          [int]$AffectedCount = 0, [bool]$LayoutUpdated = $false,
+          [int]$RebuiltCount = 0, [int]$UpdatedInPlaceCount = 0)
     try {
         Write-RuntimeDiagnosticEvent -Event 'POPUP_ROWS_PRESENTATION' -Stage 'presentation' -Success $true -Data (New-RuntimeDiagnosticData @{
             reason = $Reason
@@ -158,14 +184,67 @@ function Write-PopupRowsRenderDiagnostic {
             afterFingerprint = $After
             entryCount = $EntryCount
             affectedEntryCount = $AffectedCount
+            updatedInPlaceCount = $UpdatedInPlaceCount
+            rebuiltEntryCount = $RebuiltCount
             layoutUpdated = $LayoutUpdated
             activeDrag = $ActiveDrag
             skipped = $Skipped
             deferred = $Deferred
-            rebuilt = (-not $Skipped -and -not $Deferred -and $AffectedCount -gt 0)
+            rebuilt = (-not $Skipped -and -not $Deferred -and $RebuiltCount -gt 0)
         })
     }
     catch { Write-Verbose 'Popup row presentation diagnostic unavailable.' }
+}
+
+function Save-PopupRowsRenderedSnapshot {
+    param($ListPanel,$ContentPanel,$Snapshot)
+    $script:PopupRowsContentPanel = $ContentPanel
+    $script:PopupRowsIdentity = $Snapshot.Identity
+    $script:PopupRowsFingerprint = $Snapshot.Fingerprint
+    $script:PopupRowsRowSignatures = $Snapshot.RowSignatures
+    $script:PopupRowsRowStructureSignatures = $Snapshot.RowStructureSignatures
+    $script:PopupRowsGlobalSignature = $Snapshot.GlobalSignature
+    $script:PopupRowsRenderedMode = $Snapshot.Mode
+    $script:PopupRowsRenderedScale = $Snapshot.Scale
+    $script:PopupRowsViewportHeight = $ListPanel.ClientSize.Height
+    $script:PopupRowsRenderedAliasEditGuid = if ($script:IsManageEntriesMode) { [string]$script:ManageAliasEditGuid } else { '' }
+}
+
+# -1 requests the existing keyed reconstruction path instead of text-only reuse.
+# Validate every visible row before modifying any control (all-or-nothing gate).
+function Invoke-PopupRowsTextReconciliation {
+    param($ListPanel,$ContentPanel,$Snapshot,[object[]]$ExistingRows)
+    if (-not [object]::ReferenceEquals($script:PopupRowsContentPanel,$ContentPanel) -or
+        ([bool]$script:PopupRowsRenderedMode -ne [bool]$Snapshot.Mode) -or
+        ([double]$script:PopupRowsRenderedScale -ne [double]$Snapshot.Scale) -or
+        ([string]$script:PopupRowsGlobalSignature -cne [string]$Snapshot.GlobalSignature) -or
+        ($script:PopupRowsRowSignatures -isnot [hashtable]) -or
+        ($script:PopupRowsRowStructureSignatures -isnot [hashtable]) -or
+        $ExistingRows.Count -ne $Snapshot.EntryCount -or
+        $script:PopupRowsViewportHeight -ne $ListPanel.ClientSize.Height) { return -1 }
+
+    $orderedRows = @($ExistingRows | Sort-Object Top)
+    for ($i = 0; $i -lt $Snapshot.EntryCount; $i++) {
+        $row = $orderedRows[$i]
+        $guid = ([string]$Snapshot.Entries[$i].Guid).ToLowerInvariant()
+        if ($row.IsDisposed -or ([string]$row.Tag).ToLowerInvariant() -cne $guid -or
+            -not $script:PopupRowsRowStructureSignatures.ContainsKey($guid) -or
+            -not $script:PopupRowsRowSignatures.ContainsKey($guid) -or
+            [string]$script:PopupRowsRowStructureSignatures[$guid] -cne [string]$Snapshot.RowStructureSignatures[$guid] -or
+            @($row.Controls.Find('BootTitleLabel',$false)).Count -ne 1 -or
+            @($row.Controls.Find('BootSubtitleLabel',$false)).Count -ne 1) { return -1 }
+    }
+
+    $updated = 0
+    for ($i = 0; $i -lt $Snapshot.EntryCount; $i++) {
+        $entry = $Snapshot.Entries[$i]
+        $guid = ([string]$entry.Guid).ToLowerInvariant()
+        if ([string]$script:PopupRowsRowSignatures[$guid] -cne [string]$Snapshot.RowSignatures[$guid]) {
+            if (Update-BootEntryRowText -Row $orderedRows[$i] -Entry $entry) { $updated++ }
+        }
+    }
+    Save-PopupRowsRenderedSnapshot -ListPanel $ListPanel -ContentPanel $ContentPanel -Snapshot $Snapshot
+    return [int]$updated
 }
 
 function Invoke-PopupRowsReconciliation {
@@ -252,14 +331,7 @@ function Invoke-PopupRowsReconciliation {
 
         Update-BootEntryScrollLayout -ListPanel $listPanel -ContentPanel $contentPanel -ScrollBar $scrollBar -ContentBottom $y -BaseRowHeight $scaledRowHeight -RowGap $rowGap
 
-        $script:PopupRowsContentPanel = $contentPanel
-        $script:PopupRowsIdentity = $snapshot.Identity
-        $script:PopupRowsFingerprint = $snapshot.Fingerprint
-        $script:PopupRowsRowSignatures = $snapshot.RowSignatures
-        $script:PopupRowsRenderedMode = $snapshot.Mode
-        $script:PopupRowsRenderedScale = $snapshot.Scale
-        $script:PopupRowsViewportHeight = $listPanel.ClientSize.Height
-        $script:PopupRowsRenderedAliasEditGuid = if ($script:IsManageEntriesMode) { [string]$script:ManageAliasEditGuid } else { '' }
+        Save-PopupRowsRenderedSnapshot -ListPanel $listPanel -ContentPanel $contentPanel -Snapshot $snapshot
     }
     finally { $contentPanel.ResumeLayout() }
     return [int]$affected
@@ -327,7 +399,18 @@ function Update-PopupRows {
         return
     }
 
+    $textUpdated = Invoke-PopupRowsTextReconciliation -ListPanel $listPanel -ContentPanel $contentPanel -Snapshot $snapshot -ExistingRows $existingRows
+    if ($textUpdated -ge 0) {
+        # A deferred drag/editor refresh is complete after successful in-place
+        # reconciliation. Clear the pending flags exactly as a full reconcile does.
+        $script:PopupRowsRefreshPending = $false
+        $script:PopupRowsViewportPending = $false
+        Update-PopupRowsPeripheralUi -StatusLabel $statusLabel
+        Write-PopupRowsRenderDiagnostic -Reason $Reason -Before $before -After $snapshot.Fingerprint -EntryCount $snapshot.EntryCount -ActiveDrag $activeDrag -Skipped ($textUpdated -eq 0) -Deferred $false -AffectedCount $textUpdated -UpdatedInPlaceCount $textUpdated
+        return
+    }
+
     $affected = Invoke-PopupRowsReconciliation -ListPanel $listPanel -ContentPanel $contentPanel -ScrollBar $scrollBar -Snapshot $snapshot -Scale $scale -ExistingRows $existingRows -ActiveDrag $activeDrag
     Update-PopupRowsPeripheralUi -StatusLabel $statusLabel
-    Write-PopupRowsRenderDiagnostic -Reason $Reason -Before $before -After $snapshot.Fingerprint -EntryCount $snapshot.EntryCount -ActiveDrag $activeDrag -Skipped $false -Deferred $false -AffectedCount $affected -LayoutUpdated $true
+    Write-PopupRowsRenderDiagnostic -Reason $Reason -Before $before -After $snapshot.Fingerprint -EntryCount $snapshot.EntryCount -ActiveDrag $activeDrag -Skipped $false -Deferred $false -AffectedCount $affected -LayoutUpdated $true -RebuiltCount $affected
 }
