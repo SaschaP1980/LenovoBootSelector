@@ -75,7 +75,7 @@ The original LBS-23 validator has **32 assertions** and is archived byte-identic
 
 | Security concern | Former redundant assertions | Permanent authority after P3 |
 | --- | ---: | --- |
-| Installer/runtime schema `0.2.15`, `fixed-task-v2` | Core 3, Regression 3 | Boundary and Release each remain independently active; new cross-surface equality/security check; native TaskBroker Boundary/Migration |
+| Installer/runtime schema `0.2.16`, `fixed-task-v2` | Core 3, Regression 3 | Boundary and Release each remain independently active; new cross-surface equality/security check; native TaskBroker Boundary/Migration |
 | Exact operation allowlist, no free task name, metadata name derivation | Core 2, Regression 4 | Boundary function-scoped runner **and** resolver checks; native negative metadata/operation tests; cross-function security contract |
 | Installer mutation-bit ACL, protected directory/file ACL and ownership checks | Core 3, Regression 5 | Boundary scoped ACL validator, Release packaged installer check, native ACL behavior, explicit protected-state and task DACL contracts |
 | TaskBroker diagnostic presence/readability/compatibility | Core 1, Regression 3 | Boundary and Release separate states; explicit diagnostic function contract and negative mutation checks |
@@ -162,8 +162,8 @@ Native PowerShell suites intentionally use different count strategies; one gener
 | `Test-BootNextSelectionUi.ps1` | Straight-line: fixed runtime count of 57 for cold-start readiness, mocked controller lifecycle and pending-row presentation, exact worker completion and source-level nonblocking, fail-closed UI contracts. |
 | `Test-BootWriterPriority.ps1` | Fixed runtime count of 24 for privilege-safe file locking, queued writers, sequential provenance, fail-closed loss/contestion and manual precedence with a fake firmware manager; runs only on Windows PS5.1. |
 | `Test-BootWriterScheduledTasks.ps1` | Fixed runtime count of 9 for actual temporary SYSTEM scheduled-task execution, serialized writer priority, ACL protection and fake-BCDEdit semantics; no real firmware operation. |
-| `Test-TaskBrokerBoundary.ps1` | Straight-line: fixed runtime count of 25, including rejection of the v1 boundary and legacy fixed task names. |
-| `Test-TaskBrokerMigration.ps1` | Straight-line: fixed runtime count of 43 covering LBS-33 migration, LBS-34 authoritative Task Scheduler XML trigger verification, LBS-35 batched ScheduledTasks performance contracts and LBS-143 BootNext registration/spec parity. |
+| `Test-TaskBrokerBoundary.ps1` | Straight-line: fixed runtime count of 26, including rejection of the v1 boundary and legacy fixed task names. |
+| `Test-TaskBrokerMigration.ps1` | Straight-line: fixed runtime count of 45 covering LBS-33 migration, LBS-34 authoritative Task Scheduler XML trigger verification, LBS-35 batched ScheduledTasks performance contracts and LBS-143 BootNext registration/spec parity. |
 | `Test-BootTargetDrift.ps1` | Straight-line: fixed runtime count of 13. |
 | `Test-SingleInstanceMutex.ps1` | Explicit manual increments; fixed fail guard of 4. |
 | `Test-InstanceActivation.ps1` | Explicit manual increments; fixed runtime count of 21 with same-user cross-process and WinForms message-loop tests. |

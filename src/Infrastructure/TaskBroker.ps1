@@ -27,6 +27,7 @@ function Test-TaskBrokerMetadataContract {
         if ([string]$Metadata.firmwareRefreshTask -ne 'LenovoBootSelector-RefreshFirmware') { return $false }
         if ([string]$Metadata.defaultClearTask -ne 'LenovoBootSelector-Default-Clear') { return $false }
         if ([string]$Metadata.defaultRestoreTask -ne 'LenovoBootSelector-Default-Restore') { return $false }
+        if ($null -eq $Metadata.PSObject.Properties['defaultRestoreDelaySeconds'] -or [int]$Metadata.defaultRestoreDelaySeconds -ne 0) { return $false }
 
         $expectedManagerFile = Join-Path $script:TaskBrokerStateDir 'fwbootmgr.txt'
         $expectedFirmwareFile = Join-Path $script:TaskBrokerStateDir 'firmware.txt'

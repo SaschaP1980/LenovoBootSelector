@@ -161,7 +161,7 @@ def main():
     base=json.loads((root/'tests/characterization-baseline-v0.3.4.json').read_text())
     for fn in ['LenovoBootMenuTray.ico','Start-LenovoBootMenuTray.cmd','Start-LenovoBootMenuTray.vbs','Uninstall-LenovoBootMenuTasks.cmd','icon-preview.png']:
         s.eq(f'Unrelated runtime asset still baseline-identical: {fn}',sha_file(root/'bin'/fn),base['source_sha256'][fn])
-    s.contains('LBS-6 installer schema bumped',install,"$version = '0.2.15'")
+    s.contains('LBS-6 installer schema bumped',install,"$version = '0.2.16'")
     s.contains('LBS-6 installer writes boundary contract',install,"boundaryContract = 'fixed-task-v2'")
     s.contains('LBS-6 task ACL rejects dangerous rights',install,'$dangerousMask')
     s.absent('LBS-6 task ACL no longer treats GenericAll as sufficient',install,'$hasAll =')
@@ -187,6 +187,17 @@ def main():
     ntest=txt(root/'tests/Test-FunctionalCore.ps1')
     s.absent('Native test has no ambiguous $Name: interpolation',ntest,'"$Name:')
     s.contains('Native test uses delimited Name interpolation',ntest,'"${Name}:')
+    # LBS-3: no-delay startup task remains fixed and the post-boot exporter is read-only.
+    snapshot=txt(root/'tools/Export-LBS3BootSnapshot.ps1')
+    s.contains('LBS-3 installer uses unsuspended BootTrigger',install,"$startupTrigger = New-ScheduledTaskTrigger -AtStartup")
+    s.absent('LBS-3 installer has no PT30S',install,"PT30S")
+    s.contains('LBS-3 installer explicitly verifies missing Delay XML child',install,"[switch]$StartupWithoutDelay")
+    s.contains('LBS-3 TaskBroker metadata records no artificial delay',install,"defaultRestoreDelaySeconds = 0")
+    s.contains('LBS-3 read-only export enumerates firmware',snapshot,"& $bcd /enum '{fwbootmgr}' /v")
+    s.contains('LBS-3 read-only export requires current-boot origin',snapshot,"$report.provenance.isCurrentBoot")
+    s.absent('LBS-3 read-only export does not disclose Windows account name',snapshot,'WindowsIdentity]::GetCurrent().Name')
+    for forbidden in ('Start-ScheduledTask','Register-ScheduledTask','/set ', 'bootsequence $guid'):
+        s.absent('LBS-3 read-only export excludes privileged mutation: ' + forbidden,snapshot,forbidden)
     # Deterministic build check.
     cp=subprocess.run([sys.executable,str(root/'tools/build_runtime.py'),'--root',str(root),'--check'],capture_output=True,text=True)
     s.eq('Runtime builder check succeeds',cp.returncode,0)

@@ -1,5 +1,13 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.0.0 – Remove fixed Default Restore startup delay (LBS-3)
+
+- Register the fixed SYSTEM `LenovoBootSelector-Default-Restore` task with one AtStartup BootTrigger and **no Delay element**. Actual Windows Task Scheduler execution time is not guaranteed to be zero.
+- Preserve the LBS-143 protected current-boot provenance, LBS-owned manual BootNext priority, shared privileged writer lock, allowlisted fixed-task operations and one-shot firmware `bootsequence` readback; never alter permanent `BootOrder` or `{fwbootmgr} displayorder`.
+- Move the exact TaskBroker schema to 0.2.16. Existing installations require an **explicit elevated Repair privileged tasks** action; there is no silent unelevated task modification.
+- Record `defaultRestoreDelaySeconds = 0` for the absence of additional delay, update English/German user-facing explanations, and tighten canonical Task Scheduler XML and runtime metadata validation.
+- Use a separate read-only, headless boot-evidence snapshot after each owner reboot: normal tray runtime diagnostics alone cannot prove a SYSTEM Default Restore write. Five physical reboot/write/readback acceptance checks remain owner-run.
+
 ## v1.4.0.0 – Smooth Manage Entries drag reordering (LBS-172)
 
 - Capture the dragged row once into a full-size WinForms bitmap, including its pencil, eye, grip, title and other children. During the OLE drag, move only one disabled PictureBox visual while keeping the real row and its handlers parked; restore the original controls on drop/cancel. Retain the existing live-row path as a nonfatal fallback if the visual snapshot cannot be captured.
