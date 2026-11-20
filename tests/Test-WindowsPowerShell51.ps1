@@ -79,3 +79,8 @@ if ($LASTEXITCODE -ne 0) { throw 'LBS-144 visibility eye/refresh DPI regression 
 $manageViewportProbe = Join-Path $root 'tests\Test-LBS157-ManageViewport.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $manageViewportProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-157 Manage Entries viewport regression failed' }
+
+# LBS-167: isolate real WinForms refresh/drag row identity and diagnostics.
+$refreshRowsProbe = Join-Path $root 'tests\Test-LBS167-RefreshRendering.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $refreshRowsProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-167 popup refresh/drag regression failed' }

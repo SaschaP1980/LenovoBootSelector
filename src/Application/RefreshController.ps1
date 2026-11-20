@@ -30,7 +30,7 @@ function Apply-BackgroundRefreshResult {
             }
             Update-TaskBrokerUiState -Fast | Out-Null
             Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_COMPLETED' -Stage 'ready' -Success $false -DurationMs $Result.Timings.TotalMs -Data (New-RuntimeDiagnosticData @{ workerError = [string]$Result.Error }) -Level error
-            if ($script:Popup -and -not $script:Popup.IsDisposed) { Update-PopupRows }
+            if ($script:Popup -and -not $script:Popup.IsDisposed) { Update-PopupRows -Reason 'readiness-failed' }
             return $false
         }
         throw ("Hintergrund-Refresh ({0}) fehlgeschlagen: {1}" -f ([string]$Result.Stage), ([string]$Result.Error))

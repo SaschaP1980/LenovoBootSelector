@@ -1,6 +1,14 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.3.0.0 – Stable boot-target presentation and refresh-safe Manage Entries drag (LBS-167)
+
+- Compare canonical display-relevant entry metadata, aliases, hidden state, order, selection, translations and DPI before rebuilding WinForms boot rows; skip a destructive redraw when firmware refresh data is unchanged.
+- Keep status and freshness UI independent of row creation, preserving scroll offset and existing row controls across unchanged refreshes and quick popup reopening.
+- Defer genuine changed target/label presentation while an active drag or alias edit owns its controls, then apply after the interaction ends without discarding Manage Entries draft settings.
+- Emit bounded row-render diagnostics with a reason, anonymized before/after SHA-256 presentation fingerprints, row count and skip/defer/rebuild/drag state.
+- Preserve existing read-only firmware drift checks, One-Shot BootNext, TaskBroker safety boundaries and LBS-163 animated reordering. Add native Windows PowerShell 5.1 WinForms regression coverage; real Lenovo owner acceptance remains separate.
+
 ## v1.2.3.0 – Animated Manage Entries drag reordering (LBS-163)
 
 - Replace the strong red insertion bar with a subdued full-height destination placeholder and smooth in-place movement of neighboring boot-target rows during a drag.
