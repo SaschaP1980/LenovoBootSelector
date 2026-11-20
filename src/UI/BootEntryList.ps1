@@ -34,6 +34,10 @@ function Set-RowHoverState($Control, [bool]$Hover) {
 
     $rowGuid = [string]$row.Tag
     if ($script:IsManageEntriesMode) {
+        if ($script:ManageActiveDragGuid -and $rowGuid -eq $script:ManageActiveDragGuid -and $script:ManageDragLayout) {
+            $row.BackColor = [Drawing.Color]::FromArgb(48,48,54)
+            return
+        }
         $hidden = Test-ManageEntryHidden -Guid $rowGuid
         if ($hidden) {
             $row.BackColor = if ($Hover) { [Drawing.Color]::FromArgb(37,37,37) } else { [Drawing.Color]::FromArgb(27,27,27) }
@@ -91,7 +95,16 @@ function Update-PopupRows {
         @(Get-OrderedEntriesForUi)
     }
     $handlers = New-BootEntryInteractionHandlers
-    $contentPanel.AllowDrop = $false
+    # Also accept drops over the live placeholder/gaps, not only over row controls.
+    # Attach just once to the persistent content panel across row refreshes.
+    if ($script:ManageContentDropPanel -ne $contentPanel) {
+        $contentPanel.Add_DragEnter($handlers.DragEnter)
+        $contentPanel.Add_DragOver($handlers.DragOver)
+        $contentPanel.Add_DragLeave($handlers.DragLeave)
+        $contentPanel.Add_DragDrop($handlers.DragDrop)
+        $script:ManageContentDropPanel = $contentPanel
+    }
+    $contentPanel.AllowDrop = [bool]$script:IsManageEntriesMode
 
     foreach ($entry in $displayEntries) {
         $rendered = New-BootEntryRow -Entry $entry -Y 0 -BaseRowHeight $baseRowHeight -Handlers $handlers
