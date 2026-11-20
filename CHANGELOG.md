@@ -1,6 +1,13 @@
 ﻿# Lenovo Boot Selector – Changelog
 
 
+## v1.3.1.1 – Improve Manage Entries pencil optical size (LBS-166)
+
+- Increase only the alias-edit pencil glyph from 12.0 pt to 14.0 pt (+16.7% nominal) in Segoe UI Symbol so its visual prominence better matches the already accepted eye and owner-drawn reorder grip.
+- Keep the original 25×34 design-pixel pencil hit area, position, vertical centering, gray/accent hover color, cursor, accessible description, tooltip and click-to-edit workflow.
+- Extend the native WinForms LBS-166 regression checks to verify 14 pt versus the earlier 12 pt text metrics, unchanged interaction geometry and 250% single-pass DPI scaling without multiplying the point-size font. Preserve the previous grip, drag/reorder and firmware safety contracts.
+- No firmware operations, BootOrder, TaskBroker, persistence, unrelated layout, updater or Diagnostics Worker behavior changes. Final 100%/250% physical visual acceptance remains with the owner.
+
 ## v1.3.1.0 – Make Manage Entries reorder handle optically consistent (LBS-166)
 
 - Replace the undersized font-dependent reorder symbol with three antialiased, round-ended strokes sized from the WinForms paint-surface DPI, with a visual footprint comparable to the neighboring eye and pencil.

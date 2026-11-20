@@ -127,6 +127,7 @@ LBS-40 adds `../tools/validate_test_contracts.py` as a shared preflight contract
 | `Test-TaskBrokerMigration.ps1` | Safety / Migration | LBS-33 canonical privileged identifiers, migration ordering, legacy cleanup ownership, and default-state precedence |
 | `Test-IdentifierCompatibility.ps1` | Compatibility | Active naming contract, autostart migration, package compatibility IDs, and cross-version singleton/task invariants |
 | `Test-ArchitectureSoak.ps1` | Soak | Repeated architecture/state stability |
+| `Test-LBS166-ManageGripDpi.ps1` | Presentation / DPI | 44 native WinForms assertions covering the three-stroke grip, 100–300% geometry and ink, 14 pt pencil optical font/accessible hit target and 250% single-pass scaling. Physical owner visual acceptance remains separate. |
 | `Test-LBS167-RefreshRendering.ps1` | Presentation / interaction | 27 isolated native WinForms assertions covering unchanged firmware refresh, active drag/alias editor deferral, draft preservation, real metadata/selection/DPI changes, quick reopen, status updates and SHA-256-only rebuild diagnostics. Physical owner acceptance remains separate. |
 | `Test-WindowsPowerShell51.ps1` | Compatibility | Windows PowerShell 5.1 parser/encoding gate and native aggregate runner |
 

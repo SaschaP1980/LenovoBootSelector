@@ -5,6 +5,7 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 . (Join-Path $root 'src\UI\BootEntryRows.ps1')
+. (Join-Path $root 'src\UI\PopupDpiLayout.ps1')
 $script:checks = 0
 function Check([string]$Name,[bool]$Good) {
     if (-not $Good) { throw "LBS166 FAIL: $Name" }
@@ -77,6 +78,18 @@ try {
     Check 'Native reorder handle uses owner-drawn Panel' ($null -ne $grip -and $grip -is [Windows.Forms.Panel])
     Check 'Existing grip column and 26x34 hit target' ($grip.Left -eq 350 -and $grip.Top -eq 12 -and $grip.Width -eq 26 -and $grip.Height -eq 34)
     Check 'Eye and pencil retain original geometry' ($eye.Left -eq 286 -and $eye.Width -eq 32 -and $pencil.Left -eq 321 -and $pencil.Width -eq 25)
+
+    # Owner follow-up after v1.3.1.0: only the pencil font grows, not its hit area.
+    Check 'Pencil uses the new 14pt optical font size' ([Math]::Abs($pencil.Font.SizeInPoints - 14.0) -lt 0.05)
+    Check 'Pencil retains 25x34 click area and vertical centering' ($pencil.Top -eq 12 -and $pencil.Height -eq 34 -and $pencil.Width -eq 25 -and $pencil.TextAlign -eq [Drawing.ContentAlignment]::MiddleCenter)
+    Check 'Pencil retains original identity and accessible hand action' ($pencil.Name -eq 'AliasEditButton' -and $pencil.Text -eq ([string][char]0x270E) -and $pencil.Cursor -eq [Windows.Forms.Cursors]::Hand -and [string]$pencil.Tag -eq $entry.Guid -and $pencil.AccessibleDescription -eq 'Manage.EditAliasAccessible')
+    $oldPencilFont = New-Object Drawing.Font('Segoe UI Symbol', 12.0, [Drawing.FontStyle]::Regular)
+    try {
+        $oldInk = [Windows.Forms.TextRenderer]::MeasureText($pencil.Text,$oldPencilFont)
+        $newInk = [Windows.Forms.TextRenderer]::MeasureText($pencil.Text,$pencil.Font)
+        Check 'New pencil text metrics exceed previous 12pt baseline' ($newInk.Height -gt $oldInk.Height -and $newInk.Width -ge $oldInk.Width)
+    }
+    finally { $oldPencilFont.Dispose() }
     Check 'Grip retains SizeAll cursor, drop target and tag' ($grip.Cursor -eq [Windows.Forms.Cursors]::SizeAll -and $grip.AllowDrop -and [string]$grip.Tag -eq $entry.Guid)
     Check 'Grip retains same event hookup control collection' ($controls.Count -eq 7 -and $controls[6] -eq $grip)
     $native = New-Object Drawing.Bitmap(26,34)
@@ -87,6 +100,13 @@ try {
         Check 'Native raster stays centered and not clipped' ($ink.Width -ge 14 -and $ink.Width -le 22 -and $ink.Height -ge 11 -and $ink.Height -le 18 -and $ink.Left -gt 0 -and $ink.Right -lt 25)
     }
     finally { $native.Dispose() }
+    [void](Set-PopupBootRowDpiLayout -Row $row -Scale 2.5 -Y 0)
+    Check '250% layout scales hit area once without scaling point font twice' (
+        $pencil.Left -eq [int][Math]::Round(321*2.5) -and
+        $pencil.Top -eq 30 -and
+        $pencil.Width -eq [int][Math]::Round(25*2.5) -and
+        $pencil.Height -eq 85 -and
+        [Math]::Abs($pencil.Font.SizeInPoints - 14.0) -lt 0.05)
 }
 finally { $row.Dispose(); $dummy.Dispose() }
 foreach ($c in @($cases[0],$cases[4])) {
@@ -102,5 +122,5 @@ foreach ($c in @($cases[0],$cases[4])) {
     }
     finally { $graphics.Dispose(); $bitmap.Dispose() }
 }
-Write-Host "LBS166 GRIP TOTAL $script:checks/39"
-if ($script:checks -ne 39) { throw "Expected 39 native grip checks, got $script:checks" }
+Write-Host "LBS166 GRIP TOTAL $script:checks/44"
+if ($script:checks -ne 44) { throw "Expected 44 native grip/pencil checks, got $script:checks" }

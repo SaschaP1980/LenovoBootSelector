@@ -725,7 +725,7 @@ $state.Add_MouseLeave({
 })
 $row.Controls.Add($state)
 
-$editAlias = New-Label -Text '✎' -Font (New-Object Drawing.Font('Segoe UI Symbol', 12.0, [Drawing.FontStyle]::Regular)) `
+$editAlias = New-Label -Text '✎' -Font (New-Object Drawing.Font('Segoe UI Symbol', 14.0, [Drawing.FontStyle]::Regular)) `
     -ForeColor ([Drawing.Color]::FromArgb(190,190,190)) -X 321 -Y 12 -Width 25 -Height 34
 $editAlias.Name = 'AliasEditButton'
 $editAlias.Tag = $entry.Guid
