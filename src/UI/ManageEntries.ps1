@@ -148,13 +148,15 @@ function Start-ManageEntriesMode {
     $script:IsManageEntriesMode = $true
     $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusEditing'
     Update-ManageEntriesUiState
-    Update-PopupRows
+    Update-PopupRows -Reason 'manage-enter'
     Update-ManageSaveButtonState
 }
 
 function Stop-ManageEntriesMode {
     param([switch]$Save)
     if (-not $script:IsManageEntriesMode) { return }
+    # Explicit mode exit supersedes any deferred in-mode presentation refresh.
+    $script:PopupRowsRefreshPending = $false
     Reset-ManageDragPreview
 
     if ($Save) {
@@ -178,5 +180,5 @@ function Stop-ManageEntriesMode {
     $script:ManageBaselineEntryAliases = @{}
     $script:ManageAliasEditGuid = $null
     Update-ManageEntriesUiState
-    Update-PopupRows
+    Update-PopupRows -Reason 'manage-exit'
 }

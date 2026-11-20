@@ -79,7 +79,7 @@ function Add-PopupHeaderSection {
     $refresh.Add_Click({
         if (Test-MaintenanceBusy) { return }
         $script:LastStatusText = Get-LocalizedString -Key 'Status.BootTargetsRefreshing'
-        Update-PopupRows
+        Update-PopupRows -Reason 'manual-refresh-start'
         Start-BackgroundBootRefresh -RefreshStorage
         Update-RefreshButtonVisual
     })

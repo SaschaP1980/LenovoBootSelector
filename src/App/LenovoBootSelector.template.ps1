@@ -1865,7 +1865,7 @@ function Apply-FirmwareBootState {
 
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     if ($capabilities.CanUseCachedBootState) { [void](Refresh-SystemDefaultState) }
-    Update-PopupRows
+    Update-PopupRows -Reason 'firmware-state'
 }
 
 function Refresh-BootState {
