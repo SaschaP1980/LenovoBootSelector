@@ -2225,7 +2225,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.1.0'
+$script:AppVersion = '1.5.1.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -5144,7 +5144,7 @@ function Update-ManageSaveButtonState {
         $button.Cursor = [System.Windows.Forms.Cursors]::Hand
     }
     else {
-        $button.ForeColor = [Drawing.Color]::FromArgb(135,135,135)
+        $button.ForeColor = [Drawing.Color]::FromArgb(146,146,146)
         $button.BackColor = [Drawing.Color]::FromArgb(35,35,35)
         $button.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(58,58,58)
         $button.Cursor = [System.Windows.Forms.Cursors]::Default
@@ -11386,7 +11386,7 @@ function Add-PopupManageEntriesSection {
     $saveManage = New-Object System.Windows.Forms.Button
     $saveManage.Text = Get-LocalizedString -Key 'Manage.Save'
     $saveManage.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
-    $saveManage.ForeColor = [Drawing.Color]::FromArgb(135,135,135)
+    $saveManage.ForeColor = [Drawing.Color]::FromArgb(146,146,146)
     $saveManage.BackColor = [Drawing.Color]::FromArgb(35,35,35)
     $saveManage.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $saveManage.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(58,58,58)
@@ -11395,6 +11395,27 @@ function Add-PopupManageEntriesSection {
     $saveManage.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(185,30,22)
     $saveManage.Location = New-Object Drawing.Point(150, 78)
     $saveManage.Size = New-Object Drawing.Size(224, 34)
+    # LBS-186: the native Flat button adapter dims disabled text against
+    # the dark background. Repaint only the disabled interior using the
+    # configured palette; keep the real Button, native border and Enabled gate.
+    $saveManage.Add_Paint({
+        param($sender,$eventArgs)
+        if ($sender.Enabled -or [Windows.Forms.SystemInformation]::HighContrast) { return }
+        $inner = $sender.ClientRectangle
+        $border = $sender.FlatAppearance.BorderSize
+        $inner.Inflate(-$border,-$border)
+        if ($inner.Width -le 0 -or $inner.Height -le 0) { return }
+        $background = New-Object Drawing.SolidBrush($sender.BackColor)
+        try { $eventArgs.Graphics.FillRectangle($background,$inner) }
+        finally { $background.Dispose() }
+        $flags = [Windows.Forms.TextFormatFlags]::HorizontalCenter -bor
+                 [Windows.Forms.TextFormatFlags]::VerticalCenter -bor
+                 [Windows.Forms.TextFormatFlags]::SingleLine -bor
+                 [Windows.Forms.TextFormatFlags]::EndEllipsis -bor
+                 [Windows.Forms.TextFormatFlags]::NoPrefix -bor
+                 [Windows.Forms.TextFormatFlags]::PreserveGraphicsClipping
+        [Windows.Forms.TextRenderer]::DrawText($eventArgs.Graphics,$sender.Text,$sender.Font,$inner,$sender.ForeColor,$flags)
+    })
     $saveManage.Enabled = $false
     $saveManage.Cursor = [System.Windows.Forms.Cursors]::Default
     $saveManage.Add_Click({ Stop-ManageEntriesMode -Save })

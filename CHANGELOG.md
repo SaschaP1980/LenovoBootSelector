@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.1.1 – Readable disabled Manage Entries Save button (LBS-186 / UX-02)
+
+- Keep the real WinForms Save button disabled for an unchanged draft. Repaint only its disabled interior in the dark theme with neutral #929292 text on #232323; preserve the native border, layout, enabled appearance, click/focus gating, and system High Contrast rendering.
+- Extend the existing typography suite from 48 to 64 assertions: actual disabled raster ink and clean/dirty/clean click gating in both locales at synthetic 96/240 DPI. Hosted test-first RED on v1.5.1.0 (run 44928146733: no readable ink) and GREEN after correction (run 44928233179: 64/64, sampled contrast floor 4.67:1). Owner visual acceptance of the correction remains separate.
+
 ## v1.5.1.0 – Coherent popup typography, contrast and spacing (LBS-186 / UX-02)
 
 - Use a restrained Segoe UI type scale: 11.5 pt brand, 10 pt bold row titles, 9 pt body/status/actions and 8.5 pt section/auxiliary text. Keep the stable header, compact popup, row heights, hit targets, Manage viewport and existing selection/restart semantics.
