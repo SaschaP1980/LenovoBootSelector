@@ -517,7 +517,9 @@ def main():
     s.has('LBS-28 default target consumes canonical checking capability',default_ui,'$checking = [bool]$capabilities.IsChecking')
     s.has('LBS-28 default target consumes canonical mutation capability',default_ui,'$enabled = [bool]$capabilities.CanSetDefaultTarget')
     s.has('Default target pending state stays visually readable',default_ui,'$visualEnabled = ($enabled -or $checking)')
-    s.has('Default target interaction remains separately gated',default_ui,'$script:DefaultInteractionEnabled = $enabled')
+    s.c('Default target interaction remains separately gated',
+        '$interactive = ($enabled -and -not [bool]$script:BootNextPendingGuid)' in default_ui and
+        '$script:DefaultInteractionEnabled = $interactive' in default_ui)
     s.has('Default target chevron is hidden only while checking',default_ui,'$script:DefaultArrowLabel.Visible = -not $checking')
     s.has('Popup default target click uses interaction gate',popup_surface,'if ($script:DefaultInteractionEnabled -and $script:DefaultButton)')
     s.has('Popup stores default target arrow for state updates',popup_surface,'$script:DefaultArrowLabel = $defaultArrow')
