@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.1.2 – Readable pending next-boot actions (LBS-186 / UX-02)
+
+- Render the truly disabled Windows Restart action and pending BootNext footer in readable neutral gray on the existing dark WinForms surfaces. Preserve the real Restart/BootNext interlock, enabled style, borders, geometry, localized full-text tooltip/accessibility and system High Contrast drawing.
+- When a BootNext write is pending, mute the Default Target selection text/chevron and expose the existing noninteractive cursor/click gate, matching the already enforced Set-DefaultGuid pending rejection. Retain the original readiness Enabled state, settings values and restore normal presentation after pending ends.
+- Extend the existing English/German 100%/250% synthetic-DPI WinForms typography regression from 64 to 84 checks with actual disabled raster ink, pending interlocks, default-selector appearance and restored interactions. The host-run RED→GREEN evidence is recorded in #186; physical owner visual acceptance remains separate.
+
 ## v1.5.1.1 – Readable disabled Manage Entries Save button (LBS-186 / UX-02)
 
 - Keep the real WinForms Save button disabled for an unchanged draft. Repaint only its disabled interior in the dark theme with neutral #929292 text on #232323; preserve the native border, layout, enabled appearance, click/focus gating, and system High Contrast rendering.

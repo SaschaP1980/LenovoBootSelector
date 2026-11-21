@@ -299,6 +299,28 @@ function Add-PopupRestartSection {
     $restartButton.Location = New-Object Drawing.Point(16, 6)
     $restartButton.Size = New-Object Drawing.Size(358, 31)
     $restartButton.Cursor = [System.Windows.Forms.Cursors]::Hand
+    # The native Flat adapter paints disabled text nearly black on dark surfaces.
+    # Only replace disabled foreground ink, leaving the real WinForms gates,
+    # unchanged enabled rendering, geometry, borders and High Contrast intact.
+    $pendingDisabledInkPainter = {
+        param($sender,$eventArgs)
+        if ($sender.Enabled -or [Windows.Forms.SystemInformation]::HighContrast) { return }
+        $inner = $sender.ClientRectangle
+        $border = $sender.FlatAppearance.BorderSize
+        $inner.Inflate(-$border,-$border)
+        if ($inner.Width -le 0 -or $inner.Height -le 0) { return }
+        $background = New-Object Drawing.SolidBrush($sender.BackColor)
+        try { $eventArgs.Graphics.FillRectangle($background,$inner) }
+        finally { $background.Dispose() }
+        $flags = [Windows.Forms.TextFormatFlags]::HorizontalCenter -bor
+                 [Windows.Forms.TextFormatFlags]::VerticalCenter -bor
+                 [Windows.Forms.TextFormatFlags]::SingleLine -bor
+                 [Windows.Forms.TextFormatFlags]::EndEllipsis -bor
+                 [Windows.Forms.TextFormatFlags]::NoPrefix -bor
+                 [Windows.Forms.TextFormatFlags]::PreserveGraphicsClipping
+        [Windows.Forms.TextRenderer]::DrawText($eventArgs.Graphics,$sender.Text,$sender.Font,$inner,([Drawing.Color]::FromArgb(146,146,146)),$flags)
+    }
+    $restartButton.Add_Paint($pendingDisabledInkPainter)
     $restartButton.Add_Click({ Restart-Windows })
     $script:RestartButton = $restartButton
     $restartPanel.Controls.Add($restartButton)
@@ -325,6 +347,7 @@ function Add-PopupRestartSection {
         $this.AccessibleName = $this.Text
         if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($this,$this.Text) }
     })
+    $restartTarget.Add_Paint($pendingDisabledInkPainter)
     $restartTarget.Add_Click({ if ($script:RestartTargetLabel -and $script:RestartTargetLabel.TabStop) { Use-DefaultForNextRestart } })
     $restartPanel.Controls.Add($restartTarget)
     $script:RestartTargetLabel = $restartTarget

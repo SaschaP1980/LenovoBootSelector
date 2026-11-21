@@ -22,6 +22,7 @@ Add-Type -TypeDefinition ($template.Substring($begin,$end-$begin)) -ReferencedAs
 . (Join-Path $root 'src\UI\RefreshPresentation.ps1')
 . (Join-Path $root 'src\UI\DefaultTargetPresentation.ps1')
 . (Join-Path $root 'src\UI\ManageEntriesState.ps1')
+. (Join-Path $root 'src\Application\BootNextSelectionController.ps1')
 
 $script:checks = 0
 function Assert-Lbs186([string]$Name,[bool]$Ok) {
@@ -54,6 +55,31 @@ function Test-Lbs186TextFit($Control,[Drawing.Graphics]$Graphics,[single]$Dpi,[s
     Write-Host ("LBS186_FONT {0} dpi={1} pt={2} inkHeight={3:F2} width={4:F2} box={5}x{6}" -f $Control.Text,$Dpi,$Control.Font.Size,$h,$size.Width,$Control.Width,$Control.Height)
     return ($h -le $Control.Height -and ($HeightOnly -or $size.Width -le $Control.Width))
 }
+function Test-Lbs186DisabledInk($Button,[int]$ExpectedBackground,[string]$Label) {
+    $raster=New-Object Drawing.Bitmap($Button.Width,$Button.Height)
+    try {
+        $Button.DrawToBitmap($raster,[Drawing.Rectangle]::new(0,0,$Button.Width,$Button.Height))
+        $background=$raster.GetPixel([int]($Button.Width*0.06),[int]($Button.Height*0.5))
+        $brightInk=0; $darkInk=0
+        for ($y=[int]($Button.Height*0.16); $y -lt [int]($Button.Height*0.84); $y++) {
+            for ($x=[int]($Button.Width*0.10); $x -lt [int]($Button.Width*0.90); $x++) {
+                $pixel=$raster.GetPixel($x,$y)
+                if ($pixel.R -eq $pixel.G -and $pixel.G -eq $pixel.B) {
+                    if ($pixel.R -ge 140 -and $pixel.R -le 165) { $brightInk++ }
+                    if ($pixel.R -lt ($Button.BackColor.R-10)) { $darkInk++ }
+                }
+            }
+        }
+        # Use the actual control background as the contrast reference. A
+        # fixed interior raster sample can land on subpixel-antialiased ink,
+        # especially on long ellipsized footer text at synthetic 240 DPI.
+        $surface=$Button.BackColor
+        Write-Host ("LBS186_PENDING_RASTER {0} sampled={1},{2},{3} surface={4},{5},{6} ink={7} dark={8}" -f $Label,$background.R,$background.G,$background.B,$surface.R,$surface.G,$surface.B,$brightInk,$darkInk)
+        return ($surface.R -eq $ExpectedBackground -and $surface.G -eq $ExpectedBackground -and $surface.B -eq $ExpectedBackground -and $brightInk -ge 10 -and $darkInk -eq 0 -and
+            (Test-Lbs186Contrast ([Drawing.Color]::FromArgb(140,140,140)) $surface $Label))
+    }
+    finally { $raster.Dispose() }
+}
 # Read the actual palette constants rather than maintaining independent test colors.
 foreach ($name in @('ColorHeader','ColorBackground','ColorRow','ColorHover','ColorSelectedRow','ColorSurface','ColorPrimary','ColorSecondary','ColorAccent','ColorWarning')) {
     $pattern = '(?m)^\$script:' + $name + ' = \[Drawing\.Color\]::FromArgb\((\d+),\s*(\d+),\s*(\d+)\)'
@@ -78,7 +104,6 @@ function Get-EntryDisplayTitle { param($Entry,[switch]$UseManageDraft) [string]$
 function Get-EntryAlias { param([string]$Guid,[switch]$UseManageDraft) $script:TestAlias }
 function Test-ManageEntryHidden { param([string]$Guid) [bool]$script:TestHidden }
 function Get-NextBootTargetDisplayName { [string]$script:TestEntry.Title }
-function Update-BootNextRestartInterlock { }
 function Resolve-BootNextDisplayStateCore { param($DefaultGuid,$EffectiveNextGuid,$FirmwareReadSucceeded,$Checking,$EffectiveTargetKnown) 'different' }
 # Execute the canonical template's presentation-only restart updater, not a copy.
 $tokens=$null; $errors=$null
@@ -179,6 +204,23 @@ foreach ($locale in @('en-US','de-DE')) {
             $script:TestDirty=$true
             Update-ManageSaveButtonState
             Assert-Lbs186 "$tag enabled Save text meets contrast in all states" ((Test-Lbs186Contrast $save.ForeColor $save.BackColor 'save-normal') -and (Test-Lbs186Contrast $save.ForeColor $save.FlatAppearance.MouseOverBackColor 'save-hover') -and (Test-Lbs186Contrast $save.ForeColor $save.FlatAppearance.MouseDownBackColor 'save-pressed'))
+            # LBS-186: actual pending BootNext UI, no task or firmware writes.
+            $manage.Visible=$false
+            $script:BootNextPendingGuid=$script:TestGuid
+            Update-DefaultUi
+            Update-RestartTargetUi
+            $reboot=$script:RestartButton
+            $pendingFooter=$script:RestartTargetLabel
+            Assert-Lbs186 "$tag pending restart has readable disabled ink" (Test-Lbs186DisabledInk $reboot 34 "$tag restart")
+            Assert-Lbs186 "$tag pending footer has readable disabled ink" (Test-Lbs186DisabledInk $pendingFooter 25 "$tag footer")
+            Assert-Lbs186 "$tag pending interlock preserves restart and footer gates" (-not $reboot.Enabled -and -not $reboot.CanSelect -and -not $pendingFooter.Enabled -and -not $pendingFooter.TabStop -and $pendingFooter.AccessibleDescription -eq $pendingFooter.Text)
+            $defaultName=$script:DefaultButton.Controls[0]
+            $disabledInk=[Drawing.Color]::FromArgb(146,146,146).ToArgb()
+            Assert-Lbs186 "$tag pending default row is visibly gated" (-not $script:DefaultInteractionEnabled -and $script:DefaultButton.Cursor -eq [Windows.Forms.Cursors]::Default -and $defaultName.ForeColor.ToArgb() -eq $disabledInk -and $script:DefaultValueLabel.ForeColor.ToArgb() -eq $disabledInk -and $script:DefaultArrowLabel.ForeColor.ToArgb() -eq $disabledInk)
+            $script:BootNextPendingGuid=$null
+            Update-DefaultUi
+            Update-RestartTargetUi
+            Assert-Lbs186 "$tag completion restores ready interactions" ($reboot.Enabled -and $pendingFooter.Enabled -and $script:DefaultInteractionEnabled -and $script:DefaultButton.Cursor -eq [Windows.Forms.Cursors]::Hand -and $defaultName.ForeColor.ToArgb() -eq $script:ColorPrimary.ToArgb() -and $script:DefaultArrowLabel.ForeColor.ToArgb() -eq $script:ColorSecondary.ToArgb())
             $footer=$rootPanel.Controls['FooterPanel'].Controls[0]
             Assert-Lbs186 "$tag footer role fits and is readable" ((Test-Lbs186TextFit $footer $graphics $dpi) -and (Test-Lbs186Contrast $footer.ForeColor $script:ColorSurface 'version-footer'))
             $script:IsManageEntriesMode=$false
@@ -225,5 +267,5 @@ foreach ($locale in @('en-US','de-DE')) {
         }
     }
 }
-Write-Host "LBS186 TYPOGRAPHY TOTAL $script:checks/64"
-if ($script:checks -ne 64) { throw "LBS186 expected 64 checks, got $script:checks" }
+Write-Host "LBS186 TYPOGRAPHY TOTAL $script:checks/84"
+if ($script:checks -ne 84) { throw "LBS186 expected 84 checks, got $script:checks" }
