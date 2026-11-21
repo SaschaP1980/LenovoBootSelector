@@ -71,7 +71,8 @@ function Get-LocalizedString { param([string]$Key,$Values) Get-LocalizedStringCo
 function Get-CurrentSystemFunctionsCapabilities { $script:TestCapabilities }
 function Test-BackgroundRefreshActive { param($State) [bool]$State.Active }
 function Get-MaintenanceBusyStatusText { Get-LocalizedString -Key 'Status.Checking' }
-function Test-ManageEntriesDirty { return $true }
+function Test-ManageEntriesDirty { return [bool]$script:TestDirty }
+function Stop-ManageEntriesMode { param([switch]$Save) if ($Save) { $script:SaveCalls++ } }
 function Get-EntryByGuid { param([string]$Guid) $script:TestEntry }
 function Get-EntryDisplayTitle { param($Entry,[switch]$UseManageDraft) [string]$Entry.Title }
 function Get-EntryAlias { param([string]$Guid,[switch]$UseManageDraft) $script:TestAlias }
@@ -139,6 +140,43 @@ foreach ($locale in @('en-US','de-DE')) {
             }
             Assert-Lbs186 "$tag localized Manage labels/actions fit" $fit
             $save=$script:ManageSaveButton
+            $manage.Visible=$true
+            $form.Show()
+            $script:TestDirty=$false
+            $script:SaveCalls=0
+            Update-ManageSaveButtonState
+            $save.PerformClick()
+            Assert-Lbs186 "$tag clean draft Save remains genuinely disabled and cannot invoke Save" (-not $save.Enabled -and -not $save.CanSelect -and $script:SaveCalls -eq 0 -and $save.Cursor -eq [Windows.Forms.Cursors]::Default)
+            # Verify actual disabled ink, not only ForeColor (the flat WinForms
+            # adapter can substitute near-black text on a dark button).
+            $raster=New-Object Drawing.Bitmap($save.Width,$save.Height)
+            try {
+                $save.DrawToBitmap($raster,[Drawing.Rectangle]::new(0,0,$save.Width,$save.Height))
+                $background=$raster.GetPixel([int]($save.Width*0.06),[int]($save.Height*0.5))
+                $maxGray=0; $brightInk=0; $darkInk=0
+                for ($y=[int]($save.Height*0.15); $y -lt [int]($save.Height*0.85); $y++) {
+                    for ($x=[int]($save.Width*0.10); $x -lt [int]($save.Width*0.90); $x++) {
+                        $pixel=$raster.GetPixel($x,$y)
+                        if ($pixel.R -eq $pixel.G -and $pixel.G -eq $pixel.B) {
+                            $maxGray=[Math]::Max($maxGray,[int]$pixel.R)
+                            if ($pixel.R -ge 140 -and $pixel.R -le 160) { $brightInk++ }
+                            if ($pixel.R -lt ($background.R-10)) { $darkInk++ }
+                        }
+                    }
+                }
+                Write-Host ("LBS186_SAVE_RASTER {0} background={1} maxGray={2} brightInk={3} darkInk={4}" -f $tag,$background.R,$maxGray,$brightInk,$darkInk)
+                Assert-Lbs186 "$tag disabled Save raster contains readable neutral text" ($background.R -eq 35 -and $brightInk -ge 10 -and (Test-Lbs186Contrast ([Drawing.Color]::FromArgb(140,140,140)) $background 'disabled-save-ink'))
+            }
+            finally { $raster.Dispose() }
+            $script:TestDirty=$true
+            Update-ManageSaveButtonState
+            $save.PerformClick()
+            Assert-Lbs186 "$tag dirty draft re-enables the existing Save action exactly once" ($save.Enabled -and $save.CanSelect -and $script:SaveCalls -eq 1 -and $save.BackColor.ToArgb() -eq $script:ColorAccent.ToArgb() -and $save.Cursor -eq [Windows.Forms.Cursors]::Hand)
+            $script:TestDirty=$false
+            Update-ManageSaveButtonState
+            $save.PerformClick()
+            Assert-Lbs186 "$tag returning to clean draft disables Save again" (-not $save.Enabled -and $script:SaveCalls -eq 1)
+            $script:TestDirty=$true
             Update-ManageSaveButtonState
             Assert-Lbs186 "$tag enabled Save text meets contrast in all states" ((Test-Lbs186Contrast $save.ForeColor $save.BackColor 'save-normal') -and (Test-Lbs186Contrast $save.ForeColor $save.FlatAppearance.MouseOverBackColor 'save-hover') -and (Test-Lbs186Contrast $save.ForeColor $save.FlatAppearance.MouseDownBackColor 'save-pressed'))
             $footer=$rootPanel.Controls['FooterPanel'].Controls[0]
@@ -187,5 +225,5 @@ foreach ($locale in @('en-US','de-DE')) {
         }
     }
 }
-Write-Host "LBS186 TYPOGRAPHY TOTAL $script:checks/48"
-if ($script:checks -ne 48) { throw "LBS186 expected 48 checks, got $script:checks" }
+Write-Host "LBS186 TYPOGRAPHY TOTAL $script:checks/64"
+if ($script:checks -ne 64) { throw "LBS186 expected 64 checks, got $script:checks" }

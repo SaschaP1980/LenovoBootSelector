@@ -31,7 +31,7 @@ function Update-ManageSaveButtonState {
         $button.Cursor = [System.Windows.Forms.Cursors]::Hand
     }
     else {
-        $button.ForeColor = [Drawing.Color]::FromArgb(135,135,135)
+        $button.ForeColor = [Drawing.Color]::FromArgb(146,146,146)
         $button.BackColor = [Drawing.Color]::FromArgb(35,35,35)
         $button.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(58,58,58)
         $button.Cursor = [System.Windows.Forms.Cursors]::Default
