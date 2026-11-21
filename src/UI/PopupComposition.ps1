@@ -21,7 +21,7 @@ function Add-PopupHeaderSection {
     # providing native Enter/Space activation and keyboard focus semantics.
     $headerSub = New-Object System.Windows.Forms.Button
     $headerSub.Text = ''
-    $headerSub.Font = New-Object Drawing.Font('Segoe UI', 8.25, [Drawing.FontStyle]::Regular)
+    $headerSub.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
     $headerSub.ForeColor = $script:ColorSecondary
     $headerSub.BackColor = $script:ColorHeader
     $headerSub.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
@@ -31,8 +31,8 @@ function Add-PopupHeaderSection {
     $headerSub.UseVisualStyleBackColor = $false
     $headerSub.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
     $headerSub.Padding = New-Object System.Windows.Forms.Padding(0)
-    $headerSub.Location = New-Object Drawing.Point(16, 36)
-    $headerSub.Size = New-Object Drawing.Size(300, 18)
+    $headerSub.Location = New-Object Drawing.Point(16, 35)
+    $headerSub.Size = New-Object Drawing.Size(300, 21)
     $headerSub.TabStop = $false
     $headerSub.Cursor = [System.Windows.Forms.Cursors]::Default
     $headerSub.Name = 'HeaderStatusLabel'
@@ -99,7 +99,7 @@ function Add-PopupHeaderSection {
     $section.Size = New-Object Drawing.Size(390, 28)
     $section.BackColor = $script:ColorBackground
 
-    $sectionLabel = New-Label -Text (Get-LocalizedString -Key 'Popup.NextBootSection') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
+    $sectionLabel = New-Label -Text (Get-LocalizedString -Key 'Popup.NextBootSection') -Font (New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 4 -Width 200 -Height 20
     $sectionLabel.Name = 'SectionLabel'
     $section.Controls.Add($sectionLabel)
@@ -107,7 +107,7 @@ function Add-PopupHeaderSection {
     $manageButton = New-Object System.Windows.Forms.Button
     $manageButton.Name = 'ManageEntriesButton'
     $manageButton.Text = Get-LocalizedString -Key 'Popup.Customize'
-    $manageButton.Font = New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)
+    $manageButton.Font = New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)
     $manageButton.ForeColor = $script:ColorSecondary
     $manageButton.BackColor = $script:ColorBackground
     $manageButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
@@ -188,7 +188,7 @@ function Add-PopupSettingsSection {
     $configSection.Size = New-Object Drawing.Size(390, 20)
     $configSection.BackColor = $script:ColorSurface
 
-    $configLabel = New-Label -Text (Get-LocalizedString -Key 'Settings.Title') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
+    $configLabel = New-Label -Text (Get-LocalizedString -Key 'Settings.Title') -Font (New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 2 -Width 220 -Height 17
     $configSection.Controls.Add($configLabel)
     $Root.Controls.Add($configSection)
@@ -199,7 +199,7 @@ function Add-PopupSettingsSection {
     $settings.Size = New-Object Drawing.Size(390, 38)
     $settings.BackColor = $script:ColorSurface
 
-    $autostartText = New-Label -Text (Get-LocalizedString -Key 'Settings.Autostart') -Font (New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)) `
+    $autostartText = New-Label -Text (Get-LocalizedString -Key 'Settings.Autostart') -Font (New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)) `
         -ForeColor $script:ColorPrimary -X 16 -Y 8 -Width 280 -Height 22
     $autostartText.Cursor = [System.Windows.Forms.Cursors]::Hand
     $settings.Controls.Add($autostartText)
@@ -208,7 +208,7 @@ function Add-PopupSettingsSection {
     $autostart = New-Object LenovoCheckBox
     $autostart.Name = 'AutostartCheckbox'
     $autostart.Text = ''
-    $autostart.Font = New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)
+    $autostart.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
     $autostart.ForeColor = $script:ColorPrimary
     $autostart.BackColor = $script:ColorSurface
     $autostart.AccentColor = $script:ColorAccent
@@ -231,12 +231,12 @@ function Add-PopupSettingsSection {
     $defaultPanel.BackColor = $script:ColorSurface
     $defaultPanel.Cursor = [System.Windows.Forms.Cursors]::Hand
 
-    $defaultName = New-Label -Text (Get-LocalizedString -Key 'Settings.DefaultTarget') -Font (New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)) `
-        -ForeColor $script:ColorPrimary -X 16 -Y 8 -Width 150 -Height 22
+    $defaultName = New-Label -Text (Get-LocalizedString -Key 'Settings.DefaultTarget') -Font (New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)) `
+        -ForeColor $script:ColorPrimary -X 16 -Y 8 -Width 144 -Height 22
     $defaultName.Cursor = [System.Windows.Forms.Cursors]::Hand
     $defaultPanel.Controls.Add($defaultName)
 
-    $defaultValue = New-Label -Text (Get-LocalizedString -Key 'Settings.NoDefaultTarget') -Font (New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)) `
+    $defaultValue = New-Label -Text (Get-LocalizedString -Key 'Settings.NoDefaultTarget') -Font (New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)) `
         -ForeColor $script:ColorPrimary -X 164 -Y 8 -Width 184 -Height 22
     $defaultValue.TextAlign = [Drawing.ContentAlignment]::MiddleRight
     $defaultValue.Cursor = [System.Windows.Forms.Cursors]::Hand
@@ -288,7 +288,7 @@ function Add-PopupRestartSection {
 
     $restartButton = New-Object System.Windows.Forms.Button
     $restartButton.Text = Get-LocalizedString -Key 'Action.RestartWindows'
-    $restartButton.Font = New-Object Drawing.Font('Segoe UI', 8.6, [Drawing.FontStyle]::Bold)
+    $restartButton.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
     $restartButton.ForeColor = $script:ColorPrimary
     $restartButton.BackColor = [Drawing.Color]::FromArgb(34, 34, 34)
     $restartButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
@@ -307,8 +307,8 @@ function Add-PopupRestartSection {
     # whenever the stored default differs from the next effective boot target.
     $restartTarget = New-Object System.Windows.Forms.Button
     $restartTarget.Text = Get-LocalizedString -Key 'Status.NextTargetDefaultOrder'
-    $restartTarget.Font = New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Regular)
-    $restartTarget.ForeColor = [Drawing.Color]::FromArgb(155,155,155)
+    $restartTarget.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
+    $restartTarget.ForeColor = $script:ColorSecondary
     $restartTarget.BackColor = $script:ColorSurface
     $restartTarget.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $restartTarget.FlatAppearance.BorderSize = 0
@@ -318,8 +318,13 @@ function Add-PopupRestartSection {
     $restartTarget.AutoEllipsis = $true
     $restartTarget.TabStop = $false
     $restartTarget.Location = New-Object Drawing.Point(16, 38)
-    $restartTarget.Size = New-Object Drawing.Size(358, 20)
+    $restartTarget.Size = New-Object Drawing.Size(358, 23)
     $restartTarget.Name = 'RestartTargetLabel'
+    $restartTarget.AccessibleName = $restartTarget.Text
+    $restartTarget.Add_TextChanged({
+        $this.AccessibleName = $this.Text
+        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($this,$this.Text) }
+    })
     $restartTarget.Add_Click({ if ($script:RestartTargetLabel -and $script:RestartTargetLabel.TabStop) { Use-DefaultForNextRestart } })
     $restartPanel.Controls.Add($restartTarget)
     $script:RestartTargetLabel = $restartTarget
@@ -331,8 +336,8 @@ function Add-PopupRestartSection {
     $footerPanel.Location = New-Object Drawing.Point(0, 652)
     $footerPanel.Size = New-Object Drawing.Size(390, 20)
     $footerPanel.BackColor = $script:ColorSurface
-    $versionLabel = New-Label -Text ("v{0}" -f $script:AppVersion) -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Regular)) `
-        -ForeColor ([Drawing.Color]::FromArgb(115,115,115)) -X 316 -Y 0 -Width 58 -Height 18
+    $versionLabel = New-Label -Text ("v{0}" -f $script:AppVersion) -Font (New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Regular)) `
+        -ForeColor ([Drawing.Color]::FromArgb(155,155,155)) -X 284 -Y 0 -Width 90 -Height 20
     $versionLabel.TextAlign = [Drawing.ContentAlignment]::MiddleRight
     $footerPanel.Controls.Add($versionLabel)
     $Root.Controls.Add($footerPanel)
@@ -358,21 +363,21 @@ function Add-PopupManageEntriesSection {
     $manageDivider.BackColor = [Drawing.Color]::FromArgb(54,54,54)
     $managePanel.Controls.Add($manageDivider)
 
-    $manageTitle = New-Label -Text (Get-LocalizedString -Key 'Manage.Title') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Bold)) `
+    $manageTitle = New-Label -Text (Get-LocalizedString -Key 'Manage.Title') -Font (New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 8 -Width 350 -Height 18
     $managePanel.Controls.Add($manageTitle)
 
-    $manageHint = New-Label -Text (Get-LocalizedString -Key 'Manage.Hint') -Font (New-Object Drawing.Font('Segoe UI', 7.5, [Drawing.FontStyle]::Regular)) `
-        -ForeColor $script:ColorSecondary -X 16 -Y 29 -Width 358 -Height 17
+    $manageHint = New-Label -Text (Get-LocalizedString -Key 'Manage.Hint') -Font (New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)) `
+        -ForeColor $script:ColorSecondary -X 16 -Y 28 -Width 358 -Height 20
     $managePanel.Controls.Add($manageHint)
 
-    $manageSubHint = New-Label -Text (Get-LocalizedString -Key 'Manage.SubHint') -Font (New-Object Drawing.Font('Segoe UI', 7.2, [Drawing.FontStyle]::Regular)) `
-        -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 46 -Width 358 -Height 17
+    $manageSubHint = New-Label -Text (Get-LocalizedString -Key 'Manage.SubHint') -Font (New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)) `
+        -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 49 -Width 358 -Height 20
     $managePanel.Controls.Add($manageSubHint)
 
     $cancelManage = New-Object System.Windows.Forms.Button
     $cancelManage.Text = Get-LocalizedString -Key 'Common.Cancel'
-    $cancelManage.Font = New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)
+    $cancelManage.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
     $cancelManage.ForeColor = $script:ColorPrimary
     $cancelManage.BackColor = [Drawing.Color]::FromArgb(34,34,34)
     $cancelManage.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
@@ -388,13 +393,13 @@ function Add-PopupManageEntriesSection {
 
     $saveManage = New-Object System.Windows.Forms.Button
     $saveManage.Text = Get-LocalizedString -Key 'Manage.Save'
-    $saveManage.Font = New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Bold)
+    $saveManage.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
     $saveManage.ForeColor = [Drawing.Color]::FromArgb(135,135,135)
     $saveManage.BackColor = [Drawing.Color]::FromArgb(35,35,35)
     $saveManage.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $saveManage.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(58,58,58)
     $saveManage.FlatAppearance.BorderSize = 1
-    $saveManage.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(242,59,49)
+    $saveManage.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(190,35,28)
     $saveManage.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(185,30,22)
     $saveManage.Location = New-Object Drawing.Point(150, 78)
     $saveManage.Size = New-Object Drawing.Size(224, 34)
@@ -408,8 +413,8 @@ function Add-PopupManageEntriesSection {
     $manageFooter.Location = New-Object Drawing.Point(0, 116)
     $manageFooter.Size = New-Object Drawing.Size(390, 32)
     $manageFooter.BackColor = $script:ColorSurface
-    $manageVersion = New-Label -Text ("v{0}" -f $script:AppVersion) -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Regular)) `
-        -ForeColor ([Drawing.Color]::FromArgb(120,120,120)) -X 316 -Y 7 -Width 58 -Height 18
+    $manageVersion = New-Label -Text ("v{0}" -f $script:AppVersion) -Font (New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Regular)) `
+        -ForeColor ([Drawing.Color]::FromArgb(155,155,155)) -X 284 -Y 7 -Width 90 -Height 20
     $manageVersion.TextAlign = [Drawing.ContentAlignment]::MiddleRight
     $manageFooter.Controls.Add($manageVersion)
     $managePanel.Controls.Add($manageFooter)

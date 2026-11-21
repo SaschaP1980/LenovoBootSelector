@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.1.0 – Coherent popup typography, contrast and spacing (LBS-186 / UX-02)
+
+- Use a restrained Segoe UI type scale: 11.5 pt brand, 10 pt bold row titles, 9 pt body/status/actions and 8.5 pt section/auxiliary text. Keep the stable header, compact popup, row heights, hit targets, Manage viewport and existing selection/restart semantics.
+- Improve effective contrast for hidden row text, version labels and interactive status/actions; retain the Lenovo-red structural accent and use a lighter red for text against dark surfaces. Darken the enabled Save hover background to preserve white-text contrast.
+- Adjust internal spacing and footer/in-line alias hint widths; retain full long names and status descriptions through existing or explicit tooltip/accessibility text.
+- Add 48 focused isolated native WinForms typography assertions for English/German and synthetic 96/240 DPI, including contrast and font-fit metrics. Physical mixed-monitor visual acceptance remains separate.
+
 ## v1.5.0.0 – Remove fixed Default Restore startup delay (LBS-3)
 
 - Register the fixed SYSTEM `LenovoBootSelector-Default-Restore` task with one AtStartup BootTrigger and **no Delay element**. Actual Windows Task Scheduler execution time is not guaranteed to be zero.

@@ -17,6 +17,8 @@ function Update-DefaultUi {
 
         if ($script:DefaultValueLabel -and -not $script:DefaultValueLabel.IsDisposed) {
             $script:DefaultValueLabel.Text = if ($checking) { Get-LocalizedString -Key 'Status.Checking' } else { Get-DefaultEntryTitle }
+            $script:DefaultValueLabel.AccessibleDescription = [string]$script:DefaultValueLabel.Text
+            if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($script:DefaultValueLabel, [string]$script:DefaultValueLabel.Text) }
             $script:DefaultValueLabel.ForeColor = if ($visualEnabled) { $script:ColorPrimary } else { [Drawing.Color]::FromArgb(110,110,110) }
         }
         if ($script:DefaultArrowLabel -and -not $script:DefaultArrowLabel.IsDisposed) {

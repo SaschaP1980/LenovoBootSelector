@@ -1310,7 +1310,7 @@ function Update-RestartTargetUi {
     $script:RestartTargetLabel.Enabled = $true
     $script:RestartTargetLabel.Cursor = if ($canApply) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
     $script:RestartTargetLabel.TabStop = [bool]$canApply
-    $script:RestartTargetLabel.ForeColor = if ($canApply) { $script:ColorAccent } else { $script:ColorSecondary }
+    $script:RestartTargetLabel.ForeColor = if ($canApply) { [Drawing.Color]::FromArgb(255,110,102) } else { $script:ColorSecondary }
     $script:RestartTargetLabel.AccessibleDescription = if ($canApply) { Get-LocalizedString -Key 'BootNext.UseDefaultHint' -Values @{ Default=$default } } else { $label }
     $script:RestartTargetLabel.FlatAppearance.MouseOverBackColor = if ($canApply) { $script:ColorSelectedRow } else { $script:ColorSurface }
     Update-BootNextRestartInterlock

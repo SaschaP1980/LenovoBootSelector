@@ -600,7 +600,7 @@ function Add-BootEntryAliasEditor {
     $aliasEditor.Name = 'AliasEditor'
     $aliasEditor.Tag = $entry.Guid
     $aliasEditor.Text = if ($alias) { [string]$alias } else { '' }
-    $aliasEditor.Font = New-Object Drawing.Font('Segoe UI', 9.2, [Drawing.FontStyle]::Regular)
+    $aliasEditor.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
     $aliasEditor.ForeColor = $script:ColorPrimary
     $aliasEditor.BackColor = [Drawing.Color]::FromArgb(24,24,24)
     $aliasEditor.BorderStyle = [System.Windows.Forms.BorderStyle]::None
@@ -685,15 +685,15 @@ function Add-BootEntryAliasEditor {
     $applyAlias.Name = 'AliasApplyButton'
     $applyAlias.Text = Get-LocalizedString -Key 'Common.Apply'
     $applyAlias.Tag = $entry.Guid
-    $applyAlias.Font = New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Bold)
-    $applyAlias.ForeColor = $script:ColorAccent
+    $applyAlias.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
+    $applyAlias.ForeColor = [Drawing.Color]::FromArgb(255,110,102)
     $applyAlias.BackColor = $script:ColorRow
     $applyAlias.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $applyAlias.FlatAppearance.BorderSize = 0
     $applyAlias.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(42,42,42)
     $applyAlias.FlatAppearance.MouseDownBackColor = $script:ColorSelectedRow
     $applyAlias.Location = New-Object Drawing.Point(58, 62)
-    $applyAlias.Size = New-Object Drawing.Size(104, 24)
+    $applyAlias.Size = New-Object Drawing.Size(92, 24)
     $applyAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
     $applyAlias.Add_Click({
         param($sender,$eventArgs)
@@ -711,15 +711,15 @@ function Add-BootEntryAliasEditor {
     $cancelAlias = New-Object System.Windows.Forms.Button
     $cancelAlias.Name = 'AliasCancelButton'
     $cancelAlias.Text = Get-LocalizedString -Key 'Common.Cancel'
-    $cancelAlias.Font = New-Object Drawing.Font('Segoe UI', 7.6, [Drawing.FontStyle]::Regular)
+    $cancelAlias.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
     $cancelAlias.ForeColor = $script:ColorSecondary
     $cancelAlias.BackColor = $script:ColorRow
     $cancelAlias.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $cancelAlias.FlatAppearance.BorderSize = 0
     $cancelAlias.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(42,42,42)
     $cancelAlias.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(34,34,34)
-    $cancelAlias.Location = New-Object Drawing.Point(166, 62)
-    $cancelAlias.Size = New-Object Drawing.Size(94, 24)
+    $cancelAlias.Location = New-Object Drawing.Point(154, 62)
+    $cancelAlias.Size = New-Object Drawing.Size(80, 24)
     $cancelAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
     $cancelAlias.Add_Click({
         $script:ManageAliasEditGuid = $null
@@ -728,9 +728,11 @@ function Add-BootEntryAliasEditor {
     })
     $row.Controls.Add($cancelAlias)
 
-    $originalHint = New-Label -Text (Get-LocalizedString -Key 'Manage.OriginalNameHint') -Font (New-Object Drawing.Font('Segoe UI', 7.0, [Drawing.FontStyle]::Regular)) `
-        -ForeColor ([Drawing.Color]::FromArgb(125,125,125)) -X 266 -Y 65 -Width 110 -Height 18
+    $originalHint = New-Label -Text (Get-LocalizedString -Key 'Manage.OriginalNameHint') -Font (New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Regular)) `
+        -ForeColor ([Drawing.Color]::FromArgb(155,155,155)) -X 238 -Y 60 -Width 138 -Height 30
     $originalHint.TextAlign = [Drawing.ContentAlignment]::MiddleRight
+    $originalHint.AccessibleDescription = $originalHint.Text
+    if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($originalHint,$originalHint.Text) }
     $row.Controls.Add($originalHint)
 }
 
@@ -1084,8 +1086,8 @@ $marker.AllowDrop = $script:IsManageEntriesMode
 $row.Controls.Add($marker)
 
 $iconColor = if ($isHidden) { [Drawing.Color]::FromArgb(105,105,105) } else { $entry.Accent }
-$titleColor = if ($isHidden) { [Drawing.Color]::FromArgb(145,145,145) } else { $script:ColorPrimary }
-$subtitleColor = if ($isHidden) { [Drawing.Color]::FromArgb(100,100,100) } else { $script:ColorSecondary }
+$titleColor = if ($isHidden) { [Drawing.Color]::FromArgb(175,175,175) } else { $script:ColorPrimary }
+$subtitleColor = if ($isHidden) { [Drawing.Color]::FromArgb(155,155,155) } else { $script:ColorSecondary }
 
 $icon = New-Label -Text $entry.Symbol -Font (New-Object Drawing.Font('Segoe UI Symbol', 18, [Drawing.FontStyle]::Regular)) `
     -ForeColor $iconColor -X 22 -Y 7 -Width 28 -Height 44
@@ -1136,8 +1138,8 @@ $subtitle = $null
 if (-not $aliasEditActive) {
     $subtitleWidth = if ($script:IsManageEntriesMode) { 220 } else { 284 }
     $subtitleText = [string]$rowText.Subtitle
-    $subtitle = New-Label -Text $subtitleText -Font (New-Object Drawing.Font('Segoe UI', 8.3, [Drawing.FontStyle]::Regular)) `
-        -ForeColor $subtitleColor -X 58 -Y 27 -Width $subtitleWidth -Height 27
+    $subtitle = New-Label -Text $subtitleText -Font (New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)) `
+        -ForeColor $subtitleColor -X 58 -Y 28 -Width $subtitleWidth -Height 26
     $subtitle.Name = 'BootSubtitleLabel'
     $subtitle.AutoEllipsis = $false
     $subtitle.AccessibleDescription = [string]$subtitleText

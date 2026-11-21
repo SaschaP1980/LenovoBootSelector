@@ -95,6 +95,11 @@ $headerProbe = Join-Path $root 'tests\Test-LBS174-HeaderStability.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $headerProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-174 native popup header regression failed' }
 
+# LBS-186: actual popup and row text fit, contrast and localized roles.
+$typographyProbe = Join-Path $root 'tests\Test-LBS186-Typography.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $typographyProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-186 native typography regression failed' }
+
 # LBS-172: isolate native snapshot-drag, fast reversals, cleanup and 100%/250% DPI.
 $dragVisualProbe = Join-Path $root 'tests\Test-LBS172-DragVisual.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $dragVisualProbe
