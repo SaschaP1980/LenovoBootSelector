@@ -99,7 +99,7 @@ try {
     Assert-Lbs174 'completion does not move title' ($title.Location -eq $atRest)
     Assert-Lbs174 'completion clears status text' ([string]$status.Text -eq '')
     Assert-Lbs174 'initial header title is larger than compact 10.2pt design' ([Math]::Abs($title.Font.Size-11.5) -lt .05)
-    Assert-Lbs174 'initial status uses readable 8.25pt font' ([Math]::Abs($status.Font.Size-8.25) -lt .05)
+    Assert-Lbs174 'initial status uses readable 9pt font' ([Math]::Abs($status.Font.Size-9.0) -lt .05)
     Assert-Lbs174 'title and reserved status region have positive vertical separation' ($title.Bottom + 2 -le $status.Top)
     Assert-Lbs174 'title clears refresh affordance horizontally' ($title.Right + 8 -le $refresh.Left)
     Assert-Lbs174 'status clears refresh affordance horizontally' ($status.Right + 8 -le $refresh.Left)

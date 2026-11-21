@@ -522,13 +522,21 @@ The Hotfix exception exists to keep urgent, narrow corrections fast. Even when a
 
 ### LBS Issue title and branch naming
 
-`LBS` is this repository's project-specific prefix. For new actionable Issues, use the **GitHub Issue number** as the numeric identity everywhere.
+**Mandatory Issue-Creation Completion Gate (all chats and development paths).**
 
-After GitHub creates the Issue and returns its number, immediately normalize the title before implementation:
+`LBS` is this repository's project-specific prefix. Every newly created non-Epic Issue uses the **GitHub Issue number** as its numeric identity, including backlog-only, documentation/process, enhancement, bug and Epic-child Issues. This rule applies even if implementation is not authorized or no development path has been selected. Before any Issue creation, including a batch or planning-only request, use the current mandatory bootstrap in [Initial Prompt](INITIAL_PROMPT.md).
 
-`[LBS-<github-issue-number>] <descriptive title>`
+**Epic exception:** A genuine Epic is a parent planning/coordination container. Its title starts with `[Epic]` and must not contain an `[LBS-<number>]` identifier. Its GitHub-assigned Issue number still exists and is used for links. Every concrete child Issue extracted from an Epic follows the normal numbered LBS title rule. Do not use the Epic exception for ordinary scoped backlog items.
 
-If the Work-Path is selected, use the same number in:
+For every new Issue, complete this sequence before creating the next Issue (including in batches), reporting success, ending the task or beginning implementation:
+
+1. Classify the Issue as regular or Epic and create it with the intended descriptive title, body, and labels. Never guess the next GitHub number.
+2. Read the actual GitHub-assigned number from the creation response. If missing, resolve the existing Issue by its returned URL or verified repository state; do not guess or create a duplicate.
+3. For a regular Issue, immediately update its title to `[LBS-<github-issue-number>] <descriptive title>`, preserving all other metadata. For an Epic, retain the intended unnumbered `[Epic]` title.
+4. Independently fetch the persisted Issue from GitHub. For a regular Issue, verify the exact intended title and exact prefix matching its actual GitHub number (a bare `[LBS]` is never valid). For an Epic, verify the exact intended title starts with `[Epic]` and contains no numbered LBS identifier.
+5. Mark creation complete only after the read-back passes. If the write or verification fails, reconcile the same Issue and retry safely; if unresolved, report creation as incomplete and do not claim success. On chat interruption, inspect and finish the existing Issue rather than creating a duplicate. For batches, report which actual Issues were independently verified and which remain incomplete.
+
+If Work-Path is selected for a regular Issue, use the same number in:
 
 `work/LBS-<github-issue-number>`
 
@@ -536,9 +544,9 @@ and later in:
 
 `Work-Branch: work/LBS-<github-issue-number>`
 
-Example: GitHub Issue `#90` -> `[LBS-90] ...` -> `work/LBS-90`.
+Example: regular GitHub Issue `#90` -> `[LBS-90] ...` -> `work/LBS-90`; a genuine Epic at GitHub Issue `#91` -> `[Epic] ...` (no numbered LBS prefix).
 
-Do not search for or allocate a separate free LBS number. Historical Issues with older independent LBS IDs remain unchanged as historical provenance.
+Do not search for or allocate a separate free LBS number. Historical Issues with older independent LBS IDs remain unchanged as historical provenance. This title gate does not itself authorize implementation, require a development-path label, or trigger a product build/release.
 
 ### Issue-backed implementation lifecycle — best practice
 

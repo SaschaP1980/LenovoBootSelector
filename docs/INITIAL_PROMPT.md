@@ -20,7 +20,7 @@ If a GitHub connector is available, use it for repository, Issue, Pull Request, 
 
 ## 2. Bootstrap – always execute first
 
-Before planning or implementing a product change:
+Before planning or implementing a product change **or creating, recording, or triaging GitHub Issues (including backlog-only and Epic requests)**:
 
 1. Read the current `main` commit, including SHA and tree.
 2. Read this file from the current `main`.
@@ -442,7 +442,11 @@ It does **not** count as physical Lenovo hardware/UEFI E2E. Final reports must e
 
 ## 17. GitHub Issue lifecycle
 
-For this repository, `LBS` is the project-specific Issue/branch prefix. For every newly created actionable Issue, use the **GitHub Issue number** as the numeric component: after Issue creation immediately normalize the title to `[LBS-<github-issue-number>] <descriptive title>`. If Work-Path is selected, use the same number in `work/LBS-<github-issue-number>`. Do not allocate or search for a separate LBS sequence. Historical Issues with older independent LBS IDs remain historical evidence.
+For this repository, `LBS` is the project-specific Issue/branch prefix. Every newly created non-Epic Issue, including a backlog item not yet authorized for implementation, must have the title `[LBS-<github-issue-number>] <descriptive title>`. Use the actual number returned by GitHub after creation. If Work-Path is selected, use the same number in `work/LBS-<github-issue-number>`. Do not allocate or search for a separate LBS sequence. Historical Issues with older independent LBS IDs remain historical evidence.
+
+**Epic exception:** A genuine Epic is a parent planning/coordination container, not a scoped implementation Issue. Its title starts with `[Epic]` and must not contain an `[LBS-<number>]` identifier. GitHub still assigns its normal Issue number. A concrete child Issue extracted from an Epic is not exempt and must receive its own `[LBS-<github-issue-number>]` title prefix.
+
+**Mandatory Issue-Creation Completion Gate — applies in every fresh or resumed chat, even for backlog-only requests and batch creation:** Follow the verified create/rename/re-read procedure in [GitHub How-To](GITHUB_HOWTO.md#lbs-issue-title-and-branch-naming). For each non-Epic Issue, immediately rename using the returned number, then independently fetch the actual saved Issue and verify the exact canonical prefix and intended title. For an Epic, independently verify the saved `[Epic]` title and absence of a numbered LBS identifier. Do this before creating the next Issue, reporting successful creation, ending the task, or starting implementation. An unnumbered `[LBS]` placeholder is never a completed Issue. If verification fails or is interrupted, reconcile the existing Issue and finish the gate without creating a duplicate; report any unresolved item as incomplete. This gate does not require a development-path decision, build, or release.
 
 For Issue-backed work:
 

@@ -2,7 +2,7 @@
     if (-not $script:HeaderStatusLabel -or $script:HeaderStatusLabel.IsDisposed) { return }
     $interactive = [bool]$script:HeaderUpdateInteractionEnabled
     $highlight = ($interactive -and ([bool]$script:HeaderStatusHovered -or $script:HeaderStatusLabel.Focused))
-    $script:HeaderStatusLabel.ForeColor = if ($highlight) { $script:ColorAccent } else { $script:ColorSecondary }
+    $script:HeaderStatusLabel.ForeColor = if ($highlight) { [Drawing.Color]::FromArgb(255,110,102) } else { $script:ColorSecondary }
     $script:HeaderStatusLabel.Cursor = if ($interactive) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
     $script:HeaderStatusLabel.TabStop = $interactive
 }
