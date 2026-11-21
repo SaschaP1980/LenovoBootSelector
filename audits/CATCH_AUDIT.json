@@ -1,5 +1,5 @@
 {
-  "version": "1.5.1.1",
+  "version": "1.5.1.2",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
@@ -718,7 +718,7 @@
     },
     {
       "source": "src/UI/DefaultTargetPresentation.ps1",
-      "line": 31,
+      "line": 43,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "} catch { }"
