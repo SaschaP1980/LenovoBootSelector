@@ -116,7 +116,7 @@ When a Patch/Hotfix uses Work-Path by exception, record the concise reason in th
 
 For this repository, **`LBS` is the project-specific Issue/branch prefix for Lenovo Boot Selector**.
 
-For every newly created actionable project Issue, the numeric component is the **GitHub Issue number itself**. Do not maintain or search for a separate free LBS sequence.
+For every newly created non-Epic project Issue, including backlog-only and documentation/process Issues, the numeric component is the **GitHub Issue number itself**. Do not maintain or search for a separate free LBS sequence. A genuine Epic is a parent planning/coordination container and is the sole Issue-title exception: start its title with `[Epic]` and do not add an `[LBS-<number>]` identifier. Its normal GitHub Issue number still exists. Every scoped child Issue extracted from an Epic must receive its own canonical LBS prefix.
 
 Canonical forms:
 
@@ -124,12 +124,15 @@ Canonical forms:
 - Work-Path branch -> `work/LBS-90`;
 - Candidate provenance -> `Work-Branch: work/LBS-90`.
 
-Because GitHub assigns the Issue number only after creation, use this two-step creation flow:
+Because GitHub assigns the Issue number only after creation, use the mandatory Issue-Creation Completion Gate defined in [GitHub How-To](GITHUB_HOWTO.md#lbs-issue-title-and-branch-naming):
 
-1. create the Issue with the intended descriptive title/body/labels;
-2. read the returned GitHub Issue number;
-3. immediately rename the Issue to `[LBS-<github-issue-number>] <descriptive title>` before implementation starts;
-4. if Work-Path is selected, use that same GitHub Issue number in the work branch and Candidate provenance.
+1. classify the Issue as a genuine Epic or a regular Issue; create it with the intended descriptive title/body/labels;
+2. read the actual returned GitHub Issue number;
+3. for a regular Issue, immediately rename it to `[LBS-<github-issue-number>] <descriptive title>`; for an Epic, retain the `[Epic]` title without a numbered LBS identifier;
+4. independently re-read the saved Issue and require an exact intended title and the correct prefix/exception before declaring success, creating another Issue in a batch, ending the task, or starting implementation;
+5. if Work-Path is selected for a regular Issue, use that same GitHub Issue number in the work branch and Candidate provenance.
+
+This gate also applies to pure backlog creation with no build authorization. A bare `[LBS]` prefix is an incomplete creation, not an alternative naming style. On failure or interruption, repair/reconcile the existing Issue instead of creating a duplicate; do not report completion until verified.
 
 Do not infer another numeric namespace and do not scan for an unused LBS number. The GitHub Issue number is the single numeric identity for new work.
 
