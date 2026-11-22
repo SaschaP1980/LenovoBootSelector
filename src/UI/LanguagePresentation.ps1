@@ -58,6 +58,15 @@ function Rebuild-PopupForLocale {
     }
 }
 
+function Update-CachedBootEntryLocalization {
+    # Project the same firmware identity and already observed storage facts.
+    # Do not read hardware or use a newer global storage snapshot which may
+    # belong to a refresh deferred while a BootNext selection is pending.
+    $script:CurrentEntries = @(foreach ($entry in $script:CurrentEntries) {
+        Get-FriendlyBootEntry -Guid ([string]$entry.Guid) -RawDescription ([string]$entry.LocalizationRawDescription) -StorageContext $entry.LocalizationStorageContext
+    })
+}
+
 function Set-LanguageFromUi {
     param([Parameter(Mandatory=$true)][ValidateSet('en-US','de-DE')][string]$Locale)
 
@@ -66,6 +75,7 @@ function Set-LanguageFromUi {
     Update-TrayLocalizedText
 
     if ($after -ne $before) {
+        Update-CachedBootEntryLocalization
         Rebuild-PopupForLocale
     }
     return $after

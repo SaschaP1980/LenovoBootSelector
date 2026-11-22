@@ -1747,6 +1747,10 @@ function Get-FriendlyBootEntry {
         TypeTooltip = [string]$model.TypeTooltip
         Resolution = $model.Resolution
         ResolutionReason = $model.ResolutionReason
+        # Keep the exact original raw input (including empty descriptions)
+        # and associated storage snapshot for presentation-only relocalization.
+        LocalizationRawDescription = [string]$RawDescription
+        LocalizationStorageContext = $StorageContext
     }
 }
 

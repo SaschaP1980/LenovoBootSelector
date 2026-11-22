@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.1.3 – Immediately localize cached boot entries (LBS-191)
+
+- Reproject existing boot-entry titles, subtitles and tooltips immediately when changing German/English language, before the popup is rebuilt.
+- Preserve the original firmware description and the storage snapshot associated with each entry, including empty descriptions; do not invoke a hardware refresh or privileged task for localization.
+- Add a focused Windows PowerShell 5.1 regression for both directions, cached hardware evidence, pending selection, aliases and draft preservation, and later refresh completion.
+
 ## v1.5.1.2 – Readable pending next-boot actions (LBS-186 / UX-02)
 
 - Render the truly disabled Windows Restart action and pending BootNext footer in readable neutral gray on the existing dark WinForms surfaces. Preserve the real Restart/BootNext interlock, enabled style, borders, geometry, localized full-text tooltip/accessibility and system High Contrast drawing.
