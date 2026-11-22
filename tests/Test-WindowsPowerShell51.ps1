@@ -100,6 +100,11 @@ $typographyProbe = Join-Path $root 'tests\Test-LBS186-Typography.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $typographyProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-186 native typography regression failed' }
 
+# LBS-191: exercise the canonical locale and cached-entry adapters in isolation.
+$liveLocalizationProbe = Join-Path $root 'tests\Test-LBS191-LiveLocalization.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $liveLocalizationProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-191 live localization regression failed' }
+
 # LBS-172: isolate native snapshot-drag, fast reversals, cleanup and 100%/250% DPI.
 $dragVisualProbe = Join-Path $root 'tests\Test-LBS172-DragVisual.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $dragVisualProbe
