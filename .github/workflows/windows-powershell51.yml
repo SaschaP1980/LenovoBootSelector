@@ -175,6 +175,7 @@ jobs:
               manageGrip = Get-TestTotal $logText '^LBS166 GRIP TOTAL\s+(\d+)/(\d+)\s*$'
               manageViewport = Get-TestTotal $logText '^LBS157 VIEWPORT TOTAL\s+(\d+)/(\d+)\s*$'
               localizationRuntime = Get-TestTotal $logText '^LOCALIZATION TOTAL\s+(\d+)/(\d+)\s*$'
+              liveLocalization = Get-TestTotal $logText '^LBS191 LIVE LOCALIZATION TOTAL\s+(\d+)/(\d+)\s*$'
               refreshRuntime = Get-TestTotal $logText '^REFRESH TOTAL\s+(\d+)/(\d+)\s*$'
               refreshController = Get-TestTotal $logText '^REFRESH CONTROLLER TOTAL\s+(\d+)/(\d+)\s*$'
               mutex = Get-TestTotal $logText '^MUTEX TOTAL\s+(\d+)/(\d+)\s*$'
@@ -206,6 +207,7 @@ jobs:
               'manageGrip',
               'manageViewport',
               'localizationRuntime',
+              'liveLocalization',
               'refreshRuntime',
               'refreshController',
               'mutex',
@@ -243,6 +245,7 @@ jobs:
               $totals.manageGrip.passed +
               $totals.manageViewport.passed +
               $totals.localizationRuntime.passed +
+              $totals.liveLocalization.passed +
               $totals.refreshRuntime.passed +
               $totals.refreshController.passed +
               $totals.mutex.passed +
@@ -271,6 +274,7 @@ jobs:
               $totals.manageGrip.expected +
               $totals.manageViewport.expected +
               $totals.localizationRuntime.expected +
+              $totals.liveLocalization.expected +
               $totals.refreshRuntime.expected +
               $totals.refreshController.expected +
               $totals.mutex.expected +
