@@ -30,6 +30,11 @@ $dragVisualProbe = Join-Path $root 'tests\Test-LBS172-DragVisual.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $dragVisualProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-172 native Manage Entries drag visual regression failed' }
 
+# LBS-217: native DE/EN selected/pending/idle row status semantics at 96/240 synthetic DPI.
+$bootRowStateProbe = Join-Path $root 'tests\Test-LBS217-RowState.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $bootRowStateProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-217 native boot row state semantics regression failed' }
+
 # LBS-215: isolate native Manage grip click routing and unchanged drag admission.
 $gripClickProbe = Join-Path $root 'tests\Test-LBS215-GripClick.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $gripClickProbe

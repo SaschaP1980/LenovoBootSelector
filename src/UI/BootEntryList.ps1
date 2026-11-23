@@ -102,7 +102,9 @@ function Get-PopupRowsPresentationState {
         (Get-LocalizedString -Key 'Manage.HiddenAccessible'),
         (Get-LocalizedString -Key 'Manage.VisibleAccessible'),
         (Get-LocalizedString -Key 'Boot.MenuManageSubtitle'),
-        (Get-LocalizedString -Key 'BootNext.SelectionPending')
+        (Get-LocalizedString -Key 'BootNext.SelectionPending'),
+        (Get-LocalizedString -Key 'BootNext.RowPendingHint'),
+        (Get-LocalizedString -Key 'BootNext.RowSelectedHint')
     )
     $presentation = [ordered]@{
         scale = [Math]::Round($Scale, 4)
