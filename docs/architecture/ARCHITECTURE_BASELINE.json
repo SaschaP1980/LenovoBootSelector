@@ -1,7 +1,7 @@
 {
-  "version": "1.5.10.1",
+  "version": "1.5.10.2",
   "runtime": {
-    "lines": 12900,
+    "lines": 12915,
     "functions": 369,
     "scriptReferences": 1713,
     "scriptVariables": 188,
@@ -28,12 +28,12 @@
   },
   "ui": {
     "files": 20,
-    "lines": 5582,
+    "lines": 5584,
     "functions": 143,
     "scriptReferences": 1012
   },
   "appTemplate": {
-    "lines": 2398,
+    "lines": 2411,
     "functions": 32,
     "scriptReferences": 430
   }

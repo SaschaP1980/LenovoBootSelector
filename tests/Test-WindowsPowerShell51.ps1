@@ -30,6 +30,11 @@ $dragVisualProbe = Join-Path $root 'tests\Test-LBS172-DragVisual.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $dragVisualProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-172 native Manage Entries drag visual regression failed' }
 
+# LBS-206 Hotfix v1.5.10.2: owner-painted Standardziel boundary + reset tooltip.
+$menuEdgeProbe = Join-Path $root 'tests\Test-LBS206-MenuContrast.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $menuEdgeProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-206 native Standardziel contrast / tooltip regression failed' }
+
 # LBS-206: native Layout C readback status, explicit default once and DPI safety.
 $layoutCProbe = Join-Path $root 'tests\Test-LBS206-LayoutC.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $layoutCProbe

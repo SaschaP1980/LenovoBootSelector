@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.10.2 – Standard-target reset tooltip and dropdown contrast (LBS-206 Hotfix)
+
+- Correct the **Reset to default target / Auf Standardziel zurücksetzen** tooltip in both English and German: it replaces the currently verified one-time next-boot target with the saved default and does **not** restart the computer. The visible button label, accessible description and existing guarded BootNext worker remain unchanged in function.
+- Give only the **Standard-Startziel** context menu a restrained neutral **#6C6C6C** owner-painted outline, scaled on the menu's native 96/240-DPI graphics surface. This creates a measured boundary contrast of at least **3:1** against the existing dark settings/list surfaces without altering menu interior, text, selectable rows, keyboard/ESC behavior or unrelated tray/submenus.
+- Add isolated native Windows PowerShell 5.1 raster and localization regressions for DE/EN, 100%/250% synthetic DPI, actual edge pixels, preserved dark menu background, unaffected other menus and two-language no-restart reset semantics. No firmware, privileged task, updater or persistent default behavior changes.
+
 ## v1.5.10.1 – Reset-to-default clarity and asynchronous BootNext feedback (LBS-206 Hotfix)
 
 - Change the conditional action label to **Reset to default target / Auf Standardziel zurücksetzen**; show it only when the independently verified one-time firmware target differs from a valid stored default. Firmware-order, unverified, unavailable, aligned and pending states no longer offer a misleading reset.
