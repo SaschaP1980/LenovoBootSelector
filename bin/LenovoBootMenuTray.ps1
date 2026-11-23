@@ -91,9 +91,15 @@ function Get-LocalizationCatalogCore {
             'BootNext.UnknownLine' = 'Next restart: unknown · check before restarting'
             'BootNext.FirmwareOrderLine' = 'Next: firmware order · default: {Default}'
             'BootNext.AlignedLine' = 'Next: {Next} · matches default'
-            'BootNext.DifferentLine' = 'Next: {Next} · default: {Default} (change)'
+            'BootNext.DifferentLine' = 'Next: {Next} · default: {Default}'
             'BootNext.UnavailableLine' = 'Next boot target unavailable'
             'BootNext.UseDefaultHint' = 'Set {Default} as the one-time target for the next restart'
+            'BootNext.UseDefaultOnce' = 'Use default once'
+            'BootNext.LayoutUnknown' = 'Next restart · unverified; check target'
+            'BootNext.LayoutFirmwareOrder' = 'Verified · firmware order (no one-time target)'
+            'BootNext.LayoutAligned' = 'Verified · matches default: {Next}'
+            'BootNext.LayoutDifferent' = 'Verified · differs from default: {Next}'
+            'BootNext.LayoutUnavailable' = 'Next restart · selected target unavailable'
             'BootNext.DefaultApplied' = 'Stored default selected for the next restart.'
             'BootNext.DefaultApplyFailed' = 'The next restart target could not be changed. Please check the actual target.'
             'BootNext.SelectionPending' = 'Setting next boot target…'
@@ -371,9 +377,15 @@ function Get-LocalizationCatalogCore {
             'BootNext.UnknownLine' = 'Nächster Neustart: unbekannt · bitte prüfen'
             'BootNext.FirmwareOrderLine' = 'Nächstes Ziel: Firmware-Reihenfolge · Standard: {Default}'
             'BootNext.AlignedLine' = 'Nächstes Ziel: {Next} · entspricht Standard'
-            'BootNext.DifferentLine' = 'Nächstes Ziel: {Next} · Standard: {Default} (ändern)'
+            'BootNext.DifferentLine' = 'Nächstes Ziel: {Next} · Standard: {Default}'
             'BootNext.UnavailableLine' = 'Nächstes Startziel nicht verfügbar'
             'BootNext.UseDefaultHint' = '{Default} einmalig für den nächsten Neustart vormerken'
+            'BootNext.UseDefaultOnce' = 'Standard einmalig verwenden'
+            'BootNext.LayoutUnknown' = 'Nächster Start · ungeprüft; Ziel prüfen'
+            'BootNext.LayoutFirmwareOrder' = 'Geprüft · Firmware-Reihenfolge (kein Einmalziel)'
+            'BootNext.LayoutAligned' = 'Bestätigt · wie Standard: {Next}'
+            'BootNext.LayoutDifferent' = 'Bestätigt · abweichend vom Standard: {Next}'
+            'BootNext.LayoutUnavailable' = 'Nächster Start · Ziel nicht verfügbar'
             'BootNext.DefaultApplied' = 'Standardziel wurde für den nächsten Neustart vorgemerkt.'
             'BootNext.DefaultApplyFailed' = 'Das nächste Startziel konnte nicht geändert werden. Bitte das tatsächliche Ziel prüfen.'
             'BootNext.SelectionPending' = 'Wird gesetzt …'
@@ -2280,7 +2292,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.9.0'
+$script:AppVersion = '1.5.10.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -2377,6 +2389,7 @@ $script:DefaultValueLabel = $null
 $script:DefaultArrowLabel = $null
 $script:DefaultInteractionEnabled = $false
 $script:RestartTargetLabel = $null
+$script:RestartUseDefaultButton = $null
 $script:DefaultContextMenu = $null
 $script:DefaultContextRoot = $null
 $script:LegacySessionRestoreRegistryPath = 'HKCU:\Volatile Environment'
@@ -6680,28 +6693,64 @@ function Use-DefaultForNextRestart {
 }
 
 function Update-RestartTargetUi {
+    # LBS-206: never infer a confirmed target from a pending request or cached
+    # GUID. Only the existing firmware readback flag permits a verified label.
     if (-not $script:RestartTargetLabel -or $script:RestartTargetLabel.IsDisposed) { return }
     $hasTarget = (-not $script:SelectedGuid -or $null -ne (Get-EntryByGuid $script:SelectedGuid))
     $model = Resolve-BootNextDisplayStateCore -DefaultGuid $script:DefaultGuid -EffectiveNextGuid $script:SelectedGuid -FirmwareReadSucceeded ([bool]$script:NextBootFirmwareReadVerified) -Checking $false -EffectiveTargetKnown $hasTarget
     $next = Get-NextBootTargetDisplayName
     $default = Get-DefaultEntryTitle
-    $canApply = ($model -eq 'different' -or $model -eq 'firmware-order') -and [bool]$script:DefaultGuid
     switch ($model) {
-        'unknown'        { $labelKey = 'BootNext.UnknownLine' }
-        'firmware-order' { $labelKey = 'BootNext.FirmwareOrderLine' }
-        'aligned'        { $labelKey = 'BootNext.AlignedLine' }
-        'different'      { $labelKey = 'BootNext.DifferentLine' }
-        'unavailable'    { $labelKey = 'BootNext.UnavailableLine' }
-        default          { $labelKey = 'BootNext.UnknownLine' }
+        'unknown'        { $labelKey = 'BootNext.LayoutUnknown' }
+        'firmware-order' { $labelKey = 'BootNext.LayoutFirmwareOrder' }
+        'aligned'        { $labelKey = 'BootNext.LayoutAligned' }
+        'different'      { $labelKey = 'BootNext.LayoutDifferent' }
+        'unavailable'    { $labelKey = 'BootNext.LayoutUnavailable' }
+        default          { $labelKey = 'BootNext.LayoutUnknown' }
     }
     $label = Get-LocalizedString -Key $labelKey -Values @{ Next=$next; Default=$default }
     $script:RestartTargetLabel.Text = $label
-    $script:RestartTargetLabel.Enabled = $true
-    $script:RestartTargetLabel.Cursor = if ($canApply) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
-    $script:RestartTargetLabel.TabStop = [bool]$canApply
-    $script:RestartTargetLabel.ForeColor = if ($canApply) { [Drawing.Color]::FromArgb(255,110,102) } else { $script:ColorSecondary }
-    $script:RestartTargetLabel.AccessibleDescription = if ($canApply) { Get-LocalizedString -Key 'BootNext.UseDefaultHint' -Values @{ Default=$default } } else { $label }
-    $script:RestartTargetLabel.FlatAppearance.MouseOverBackColor = if ($canApply) { $script:ColorSelectedRow } else { $script:ColorSurface }
+    $script:RestartTargetLabel.AccessibleName = $label
+    $script:RestartTargetLabel.AccessibleDescription = $label
+    $script:RestartTargetLabel.TabStop = $false
+    $script:RestartTargetLabel.Cursor = [Windows.Forms.Cursors]::Default
+    $script:RestartTargetLabel.ForeColor = if ($model -in @('unknown','unavailable')) {
+        $script:ColorWarning
+    } elseif ($model -in @('aligned','different')) {
+        $script:ColorPrimary
+    } else { $script:ColorSecondary }
+    if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($script:RestartTargetLabel,$label) }
+
+    # This gate is presentation-only; actual activation retains the existing
+    # ProbeReadiness, fixed task, firmware re-read and verification in
+    # Use-DefaultForNextRestart. No settings/default write is added here.
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    $canApply = ($model -eq 'different' -or $model -eq 'firmware-order') -and
+        [bool]$script:DefaultGuid -and [bool]$capabilities.CanSetBootNext -and
+        -not [bool]$script:BootNextPendingGuid
+    if ($script:RestartUseDefaultButton -and -not $script:RestartUseDefaultButton.IsDisposed) {
+        $action = $script:RestartUseDefaultButton
+        $action.Text = Get-LocalizedString -Key 'BootNext.UseDefaultOnce'
+        $action.AccessibleName = $action.Text
+        $action.AccessibleDescription = Get-LocalizedString -Key 'BootNext.UseDefaultHint' -Values @{ Default=$default }
+        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($action,$action.AccessibleDescription) }
+        $action.Visible = [bool]$canApply
+        $action.Enabled = [bool]$canApply
+        $action.TabStop = [bool]$canApply
+        $action.Cursor = if ($canApply) { [Windows.Forms.Cursors]::Hand } else { [Windows.Forms.Cursors]::Default }
+    }
+    if ($script:RestartButton -and -not $script:RestartButton.IsDisposed -and $script:RestartButton.Parent) {
+        # Every bound is derived from the parent's current physical width,
+        # never from a second DPI conversion. This reapplies after rescaling.
+        $scale = [double]$script:RestartButton.Parent.Width / 390.0
+        $x = if ($canApply) { 229 } else { 16 }
+        $w = if ($canApply) { 145 } else { 358 }
+        $script:RestartButton.Bounds = [Drawing.Rectangle]::new(
+            [int][Math]::Round($x*$scale),
+            [int][Math]::Round(30*$scale),
+            [Math]::Max(1,[int][Math]::Round($w*$scale)),
+            [Math]::Max(1,[int][Math]::Round(31*$scale)))
+    }
     Update-BootNextRestartInterlock
 }
 
@@ -8551,12 +8600,21 @@ function Update-BootNextRestartInterlock {
     if ($script:RestartButton -and -not $script:RestartButton.IsDisposed) {
         $script:RestartButton.Enabled = -not $pending
     }
+    if ($script:RestartUseDefaultButton -and -not $script:RestartUseDefaultButton.IsDisposed -and $pending) {
+        # The separate one-time action is never available during readback.
+        $script:RestartUseDefaultButton.Enabled = $false
+        $script:RestartUseDefaultButton.TabStop = $false
+        $script:RestartUseDefaultButton.Visible = $false
+    }
     if ($script:RestartTargetLabel -and -not $script:RestartTargetLabel.IsDisposed -and $pending) {
         $entry = Get-EntryByGuid ([string]$script:BootNextPendingGuid)
         $title = if ($entry) { Get-EntryDisplayTitle -Entry $entry } else { Get-LocalizedString -Key 'BootNext.Unknown' }
         $text = Get-LocalizedString -Key 'BootNext.SelectionPendingFooter' -Values @{ Target=$title }
         $script:RestartTargetLabel.Text = $text
-        $script:RestartTargetLabel.Enabled = $false
+        # A passive Label stays enabled so pending amber ink remains readable;
+        # its lack of click handler and TabStop keep it non-interactive.
+        $script:RestartTargetLabel.Enabled = $true
+        if ($script:ColorWarning) { $script:RestartTargetLabel.ForeColor = $script:ColorWarning }
         $script:RestartTargetLabel.TabStop = $false
         $script:RestartTargetLabel.Cursor = [Windows.Forms.Cursors]::Default
         $script:RestartTargetLabel.AccessibleDescription = $text
@@ -11886,7 +11944,7 @@ function Add-PopupRestartSection {
     $restartButton.FlatAppearance.BorderSize = 1
     $restartButton.FlatAppearance.MouseOverBackColor = $script:ColorSelectedRow
     $restartButton.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(58, 27, 25)
-    $restartButton.Location = New-Object Drawing.Point(16, 6)
+    $restartButton.Location = New-Object Drawing.Point(16, 30)
     $restartButton.Size = New-Object Drawing.Size(358, 31)
     $restartButton.Cursor = [System.Windows.Forms.Cursors]::Hand
     # The native Flat adapter paints disabled text nearly black on dark surfaces.
@@ -11915,32 +11973,56 @@ function Add-PopupRestartSection {
     $script:RestartButton = $restartButton
     $restartPanel.Controls.Add($restartButton)
 
-    # The secondary line remains compact, but is a keyboard-focusable action
-    # whenever the stored default differs from the next effective boot target.
-    $restartTarget = New-Object System.Windows.Forms.Button
-    $restartTarget.Text = Get-LocalizedString -Key 'Status.NextTargetDefaultOrder'
-    $restartTarget.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
-    $restartTarget.ForeColor = $script:ColorSecondary
-    $restartTarget.BackColor = $script:ColorSurface
-    $restartTarget.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $restartTarget.FlatAppearance.BorderSize = 0
-    $restartTarget.FlatAppearance.MouseOverBackColor = $script:ColorSurface
-    $restartTarget.FlatAppearance.MouseDownBackColor = $script:ColorSelectedRow
-    $restartTarget.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+    # LBS-206 Layout C: the firmware-readback state is always passive and
+    # precedes the explicit restart action. The one-time default control is
+    # separate, and only appears when the guarded operation is admissible.
+    # The original 390x672 footprint and 65px restart panel are unchanged.
+    $restartTarget = New-Label -Text (Get-LocalizedString -Key 'BootNext.LayoutUnknown') -Font (New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Regular)) `
+        -ForeColor $script:ColorSecondary -X 16 -Y 3 -Width 358 -Height 23
+    $restartTarget.Name = 'RestartTargetLabel'
+    $restartTarget.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
     $restartTarget.AutoEllipsis = $true
     $restartTarget.TabStop = $false
-    $restartTarget.Location = New-Object Drawing.Point(16, 38)
-    $restartTarget.Size = New-Object Drawing.Size(358, 23)
-    $restartTarget.Name = 'RestartTargetLabel'
+    $restartTarget.Cursor = [Windows.Forms.Cursors]::Default
+    $restartTarget.AccessibleRole = [Windows.Forms.AccessibleRole]::StaticText
     $restartTarget.AccessibleName = $restartTarget.Text
+    $restartTarget.AccessibleDescription = $restartTarget.Text
     $restartTarget.Add_TextChanged({
         $this.AccessibleName = $this.Text
+        $this.AccessibleDescription = $this.Text
         if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($this,$this.Text) }
     })
-    $restartTarget.Add_Paint($pendingDisabledInkPainter)
-    $restartTarget.Add_Click({ if ($script:RestartTargetLabel -and $script:RestartTargetLabel.TabStop) { Use-DefaultForNextRestart } })
     $restartPanel.Controls.Add($restartTarget)
     $script:RestartTargetLabel = $restartTarget
+
+    $defaultOnce = New-Object System.Windows.Forms.Button
+    $defaultOnce.Name = 'RestartUseDefaultButton'
+    $defaultOnce.Text = Get-LocalizedString -Key 'BootNext.UseDefaultOnce'
+    $defaultOnce.Font = New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)
+    $defaultOnce.ForeColor = [Drawing.Color]::FromArgb(255,160,150)
+    $defaultOnce.BackColor = $script:ColorSelectedRow
+    $defaultOnce.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $defaultOnce.FlatAppearance.BorderColor = $script:ColorAccent
+    $defaultOnce.FlatAppearance.BorderSize = 1
+    $defaultOnce.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(81,37,34)
+    $defaultOnce.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(100,40,35)
+    $defaultOnce.Location = New-Object Drawing.Point(16,30)
+    $defaultOnce.Size = New-Object Drawing.Size(205,31)
+    $defaultOnce.Visible = $false
+    $defaultOnce.Enabled = $false
+    $defaultOnce.TabStop = $false
+    $defaultOnce.TabIndex = 0
+    $defaultOnce.Cursor = [Windows.Forms.Cursors]::Default
+    $defaultOnce.AccessibleName = $defaultOnce.Text
+    $defaultOnce.Add_Click({
+        if ($script:RestartUseDefaultButton -and
+            $script:RestartUseDefaultButton.Enabled -and
+            $script:RestartUseDefaultButton.Visible -and
+            -not $script:BootNextPendingGuid) { Use-DefaultForNextRestart }
+    })
+    $restartPanel.Controls.Add($defaultOnce)
+    $script:RestartUseDefaultButton = $defaultOnce
+    $restartButton.TabIndex = 1
     $Root.Controls.Add($restartPanel)
 
     # Dedicated footer height prevents Segoe UI/DPI clipping at the bottom edge.

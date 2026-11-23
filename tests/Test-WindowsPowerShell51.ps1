@@ -30,6 +30,11 @@ $dragVisualProbe = Join-Path $root 'tests\Test-LBS172-DragVisual.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $dragVisualProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-172 native Manage Entries drag visual regression failed' }
 
+# LBS-206: native Layout C readback status, explicit default once and DPI safety.
+$layoutCProbe = Join-Path $root 'tests\Test-LBS206-LayoutC.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $layoutCProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-206 native Layout C regression failed' }
+
 # LBS-205: focused popup Escape routing, child precedence and draft safety.
 $popupEscapeProbe = Join-Path $root 'tests\Test-LBS205-PopupEscape.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $popupEscapeProbe

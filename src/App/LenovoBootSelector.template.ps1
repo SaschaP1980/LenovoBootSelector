@@ -1105,6 +1105,7 @@ $script:DefaultValueLabel = $null
 $script:DefaultArrowLabel = $null
 $script:DefaultInteractionEnabled = $false
 $script:RestartTargetLabel = $null
+$script:RestartUseDefaultButton = $null
 $script:DefaultContextMenu = $null
 $script:DefaultContextRoot = $null
 $script:LegacySessionRestoreRegistryPath = 'HKCU:\Volatile Environment'
@@ -1344,28 +1345,64 @@ function Use-DefaultForNextRestart {
 }
 
 function Update-RestartTargetUi {
+    # LBS-206: never infer a confirmed target from a pending request or cached
+    # GUID. Only the existing firmware readback flag permits a verified label.
     if (-not $script:RestartTargetLabel -or $script:RestartTargetLabel.IsDisposed) { return }
     $hasTarget = (-not $script:SelectedGuid -or $null -ne (Get-EntryByGuid $script:SelectedGuid))
     $model = Resolve-BootNextDisplayStateCore -DefaultGuid $script:DefaultGuid -EffectiveNextGuid $script:SelectedGuid -FirmwareReadSucceeded ([bool]$script:NextBootFirmwareReadVerified) -Checking $false -EffectiveTargetKnown $hasTarget
     $next = Get-NextBootTargetDisplayName
     $default = Get-DefaultEntryTitle
-    $canApply = ($model -eq 'different' -or $model -eq 'firmware-order') -and [bool]$script:DefaultGuid
     switch ($model) {
-        'unknown'        { $labelKey = 'BootNext.UnknownLine' }
-        'firmware-order' { $labelKey = 'BootNext.FirmwareOrderLine' }
-        'aligned'        { $labelKey = 'BootNext.AlignedLine' }
-        'different'      { $labelKey = 'BootNext.DifferentLine' }
-        'unavailable'    { $labelKey = 'BootNext.UnavailableLine' }
-        default          { $labelKey = 'BootNext.UnknownLine' }
+        'unknown'        { $labelKey = 'BootNext.LayoutUnknown' }
+        'firmware-order' { $labelKey = 'BootNext.LayoutFirmwareOrder' }
+        'aligned'        { $labelKey = 'BootNext.LayoutAligned' }
+        'different'      { $labelKey = 'BootNext.LayoutDifferent' }
+        'unavailable'    { $labelKey = 'BootNext.LayoutUnavailable' }
+        default          { $labelKey = 'BootNext.LayoutUnknown' }
     }
     $label = Get-LocalizedString -Key $labelKey -Values @{ Next=$next; Default=$default }
     $script:RestartTargetLabel.Text = $label
-    $script:RestartTargetLabel.Enabled = $true
-    $script:RestartTargetLabel.Cursor = if ($canApply) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
-    $script:RestartTargetLabel.TabStop = [bool]$canApply
-    $script:RestartTargetLabel.ForeColor = if ($canApply) { [Drawing.Color]::FromArgb(255,110,102) } else { $script:ColorSecondary }
-    $script:RestartTargetLabel.AccessibleDescription = if ($canApply) { Get-LocalizedString -Key 'BootNext.UseDefaultHint' -Values @{ Default=$default } } else { $label }
-    $script:RestartTargetLabel.FlatAppearance.MouseOverBackColor = if ($canApply) { $script:ColorSelectedRow } else { $script:ColorSurface }
+    $script:RestartTargetLabel.AccessibleName = $label
+    $script:RestartTargetLabel.AccessibleDescription = $label
+    $script:RestartTargetLabel.TabStop = $false
+    $script:RestartTargetLabel.Cursor = [Windows.Forms.Cursors]::Default
+    $script:RestartTargetLabel.ForeColor = if ($model -in @('unknown','unavailable')) {
+        $script:ColorWarning
+    } elseif ($model -in @('aligned','different')) {
+        $script:ColorPrimary
+    } else { $script:ColorSecondary }
+    if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($script:RestartTargetLabel,$label) }
+
+    # This gate is presentation-only; actual activation retains the existing
+    # ProbeReadiness, fixed task, firmware re-read and verification in
+    # Use-DefaultForNextRestart. No settings/default write is added here.
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    $canApply = ($model -eq 'different' -or $model -eq 'firmware-order') -and
+        [bool]$script:DefaultGuid -and [bool]$capabilities.CanSetBootNext -and
+        -not [bool]$script:BootNextPendingGuid
+    if ($script:RestartUseDefaultButton -and -not $script:RestartUseDefaultButton.IsDisposed) {
+        $action = $script:RestartUseDefaultButton
+        $action.Text = Get-LocalizedString -Key 'BootNext.UseDefaultOnce'
+        $action.AccessibleName = $action.Text
+        $action.AccessibleDescription = Get-LocalizedString -Key 'BootNext.UseDefaultHint' -Values @{ Default=$default }
+        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($action,$action.AccessibleDescription) }
+        $action.Visible = [bool]$canApply
+        $action.Enabled = [bool]$canApply
+        $action.TabStop = [bool]$canApply
+        $action.Cursor = if ($canApply) { [Windows.Forms.Cursors]::Hand } else { [Windows.Forms.Cursors]::Default }
+    }
+    if ($script:RestartButton -and -not $script:RestartButton.IsDisposed -and $script:RestartButton.Parent) {
+        # Every bound is derived from the parent's current physical width,
+        # never from a second DPI conversion. This reapplies after rescaling.
+        $scale = [double]$script:RestartButton.Parent.Width / 390.0
+        $x = if ($canApply) { 229 } else { 16 }
+        $w = if ($canApply) { 145 } else { 358 }
+        $script:RestartButton.Bounds = [Drawing.Rectangle]::new(
+            [int][Math]::Round($x*$scale),
+            [int][Math]::Round(30*$scale),
+            [Math]::Max(1,[int][Math]::Round($w*$scale)),
+            [Math]::Max(1,[int][Math]::Round(31*$scale)))
+    }
     Update-BootNextRestartInterlock
 }
 
