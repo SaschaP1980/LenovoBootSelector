@@ -53,6 +53,7 @@ foreach ($factor in @(1.0,2.5)) {
     $script:ManageDragGuid=$null
     $script:ManageActiveDragGuid=$null
     $script:VisibilityCalls=0; $script:RefreshCalls=0; $script:Hidden=$false
+    $script:BootSelectCalls=0
     $guid='12345678-1234-4234-8234-123456789abc'
     $entry=[pscustomobject]@{Guid=$guid}
     $script:Popup=New-Object Windows.Forms.Form
@@ -106,7 +107,7 @@ foreach ($factor in @(1.0,2.5)) {
             $script:SettingsWrites -eq 0 -and $script:BootSelectCalls -eq 0)
         $script:IsManageEntriesMode=$false
         [void]$click.Invoke($row,@([EventArgs]::Empty))
-        $expected=if ($dpi -eq 96) { 1 } else { 2 }
+        $expected=1
         Assert-Lbs215 "$dpi DPI normal row click still uses existing boot selection gate" (
             $script:BootSelectCalls -eq $expected -and $script:VisibilityCalls -eq 3)
     }
