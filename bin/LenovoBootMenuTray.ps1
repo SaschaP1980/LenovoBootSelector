@@ -94,7 +94,7 @@ function Get-LocalizationCatalogCore {
             'BootNext.DifferentLine' = 'Next: {Next} · default: {Default}'
             'BootNext.UnavailableLine' = 'Next boot target unavailable'
             'BootNext.UseDefaultHint' = 'Set {Default} as the one-time target for the next restart'
-            'BootNext.UseDefaultOnce' = 'Use default once'
+            'BootNext.UseDefaultOnce' = 'Reset to default target'
             'BootNext.LayoutUnknown' = 'Next restart · unverified; check target'
             'BootNext.LayoutFirmwareOrder' = 'Verified · firmware order (no one-time target)'
             'BootNext.LayoutAligned' = 'Verified · matches default: {Next}'
@@ -380,7 +380,7 @@ function Get-LocalizationCatalogCore {
             'BootNext.DifferentLine' = 'Nächstes Ziel: {Next} · Standard: {Default}'
             'BootNext.UnavailableLine' = 'Nächstes Startziel nicht verfügbar'
             'BootNext.UseDefaultHint' = '{Default} einmalig für den nächsten Neustart vormerken'
-            'BootNext.UseDefaultOnce' = 'Standard einmalig verwenden'
+            'BootNext.UseDefaultOnce' = 'Auf Standardziel zurücksetzen'
             'BootNext.LayoutUnknown' = 'Nächster Start · ungeprüft; Ziel prüfen'
             'BootNext.LayoutFirmwareOrder' = 'Geprüft · Firmware-Reihenfolge (kein Einmalziel)'
             'BootNext.LayoutAligned' = 'Bestätigt · wie Standard: {Next}'
@@ -2292,7 +2292,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.10.0'
+$script:AppVersion = '1.5.10.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -5904,10 +5904,33 @@ function Show-DefaultTargetMenu {
         if ($script:DefaultContextMenu) { $script:DefaultContextMenu.Dispose() }
     } catch { }
     $script:DefaultContextMenu = New-DefaultTargetMenu
+    $script:DefaultContextMenu.Add_Closed({
+        param($sender,$eventArgs)
+        if (-not [object]::ReferenceEquals($sender,$script:DefaultContextMenu)) { return }
+        $script:DefaultTargetMenuOpening = $false
+        # An actual click/focus transfer outside LBS still closes the popup;
+        # a selected menu item, local Escape or owner click does not.
+        $external = $eventArgs.CloseReason -eq [Windows.Forms.ToolStripDropDownCloseReason]::AppFocusChange -or
+                    $eventArgs.CloseReason -eq [Windows.Forms.ToolStripDropDownCloseReason]::AppClicked
+        if ($external -and $script:Popup -and -not $script:Popup.IsDisposed -and
+            $script:Popup.Visible -and -not $script:Popup.ContainsFocus -and
+            -not $script:ExitRequested) {
+            $capabilities = Get-CurrentSystemFunctionsCapabilities
+            if ([string]$capabilities.State -ne 'Busy') { $script:Popup.Hide() }
+        }
+    })
     $ownerScreen = [System.Windows.Forms.Screen]::FromControl($Owner)
     $ownerScale = (Get-PopupMonitorDpiScale -Screen $ownerScreen).Factor
     [void](Set-LenovoMenuDpiLayout -Menu $script:DefaultContextMenu -Scale ([double]$ownerScale))
-    $script:DefaultContextMenu.Show($Owner, (New-Object Drawing.Point(0, $Owner.Height)))
+    $script:DefaultTargetMenuOpening = $true
+    try {
+        $script:DefaultContextMenu.Show($Owner, (New-Object Drawing.Point(0, $Owner.Height)))
+    }
+    catch {
+        $script:DefaultTargetMenuOpening = $false
+        throw
+    }
+    if (-not $script:DefaultContextMenu.Visible) { $script:DefaultTargetMenuOpening = $false }
 }
 
 
@@ -6673,23 +6696,19 @@ function Get-NextBootTargetDisplayName {
 }
 
 function Use-DefaultForNextRestart {
-    if ($script:BootNextPendingGuid) { return }
+    # LBS-206 Hotfix: use the very same guarded async selection controller
+    # as a manual row activation. Do not call the synchronous firmware writer
+    # here: the controller paints pending immediately, interlocks Restart,
+    # and only confirms the new target after independent firmware readback.
+    if ($script:BootNextPendingGuid -or $script:IsManageEntriesMode) { return }
     $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
-    if (-not $capabilities.CanSetBootNext -or -not $script:DefaultGuid) { return }
-    try {
-        [void](Refresh-EffectiveNextBootState)
-        if ($script:SelectedGuid -eq $script:DefaultGuid) { return }
-        $requested = [string]$script:DefaultGuid
-        Set-BootNextTarget -Guid $requested
-        [void](Refresh-EffectiveNextBootState)
-        if ($script:SelectedGuid -ne $requested) { throw 'Manual next boot target verification failed.' }
-        $script:LastStatusText = Get-LocalizedString -Key 'BootNext.DefaultApplied'
-        Update-PopupRows
-    }
-    catch {
-        $script:LastStatusText = Get-LocalizedString -Key 'BootNext.DefaultApplyFailed'
-        Update-PopupRows
-    }
+    if (-not $capabilities.CanSetBootNext -or -not $script:DefaultGuid -or
+        -not $script:NextBootFirmwareReadVerified -or -not $script:SelectedGuid -or
+        $script:SelectedGuid -eq $script:DefaultGuid) { return }
+    # Neither stale/unavailable target nor default may cross the task allowlist.
+    if (-not (Get-EntryByGuid ([string]$script:DefaultGuid)) -or
+        -not (Get-EntryByGuid ([string]$script:SelectedGuid))) { return }
+    Invoke-NormalBootTargetSelection -Guid ([string]$script:DefaultGuid)
 }
 
 function Update-RestartTargetUi {
@@ -6725,8 +6744,10 @@ function Update-RestartTargetUi {
     # ProbeReadiness, fixed task, firmware re-read and verification in
     # Use-DefaultForNextRestart. No settings/default write is added here.
     $capabilities = Get-CurrentSystemFunctionsCapabilities
-    $canApply = ($model -eq 'different' -or $model -eq 'firmware-order') -and
-        [bool]$script:DefaultGuid -and [bool]$capabilities.CanSetBootNext -and
+    $canApply = ($model -eq 'different') -and
+        [bool]$script:DefaultGuid -and
+        ($null -ne (Get-EntryByGuid ([string]$script:DefaultGuid))) -and
+        [bool]$capabilities.CanSetBootNext -and
         -not [bool]$script:BootNextPendingGuid
     if ($script:RestartUseDefaultButton -and -not $script:RestartUseDefaultButton.IsDisposed) {
         $action = $script:RestartUseDefaultButton
@@ -12362,6 +12383,12 @@ function New-PopupForm {
     })
 
     $form.Add_Deactivate({
+        # The default-target ToolStrip is part of this popup's own UI.
+        # A focus handoff to it must not hide the owner form underneath.
+        # The opening flag covers Deactivate before DropDown.Visible is set.
+        if ($script:DefaultTargetMenuOpening -or
+            ($script:DefaultContextMenu -and -not $script:DefaultContextMenu.IsDisposed -and
+             $script:DefaultContextMenu.Visible)) { return }
         $capabilities = Get-CurrentSystemFunctionsCapabilities
         if (-not $script:ExitRequested -and [string]$capabilities.State -ne 'Busy') { $this.Hide() }
     })

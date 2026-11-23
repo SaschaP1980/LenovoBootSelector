@@ -35,6 +35,12 @@ $layoutCProbe = Join-Path $root 'tests\Test-LBS206-LayoutC.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $layoutCProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-206 native Layout C regression failed' }
 
+# LBS-206 hotfix: real canonical reset entry point must enqueue the standard
+# asynchronous selection, not a synchronous firmware write.
+$resetProbe = Join-Path $root 'tests\Test-LBS206-Hotfix.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $resetProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-206 reset pending hotfix regression failed' }
+
 # LBS-205: focused popup Escape routing, child precedence and draft safety.
 $popupEscapeProbe = Join-Path $root 'tests\Test-LBS205-PopupEscape.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $popupEscapeProbe

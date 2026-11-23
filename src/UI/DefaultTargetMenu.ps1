@@ -41,8 +41,31 @@ function Show-DefaultTargetMenu {
         if ($script:DefaultContextMenu) { $script:DefaultContextMenu.Dispose() }
     } catch { }
     $script:DefaultContextMenu = New-DefaultTargetMenu
+    $script:DefaultContextMenu.Add_Closed({
+        param($sender,$eventArgs)
+        if (-not [object]::ReferenceEquals($sender,$script:DefaultContextMenu)) { return }
+        $script:DefaultTargetMenuOpening = $false
+        # An actual click/focus transfer outside LBS still closes the popup;
+        # a selected menu item, local Escape or owner click does not.
+        $external = $eventArgs.CloseReason -eq [Windows.Forms.ToolStripDropDownCloseReason]::AppFocusChange -or
+                    $eventArgs.CloseReason -eq [Windows.Forms.ToolStripDropDownCloseReason]::AppClicked
+        if ($external -and $script:Popup -and -not $script:Popup.IsDisposed -and
+            $script:Popup.Visible -and -not $script:Popup.ContainsFocus -and
+            -not $script:ExitRequested) {
+            $capabilities = Get-CurrentSystemFunctionsCapabilities
+            if ([string]$capabilities.State -ne 'Busy') { $script:Popup.Hide() }
+        }
+    })
     $ownerScreen = [System.Windows.Forms.Screen]::FromControl($Owner)
     $ownerScale = (Get-PopupMonitorDpiScale -Screen $ownerScreen).Factor
     [void](Set-LenovoMenuDpiLayout -Menu $script:DefaultContextMenu -Scale ([double]$ownerScale))
-    $script:DefaultContextMenu.Show($Owner, (New-Object Drawing.Point(0, $Owner.Height)))
+    $script:DefaultTargetMenuOpening = $true
+    try {
+        $script:DefaultContextMenu.Show($Owner, (New-Object Drawing.Point(0, $Owner.Height)))
+    }
+    catch {
+        $script:DefaultTargetMenuOpening = $false
+        throw
+    }
+    if (-not $script:DefaultContextMenu.Visible) { $script:DefaultTargetMenuOpening = $false }
 }

@@ -99,7 +99,7 @@ foreach ($locale in @('en-US','de-DE')) {
             $script:BootNextPendingGuid=$null
             $script:CanSetBootNext=$true
             Update-RestartTargetUi
-            $expectedAction=if($locale -eq 'de-DE'){'Standard einmalig verwenden'}else{'Use default once'}
+            $expectedAction=if($locale -eq 'de-DE'){'Auf Standardziel zurücksetzen'}else{'Reset to default target'}
             Assert-Lbs206 "$tag differing verified target has separate explicit action" (
                 $action.Visible -and $action.Enabled -and $action.TabStop -and
                 $action.Text -eq $expectedAction -and
@@ -151,7 +151,7 @@ foreach ($locale in @('en-US','de-DE')) {
             $script:SelectedGuid=$null
             Update-RestartTargetUi
             Assert-Lbs206 "$tag firmware order is not misrepresented as confirmed BootNext" (
-                $status.Text -match '(?i)(firmware|reihenfolge)' -and $action.Enabled)
+                $status.Text -match '(?i)(firmware|reihenfolge)' -and (-not $action.Enabled -or -not $action.Visible))
             $script:SelectedGuid=$script:Entry2
             $script:BootNextPendingGuid=$script:Entry2
             Update-RestartTargetUi

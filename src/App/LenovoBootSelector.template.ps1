@@ -1325,23 +1325,19 @@ function Get-NextBootTargetDisplayName {
 }
 
 function Use-DefaultForNextRestart {
-    if ($script:BootNextPendingGuid) { return }
+    # LBS-206 Hotfix: use the very same guarded async selection controller
+    # as a manual row activation. Do not call the synchronous firmware writer
+    # here: the controller paints pending immediately, interlocks Restart,
+    # and only confirms the new target after independent firmware readback.
+    if ($script:BootNextPendingGuid -or $script:IsManageEntriesMode) { return }
     $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
-    if (-not $capabilities.CanSetBootNext -or -not $script:DefaultGuid) { return }
-    try {
-        [void](Refresh-EffectiveNextBootState)
-        if ($script:SelectedGuid -eq $script:DefaultGuid) { return }
-        $requested = [string]$script:DefaultGuid
-        Set-BootNextTarget -Guid $requested
-        [void](Refresh-EffectiveNextBootState)
-        if ($script:SelectedGuid -ne $requested) { throw 'Manual next boot target verification failed.' }
-        $script:LastStatusText = Get-LocalizedString -Key 'BootNext.DefaultApplied'
-        Update-PopupRows
-    }
-    catch {
-        $script:LastStatusText = Get-LocalizedString -Key 'BootNext.DefaultApplyFailed'
-        Update-PopupRows
-    }
+    if (-not $capabilities.CanSetBootNext -or -not $script:DefaultGuid -or
+        -not $script:NextBootFirmwareReadVerified -or -not $script:SelectedGuid -or
+        $script:SelectedGuid -eq $script:DefaultGuid) { return }
+    # Neither stale/unavailable target nor default may cross the task allowlist.
+    if (-not (Get-EntryByGuid ([string]$script:DefaultGuid)) -or
+        -not (Get-EntryByGuid ([string]$script:SelectedGuid))) { return }
+    Invoke-NormalBootTargetSelection -Guid ([string]$script:DefaultGuid)
 }
 
 function Update-RestartTargetUi {
@@ -1377,8 +1373,10 @@ function Update-RestartTargetUi {
     # ProbeReadiness, fixed task, firmware re-read and verification in
     # Use-DefaultForNextRestart. No settings/default write is added here.
     $capabilities = Get-CurrentSystemFunctionsCapabilities
-    $canApply = ($model -eq 'different' -or $model -eq 'firmware-order') -and
-        [bool]$script:DefaultGuid -and [bool]$capabilities.CanSetBootNext -and
+    $canApply = ($model -eq 'different') -and
+        [bool]$script:DefaultGuid -and
+        ($null -ne (Get-EntryByGuid ([string]$script:DefaultGuid))) -and
+        [bool]$capabilities.CanSetBootNext -and
         -not [bool]$script:BootNextPendingGuid
     if ($script:RestartUseDefaultButton -and -not $script:RestartUseDefaultButton.IsDisposed) {
         $action = $script:RestartUseDefaultButton
