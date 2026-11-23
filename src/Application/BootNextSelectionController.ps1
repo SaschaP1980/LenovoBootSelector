@@ -2,7 +2,7 @@
 # BootNext task and authoritative firmware verification execute off-thread.
 # All UI state changes occur on the original WinForms message-loop thread.
 function Update-BootNextRestartInterlock {
-    $pending = [bool]$script:BootNextPendingGuid
+    $pending = [bool]($script:BootNextPendingGuid -or $script:DefaultTargetChangePending)
     if ($script:RestartButton -and -not $script:RestartButton.IsDisposed) {
         $script:RestartButton.Enabled = -not $pending
     }
@@ -12,7 +12,7 @@ function Update-BootNextRestartInterlock {
         $script:RestartUseDefaultButton.TabStop = $false
         $script:RestartUseDefaultButton.Visible = $false
     }
-    if ($script:RestartTargetLabel -and -not $script:RestartTargetLabel.IsDisposed -and $pending) {
+    if ($script:RestartTargetLabel -and -not $script:RestartTargetLabel.IsDisposed -and $script:BootNextPendingGuid) {
         $entry = Get-EntryByGuid ([string]$script:BootNextPendingGuid)
         $title = if ($entry) { Get-EntryDisplayTitle -Entry $entry } else { Get-LocalizedString -Key 'BootNext.Unknown' }
         $text = Get-LocalizedString -Key 'BootNext.SelectionPendingFooter' -Values @{ Target=$title }
@@ -59,7 +59,7 @@ function Start-AuthorizedPendingBootNextWorker {
     # Recheck authorizing facts AFTER cold-start readiness; never run in Checking.
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     if ([string]$capabilities.State -ne 'Ready' -or -not $capabilities.CanSetBootNext -or
-        $script:IsManageEntriesMode -or (Test-MaintenanceBusy)) {
+        $script:IsManageEntriesMode -or (Test-MaintenanceBusy) -or $script:DefaultTargetChangePending) {
         throw 'TaskBroker is not ready for a BootNext request.'
     }
     $entry = Get-EntryByGuid $requested
@@ -95,6 +95,10 @@ function Fail-DeferredBootNextSelection {
 
 function Start-BootNextSelection {
     param([Parameter(Mandatory=$true)][string]$Guid)
+    if ($script:DefaultTargetChangePending) {
+        Write-RuntimeDiagnosticEvent -Event 'BOOTNEXT_CLICK_REJECTED' -Stage 'bootnext' -Success $false -Data (New-RuntimeDiagnosticData @{ reason='default-target-changing' })
+        return
+    }
     if ($script:BootNextPendingGuid) {
         Write-RuntimeDiagnosticEvent -Event 'BOOTNEXT_CLICK_REJECTED' -Stage 'bootnext' -Success $true -Data (New-RuntimeDiagnosticData @{ reason='already-pending' })
         return

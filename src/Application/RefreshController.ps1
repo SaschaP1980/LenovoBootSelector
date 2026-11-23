@@ -130,6 +130,10 @@ function Complete-BackgroundBootRefresh {
 function Start-BackgroundBootRefresh {
     param([switch]$RefreshStorage)
 
+    if ($script:DefaultTargetChangePending) {
+        Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_SUPPRESSED' -Stage 'default' -Success $true -Data (New-RuntimeDiagnosticData @{ reason='default-target-changing' })
+        return
+    }
     if (Test-MaintenanceBusy) {
         Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_SUPPRESSED' -Stage 'maintenance' -Success $true -Data (New-RuntimeDiagnosticData @{ maintenanceMode = (Get-MaintenanceMode); refreshStorage = [bool]$RefreshStorage })
         return

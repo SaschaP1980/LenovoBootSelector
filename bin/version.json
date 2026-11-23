@@ -1,9 +1,9 @@
 {
   "schemaVersion": 2,
-  "version": "1.5.10.2",
+  "version": "1.5.10.3",
   "releaseProfile": "patch",
   "protectedFragmentIntent": [
-    "cs:protected override void OnRenderToolStripBackground"
+    "ps:Start-BackgroundBootRefresh"
   ],
   "repositoryDeleteIntent": []
 }
