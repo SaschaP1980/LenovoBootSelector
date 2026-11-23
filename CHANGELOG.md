@@ -1,5 +1,13 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.3.0 – Park native boot rows during raster-only drag reflow (LBS-172 / UX01-V7)
+
+- Address continued drag paint corruption reported on both an integrated-graphics laptop panel at 250% Windows scaling and an external GPU/display path at 100%; neither GPU nor DPI is claimed to be the proven cause.
+- During an active OLE drag, interpolate the positions of the existing cached neighbor PictureBoxes only. Keep every original nested WinForms row and child HWND at its immutable pre-drag coordinates instead of moving hidden native rows on every 16ms animation frame.
+- On a rapid direction reversal, use the actual current raster position as the new easing start. At drop or cancellation, move each hidden native row at most once to its exact committed or original destination under the cached picture before returning the real controls to view. Preserve the live-row fallback if snapshot capture fails.
+- Extend the isolated Windows PowerShell 5.1 drag regression from 93 to 105 assertions across synthetic 250% and 100% DPI: parked native row coordinates/handles, raster-only motion, no retarget snap, valid/drop/cancel handoff, unchanged identity and draft-only Save/Cancel, alongside the existing raster-ink, geometry and placeholder tests.
+- Do not change BootNext, BootOrder, privileged TaskBroker operations, persisted order, firmware discovery, update behavior, or GPU-specific switches. A real owner-native display retest with and without Snagit remains required; hosted WinForms tests are not proof of flicker-free physical output.
+
 ## v1.5.2.0 – Stable Manage Entries row painting at 250% (LBS-172 / UX01-V7)
 
 - During active drag, keep the original WinForms boot-row controls and their eye, pencil, grip and text children intact but parked. Animate one cached, noninteractive PictureBox per neighbor instead of repeatedly repainting nested child HWNDs during 150ms reflow; preserve immutable drop slots and the existing queued 16ms retarget decisions.
