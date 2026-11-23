@@ -4,6 +4,11 @@ param(
     [switch]$HideConsole,
     [switch]$BackgroundRefresh,
     [switch]$BootNextWorker,
+    [switch]$DefaultTargetWorker,
+    [string]$DefaultTargetGuid,
+    [switch]$DefaultTargetClear,
+    [string]$DefaultTargetResultPath,
+    [string]$DefaultTargetProgressPath,
     [string]$BootNextGuid,
     [string]$BootNextResultPath,
     [string]$BackgroundResultPath,
@@ -122,6 +127,13 @@ function Get-LocalizationCatalogCore {
             'Autostart.ErrorHeading' = 'The setting could not be changed.'
             'Default.SaveErrorHeading' = 'The default boot target could not be saved.'
             'Default.SaveErrorMessage' = 'Please try again. If the problem persists, open Maintenance → Repair system functions.'
+            'Default.ChangeSaving' = 'Saving …'
+            'Default.ChangeVerifying' = 'Verifying …'
+            'Default.ChangeSavingFooter' = 'Saving default: {Target} · not yet confirmed'
+            'Default.ChangeVerifyingFooter' = 'Verifying default and next boot: {Target} …'
+            'Default.ChangePartialHeading' = 'Default saved; next boot not verified'
+            'Default.ChangePartial' = 'The stored default was confirmed, but the next boot could not be verified. Check it before restarting.'
+            'Default.ChangeUnknown' = 'Default target not verified'
             'Status.NewBootTargetDetected' = 'New boot target detected · Reinitialize system functions.'
             'Status.BootTargetsChanged' = 'Boot targets changed · Reinitialize system functions.'
             'Status.SystemFunctionsRepairRequired' = 'System functions need to be repaired.'
@@ -408,6 +420,13 @@ function Get-LocalizationCatalogCore {
             'Autostart.ErrorHeading' = 'Die Einstellung konnte nicht geändert werden.'
             'Default.SaveErrorHeading' = 'Das Standard-Startziel konnte nicht gespeichert werden.'
             'Default.SaveErrorMessage' = 'Bitte versuche es erneut. Falls das Problem bestehen bleibt, öffne Wartung → Systemfunktionen reparieren.'
+            'Default.ChangeSaving' = 'Speichern …'
+            'Default.ChangeVerifying' = 'Prüfen …'
+            'Default.ChangeSavingFooter' = 'Standardziel wird gespeichert: {Target} · noch nicht bestätigt'
+            'Default.ChangeVerifyingFooter' = 'Standardziel und nächsten Start prüfen: {Target} …'
+            'Default.ChangePartialHeading' = 'Standardziel gespeichert, nächster Start ungeprüft'
+            'Default.ChangePartial' = 'Das gespeicherte Standardziel wurde bestätigt, aber der nächste Start konnte nicht geprüft werden. Bitte vor dem Neustart kontrollieren.'
+            'Default.ChangeUnknown' = 'Standardziel nicht verifiziert'
             'Status.NewBootTargetDetected' = 'Neues Startziel erkannt · Systemfunktionen neu initialisieren.'
             'Status.BootTargetsChanged' = 'Startziele geändert · Systemfunktionen neu initialisieren.'
             'Status.SystemFunctionsRepairRequired' = 'Systemfunktionen müssen repariert werden.'
@@ -2256,7 +2275,7 @@ $activationEvent = $null
 $activationListener = $null
 $singleInstanceMutexState = 'not-applicable'
 $singleInstanceGraceMs = 500
-if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare) {
+if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -and -not $UpdatePrepare -and -not $DefaultTargetWorker) {
     $singleInstanceMutexState = 'busy'
     $mutex = [System.Threading.Mutex]::new($false, 'Local\LenovoBootMenuTray')
     try {
@@ -2305,7 +2324,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.10.2'
+$script:AppVersion = '1.5.10.3'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -2396,6 +2415,17 @@ $script:UiLocale = 'en-US'
 $script:LocalePreferenceSource = 'default'
 $script:LocalePreferenceNeedsConfirmation = $false
 $script:DefaultGuid = $null
+$script:DefaultTargetReadUncertain = $false
+$script:DefaultTargetChangePending = $false
+$script:DefaultTargetChangeRequestedGuid = $null
+$script:DefaultTargetChangeOperation = ''
+$script:DefaultTargetChangeStage = ''
+$script:DefaultTargetChangeWorkerStarted = $false
+$script:DefaultTargetChangeStartedUtc = [datetime]::MinValue
+$script:DefaultTargetChangeProcess = $null
+$script:DefaultTargetChangeTimer = $null
+$script:DefaultTargetChangeResultPath = $null
+$script:DefaultTargetChangeProgressPath = $null
 $script:LegacyDefaultGuid = $null
 $script:DefaultButton = $null
 $script:DefaultValueLabel = $null
@@ -5751,6 +5781,7 @@ function Stop-ManageEntriesMode {
 
 
 function Get-DefaultEntryTitle {
+    if ($script:DefaultTargetReadUncertain) { return (Get-LocalizedString -Key 'Default.ChangeUnknown') }
     if (-not $script:DefaultGuid) { return (Get-LocalizedString -Key 'Settings.NoDefaultTarget') }
     $entry = Get-EntryByGuid $script:DefaultGuid
     if ($entry) { return (Get-EntryDisplayTitle -Entry $entry) }
@@ -5766,7 +5797,8 @@ function Update-DefaultUi {
         # Keep the existing native readiness Enabled contract. While a one-shot
         # BootNext write is pending, its default-target command is already
         # rejected by Set-DefaultGuid; do not misleadingly advertise it as active.
-        $interactive = ($enabled -and -not [bool]$script:BootNextPendingGuid)
+        $pendingDefault = [bool]$script:DefaultTargetChangePending
+        $interactive = ($enabled -and -not [bool]$script:BootNextPendingGuid -and -not $pendingDefault)
         $mutedInk = [Drawing.Color]::FromArgb(146,146,146)
         $script:DefaultInteractionEnabled = $interactive
         if (-not $interactive) { $script:DefaultButton.BackColor = $script:ColorSurface }
@@ -5774,22 +5806,33 @@ function Update-DefaultUi {
         $script:DefaultButton.Cursor = if ($interactive) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
 
         if ($script:DefaultValueLabel -and -not $script:DefaultValueLabel.IsDisposed) {
-            $script:DefaultValueLabel.Text = if ($checking) { Get-LocalizedString -Key 'Status.Checking' } else { Get-DefaultEntryTitle }
-            $script:DefaultValueLabel.AccessibleDescription = [string]$script:DefaultValueLabel.Text
-            if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($script:DefaultValueLabel, [string]$script:DefaultValueLabel.Text) }
-            $script:DefaultValueLabel.ForeColor = if ($interactive) { $script:ColorPrimary } else { $mutedInk }
+            $target = Get-DefaultEntryTitle
+            if ($pendingDefault) {
+                $entry = if ($script:DefaultTargetChangeRequestedGuid) { Get-EntryByGuid ([string]$script:DefaultTargetChangeRequestedGuid) } else { $null }
+                $target = if ($entry) { Get-EntryDisplayTitle -Entry $entry } else { Get-LocalizedString -Key 'Settings.NoDefaultTarget' }
+            }
+            $key = if ($script:DefaultTargetChangeStage -eq 'verifying') { 'Default.ChangeVerifying' } else { 'Default.ChangeSaving' }
+            $script:DefaultValueLabel.Text = if ($pendingDefault) { Get-LocalizedString -Key $key } elseif ($checking) { Get-LocalizedString -Key 'Status.Checking' } else { $target }
+            $description = if ($pendingDefault) {
+                Get-LocalizedString -Key $(if ($script:DefaultTargetChangeStage -eq 'verifying') { 'Default.ChangeVerifyingFooter' } else { 'Default.ChangeSavingFooter' }) -Values @{ Target=$target }
+            } else { [string]$script:DefaultValueLabel.Text }
+            $script:DefaultValueLabel.AccessibleName = $description
+            $script:DefaultValueLabel.AccessibleDescription = $description
+            if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($script:DefaultValueLabel,$description) }
+            $script:DefaultValueLabel.ForeColor = if ($pendingDefault) { $script:ColorWarning } elseif ($interactive) { $script:ColorPrimary } else { $mutedInk }
         }
         if ($script:DefaultArrowLabel -and -not $script:DefaultArrowLabel.IsDisposed) {
-            $script:DefaultArrowLabel.Visible = -not $checking
+            $script:DefaultArrowLabel.Visible = (-not $checking -or $pendingDefault)
+            $script:DefaultArrowLabel.Text = if ($pendingDefault) { '…' } else { '›' }
         }
         foreach ($child in $script:DefaultButton.Controls) {
             try {
                 $child.Enabled = $visualEnabled
                 $child.Cursor = if ($interactive) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
                 if ($child -eq $script:DefaultArrowLabel) {
-                    $child.ForeColor = if ($interactive) { $script:ColorSecondary } else { $mutedInk }
+                    $child.ForeColor = if ($pendingDefault) { $script:ColorWarning } elseif ($interactive) { $script:ColorSecondary } else { $mutedInk }
                 }
-                elseif ($child -is [System.Windows.Forms.Label]) {
+                elseif ($child -is [System.Windows.Forms.Label] -and $child -ne $script:DefaultValueLabel) {
                     $child.ForeColor = if ($interactive) { $script:ColorPrimary } else { $mutedInk }
                 }
             } catch { }
@@ -5800,8 +5843,10 @@ function Update-DefaultUi {
 
 function Refresh-SystemDefaultState {
     $script:DefaultGuid = $null
+    $script:DefaultTargetReadUncertain = $true
     try {
         $script:DefaultGuid = Get-TaskBrokerDefaultTargetGuid
+        $script:DefaultTargetReadUncertain = $false
     }
     catch {
         $script:DefaultGuid = $null
@@ -5819,7 +5864,8 @@ function Complete-LegacyDefaultMigration {
 }
 
 function Set-DefaultGuid {
-    param([AllowNull()][string]$Guid)
+    param([AllowNull()][string]$Guid, [AllowNull()][string]$ProgressPath)
+    if ($script:DefaultTargetChangePending) { throw 'Ein Standardzielwechsel wird noch überprüft.' }
     if ($script:BootNextPendingGuid) { throw 'Eine manuelle BootNext-Auswahl wird noch verifiziert.' }
     $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
     if ([string]$capabilities.State -eq 'Busy') { throw 'Während der Wartung kann das Standard-Startziel nicht geändert werden.' }
@@ -5831,6 +5877,10 @@ function Set-DefaultGuid {
         if ($Guid) {
             $normalized = $Guid.ToLowerInvariant()
             Set-TaskBrokerDefaultTarget -Guid $normalized
+            if ($ProgressPath) {
+                try { [IO.File]::WriteAllText($ProgressPath,'verifying',(New-Object Text.UTF8Encoding($false))) }
+                catch { }
+            }
             [void](Refresh-SystemDefaultState)
             if (-not $script:DefaultGuid -or $script:DefaultGuid -ne $normalized) {
                 throw 'Das systemweite Standardziel konnte nach der Aufgaben-Ausführung nicht verifiziert werden.'
@@ -5842,6 +5892,10 @@ function Set-DefaultGuid {
         }
         else {
             Clear-TaskBrokerDefaultTarget
+            if ($ProgressPath) {
+                try { [IO.File]::WriteAllText($ProgressPath,'verifying',(New-Object Text.UTF8Encoding($false))) }
+                catch { }
+            }
             [void](Refresh-SystemDefaultState)
             if ($script:DefaultGuid) { throw 'Das systemweite Standardziel konnte nicht deaktiviert werden.' }
             $script:LastStatusText = Get-LocalizedString -Key 'Default.SystemDisabledStatus'
@@ -5890,7 +5944,7 @@ function New-DefaultTargetMenu {
     $none.Checked = -not [bool]$script:DefaultGuid
     $none.Padding = New-Object System.Windows.Forms.Padding(18, 3, 32, 3)
     $none.Add_Click({
-        try { Set-DefaultGuid -Guid $null }
+        try { Start-DefaultTargetChange -Guid $null }
         catch { Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Settings.DefaultTarget') -Heading (Get-LocalizedString -Key 'Default.SaveErrorHeading') -Message (Get-LocalizedString -Key 'Default.SaveErrorMessage') -Kind Error }
     })
     [void]$menu.Items.Add($none)
@@ -5902,7 +5956,7 @@ function New-DefaultTargetMenu {
         $item.Checked = ($script:DefaultGuid -and $entry.Guid -eq $script:DefaultGuid)
         $item.Padding = New-Object System.Windows.Forms.Padding(18, 3, 32, 3)
         $item.Add_Click({
-            try { Set-DefaultGuid -Guid ([string]$this.Tag) }
+            try { Start-DefaultTargetChange -Guid ([string]$this.Tag) }
             catch { Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Settings.DefaultTarget') -Heading (Get-LocalizedString -Key 'Default.SaveErrorHeading') -Message (Get-LocalizedString -Key 'Default.SaveErrorMessage') -Kind Error }
         })
         [void]$menu.Items.Add($item)
@@ -5912,7 +5966,7 @@ function New-DefaultTargetMenu {
 
 function Show-DefaultTargetMenu {
     param([System.Windows.Forms.Control]$Owner)
-    if (Test-MaintenanceBusy -or (Test-BootTargetDriftDetected)) { return }
+    if ($script:DefaultTargetChangePending -or $script:BootNextPendingGuid -or (Test-MaintenanceBusy) -or (Test-BootTargetDriftDetected)) { return }
     if (-not $Owner -or $script:CurrentEntries.Count -eq 0 -or -not (Test-TaskBrokerReady)) { return }
     [void](Refresh-SystemDefaultState)
     try {
@@ -6715,7 +6769,7 @@ function Use-DefaultForNextRestart {
     # as a manual row activation. Do not call the synchronous firmware writer
     # here: the controller paints pending immediately, interlocks Restart,
     # and only confirms the new target after independent firmware readback.
-    if ($script:BootNextPendingGuid -or $script:IsManageEntriesMode) { return }
+    if ($script:BootNextPendingGuid -or $script:DefaultTargetChangePending -or $script:IsManageEntriesMode) { return }
     $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
     if (-not $capabilities.CanSetBootNext -or -not $script:DefaultGuid -or
         -not $script:NextBootFirmwareReadVerified -or -not $script:SelectedGuid -or
@@ -6727,9 +6781,28 @@ function Use-DefaultForNextRestart {
 }
 
 function Update-RestartTargetUi {
-    # LBS-206: never infer a confirmed target from a pending request or cached
-    # GUID. Only the existing firmware readback flag permits a verified label.
+    # The persistent default is saved off-thread; no prior firmware value
+    # may be presented as newly confirmed until both readbacks complete.
     if (-not $script:RestartTargetLabel -or $script:RestartTargetLabel.IsDisposed) { return }
+    if ($script:DefaultTargetChangePending) {
+        $entry = if ($script:DefaultTargetChangeRequestedGuid) { Get-EntryByGuid ([string]$script:DefaultTargetChangeRequestedGuid) } else { $null }
+        $target = if ($entry) { Get-EntryDisplayTitle -Entry $entry } else { Get-LocalizedString -Key 'Settings.NoDefaultTarget' }
+        $key = if ($script:DefaultTargetChangeStage -eq 'verifying') { 'Default.ChangeVerifyingFooter' } else { 'Default.ChangeSavingFooter' }
+        $label = Get-LocalizedString -Key $key -Values @{ Target = $target }
+        $script:RestartTargetLabel.Text = $label
+        $script:RestartTargetLabel.ForeColor = $script:ColorWarning
+        $script:RestartTargetLabel.TabStop = $false
+        $script:RestartTargetLabel.AccessibleName = $label
+        $script:RestartTargetLabel.AccessibleDescription = $label
+        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($script:RestartTargetLabel,$label) }
+        if ($script:RestartUseDefaultButton -and -not $script:RestartUseDefaultButton.IsDisposed) {
+            $script:RestartUseDefaultButton.Visible = $false
+            $script:RestartUseDefaultButton.Enabled = $false
+            $script:RestartUseDefaultButton.TabStop = $false
+        }
+        Update-BootNextRestartInterlock
+        return
+    }
     $hasTarget = (-not $script:SelectedGuid -or $null -ne (Get-EntryByGuid $script:SelectedGuid))
     $model = Resolve-BootNextDisplayStateCore -DefaultGuid $script:DefaultGuid -EffectiveNextGuid $script:SelectedGuid -FirmwareReadSucceeded ([bool]$script:NextBootFirmwareReadVerified) -Checking $false -EffectiveTargetKnown $hasTarget
     $next = Get-NextBootTargetDisplayName
@@ -6792,6 +6865,7 @@ function Update-RestartTargetUi {
 
 function Restart-Windows {
     if ($script:BootNextPendingGuid) { return }
+    if ($script:DefaultTargetChangePending) { return }
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     if (-not $capabilities.CanRestart) { return }
     # A cached SelectedGuid must never be the sole evidence in a restart dialog.
@@ -7578,7 +7652,7 @@ function Complete-TaskBrokerInstall {
 
 function Start-TaskBrokerInstall {
     param([ValidateSet('Setup','Repair','Migrate','Reinitialize')][string]$Mode = 'Setup')
-    if ($script:TaskBrokerInstallInProgress -or $script:TaskBrokerRemoveInProgress -or (Test-MaintenanceBusy)) { return }
+    if ($script:DefaultTargetChangePending -or $script:TaskBrokerInstallInProgress -or $script:TaskBrokerRemoveInProgress -or (Test-MaintenanceBusy)) { return }
     $script:TaskBrokerInstallDiagnosticStartedUtc = [datetime]::UtcNow
     Write-RuntimeDiagnosticEvent -Event 'SYSTEM_FUNCTIONS_SETUP_STARTED' -Stage 'maintenance' -Success $true -Data (New-RuntimeDiagnosticData @{ mode = $Mode })
     if (-not (Test-Path -LiteralPath $script:TaskBrokerInstallScript)) {
@@ -7725,7 +7799,7 @@ function Complete-TaskBrokerRemove {
 }
 
 function Start-TaskBrokerRemove {
-    if ($script:TaskBrokerInstallInProgress -or $script:TaskBrokerRemoveInProgress -or (Test-MaintenanceBusy)) { return }
+    if ($script:DefaultTargetChangePending -or $script:TaskBrokerInstallInProgress -or $script:TaskBrokerRemoveInProgress -or (Test-MaintenanceBusy)) { return }
     $script:TaskBrokerRemoveDiagnosticStartedUtc = [datetime]::UtcNow
     Write-RuntimeDiagnosticEvent -Event 'SYSTEM_FUNCTIONS_REMOVE_STARTED' -Stage 'maintenance' -Success $true
     if (-not (Test-Path -LiteralPath $script:TaskBrokerUninstallScript)) {
@@ -8496,6 +8570,108 @@ function Invoke-BootNextSelectionWorker {
     return 1
 }
 
+# LBS-206: unelevated persistent-default worker. The fixed allowlisted
+# TaskBroker SYSTEM tasks remain the only privileged writers. UI is not created.
+function Start-DefaultTargetWorkerProcess {
+    param(
+        [Parameter(Mandatory=$true)][string]$ScriptPath,
+        [AllowNull()][string]$Guid,
+        [bool]$Clear,
+        [Parameter(Mandatory=$true)][string]$ResultPath,
+        [Parameter(Mandatory=$true)][string]$ProgressPath,
+        [AllowNull()][string]$RuntimeSessionId
+    )
+    $normalized = Normalize-TaskBrokerGuid -Guid $Guid
+    if (-not $Clear -and (-not $normalized -or -not (Get-TaskBrokerTarget -Guid $normalized))) {
+        throw 'The requested default target is not in the authorized firmware allowlist.'
+    }
+    if ($Clear -and $Guid) { throw 'Clear default operation cannot name a target.' }
+
+    $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $args = @(
+        '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass',
+        '-File', ('"{0}"' -f $ScriptPath),
+        '-DefaultTargetWorker',
+        '-DefaultTargetResultPath', ('"{0}"' -f $ResultPath),
+        '-DefaultTargetProgressPath', ('"{0}"' -f $ProgressPath)
+    )
+    if ($Clear) { $args += '-DefaultTargetClear' }
+    else { $args += @('-DefaultTargetGuid', ('"{0}"' -f $normalized)) }
+    if ($RuntimeSessionId) { $args += @('-RuntimeSessionId', ('"{0}"' -f $RuntimeSessionId)) }
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $psExe
+    $psi.Arguments = ($args -join ' ')
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
+    $process = [Diagnostics.Process]::Start($psi)
+    if (-not $process) { throw 'Default target worker could not start.' }
+    return $process
+}
+
+function Invoke-DefaultTargetWorker {
+    param(
+        [AllowNull()][string]$Guid,
+        [bool]$Clear,
+        [Parameter(Mandatory=$true)][string]$ResultPath,
+        [Parameter(Mandatory=$true)][string]$ProgressPath
+    )
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $normalized = Normalize-TaskBrokerGuid -Guid $Guid
+    $operation = if ($Clear) { 'clear' } else { 'set' }
+    $result = [ordered]@{
+        Success = $false
+        Operation = $operation
+        RequestedGuid = if ($Clear) { '' } else { [string]$normalized }
+        SavedGuid = ''
+        NextGuid = ''
+        NextVerified = $false
+        Stage = 'admission'
+        Error = ''
+    }
+    try {
+        if ($Clear -and $Guid) { throw 'Clear worker must not carry a target.' }
+        if (-not $Clear -and (-not $normalized -or -not (Get-TaskBrokerTarget -Guid $normalized))) {
+            throw 'Default target is not allowlisted.'
+        }
+        $result.Stage = 'saving'
+        # Only the original guarded writer is allowed to persist a default.
+        # Its optional progress marker is written AFTER the authorized task
+        # returns, and BEFORE its independent default/firmware readback.
+        Set-DefaultGuid -Guid $(if ($Clear) { $null } else { $normalized }) -ProgressPath $ProgressPath
+        if ($Clear -and $script:DefaultGuid) { throw 'Clear was not verified.' }
+        if (-not $Clear -and [string]$script:DefaultGuid -ne $normalized) {
+            throw 'Saved default does not match the requested target.'
+        }
+        $result.SavedGuid = [string]$script:DefaultGuid
+        $result.NextGuid = [string]$script:SelectedGuid
+        $result.NextVerified = [bool]$script:NextBootFirmwareReadVerified
+        $result.Stage = if ($result.NextVerified) { 'complete' } else { 'next-unverified' }
+        $result.Success = $true
+    }
+    catch {
+        $result.Error = $_.Exception.Message
+        $result.Stage = 'failed'
+    }
+    finally {
+        $sw.Stop()
+        try {
+            if (-not (Test-Path -LiteralPath (Split-Path -Parent $ResultPath) -PathType Container)) {
+                throw 'Default worker result directory does not exist.'
+            }
+            $json = $result | ConvertTo-Json -Compress -Depth 4
+            [IO.File]::WriteAllText($ResultPath,$json,(New-Object Text.UTF8Encoding($false)))
+        }
+        catch { $result.Success = $false }
+        Write-RuntimeDiagnosticEvent -Event 'DEFAULT_WORKER_COMPLETED' -Stage ([string]$result.Stage) -Success ([bool]$result.Success) -DurationMs $sw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{
+            operation=$operation; targetGuid=[string]$result.RequestedGuid
+            nextVerified=[bool]$result.NextVerified; workerError=[string]$result.Error
+        }) -Level $(if ($result.Success) { 'info' } else { 'error' })
+    }
+    if ($result.Success) { return 0 }
+    return 1
+}
+
 function New-BackgroundRefreshRequest {
     param(
         [bool]$RefreshStorage,
@@ -8632,7 +8808,7 @@ function ConvertFrom-BackgroundRefreshResultText {
 # BootNext task and authoritative firmware verification execute off-thread.
 # All UI state changes occur on the original WinForms message-loop thread.
 function Update-BootNextRestartInterlock {
-    $pending = [bool]$script:BootNextPendingGuid
+    $pending = [bool]($script:BootNextPendingGuid -or $script:DefaultTargetChangePending)
     if ($script:RestartButton -and -not $script:RestartButton.IsDisposed) {
         $script:RestartButton.Enabled = -not $pending
     }
@@ -8642,7 +8818,7 @@ function Update-BootNextRestartInterlock {
         $script:RestartUseDefaultButton.TabStop = $false
         $script:RestartUseDefaultButton.Visible = $false
     }
-    if ($script:RestartTargetLabel -and -not $script:RestartTargetLabel.IsDisposed -and $pending) {
+    if ($script:RestartTargetLabel -and -not $script:RestartTargetLabel.IsDisposed -and $script:BootNextPendingGuid) {
         $entry = Get-EntryByGuid ([string]$script:BootNextPendingGuid)
         $title = if ($entry) { Get-EntryDisplayTitle -Entry $entry } else { Get-LocalizedString -Key 'BootNext.Unknown' }
         $text = Get-LocalizedString -Key 'BootNext.SelectionPendingFooter' -Values @{ Target=$title }
@@ -8689,7 +8865,7 @@ function Start-AuthorizedPendingBootNextWorker {
     # Recheck authorizing facts AFTER cold-start readiness; never run in Checking.
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     if ([string]$capabilities.State -ne 'Ready' -or -not $capabilities.CanSetBootNext -or
-        $script:IsManageEntriesMode -or (Test-MaintenanceBusy)) {
+        $script:IsManageEntriesMode -or (Test-MaintenanceBusy) -or $script:DefaultTargetChangePending) {
         throw 'TaskBroker is not ready for a BootNext request.'
     }
     $entry = Get-EntryByGuid $requested
@@ -8725,6 +8901,10 @@ function Fail-DeferredBootNextSelection {
 
 function Start-BootNextSelection {
     param([Parameter(Mandatory=$true)][string]$Guid)
+    if ($script:DefaultTargetChangePending) {
+        Write-RuntimeDiagnosticEvent -Event 'BOOTNEXT_CLICK_REJECTED' -Stage 'bootnext' -Success $false -Data (New-RuntimeDiagnosticData @{ reason='default-target-changing' })
+        return
+    }
     if ($script:BootNextPendingGuid) {
         Write-RuntimeDiagnosticEvent -Event 'BOOTNEXT_CLICK_REJECTED' -Stage 'bootnext' -Success $true -Data (New-RuntimeDiagnosticData @{ reason='already-pending' })
         return
@@ -8848,6 +9028,234 @@ function Complete-BootNextSelection {
     }
     if (-not $verified) {
         Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Boot.ChangeErrorTitle') -Heading (Get-LocalizedString -Key 'Boot.ChangeErrorHeading') -Message (Get-LocalizedString -Key 'Boot.ChangeErrorMessage') -Kind Error
+    }
+}
+
+# LBS-206: an explicit persistent-default change runs in one UNELEVATED
+# child process. Only the preinstalled allowlisted SYSTEM tasks may write it.
+# WinForms state is mutated only on the main STA / Forms.Timer thread.
+function Stop-DefaultTargetChangeWorker {
+    param([string]$Reason = 'completed')
+    if ($script:DefaultTargetChangeTimer) {
+        try { $script:DefaultTargetChangeTimer.Stop(); $script:DefaultTargetChangeTimer.Dispose() } catch { }
+        $script:DefaultTargetChangeTimer = $null
+    }
+    if ($script:DefaultTargetChangeProcess) {
+        try {
+            $script:DefaultTargetChangeProcess.Refresh()
+            if (-not $script:DefaultTargetChangeProcess.HasExited) {
+                $script:DefaultTargetChangeProcess.Kill()
+                $script:DefaultTargetChangeProcess.WaitForExit(3000) | Out-Null
+            }
+            $script:DefaultTargetChangeProcess.Dispose()
+        }
+        catch { }
+        $script:DefaultTargetChangeProcess = $null
+    }
+    foreach ($path in @($script:DefaultTargetChangeResultPath,$script:DefaultTargetChangeProgressPath)) {
+        if ($path) { Remove-BackgroundRefreshResultFile -Path ([string]$path) }
+    }
+    $script:DefaultTargetChangeResultPath = $null
+    $script:DefaultTargetChangeProgressPath = $null
+    $script:DefaultTargetChangeRequestedGuid = $null
+    $script:DefaultTargetChangeOperation = ''
+    $script:DefaultTargetChangeStage = ''
+    $script:DefaultTargetChangePending = $false
+    $script:DefaultTargetChangeWorkerStarted = $false
+    $script:DefaultTargetChangeStartedUtc = [datetime]::MinValue
+}
+
+function Start-DefaultTargetChange {
+    param([AllowNull()][string]$Guid)
+    # A pending save is a single immutable intent. No superseding click
+    # may create a second SYSTEM task or overlap a one-shot BootNext writer.
+    if ($script:DefaultTargetChangePending -or $script:BootNextPendingGuid -or
+        $script:IsManageEntriesMode -or (Test-MaintenanceBusy)) { return }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    if ([string]$capabilities.State -ne 'Ready' -or -not $capabilities.CanSetDefaultTarget) { return }
+    $normalized = Normalize-TaskBrokerGuid -Guid $Guid
+    if ($Guid -and (-not $normalized -or -not (Get-EntryByGuid $normalized) -or
+        -not (Get-TaskBrokerTarget -Guid $normalized))) { return }
+    if ([string]$script:DefaultGuid -eq [string]$normalized) { return }
+    $script:DefaultTargetChangePending = $true
+    $script:DefaultTargetChangeRequestedGuid = if ($normalized) { [string]$normalized } else { $null }
+    $script:DefaultTargetChangeOperation = if ($normalized) { 'set' } else { 'clear' }
+    $script:DefaultTargetChangeStage = 'saving'
+    $script:DefaultTargetChangeStartedUtc = [datetime]::UtcNow
+    $script:DefaultTargetChangeWorkerStarted = $false
+    $target = if ($normalized) {
+        $entry = Get-EntryByGuid $normalized
+        if ($entry) { Get-EntryDisplayTitle -Entry $entry } else { $normalized }
+    } else { Get-LocalizedString -Key 'Settings.NoDefaultTarget' }
+    $script:LastStatusText = Get-LocalizedString -Key 'Default.ChangeSavingFooter' -Values @{ Target = $target }
+    try {
+        # Render pending BEFORE queuing the child on a later WinForms tick.
+        Update-DefaultUi
+        Update-RestartTargetUi
+        Update-PopupRows
+        Write-RuntimeDiagnosticEvent -Event 'DEFAULT_TARGET_PENDING_SHOWN' -Stage 'default' -Success $true -Data (New-RuntimeDiagnosticData @{ operation=$script:DefaultTargetChangeOperation; targetGuid=[string]$normalized })
+        $timer = New-Object Windows.Forms.Timer
+        $timer.Interval = 120
+        $timer.Add_Tick({ Complete-DefaultTargetChange })
+        $script:DefaultTargetChangeTimer = $timer
+        $timer.Start()
+    }
+    catch {
+        Write-RuntimeDiagnosticEvent -Event 'DEFAULT_TARGET_ASYNC_START_FAILED' -Stage 'default' -Success $false -ErrorRecord $_ -Level error
+        Stop-DefaultTargetChangeWorker -Reason 'ui-start-failed'
+        Update-DefaultUi
+        Update-RestartTargetUi
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Settings.DefaultTarget') -Heading (Get-LocalizedString -Key 'Default.SaveErrorHeading') -Message (Get-LocalizedString -Key 'Default.SaveErrorMessage') -Kind Error
+    }
+}
+
+function Start-AuthorizedDefaultTargetWorker {
+    $requested = [string]$script:DefaultTargetChangeRequestedGuid
+    $clear = ($script:DefaultTargetChangeOperation -eq 'clear')
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    if ([string]$capabilities.State -ne 'Ready' -or -not $capabilities.CanSetDefaultTarget -or
+        $script:BootNextPendingGuid -or $script:IsManageEntriesMode -or (Test-MaintenanceBusy)) {
+        throw 'Default-target operation is no longer admissible.'
+    }
+    if (-not $clear -and (-not (Get-EntryByGuid $requested) -or
+        -not (Get-TaskBrokerTarget -Guid $requested))) {
+        throw 'Default-target operation is not allowlisted.'
+    }
+    if ($clear -and $requested) { throw 'Clear default cannot have a target.' }
+    # The read-only startup refresh must not race a persistent default write.
+    if ($script:BackgroundRefreshState -and
+        (Test-BackgroundRefreshActive -State $script:BackgroundRefreshState)) {
+        Stop-BackgroundBootRefreshForMaintenance -Reason 'default-target-change'
+    }
+    if (-not (Test-Path -LiteralPath $script:TaskBrokerLocalDir -PathType Container)) {
+        [void](New-Item -ItemType Directory -Path $script:TaskBrokerLocalDir -Force)
+    }
+    $token = [guid]::NewGuid().ToString('N')
+    $resultPath = Join-Path $script:TaskBrokerLocalDir ("runtime-default-{0}.json" -f $token)
+    $progressPath = Join-Path $script:TaskBrokerLocalDir ("runtime-default-{0}.progress" -f $token)
+    $process = Start-DefaultTargetWorkerProcess -ScriptPath $script:ScriptPath -Guid $requested -Clear $clear -ResultPath $resultPath -ProgressPath $progressPath -RuntimeSessionId $script:RuntimeSessionId
+    $script:DefaultTargetChangeProcess = $process
+    $script:DefaultTargetChangeResultPath = $resultPath
+    $script:DefaultTargetChangeProgressPath = $progressPath
+    Write-RuntimeDiagnosticEvent -Event 'DEFAULT_TARGET_WORKER_STARTED' -Stage 'default' -Success $true -Data (New-RuntimeDiagnosticData @{ operation=$script:DefaultTargetChangeOperation; targetGuid=$requested; processId=$process.Id })
+}
+
+function Complete-DefaultTargetChange {
+    if (-not $script:DefaultTargetChangePending) { return }
+    if (-not $script:DefaultTargetChangeWorkerStarted) {
+        $script:DefaultTargetChangeWorkerStarted = $true
+        try { Start-AuthorizedDefaultTargetWorker }
+        catch {
+            Write-RuntimeDiagnosticEvent -Event 'DEFAULT_TARGET_ASYNC_START_FAILED' -Stage 'default' -Success $false -ErrorRecord $_ -Level error
+            Stop-DefaultTargetChangeWorker -Reason 'worker-start-failed'
+            Update-DefaultUi
+            Update-RestartTargetUi
+            Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Settings.DefaultTarget') -Heading (Get-LocalizedString -Key 'Default.SaveErrorHeading') -Message (Get-LocalizedString -Key 'Default.SaveErrorMessage') -Kind Error
+        }
+        return
+    }
+    if (-not $script:DefaultTargetChangeProcess) { return }
+    $process = $script:DefaultTargetChangeProcess
+    try { $process.Refresh() } catch { }
+    if ($script:DefaultTargetChangeStage -eq 'saving' -and $script:DefaultTargetChangeProgressPath -and
+        (Test-Path -LiteralPath $script:DefaultTargetChangeProgressPath -PathType Leaf)) {
+        try {
+            if ([IO.File]::ReadAllText($script:DefaultTargetChangeProgressPath,[Text.Encoding]::UTF8).Trim() -eq 'verifying') {
+                $script:DefaultTargetChangeStage = 'verifying'
+                Update-DefaultUi
+                Update-RestartTargetUi
+                Write-RuntimeDiagnosticEvent -Event 'DEFAULT_TARGET_VERIFYING_SHOWN' -Stage 'default' -Success $true
+            }
+        } catch { }
+    }
+    $timeout = (([datetime]::UtcNow - $script:DefaultTargetChangeStartedUtc).TotalSeconds -ge 75)
+    if (-not $process.HasExited -and -not $timeout) { return }
+    $requested = [string]$script:DefaultTargetChangeRequestedGuid
+    $operation = [string]$script:DefaultTargetChangeOperation
+    $verifiedDefault = $false
+    $verifiedNext = $false
+    $workerSuccess = $false
+    $failure = $null
+    $readGuid = $null
+    try {
+        $result = $null
+        if (-not $process.HasExited) { throw 'Default worker timed out.' }
+        if (-not $script:DefaultTargetChangeResultPath -or
+            -not (Test-Path -LiteralPath $script:DefaultTargetChangeResultPath -PathType Leaf)) {
+            throw 'Default worker did not return a result.'
+        }
+        $result = [IO.File]::ReadAllText($script:DefaultTargetChangeResultPath,[Text.Encoding]::UTF8) | ConvertFrom-Json -ErrorAction Stop
+        if ([string]$result.Operation -ne $operation -or
+            [string]$result.RequestedGuid -ne $requested) {
+            throw 'Default worker result does not match the pending request.'
+        }
+        $workerSuccess = ($process.ExitCode -eq 0 -and [bool]$result.Success)
+        if (-not $workerSuccess) {
+            throw ('Default worker did not confirm completion: ' + [string]$result.Error)
+        }
+    }
+    catch { $failure = $_ }
+    # This read happens after child process termination on the STA and uses
+    # only the SYSTEM-owned file; it does NOT launch a second scheduled task.
+    try {
+        $meta = Get-TaskBrokerMetadata
+        if (-not $meta -or -not [string]$meta.defaultFile) {
+            throw 'TaskBroker default-state metadata unavailable.'
+        }
+        $readGuid = Get-TaskBrokerDefaultTargetGuid
+        $verifiedDefault = ([string]$readGuid -eq $requested)
+        $script:DefaultGuid = if ($readGuid) { [string]$readGuid } else { $null }
+    }
+    catch {
+        $verifiedDefault = $false
+        $failure = $_
+    }
+    if ($verifiedDefault -and $workerSuccess -and [bool]$result.NextVerified) {
+        try {
+            $meta = Get-TaskBrokerMetadata
+            if (-not $meta -or -not [string]$meta.managerFile) { throw 'Firmware manager cache path unavailable.' }
+            # Force-refresh happened INSIDE the worker. The parent reads the
+            # newly written SYSTEM snapshot without starting another long task.
+            $managerText = Read-TaskBrokerTextFile -Path ([string]$meta.managerFile)
+            $state = ConvertFrom-FirmwareManagerText -Text ([string]$managerText)
+            $workerNext = [string]$result.NextGuid
+            $readNext = [string]$state.SelectedGuid
+            if ($workerNext -ne $readNext) { throw 'Worker firmware result mismatch.' }
+            $script:SelectedGuid = if ($readNext) { $readNext.ToLowerInvariant() } else { $null }
+            $script:NextBootFirmwareReadVerified = $true
+            $verifiedNext = $true
+        }
+        catch { $failure = $_ }
+    }
+    if (-not $verifiedNext) {
+        # A default task can succeed while its BootNext side effect remains
+        # unreadable. Never keep an old "confirmed" next-boot checkmark.
+        $script:SelectedGuid = $null
+        $script:NextBootFirmwareReadVerified = $false
+    }
+    $outcome = if ($workerSuccess -and $verifiedDefault -and $verifiedNext) { 'complete' }
+               elseif ($verifiedDefault) { 'partial' }
+               else { 'failed' }
+    Write-RuntimeDiagnosticEvent -Event 'DEFAULT_TARGET_CHANGE_ASYNC_COMPLETED' -Stage $outcome -Success ($outcome -eq 'complete') -ErrorRecord $failure -Level $(if ($outcome -eq 'complete') { 'info' } elseif ($outcome -eq 'partial') { 'warning' } else { 'error' }) -Data (New-RuntimeDiagnosticData @{
+        operation=$operation; requestedGuid=$requested; observedGuid=[string]$readGuid
+        workerSuccess=$workerSuccess; defaultVerified=$verifiedDefault; nextVerified=$verifiedNext
+    })
+    Stop-DefaultTargetChangeWorker -Reason $outcome
+    if ($outcome -eq 'complete') {
+        $entry = if ($script:DefaultGuid) { Get-EntryByGuid ([string]$script:DefaultGuid) } else { $null }
+        $target = if ($entry) { Get-EntryDisplayTitle -Entry $entry } else { Get-LocalizedString -Key 'Settings.NoDefaultTarget' }
+        $script:LastStatusText = Get-LocalizedString -Key 'Default.SystemSavedStatus' -Values @{ Name=$target }
+    }
+    else {
+        $script:LastStatusText = if ($outcome -eq 'partial') {
+            Get-LocalizedString -Key 'Default.ChangePartial'
+        } else { Get-LocalizedString -Key 'Default.SaveErrorHeading' }
+    }
+    Update-DefaultUi
+    Update-RestartTargetUi
+    Update-PopupRows
+    if ($outcome -ne 'complete') {
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Settings.DefaultTarget') -Heading (Get-LocalizedString -Key $(if ($outcome -eq 'partial') { 'Default.ChangePartialHeading' } else { 'Default.SaveErrorHeading' })) -Message (Get-LocalizedString -Key $(if ($outcome -eq 'partial') { 'Default.ChangePartial' } else { 'Default.SaveErrorMessage' })) -Kind $(if ($outcome -eq 'partial') { 'Warning' } else { 'Error' })
     }
 }
 
@@ -8983,6 +9391,10 @@ function Complete-BackgroundBootRefresh {
 function Start-BackgroundBootRefresh {
     param([switch]$RefreshStorage)
 
+    if ($script:DefaultTargetChangePending) {
+        Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_SUPPRESSED' -Stage 'default' -Success $true -Data (New-RuntimeDiagnosticData @{ reason='default-target-changing' })
+        return
+    }
     if (Test-MaintenanceBusy) {
         Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_SUPPRESSED' -Stage 'maintenance' -Success $true -Data (New-RuntimeDiagnosticData @{ maintenanceMode = (Get-MaintenanceMode); refreshStorage = [bool]$RefreshStorage })
         return
@@ -12521,7 +12933,7 @@ function Load-TrayIcon {
 
 
 Initialize-RuntimeDiagnostics
-if (-not ($BootNextWorker -or $BackgroundRefresh -or $UpdateCheck -or $UpdatePrepare)) {
+if (-not ($BootNextWorker -or $BackgroundRefresh -or $UpdateCheck -or $UpdatePrepare -or $DefaultTargetWorker)) {
     try { [void](Get-DiagnosticsInstallationId -SettingsDirectory $script:SettingsDir) }
     catch { Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_INSTALLATION_ID_UNAVAILABLE' -Stage 'startup' -Success $false -ErrorRecord $_ -Level warning }
 }
@@ -12536,6 +12948,10 @@ if (-not $BackgroundRefresh) {
 
 if ($BootNextWorker) {
     $exitCode = Invoke-BootNextSelectionWorker -Guid $BootNextGuid -ResultPath $BootNextResultPath
+    exit $exitCode
+}
+if ($DefaultTargetWorker) {
+    $exitCode = Invoke-DefaultTargetWorker -Guid $DefaultTargetGuid -Clear ([bool]$DefaultTargetClear) -ResultPath $DefaultTargetResultPath -ProgressPath $DefaultTargetProgressPath
     exit $exitCode
 }
 if ($BackgroundRefresh) {
@@ -12855,6 +13271,7 @@ finally {
         try { Stop-UpdatePrepareWorkflow -State $script:UpdateState } catch { }
     }
     Stop-BootNextSelectionWorker -Reason 'shutdown'
+    Stop-DefaultTargetChangeWorker -Reason 'shutdown'
     $backgroundRefreshContext = $null
     if ($script:BackgroundRefreshState) {
         $backgroundRefreshContext = Take-BackgroundRefreshCompletionContext -State $script:BackgroundRefreshState

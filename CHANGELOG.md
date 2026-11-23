@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.10.3 – Nonblocking default-target save and truthful progress (LBS-206)
+
+- Changing the persistent Standard-Startziel now immediately shows an amber **Saving…** status for the chosen target; an unelevated child process executes the existing fixed, allowlisted DefaultSet/DefaultClear task and independently re-reads the saved default and firmware next-boot state. A **Verifying…** stage appears after the authorized task completes. No UI thread blocking while waiting for the SYSTEM task.
+- Prevent duplicate default changes and overlapping BootNext, maintenance, background-refresh and restart requests while the operation is pending. Previously verified default/BootNext remain distinct from the requested value until verified; on success show authoritative state, and on failure/timeout/partial firmware readback report the actual observed state and a visible error/warning. A changed default never triggers an automatic Windows restart.
+- Add permanent native WinPS5.1 asynchronous-worker/controller regression for immediate pending, deferred process launch, duplicate suppression, verified success, failure, timeout, partial readback, and enabled-state recovery, plus updated DE/EN accessibility strings and supported DPI layout. Retain the 390×672 popup and BootNext/TaskBroker privilege boundaries.
+
 ## v1.5.10.2 – Standard-target reset tooltip and dropdown contrast (LBS-206 Hotfix)
 
 - Correct the **Reset to default target / Auf Standardziel zurücksetzen** tooltip in both English and German: it replaces the currently verified one-time next-boot target with the saved default and does **not** restart the computer. The visible button label, accessible description and existing guarded BootNext worker remain unchanged in function.

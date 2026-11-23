@@ -30,6 +30,12 @@ $dragVisualProbe = Join-Path $root 'tests\Test-LBS172-DragVisual.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $dragVisualProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-172 native Manage Entries drag visual regression failed' }
 
+# LBS-206: native asynchronous persistent default change, exact readback and
+# pending interlock (mock worker: never touches firmware or SYSTEM tasks).
+$defaultAsyncProbe = Join-Path $root 'tests\Test-LBS206-DefaultAsync.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $defaultAsyncProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-206 default-target asynchronous feedback regression failed' }
+
 # LBS-206 Hotfix v1.5.10.2: owner-painted Standardziel boundary + reset tooltip.
 $menuEdgeProbe = Join-Path $root 'tests\Test-LBS206-MenuContrast.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $menuEdgeProbe
