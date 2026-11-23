@@ -14,6 +14,10 @@ function Assert-Lbs172([string]$Name,[bool]$Ok) {
     $script:checks++
     Write-Host "PASS LBS172 $Name"
 }
+# Establish a focused early RED on the unfixed source before creating HWNDs.
+# Later checks verify painted child raster pixels, reflow and cleanup.
+Assert-Lbs172 "drag raster constructor exists before native painting" (
+    $null -ne (Get-Command New-ManageDragRowRaster -CommandType Function -ErrorAction SilentlyContinue))
 $script:IsManageEntriesMode = $true
 $script:ColorAccent = [Drawing.Color]::FromArgb(225,37,27)
 $script:ManageLastDragUtc = [datetime]::MinValue
@@ -51,12 +55,24 @@ function New-Lbs172Row([string]$Guid,[int]$Y,[double]$Scale) {
     $pencil.Location = [Drawing.Point]::new([int][Math]::Round(321*$Scale),[int][Math]::Round(12*$Scale))
     $pencil.Size = [Drawing.Size]::new([int][Math]::Round(25*$Scale),[int][Math]::Round(34*$Scale))
     $row.Controls.Add($pencil)
-    $eye = New-Object System.Windows.Forms.Panel
+    # Native child glyph labels provide deterministic raster ink without
+    # PowerShell Paint callbacks in this isolated STA fixture.
+    $eye = New-Object System.Windows.Forms.Label
     $eye.Name = 'VisibilityGlyph'
+    $eye.Text = [string][char]0x25CF
+    $eye.Font = New-Object Drawing.Font('Segoe UI Symbol',14.0,[Drawing.FontStyle]::Regular)
+    $eye.ForeColor = [Drawing.Color]::White
+    $eye.BackColor = [Drawing.Color]::Transparent
+    $eye.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $eye.Location = [Drawing.Point]::new([int][Math]::Round(286*$Scale),[int][Math]::Round(12*$Scale))
     $eye.Size = [Drawing.Size]::new([int][Math]::Round(32*$Scale),[int][Math]::Round(34*$Scale))
     $row.Controls.Add($eye)
-    $grip = New-Object System.Windows.Forms.Panel
+    $grip = New-Object System.Windows.Forms.Label
+    $grip.Text = [string][char]0x2261
+    $grip.Font = New-Object Drawing.Font('Segoe UI Symbol',14.0,[Drawing.FontStyle]::Regular)
+    $grip.ForeColor = [Drawing.Color]::White
+    $grip.BackColor = [Drawing.Color]::Transparent
+    $grip.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $grip.Name = 'ManageReorderGrip'
     $grip.Location = [Drawing.Point]::new([int][Math]::Round(350*$Scale),[int][Math]::Round(12*$Scale))
     $grip.Size = [Drawing.Size]::new([int][Math]::Round(26*$Scale),[int][Math]::Round(34*$Scale))
@@ -64,7 +80,21 @@ function New-Lbs172Row([string]$Guid,[int]$Y,[double]$Scale) {
     return $row
 }
 
-foreach ($scale in @(1.0,2.5)) {
+function Test-Lbs172VisibleInk($Bitmap,[Drawing.Rectangle]$Bounds) {
+    if (-not $Bitmap) { return $false }
+    $right = [Math]::Min([int]$Bitmap.Width,$Bounds.Right)
+    $bottom = [Math]::Min([int]$Bitmap.Height,$Bounds.Bottom)
+    for ($y = [Math]::Max(0,$Bounds.Top); $y -lt $bottom; $y++) {
+        for ($x = [Math]::Max(0,$Bounds.Left); $x -lt $right; $x++) {
+            $pixel = $Bitmap.GetPixel($x,$y)
+            if ($pixel.R -gt 150 -and $pixel.G -gt 150 -and $pixel.B -gt 150) { return $true }
+        }
+    }
+    return $false
+}
+
+# Exercise the physical-size 250% case before 100% when establishing RED.
+foreach ($scale in @(2.5,1.0)) {
     $script:ManageEntryOrder = @('a','b','c','d')
     $script:ManageActiveDragGuid = 'b'
     $form = New-Object System.Windows.Forms.Form
@@ -129,10 +159,36 @@ foreach ($scale in @(1.0,2.5)) {
         $screen = $content.PointToScreen([Drawing.Point]::new(20,([int][Math]::Round(120*$scale))))
         Set-ManageDragFloatLocation -ScreenPoint $screen -ActivateVisual
         Assert-Lbs172 "$scale activate freezes real source" (-not $source.Visible -and $source.Top -eq $sourceTop)
+        $neighbors = @($rows | Where-Object { -not [object]::ReferenceEquals($_,$source) })
+        $flatImages = if ($script:ManageDragNeighborVisuals -is [System.Collections.IDictionary]) {
+            @($script:ManageDragNeighborVisuals.Values)
+        } else { @() }
+        Assert-Lbs172 "$scale all neighbor rows have flat raster pictures during drag" (
+            $flatImages.Count -eq 3 -and
+            @($flatImages | Where-Object { $_ -is [System.Windows.Forms.PictureBox] -and $null -ne $_.Image }).Count -eq 3)
+        Assert-Lbs172 "$scale native multi-child neighbor HWNDs are parked" (
+            @($neighbors | Where-Object { $_.Visible }).Count -eq 0)
+        $allGlyphs = ($flatImages.Count -eq 3)
+        if ($allGlyphs) {
+            foreach ($neighbor in $neighbors) {
+                $pic = $script:ManageDragNeighborVisuals[[string]$neighbor.Tag]
+                if (-not $pic -or -not (Test-Lbs172VisibleInk -Bitmap $pic.Image -Bounds $neighbor.Controls['BootTitleLabel'].Bounds) -or
+                    -not (Test-Lbs172VisibleInk -Bitmap $pic.Image -Bounds $neighbor.Controls['AliasEditButton'].Bounds) -or
+                    -not (Test-Lbs172VisibleInk -Bitmap $pic.Image -Bounds $neighbor.Controls['VisibilityGlyph'].Bounds) -or
+                    -not (Test-Lbs172VisibleInk -Bitmap $pic.Image -Bounds $neighbor.Controls['ManageReorderGrip'].Bounds)) {
+                    $allGlyphs = $false
+                    break
+                }
+            }
+        }
+        Assert-Lbs172 "$scale each cached neighbor raster includes complete text and eye pencil grip ink" $allGlyphs
         Assert-Lbs172 "$scale floating image becomes visible" ($script:ManageDragGhost.Visible)
         Assert-Lbs172 "$scale single drag image stays same object" ([object]::ReferenceEquals($image,$script:ManageDragGhost.Image))
         Assert-Lbs172 "$scale image follows intended pointer position" ($script:ManageDragGhost.Top -eq $content.PointToClient($screen).Y-$script:ManageDragGrabY)
-        Assert-Lbs172 "$scale shadow is behind floating image" ($null -ne $script:ManageDragShadow -and $script:ManageDragShadow.Top -eq $script:ManageDragGhost.Top+5)
+        Assert-Lbs172 "$scale shadow is a narrow bottom edge behind the image" (
+            $null -ne $script:ManageDragShadow -and
+            $script:ManageDragShadow.Height -lt ($script:ManageDragGhost.Height/4) -and
+            $script:ManageDragShadow.Top -ge ($script:ManageDragGhost.Top+$script:ManageDragGhost.Height-$script:ManageDragShadow.Height))
 
         $lastPoint = $content.PointToScreen([Drawing.Point]::new(24,([int][Math]::Round(64*$scale)*3+$rows[3].Height-2)))
         $firstPoint = $content.PointToScreen([Drawing.Point]::new(24,2))
@@ -153,6 +209,9 @@ foreach ($scale in @(1.0,2.5)) {
         Advance-ManageDragReflow -Progress 0.5
         Assert-Lbs172 "$scale last queued decision is applied once" ($script:ManageDragRetargetCount -eq 1 -and $script:ManageDragTargets['b'] -eq [int][Math]::Round(192*$scale))
         Assert-Lbs172 "$scale neighbors animate through intermediate position" ($rows[2].Top -lt [int][Math]::Round(128*$scale) -and $rows[2].Top -gt [int][Math]::Round(64*$scale))
+        Assert-Lbs172 "$scale raster neighbor follows preview position without revealing child HWNDs" (
+            $script:ManageDragNeighborVisuals['c'].Top -eq $rows[2].Top -and
+            -not $rows[2].Visible)
         Advance-ManageDragReflow -Progress 1.0
         Assert-Lbs172 "$scale live preview reaches final slot" ($rows[2].Top -eq [int][Math]::Round(64*$scale) -and $rows[3].Top -eq [int][Math]::Round(128*$scale))
         Assert-Lbs172 "$scale full-size placeholder tracks last slot" ($script:ManageDragPlaceholder.Visible -and $script:ManageDragPlaceholder.Top -eq [int][Math]::Round(192*$scale))
@@ -166,6 +225,10 @@ foreach ($scale in @(1.0,2.5)) {
         Assert-Lbs172 "$scale invalid preview restores all neighbors" ($rows[0].Top -eq 0 -and $rows[2].Top -eq [int][Math]::Round(128*$scale))
         Reset-ManageDragPreview
         Assert-Lbs172 "$scale cancellation restores source original slot and visibility" ($source.Visible -and $source.Top -eq $sourceTop)
+        Assert-Lbs172 "$scale cancellation restores native neighbors and clears raster pictures" (
+            @($neighbors | Where-Object { -not $_.Visible }).Count -eq 0 -and
+            $null -eq $script:ManageDragNeighborVisuals -and
+            @($content.Controls | Where-Object { $_.Name -eq 'ManageDragNeighbor' }).Count -eq 0)
         Assert-Lbs172 "$scale cancellation keeps all four original row and child identities" (
             @($content.Controls | Where-Object { $_.Name -eq 'BootRow' }).Count -eq 4 -and
             [object]::ReferenceEquals($pencilBefore,$source.Controls['AliasEditButton']) -and
@@ -188,6 +251,9 @@ foreach ($scale in @(1.0,2.5)) {
         Reset-ManageDragPreview -KeepPositions
         Assert-Lbs172 "$scale successful drop exactly matches preview order" ((@($script:ManageEntryOrder) -join ',') -eq 'a,c,d,b')
         Assert-Lbs172 "$scale successful drop keeps source visible in destination" ($source.Visible -and $source.Top -eq [int][Math]::Round(192*$scale))
+        Assert-Lbs172 "$scale successful drop restores neighbor handles and clears raster clones" (
+            @($rows | Where-Object { -not $_.Visible }).Count -eq 0 -and
+            $null -eq $script:ManageDragNeighborVisuals)
         Assert-Lbs172 "$scale successful drop never recreates the pencil" ([object]::ReferenceEquals($pencilBefore,$source.Controls['AliasEditButton']))
         Assert-Lbs172 "$scale successful drop preserves neighbor positions" ($rows[2].Top -eq [int][Math]::Round(64*$scale) -and $rows[3].Top -eq [int][Math]::Round(128*$scale))
         Assert-Lbs172 "$scale successful drop leaves no ghost/placeholder" ($null -eq $script:ManageDragGhost -and $null -eq $script:ManageDragPlaceholder)
@@ -199,5 +265,5 @@ foreach ($scale in @(1.0,2.5)) {
         $script:Popup = $null
     }
 }
-Write-Host "LBS172 DRAG TOTAL $script:checks/80"
-if ($script:checks -ne 80) { throw "LBS172 test total mismatch $script:checks" }
+Write-Host "LBS172 DRAG TOTAL $script:checks/93"
+if ($script:checks -ne 93) { throw "LBS172 test total mismatch $script:checks" }

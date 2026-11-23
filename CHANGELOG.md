@@ -1,5 +1,13 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.2.0 – Stable Manage Entries row painting at 250% (LBS-172 / UX01-V7)
+
+- During active drag, keep the original WinForms boot-row controls and their eye, pencil, grip and text children intact but parked. Animate one cached, noninteractive PictureBox per neighbor instead of repeatedly repainting nested child HWNDs during 150ms reflow; preserve immutable drop slots and the existing queued 16ms retarget decisions.
+- Refresh the complete native row before a single physical-size DrawToBitmap capture, including source and neighbors. Keep a narrow bottom-edge drag shadow instead of the previous full-height opaque dark panel; retain one intentional dashed source/destination placeholder and exact preview-to-drop parity.
+- Restore and paint native rows at their final or original positions before disposing all transient pictures, bitmaps, shadow, placeholder and timer. Failure to create the complete raster layer reverts to the existing live-row drag behavior without interrupting reordering, with one bounded diagnostic count per drag.
+- Extend the native Windows PowerShell 5.1 regression to 93 checks (250% first, then 100%) verifying title/pencil and synthetic eye/grip glyph raster, neighbor child-HWND parking, animated picture alignment and cancellation/commit cleanup, without weakening existing drag/draft/scroll/identity cases. Owner-visible real 250% flicker acceptance remains mandatory.
+- Do not change firmware, BootNext/BootOrder, TaskBroker privileges, persistence, update behavior or user confirmation semantics.
+
 ## v1.5.1.3 – Immediately localize cached boot entries (LBS-191)
 
 - Reproject existing boot-entry titles, subtitles and tooltips immediately when changing German/English language, before the popup is rebuilt.
