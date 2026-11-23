@@ -2210,7 +2210,7 @@ public sealed class LenovoVerticalScrollBar : Control
         base.OnMouseDown(e);
         if (e.Button != MouseButtons.Left) return;
         Rectangle thumb = GetThumbRectangle();
-        if (thumb.Contains(e.Location))
+        if (!thumb.IsEmpty && e.Y >= thumb.Top && e.Y < thumb.Bottom)
         {
             dragging = true;
             dragOffset = e.Y - thumb.Top;
@@ -2324,7 +2324,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.10.4'
+$script:AppVersion = '1.5.10.5'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -11401,7 +11401,7 @@ $marker.Tag = $entry.Guid
 $marker.AllowDrop = $script:IsManageEntriesMode
 $row.Controls.Add($marker)
 
-$iconColor = if ($isHidden) { [Drawing.Color]::FromArgb(105,105,105) } else { $entry.Accent }
+$iconColor = if ($isHidden) { [Drawing.Color]::FromArgb(115,115,115) } else { $entry.Accent }
 $titleColor = if ($isHidden) { [Drawing.Color]::FromArgb(175,175,175) } else { $script:ColorPrimary }
 $subtitleColor = if ($isHidden) { [Drawing.Color]::FromArgb(155,155,155) } else { $script:ColorSecondary }
 
@@ -13035,7 +13035,7 @@ try {
     $openItem.Text = Get-LocalizedString -Key 'Tray.Open'
     $script:TrayOpenMenuItem = $openItem
     $openItem.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
-    $openItem.ForeColor = $script:ColorAccent
+    $openItem.ForeColor = [Drawing.Color]::FromArgb(255,110,102)
     $openItem.Add_Click({ Show-OrTogglePopup -FromTrayClick })
     [void]$context.Items.Add($openItem)
 

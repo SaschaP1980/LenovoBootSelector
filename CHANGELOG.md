@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.10.5 – Targeted tray contrast and scrollbar thumb hit-zone fix (LBS-213 Hotfix)
+
+- Improve the **Tray > Open** command foreground with scoped lighter red #FF6E66, preserving the global Lenovo brand accent, menu layout, typography, localization and all other items. Improve only the hidden storage-type glyph foreground to neutral #737373 while preserving all visibility state semantics.
+- Expand the horizontal pointer acquisition zone for the existing vertical scrollbar thumb to the track width only while vertically within the thumb. Clicks above or below still page by LargeChange; keep thumb drawing, width, drag lifecycle, keyboard, scrolling and Manage Entries interactions unchanged.
+- Add a focused 20-assertion native Windows PowerShell 5.1 regression for source color binding, text/non-text contrast, actual 96/240 DPI menu raster and scrolling drag/paging behavior. No BootNext, default persistence, firmware, SYSTEM task, restart, updater or window-footprint changes.
+
 ## v1.5.10.4 – Hide duplicate default-target progress ellipsis (LBS-206 Hotfix)
 
 - Hide the separate default-target menu indicator while the existing asynchronous save or verification status is shown. The localized amber **Saving …** / **Verifying …** label remains visible without a second trailing ellipsis; the normal selection chevron returns after the pending operation ends.
