@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.7.0 – Keyboard-accessible tray menu with reliable outside-click dismissal (UX01-V9/V10 / LBS-200)
+
+- Activate the manually positioned tray context-menu HWND as the keyboard foreground target when shown. Preserve the existing exact-monitor DPI placement, tray left/right-click behavior, and WinForms AutoClose lifecycle; moving foreground to another application safely dismisses the menu.
+- Navigate available enabled tray actions with Up/Down, skipping disabled items and separators in the root, Language and Maintenance menus. Keep native Right/Left submenu navigation, Escape dismissal and deliberate Enter activation without implicit item actions. Give the actually selected keyboard row priority in the custom menu highlight, even with a stationary pointer.
+- Add a Windows PowerShell 5.1 STA native test with 26 assertions over synthetic 100%/250% menu widths and an independent WinForms process for external foreground handoff, plus native keyboard, submenu, focused hot ink, explicit activation and Escape behavior. No firmware, BootNext controller, TaskBroker, restart admission, updater or persistent-default changes.
+
 ## v1.5.6.1 – Neutral keyboard focus styling in the normal boot-target list (LBS-197)
 
 - Replace the coral-red keyboard focus rectangle with a thinner, neutral blue-gray outline and a restrained translucent interior tint. Paint-only styling retains each row's base background, confirmed-red accent, pending-amber status, readable text and existing hover treatment.

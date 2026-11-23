@@ -1,7 +1,9 @@
 {
   "schemaVersion": 2,
-  "version": "1.5.6.1",
+  "version": "1.5.7.0",
   "releaseProfile": "patch",
-  "protectedFragmentIntent": [],
+  "protectedFragmentIntent": [
+    "cs:public static ToolStripMenuItem GetVisualHotItem"
+  ],
   "repositoryDeleteIntent": []
 }

@@ -30,6 +30,11 @@ $dragVisualProbe = Join-Path $root 'tests\Test-LBS172-DragVisual.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $dragVisualProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-172 native Manage Entries drag visual regression failed' }
 
+# LBS-200: isolated native WinForms tray-menu activation and dismissal probe.
+$trayMenuProbe = Join-Path $root 'tests\Test-LBS200-TrayMenu.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $trayMenuProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-200 native tray menu regression failed' }
+
 # UX01-V8 / LBS-197: real focusable normal rows, scroll and safe keyboard selection.
 $keyboardProbe = Join-Path $root 'tests\Test-LBS197-NormalKeyboard.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $keyboardProbe
