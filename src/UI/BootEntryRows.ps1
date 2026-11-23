@@ -346,7 +346,16 @@ function Advance-ManageDragReflow {
         $script:ManageDragQueuedDecision = $null
         Set-ManageDragReflowTargets -Decision $decision
     }
-    $t = if ($Progress -ge 0) { [Math]::Min(1.0,[Math]::Max(0.0,$Progress)) }
+    # LBS-172 V7 A/B: keep the 16ms timer only as a DragOver target
+    # coalescing boundary. With cached row pictures, place neighbors at
+    # their exact new slots in one callback instead of creating 150ms of
+    # intermediate native PictureBox window moves. The moving source ghost
+    # and immutable drop-hit slots are unchanged. If capture failed, use
+    # the previous eased live-row fallback rather than altering semantics.
+    $instantRasterReflow = ($script:ManageDragNeighborVisuals -is [System.Collections.IDictionary] -and
+                            $script:ManageDragGhost -and -not $script:ManageDragGhost.IsDisposed)
+    $t = if ($instantRasterReflow) { 1.0 }
+         elseif ($Progress -ge 0) { [Math]::Min(1.0,[Math]::Max(0.0,$Progress)) }
          else { [Math]::Min(1.0,([datetime]::UtcNow-$script:ManageDragAnimationStartUtc).TotalMilliseconds/150.0) }
     $ease = 1.0 - [Math]::Pow(1.0-$t,3.0)
     $script:ManageDragContent.SuspendLayout()

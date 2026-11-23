@@ -103,9 +103,9 @@ try {
         Check "$scale immutable last destination" ($null -ne $visualLast -and $visualLast.InsertIndex -eq 3)
         Set-ManageDropPreview -Decision $visualLast
         Advance-ManageDragReflow -Progress 0.5
-        Check "$scale smooth in-between frame" (
-            $script:ManageDragNeighborVisuals['c'].Top -lt [int](128*$scale) -and
-            $script:ManageDragNeighborVisuals['c'].Top -gt [int](64*$scale) -and
+        Check "$scale single-frame final neighbor placement" (
+            $script:ManageDragNeighborVisuals['c'].Top -eq [int](64*$scale) -and
+            $script:ManageDragNeighborVisuals['d'].Top -eq [int](128*$scale) -and
             $rows[2].Top -eq [int](128*$scale))
         Advance-ManageDragReflow -Progress 1.0
         Check "$scale first neighbor shifts up" (
