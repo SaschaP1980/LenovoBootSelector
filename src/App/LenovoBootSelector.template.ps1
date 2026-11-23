@@ -912,7 +912,7 @@ public sealed class LenovoVerticalScrollBar : Control
         base.OnMouseDown(e);
         if (e.Button != MouseButtons.Left) return;
         Rectangle thumb = GetThumbRectangle();
-        if (thumb.Contains(e.Location))
+        if (!thumb.IsEmpty && e.Y >= thumb.Top && e.Y < thumb.Bottom)
         {
             dragging = true;
             dragOffset = e.Y - thumb.Top;
@@ -2168,7 +2168,7 @@ try {
     $openItem.Text = Get-LocalizedString -Key 'Tray.Open'
     $script:TrayOpenMenuItem = $openItem
     $openItem.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
-    $openItem.ForeColor = $script:ColorAccent
+    $openItem.ForeColor = [Drawing.Color]::FromArgb(255,110,102)
     $openItem.Add_Click({ Show-OrTogglePopup -FromTrayClick })
     [void]$context.Items.Add($openItem)
 

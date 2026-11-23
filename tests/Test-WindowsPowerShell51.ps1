@@ -30,6 +30,11 @@ $dragVisualProbe = Join-Path $root 'tests\Test-LBS172-DragVisual.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $dragVisualProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-172 native Manage Entries drag visual regression failed' }
 
+# LBS-213: isolated native semantic ink contrast and scrollbar pointer-hit regression.
+$contrastScrollProbe = Join-Path $root 'tests\Test-LBS213-ContrastScroll.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $contrastScrollProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-213 native contrast / scrollbar regression failed' }
+
 # LBS-206: native asynchronous persistent default change, exact readback and
 # pending interlock (mock worker: never touches firmware or SYSTEM tasks).
 $defaultAsyncProbe = Join-Path $root 'tests\Test-LBS206-DefaultAsync.ps1'
