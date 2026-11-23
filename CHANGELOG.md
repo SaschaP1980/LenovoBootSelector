@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.11.0 – UX-04 boot-row state clarification (LBS-217)
+
+- Give the existing confirmed-next-boot checkmark and not-yet-confirmed pending ellipsis localized, noncolor descriptions, accessible text and native hover ToolTips. The status descriptions explicitly distinguish a pending request from a confirmed firmware next-boot selection. An idle indicator remains silent. No new or speculative row-level error/disabled states are introduced.
+- Keep every visible boot-row glyph, full device title/subtitle and contextual storage tooltip, 390x60 row geometry, 390x672 popup, 402/436 list viewport, focus/keyboard behavior, Manage eye/pencil/grip controls, drag animations, USB firmware target identity, and existing BootNext/Restart safety gates unchanged.
+- Include both language-specific hint keys in the row-localization fingerprint so live language switches refresh the indicator metadata, and add an isolated 75-assertion native WinForms Windows PowerShell 5.1 regression across EN/DE and synthetic 96/240 DPI. No firmware, TaskBroker, privileged tasks, settings persistence, BootOrder or restart changes.
+
 ## v1.5.10.6 – Do not toggle Manage Entries visibility on reorder-grip click (LBS-215 Hotfix)
 
 - Correct a confirmed Manage Entries misinteraction: a stationary click on the reorder grip no longer toggles visibility. The grip remains dedicated to dragging; clicking the eye, the existing row surface, and other row controls retains its established visibility behavior. The pencil continues to open alias editing.
