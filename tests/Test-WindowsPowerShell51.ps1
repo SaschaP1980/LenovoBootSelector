@@ -30,6 +30,11 @@ $dragVisualProbe = Join-Path $root 'tests\Test-LBS172-DragVisual.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $dragVisualProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-172 native Manage Entries drag visual regression failed' }
 
+# LBS-215: isolate native Manage grip click routing and unchanged drag admission.
+$gripClickProbe = Join-Path $root 'tests\Test-LBS215-GripClick.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $gripClickProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-215 native Manage grip click routing regression failed' }
+
 # LBS-213: isolated native semantic ink contrast and scrollbar pointer-hit regression.
 $contrastScrollProbe = Join-Path $root 'tests\Test-LBS213-ContrastScroll.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $contrastScrollProbe
