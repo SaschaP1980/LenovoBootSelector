@@ -2225,7 +2225,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.6.0'
+$script:AppVersion = '1.5.6.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -10692,8 +10692,8 @@ public sealed class LenovoNormalBootKeyboardRow : Panel
         r.Inflate(-3, -3);
         if (r.Width > 0 && r.Height > 0)
         {
-            using (Pen p = new Pen(Color.FromArgb(255, 110, 102), 2.0f))
-                e.Graphics.DrawRectangle(p, r);
+            using (Brush tint = new SolidBrush(Color.FromArgb(18, 180, 196, 214))) e.Graphics.FillRectangle(tint, r);
+            using (Pen p = new Pen(Color.FromArgb(181, 196, 212), 1.5f)) e.Graphics.DrawRectangle(p, r);
         }
     }
 }

@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.6.1 – Neutral keyboard focus styling in the normal boot-target list (LBS-197)
+
+- Replace the coral-red keyboard focus rectangle with a thinner, neutral blue-gray outline and a restrained translucent interior tint. Paint-only styling retains each row's base background, confirmed-red accent, pending-amber status, readable text and existing hover treatment.
+- Extend the native Windows PowerShell 5.1 LBS-197 fixture to 57 assertions at synthetic 100% and 250% row sizes, checking focused outline color, subtle background emphasis and complete focus-decoration removal after moving elsewhere. Keep Tab/arrow/Home/End, deliberate Enter/Space selection, GUID-based focus restoration, pointer parity and explicit restart semantics unchanged.
+
 ## v1.5.6.0 – Keyboard access to normal boot entries (UX01-V8 / LBS-197)
 
 - Add true WinForms keyboard focus, directional navigation and deliberate Enter/Space activation to the **normal boot-target list**. A small selectable native Panel subclass makes Up/Down/Home/End and Enter/Space input keys; TabStop, visual focus border, accessible PushButton role and title/subtitle metadata apply only to normal rows, not Manage Entries.
