@@ -49,6 +49,28 @@ function Invoke-Lbs197Key($Row,[System.Windows.Forms.Keys]$Key) {
     [void]$up.Invoke($Row,[object[]]@($args))
     [System.Windows.Forms.Application]::DoEvents()
 }
+# Paint the actual focused native Panel into an isolated GDI bitmap.
+# Sample inside the outline and the untouched interior (away from child labels).
+function Get-Lbs197RowPaintPixels($Row) {
+    $bmp = [Drawing.Bitmap]::new([int]$Row.ClientSize.Width,[int]$Row.ClientSize.Height)
+    $graphics = [Drawing.Graphics]::FromImage($bmp)
+    try {
+        $graphics.Clear($Row.BackColor)
+        $flags = [Reflection.BindingFlags]::Instance -bor [Reflection.BindingFlags]::NonPublic
+        $paint = $Row.GetType().GetMethod('OnPaint',$flags)
+        if (-not $paint) { throw 'Native row OnPaint unavailable.' }
+        $args = [System.Windows.Forms.PaintEventArgs]::new($graphics,$Row.ClientRectangle)
+        [void]$paint.Invoke($Row,[object[]]@($args))
+        return [pscustomobject]@{
+            Border = $bmp.GetPixel(3,[int]($Row.Height/2))
+            Interior = $bmp.GetPixel(10,[int]($Row.Height-10))
+        }
+    }
+    finally {
+        $graphics.Dispose()
+        $bmp.Dispose()
+    }
+}
 Assert-Lbs197 'normal WinForms keyboard row initializer exists' (
     $null -ne (Get-Command Initialize-NormalBootKeyboardRow -CommandType Function -ErrorAction SilentlyContinue))
 $ui = [IO.File]::ReadAllText((Join-Path $root 'src\UI\BootEntryList.ps1'))
@@ -123,6 +145,16 @@ foreach ($scale in @(2.5,1.0)) {
             [bool]$method.Invoke($rows[0],[object[]]@([System.Windows.Forms.Keys]::Home)) -and
             [bool]$method.Invoke($rows[0],[object[]]@([System.Windows.Forms.Keys]::Return)))
         Assert-Lbs197 "$scale starting row can take real keyboard focus" ($rows[0].Focus() -and $rows[0].Focused)
+        $focusPixels = Get-Lbs197RowPaintPixels $rows[0]
+        Assert-Lbs197 "$scale focused outline is cool-neutral and not red" (
+            $focusPixels.Border.R -ge 120 -and
+            $focusPixels.Border.B -gt ($focusPixels.Border.R + 12) -and
+            $focusPixels.Border.G -ge $focusPixels.Border.R)
+        Assert-Lbs197 "$scale focused row has subtle tint without modifying base background" (
+            $focusPixels.Interior.R -gt $rows[0].BackColor.R -and
+            $focusPixels.Interior.B -gt $rows[0].BackColor.B -and
+            ($focusPixels.Interior.R - $rows[0].BackColor.R) -lt 20 -and
+            $rows[0].BackColor.ToArgb() -eq $script:ColorRow.ToArgb())
         Invoke-Lbs197Key $rows[0] ([System.Windows.Forms.Keys]::Down)
         Assert-Lbs197 "$scale Down focuses next GUID without selection" (
             $rows[1].Focused -and $script:BootNextCalls -eq 0 -and $script:WriteCalls -eq 0 -and $script:RestartCalls -eq 0)
@@ -182,6 +214,10 @@ foreach ($scale in @(2.5,1.0)) {
         $other.Focus() | Out-Null
         [void]$armUp.Invoke($rows[0],[object[]]@(
             [System.Windows.Forms.KeyEventArgs]::new([System.Windows.Forms.Keys]::Return)))
+        $unfocusedPixels = Get-Lbs197RowPaintPixels $rows[0]
+        Assert-Lbs197 "$scale unfocused row clears its border and tint" (
+            $unfocusedPixels.Border.ToArgb() -eq $rows[0].BackColor.ToArgb() -and
+            $unfocusedPixels.Interior.ToArgb() -eq $rows[0].BackColor.ToArgb())
         Assert-Lbs197 "$scale moving focus cancels any armed selection" ($script:BootNextCalls -eq 3)
         Assert-Lbs197 "$scale focus elsewhere is not reported as entry focus" (
             (Get-NormalBootFocusedGuid -ContentPanel $content) -eq '')
@@ -195,5 +231,5 @@ foreach ($scale in @(2.5,1.0)) {
         $script:LastBootNextGuid = ''
     }
 }
-Write-Host "LBS197 KEYBOARD TOTAL $script:checks/51"
-if ($script:checks -ne 51) { throw "LBS197 test total mismatch $script:checks" }
+Write-Host "LBS197 KEYBOARD TOTAL $script:checks/57"
+if ($script:checks -ne 57) { throw "LBS197 test total mismatch $script:checks" }
