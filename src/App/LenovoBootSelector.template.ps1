@@ -440,6 +440,32 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
 
 public static class LenovoMenuLayout
 {
+    // ToolStrip's default Down key may leave an unavailable or disabled menu
+    // item selected. Navigate the visible enabled actions explicitly while
+    // retaining native Right/Left/Enter/Escape handling and actual Click events.
+    public static bool SelectEnabledArrowItem(ToolStripDropDown menu, Keys keyData)
+    {
+        Keys key = keyData & Keys.KeyCode;
+        if (key != Keys.Up && key != Keys.Down) return false;
+        if (menu == null || menu.IsDisposed) return true;
+        int count = menu.Items.Count;
+        if (count == 0) return true;
+        int start = key == Keys.Up ? 0 : -1;
+        for (int i = 0; i < count; i++)
+            if (menu.Items[i].Selected) { start = i; break; }
+        int direction = key == Keys.Up ? -1 : 1;
+        for (int offset = 1; offset <= count; offset++)
+        {
+            int index = ((start + direction * offset) % count + count) % count;
+            ToolStripMenuItem candidate = menu.Items[index] as ToolStripMenuItem;
+            if (candidate == null || !candidate.Available || !candidate.Enabled) continue;
+            candidate.Select();
+            InvalidateWholeMenu(menu);
+            return true;
+        }
+        return true;
+    }
+
     public static ToolStripItem HitTestRow(ToolStripDropDown menu, Point clientPoint)
     {
         if (menu == null || menu.IsDisposed || !menu.ClientRectangle.Contains(clientPoint)) return null;
@@ -456,6 +482,15 @@ public static class LenovoMenuLayout
     public static ToolStripMenuItem GetVisualHotItem(ToolStripDropDown menu)
     {
         if (menu == null || menu.IsDisposed) return null;
+        // Native keyboard selection must outrank the last stationary pointer
+        // position. WinForms also updates Selected during actual mouse hover,
+        // retaining pointer behavior while keeping arrow focus visible.
+        foreach (ToolStripItem candidate in menu.Items)
+        {
+            ToolStripMenuItem menuItem = candidate as ToolStripMenuItem;
+            if (menuItem == null || !menuItem.Available) continue;
+            if (menuItem.Pressed || menuItem.Selected) return menuItem;
+        }
         try
         {
             Point point = menu.PointToClient(Control.MousePosition);
@@ -463,19 +498,9 @@ public static class LenovoMenuLayout
             {
                 ToolStripMenuItem hit = HitTestRow(menu, point) as ToolStripMenuItem;
                 if (hit != null && hit.Available) return hit;
-                return null;
             }
         }
         catch { }
-
-        // Keyboard navigation and a parent item with an open child submenu use
-        // the native Selected/Pressed state while the pointer is outside.
-        foreach (ToolStripItem candidate in menu.Items)
-        {
-            ToolStripMenuItem menuItem = candidate as ToolStripMenuItem;
-            if (menuItem == null || !menuItem.Available) continue;
-            if (menuItem.Pressed || menuItem.Selected) return menuItem;
-        }
         return null;
     }
 
@@ -517,12 +542,34 @@ public static class LenovoMenuLayout
 
 public sealed class LenovoContextMenuStrip : ContextMenuStrip
 {
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr window);
+
     public int TargetWidth { get; set; }
     public LenovoContextMenuStrip()
     {
         TargetWidth = 260;
         ShowCheckMargin = false;
         ShowImageMargin = false;
+    }
+
+    // NotifyIcon's native context-menu path establishes a foreground HWND.
+    // This tray menu is manually positioned (mixed-DPI safety), so restore
+    // native keyboard activation without touching its placement or handlers.
+    protected override void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
+        if (Visible && AutoClose && IsHandleCreated)
+        {
+            SetForegroundWindow(Handle);
+            Focus();
+        }
+    }
+
+    protected override bool ProcessDialogKey(Keys keyData)
+    {
+        if (LenovoMenuLayout.SelectEnabledArrowItem(this, keyData)) return true;
+        return base.ProcessDialogKey(keyData);
     }
 
     public override Size GetPreferredSize(Size constrainingSize)
@@ -559,6 +606,12 @@ public sealed class LenovoDropDownMenu : ToolStripDropDownMenu
         TargetWidth = 260;
         ShowCheckMargin = false;
         ShowImageMargin = false;
+    }
+
+    protected override bool ProcessDialogKey(Keys keyData)
+    {
+        if (LenovoMenuLayout.SelectEnabledArrowItem(this, keyData)) return true;
+        return base.ProcessDialogKey(keyData);
     }
 
     public override Size GetPreferredSize(Size constrainingSize)
