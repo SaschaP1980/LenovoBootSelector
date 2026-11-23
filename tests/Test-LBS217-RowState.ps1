@@ -85,8 +85,8 @@ try {
                             $expectedHint -ne $key -and
                             ($status -ne 'pending' -or $expectedHint -match 'not|noch')))
                     Assert-Lbs217 "$prefix state glyph has non-color accessible semantics" (
-                        $glyph.AccessibleName -eq $expectedHint -and
-                        $glyph.AccessibleDescription -eq $expectedHint -and
+                        [string]$glyph.AccessibleName -eq $expectedHint -and
+                        [string]$glyph.AccessibleDescription -eq $expectedHint -and
                         ($status -eq 'idle' -or $glyph.AccessibleRole -eq [Windows.Forms.AccessibleRole]::StaticText))
                     Assert-Lbs217 "$prefix state hint is attached to native ToolTip" (
                         [string]$script:BootTypeToolTip.GetToolTip($glyph) -eq $expectedHint)
