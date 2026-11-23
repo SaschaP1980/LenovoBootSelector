@@ -69,6 +69,7 @@ try {
                 $expectedGlyph = if ($status -eq 'pending') { [string][char]0x2026 } elseif ($status -eq 'selected') { [string][char]0x2713 } else { '' }
                 $key = if ($status -eq 'pending') { 'BootNext.RowPendingHint' } elseif ($status -eq 'selected') { 'BootNext.RowSelectedHint' } else { '' }
                 $expectedHint = if ($key) { Get-LocalizedString -Key $key } else { '' }
+                $expectedSubtitle = if ($status -eq 'pending') { Get-LocalizedString -Key 'BootNext.SelectionPending' } else { [string]$entry.Subtitle }
                 $result = New-BootEntryRow -Entry $entry -Y 0 -BaseRowHeight 60 -Handlers $handlers
                 $row = $result.Row
                 try {
@@ -94,12 +95,12 @@ try {
                         $row.Height -eq [int][Math]::Round(60*$factor) -and
                         $glyph.Width -eq [int][Math]::Round(24*$factor) -and
                         $glyph.Height -eq [int][Math]::Round(34*$factor))
-                    Assert-Lbs217 "$prefix target title subtitle and keyboard row identity unchanged" (
+                    Assert-Lbs217 "$prefix target title and state subtitle preserve keyboard row identity" (
                         $row.AccessibleRole -eq [Windows.Forms.AccessibleRole]::PushButton -and
                         $row.AccessibleName -eq $entry.Title -and
-                        $row.AccessibleDescription -eq $entry.Subtitle -and
+                        $row.AccessibleDescription -eq $expectedSubtitle -and
                         $row.Controls['BootTitleLabel'].Text -eq $entry.Title -and
-                        $row.Controls['BootSubtitleLabel'].Text -eq $entry.Subtitle)
+                        $row.Controls['BootSubtitleLabel'].Text -eq $expectedSubtitle)
                 }
                 finally { $row.Dispose() }
             }
