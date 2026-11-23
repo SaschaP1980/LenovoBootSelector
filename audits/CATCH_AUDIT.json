@@ -711,7 +711,7 @@
     },
     {
       "source": "src/UI/DefaultTargetMenu.ps1",
-      "line": 42,
+      "line": 44,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "} catch { }"
