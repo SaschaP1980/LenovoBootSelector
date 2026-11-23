@@ -238,6 +238,7 @@ function Get-LocalizationCatalogCore {
             'Update.AvailableHeading' = 'Lenovo Boot Selector v{Version} is available.'
             'Update.AvailableMessage' = 'You can install the new version now. You can also find the update later in the tray menu under Maintenance → Update app…'
             'Update.InstallNow' = 'Update now'
+            'Update.Later' = 'Later'
             'Update.CheckNoResult' = 'The update check did not return a result.'
             'Update.AvailableStatus' = 'New app version available: v{Version}'
             'Update.CurrentStatus' = 'Lenovo Boot Selector is up to date · v{Version}'
@@ -517,6 +518,7 @@ function Get-LocalizationCatalogCore {
             'Update.AvailableHeading' = 'Lenovo Boot Selector v{Version} ist verfügbar.'
             'Update.AvailableMessage' = 'Du kannst die neue Version jetzt direkt installieren. Später findest du die Aktualisierung im Tray-Menü unter Wartung → App aktualisieren…'
             'Update.InstallNow' = 'Jetzt aktualisieren'
+            'Update.Later' = 'Später'
             'Update.CheckNoResult' = 'Die Update-Prüfung hat kein Ergebnis geliefert.'
             'Update.AvailableStatus' = 'Neue App-Version verfügbar: v{Version}'
             'Update.CurrentStatus' = 'Lenovo Boot Selector ist aktuell · v{Version}'
@@ -2278,7 +2280,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.7.0'
+$script:AppVersion = '1.5.8.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -4843,7 +4845,7 @@ function Show-AvailableUpdateDialog {
         return $false
     }
     $manifest = $script:UpdateState.AvailableManifest
-    Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.Available') -Heading (Get-LocalizedString -Key 'Update.AvailableHeading' -Values @{ Version=$manifest.Version }) -Message (Get-LocalizedString -Key 'Update.AvailableMessage') -Kind Info -SecondaryButtonText (Get-LocalizedString -Key 'Update.InstallNow') -SecondaryAction { Start-ManualAppUpdate }
+    Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.Available') -Heading (Get-LocalizedString -Key 'Update.AvailableHeading' -Values @{ Version=$manifest.Version }) -Message (Get-LocalizedString -Key 'Update.AvailableMessage') -Kind Info -SecondaryButtonText (Get-LocalizedString -Key 'Update.InstallNow') -SecondaryAction { Start-ManualAppUpdate } -PromoteSecondaryAction -DismissButtonText (Get-LocalizedString -Key 'Update.Later')
     return $true
 }
 
@@ -6051,8 +6053,19 @@ function Show-LenovoNoticeDialog {
         [Parameter(Mandatory=$true)][string]$Message,
         [ValidateSet('Info','Warning','Error')][string]$Kind = 'Info',
         [string]$SecondaryButtonText,
-        [scriptblock]$SecondaryAction
+        [scriptblock]$SecondaryAction,
+        [switch]$PromoteSecondaryAction,
+        [string]$DismissButtonText
     )
+
+    # Only the available-update notice promotes the optional action.
+    # Require a named safe dismissal so Enter/Escape cannot install by default.
+    if ($PromoteSecondaryAction -and
+        ([string]::IsNullOrWhiteSpace($SecondaryButtonText) -or
+         -not $SecondaryAction -or
+         [string]::IsNullOrWhiteSpace($DismissButtonText))) {
+        throw 'Promoted notice actions require explicit install and dismiss labels.'
+    }
 
     $form = New-Object System.Windows.Forms.Form
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
@@ -6091,16 +6104,19 @@ function Show-LenovoNoticeDialog {
     if (-not [string]::IsNullOrWhiteSpace($SecondaryButtonText) -and $SecondaryAction) {
         $secondary = New-Object System.Windows.Forms.Button
         $secondary.Text = $SecondaryButtonText
-        $secondary.Font = New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)
-        $secondary.ForeColor = $script:ColorPrimary
-        $secondary.BackColor = [Drawing.Color]::FromArgb(34,34,34)
+        $secondary.Font = if ($PromoteSecondaryAction) {
+            New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)
+        } else { New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular) }
+        $secondary.ForeColor = if ($PromoteSecondaryAction) { [Drawing.Color]::White } else { $script:ColorPrimary }
+        $secondary.BackColor = if ($PromoteSecondaryAction) { $script:ColorAccent } else { [Drawing.Color]::FromArgb(34,34,34) }
         $secondary.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
         $secondary.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(70,70,70)
-        $secondary.FlatAppearance.BorderSize = 1
-        $secondary.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(46,46,46)
-        $secondary.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(38,38,38)
-        $secondary.Location = New-Object Drawing.Point(184,190)
+        $secondary.FlatAppearance.BorderSize = if ($PromoteSecondaryAction) { 0 } else { 1 }
+        $secondary.FlatAppearance.MouseOverBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(242,59,49) } else { [Drawing.Color]::FromArgb(46,46,46) }
+        $secondary.FlatAppearance.MouseDownBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(185,30,22) } else { [Drawing.Color]::FromArgb(38,38,38) }
+        $secondary.Location = if ($PromoteSecondaryAction) { New-Object Drawing.Point(306,190) } else { New-Object Drawing.Point(184,190) }
         $secondary.Size = New-Object Drawing.Size(146,34)
+        $secondary.TabIndex = if ($PromoteSecondaryAction) { 1 } else { 0 }
         $secondary.Cursor = [System.Windows.Forms.Cursors]::Hand
         $secondaryActionLocal = $SecondaryAction
         $dialogLocal = $form
@@ -6118,24 +6134,38 @@ function Show-LenovoNoticeDialog {
     }
 
     $ok = New-Object System.Windows.Forms.Button
-    $ok.Text = Get-LocalizedString -Key 'Common.OK'
-    $ok.Font = New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)
-    $ok.ForeColor = [Drawing.Color]::White
-    $ok.BackColor = $script:ColorAccent
+    $ok.Text = if ($PromoteSecondaryAction) { $DismissButtonText } else { Get-LocalizedString -Key 'Common.OK' }
+    $ok.Font = if ($PromoteSecondaryAction) {
+        New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Regular)
+    } else { New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold) }
+    $ok.ForeColor = if ($PromoteSecondaryAction) { $script:ColorPrimary } else { [Drawing.Color]::White }
+    $ok.BackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(34,34,34) } else { $script:ColorAccent }
     $ok.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $ok.FlatAppearance.BorderSize = 0
-    $ok.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(242,59,49)
-    $ok.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(185,30,22)
-    $ok.Location = New-Object Drawing.Point(342,190)
+    $ok.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(70,70,70)
+    $ok.FlatAppearance.BorderSize = if ($PromoteSecondaryAction) { 1 } else { 0 }
+    $ok.FlatAppearance.MouseOverBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(46,46,46) } else { [Drawing.Color]::FromArgb(242,59,49) }
+    $ok.FlatAppearance.MouseDownBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(38,38,38) } else { [Drawing.Color]::FromArgb(185,30,22) }
+    $ok.Location = if ($PromoteSecondaryAction) { New-Object Drawing.Point(184,190) } else { New-Object Drawing.Point(342,190) }
     $ok.Size = New-Object Drawing.Size(110,34)
+    $ok.TabIndex = if ($PromoteSecondaryAction) { 0 } else { 1 }
     $ok.Cursor = [System.Windows.Forms.Cursors]::Hand
-    $ok.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $ok.DialogResult = if ($PromoteSecondaryAction) { [System.Windows.Forms.DialogResult]::Cancel } else { [System.Windows.Forms.DialogResult]::OK }
     $root.Controls.Add($ok)
     $form.AcceptButton = $ok
     $form.CancelButton = $ok
     try {
         $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
         Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner -Role 'notice'
+        if ($PromoteSecondaryAction) {
+            # Safe dismissal receives initial focus even if the native tab
+            # traversal order or owner activation changes during ShowDialog.
+            $dismissButtonLocal = $ok
+            $form.Add_Shown({
+                if (-not $dismissButtonLocal.IsDisposed -and $dismissButtonLocal.CanFocus) {
+                    [void]$dismissButtonLocal.Focus()
+                }
+            }.GetNewClosure())
+        }
         if ($owner) { [void]$form.ShowDialog($owner) } else { [void]$form.ShowDialog() }
     }
     finally { $form.Dispose() }

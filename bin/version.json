@@ -1,9 +1,9 @@
 {
   "schemaVersion": 2,
-  "version": "1.5.7.0",
+  "version": "1.5.8.0",
   "releaseProfile": "patch",
   "protectedFragmentIntent": [
-    "cs:public static ToolStripMenuItem GetVisualHotItem"
+    "ps:Show-LenovoNoticeDialog"
   ],
   "repositoryDeleteIntent": []
 }

@@ -35,6 +35,11 @@ $trayMenuProbe = Join-Path $root 'tests\Test-LBS200-TrayMenu.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $trayMenuProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-200 native tray menu regression failed' }
 
+# LBS-202: isolated native update notice focus, safe defaults and deliberate install.
+$updateNoticeProbe = Join-Path $root 'tests\Test-LBS202-UpdateNotice.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $updateNoticeProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-202 native update-available dialog regression failed' }
+
 # UX01-V8 / LBS-197: real focusable normal rows, scroll and safe keyboard selection.
 $keyboardProbe = Join-Path $root 'tests\Test-LBS197-NormalKeyboard.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $keyboardProbe

@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.8.0 – Explicit update and safe deferral actions in available-version notice (LBS-202 / UX01-V13)
+
+- The available-update notice now labels the neutral left action Later / Später and makes Update now / Jetzt aktualisieren the red visual primary action on the right. The existing explanatory text and Maintenance → Update app tray path remain unchanged.
+- The non-installing deferral button remains the WinForms AcceptButton and CancelButton, receives initial keyboard focus and cannot start an update on default Enter or Escape. Only explicitly activating the highlighted update action invokes the existing user-controlled update-preparation path.
+- The shared notice dialog retains its original single red OK and optional outlined secondary actions for success/current/failure/diagnostic notices. Add isolated Windows PowerShell 5.1 native regressions for both locales, synthetic 100%/250% geometry and safe versus deliberate action routing; no firmware, TaskBroker or updater backend changes.
+
 ## v1.5.7.0 – Keyboard-accessible tray menu with reliable outside-click dismissal (UX01-V9/V10 / LBS-200)
 
 - Activate the manually positioned tray context-menu HWND as the keyboard foreground target when shown. Preserve the existing exact-monitor DPI placement, tray left/right-click behavior, and WinForms AutoClose lifecycle; moving foreground to another application safely dismisses the menu.
