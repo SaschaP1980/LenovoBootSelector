@@ -214,9 +214,18 @@ foreach ($scale in @(2.5,1.0)) {
         Assert-Lbs172 "$scale no neighbor HWND reposition before frame" ($rows[2].Top -eq [int][Math]::Round(128*$scale))
         Advance-ManageDragReflow -Progress 0.5
         Assert-Lbs172 "$scale last queued decision is applied once" ($script:ManageDragRetargetCount -eq 1 -and $script:ManageDragTargets['b'] -eq [int][Math]::Round(192*$scale))
-        Assert-Lbs172 "$scale neighbors animate through intermediate position" (
-            $script:ManageDragNeighborVisuals['c'].Top -lt [int][Math]::Round(128*$scale) -and
-            $script:ManageDragNeighborVisuals['c'].Top -gt [int][Math]::Round(64*$scale))
+        # LBS-172 A/B: a single coalesced timer callback must settle the
+        # cached neighbors directly, not perform 150ms of 1px HWND moves.
+        Assert-Lbs172 "$scale neighbor rasters jump directly to final preview slots" (
+            $script:ManageDragNeighborVisuals['c'].Top -eq [int][Math]::Round(64*$scale) -and
+            $script:ManageDragNeighborVisuals['d'].Top -eq [int][Math]::Round(128*$scale))
+        Assert-Lbs172 "$scale reflow timer stops after first target update" (
+            $null -ne $script:ManageDragTimer -and -not $script:ManageDragTimer.Enabled)
+        $settledMoveCount = [int]$script:ManageDragNeighborMoves
+        Advance-ManageDragReflow -Progress 0.25
+        Assert-Lbs172 "$scale repeated partial frame adds no neighbor movement" (
+            $script:ManageDragNeighborMoves -eq $settledMoveCount -and
+            $script:ManageDragNeighborVisuals['c'].Top -eq [int][Math]::Round(64*$scale))
         Assert-Lbs172 "$scale raster neighbor follows preview position without revealing child HWNDs" (
             $script:ManageDragNeighborVisuals['c'].Top -ne $rows[2].Top -and
             -not $rows[2].Visible)
@@ -230,10 +239,15 @@ foreach ($scale in @(2.5,1.0)) {
         Advance-ManageDragReflow -Progress 0.0
         Assert-Lbs172 "$scale reverse retarget starts at the actual moving raster top" (
             $script:ManageDragStarts['c'] -eq $midRasterTop)
-        Assert-Lbs172 "$scale reverse retarget does not jump or recapture cached glyphs" (
-            $script:ManageDragNeighborVisuals['c'].Top -eq $midRasterTop -and
+        Assert-Lbs172 "$scale reverse retarget settles in one callback without raster recapture" (
+            $script:ManageDragNeighborVisuals['c'].Top -eq [int][Math]::Round(128*$scale) -and
             [object]::ReferenceEquals($midRasterImage,$script:ManageDragNeighborVisuals['c'].Image) -and
             (Test-Lbs172VisibleInk -Bitmap $midRasterImage -Bounds $rows[2].Controls['BootTitleLabel'].Bounds))
+        $reverseMoveCount = [int]$script:ManageDragNeighborMoves
+        Advance-ManageDragReflow -Progress 0.5
+        Assert-Lbs172 "$scale reverse direction has no subsequent intermediate moves" (
+            $script:ManageDragNeighborMoves -eq $reverseMoveCount -and
+            $script:ManageDragNeighborVisuals['c'].Top -eq [int][Math]::Round(128*$scale))
         Set-ManageDropPreview -Decision $last
         Advance-ManageDragReflow -Progress 1.0
         Assert-Lbs172 "$scale live preview reaches final slot" (
@@ -300,5 +314,5 @@ foreach ($scale in @(2.5,1.0)) {
         $script:Popup = $null
     }
 }
-Write-Host "LBS172 DRAG TOTAL $script:checks/105"
-if ($script:checks -ne 105) { throw "LBS172 test total mismatch $script:checks" }
+Write-Host "LBS172 DRAG TOTAL $script:checks/111"
+if ($script:checks -ne 111) { throw "LBS172 test total mismatch $script:checks" }
