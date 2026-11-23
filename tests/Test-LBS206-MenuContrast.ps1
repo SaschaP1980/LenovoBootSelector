@@ -101,6 +101,10 @@ foreach ($locale in @('de-DE','en-US')) {
 }
 # The menu outline must be localized to the named Standardziel root menu.
 $otherMenu = New-Object LenovoContextMenuStrip
+# A real ToolStrip has items and a non-empty client raster. An empty, auto-
+# sized WinForms dropdown may report a zero-width ClientRectangle on CI.
+[void]$otherMenu.Items.Add('Tray option')
+$otherMenu.AutoSize = $false
 $otherMenu.Size = [Drawing.Size]::new(260,150)
 $otherCanvas = [Drawing.Bitmap]::new(260,150)
 $otherG = [Drawing.Graphics]::FromImage($otherCanvas)
@@ -108,8 +112,10 @@ try {
     $otherG.Clear([Drawing.Color]::Black)
     $render = [System.Windows.Forms.ToolStripRenderEventArgs]::new($otherG,$otherMenu)
     [void]$method.Invoke($script:MenuRenderer,[object[]]@($render))
+    $trayPixel = $otherCanvas.GetPixel(0,75)
+    Write-Host ("LBS206_EDGE_TRAY_PIXEL={0},{1},{2}" -f $trayPixel.R,$trayPixel.G,$trayPixel.B)
     Assert-Lbs206Edge 'unrelated tray menu does not receive Standardziel outline' (
-        $otherCanvas.GetPixel(0,75).ToArgb() -eq $background.ToArgb())
+        $trayPixel.ToArgb() -eq $background.ToArgb())
 }
 finally { $otherG.Dispose(); $otherCanvas.Dispose(); $otherMenu.Dispose() }
 Write-Host "LBS206 EDGE TOTAL $script:Checks"
