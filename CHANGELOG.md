@@ -1,5 +1,15 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.6.0 – Keyboard access to normal boot entries (UX01-V8 / LBS-197)
+
+- Add true WinForms keyboard focus, directional navigation and deliberate Enter/Space activation to the **normal boot-target list**. A small selectable native Panel subclass makes Up/Down/Home/End and Enter/Space input keys; TabStop, visual focus border, accessible PushButton role and title/subtitle metadata apply only to normal rows, not Manage Entries.
+- Tab follows the visual boot-entry order, including after keyed recycling. Arrows/Home/End move focus among visible enabled rows without starting BootNext, writing settings or restarting; the existing EntryScroll viewport follows the focused target when a long list is clipped. Navigation clamps at first/last without wrap.
+- Enter and Space use the existing canonical guarded `Start-BootNextSelection` controller, exactly as row mouse click. Selection triggers only on an armed matching KeyUp; auto-repeated KeyDown, unmatched release and losing focus cannot select. **Do not set SuppressKeyPress on activation KeyDown**, because native WinForms would also suppress the actual KeyUp; retain event.Handled and input-key routing.
+- Capture the GUID only if a normal boot row really owned focus before row reconstruction, and restore focus/scroll to that same logical entry after keyed reconciliation; no focus theft from the Restart button, settings or an editor. Refresh-only title/subtitle updates keep accessible metadata synchronized. Preserve confirmed/pending/unknown BootNext visuals and all existing click/hover/drag behavior.
+- Scope intentionally excludes Manage Entries keyboard reordering (#178) and action-icon accessibility (#183), and does not add Default selector keyboard navigation, tray-menu changes (V9/V10), new boot permissions or layout-C redesign.
+- Add a dedicated isolated native WinPS5.1 `Test-LBS197-NormalKeyboard.ps1` probe, with **51 assertions at synthetic 250% and 100%**, including actual focus and key dispatch, scroll edges, duplicate-press rejection, keyup delivery safety, guarded activation, original click parity, zero persisted/restart actions and GUID-stable refresh. Preserve existing LBS172 125/125 buffered drag tests, LBS163 58 and BootNext worker safety.
+- Physical keyboard, screen-reader and mixed-DPI interaction still requires owner-native validation before closing #197 / checking UX01-V8 in #190. No firmware BootNext/BootOrder, TaskBroker, restart-interlock, persistence, updater or Cloudflare implementation is modified.
+
 ## v1.5.5.0 – Composite double-buffered drag painting (LBS-172 / UX01-V7)
 
 - Address owner-native residual bright horizontal striping and ghosted glyph fragments while rapidly dragging Manage Entries in v1.5.4.0. The owner reports clearly improved live behavior without recording and worse artifacts during Snagit capture; no Intel/NVIDIA GPU or Snagit driver defect is established.
