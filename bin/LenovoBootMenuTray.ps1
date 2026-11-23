@@ -2324,7 +2324,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.10.3'
+$script:AppVersion = '1.5.10.4'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -5822,8 +5822,8 @@ function Update-DefaultUi {
             $script:DefaultValueLabel.ForeColor = if ($pendingDefault) { $script:ColorWarning } elseif ($interactive) { $script:ColorPrimary } else { $mutedInk }
         }
         if ($script:DefaultArrowLabel -and -not $script:DefaultArrowLabel.IsDisposed) {
-            $script:DefaultArrowLabel.Visible = (-not $checking -or $pendingDefault)
-            $script:DefaultArrowLabel.Text = if ($pendingDefault) { '…' } else { '›' }
+            $script:DefaultArrowLabel.Visible = (-not $checking -and -not $pendingDefault)
+            $script:DefaultArrowLabel.Text = '›'
         }
         foreach ($child in $script:DefaultButton.Controls) {
             try {
