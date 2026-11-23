@@ -1246,7 +1246,7 @@ function Connect-BootEntryRowInteractions {
     $dragDropHandler = $Handlers.DragDrop
 
 foreach ($control in $RowControls) {
-    $control.Add_Click($clickHandler)
+    if ($control.Name -ne 'ManageReorderGrip') { $control.Add_Click($clickHandler) }
     $control.Add_MouseEnter($enterHandler)
     $control.Add_MouseLeave($leaveHandler)
     $control.Add_MouseWheel($wheelHandler)
