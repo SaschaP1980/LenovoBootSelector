@@ -310,11 +310,24 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
             }
         }
 
-        // Submenus remain visually distinct without any red outer border.
+        // Submenus retain their original subdued edge. The standard-target
+        // root dropdown alone needs a neutral contrast boundary against the
+        // main popup's near-identical dark surfaces (#161616 vs #191919).
         if (submenu && dropDown.ClientSize.Width > 1 && dropDown.ClientSize.Height > 1)
         {
             using (Pen edgePen = new Pen(submenuEdge, 1f))
                 e.Graphics.DrawRectangle(edgePen, 0, 0, dropDown.ClientSize.Width - 1, dropDown.ClientSize.Height - 1);
+        }
+        if (!submenu &&
+            String.Equals(dropDown.Name, "DefaultTargetContextMenu", StringComparison.Ordinal) &&
+            dropDown.ClientSize.Width > 1 && dropDown.ClientSize.Height > 1)
+        {
+            float edgeWidth = Math.Max(1f, (float)Math.Round(e.Graphics.DpiX / 96f));
+            float offset = edgeWidth / 2f;
+            using (Pen edgePen = new Pen(Color.FromArgb(108, 108, 108), edgeWidth))
+                e.Graphics.DrawRectangle(edgePen, offset, offset,
+                    Math.Max(0f, dropDown.ClientSize.Width - edgeWidth),
+                    Math.Max(0f, dropDown.ClientSize.Height - edgeWidth));
         }
         e.Graphics.Restore(ownerState);
     }

@@ -1,5 +1,7 @@
 ﻿function New-DefaultTargetMenu {
     $menu = New-Object LenovoContextMenuStrip
+    # Only this owned dropdown gets a distinct neutral outside edge.
+    $menu.Name = 'DefaultTargetContextMenu'
     $menu.BackColor = [Drawing.Color]::FromArgb(22, 22, 22)
     $menu.ForeColor = $script:ColorPrimary
     $menu.Renderer = $script:MenuRenderer
