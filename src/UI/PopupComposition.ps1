@@ -296,7 +296,7 @@ function Add-PopupRestartSection {
     $restartButton.FlatAppearance.BorderSize = 1
     $restartButton.FlatAppearance.MouseOverBackColor = $script:ColorSelectedRow
     $restartButton.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(58, 27, 25)
-    $restartButton.Location = New-Object Drawing.Point(16, 6)
+    $restartButton.Location = New-Object Drawing.Point(16, 30)
     $restartButton.Size = New-Object Drawing.Size(358, 31)
     $restartButton.Cursor = [System.Windows.Forms.Cursors]::Hand
     # The native Flat adapter paints disabled text nearly black on dark surfaces.
@@ -325,32 +325,56 @@ function Add-PopupRestartSection {
     $script:RestartButton = $restartButton
     $restartPanel.Controls.Add($restartButton)
 
-    # The secondary line remains compact, but is a keyboard-focusable action
-    # whenever the stored default differs from the next effective boot target.
-    $restartTarget = New-Object System.Windows.Forms.Button
-    $restartTarget.Text = Get-LocalizedString -Key 'Status.NextTargetDefaultOrder'
-    $restartTarget.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
-    $restartTarget.ForeColor = $script:ColorSecondary
-    $restartTarget.BackColor = $script:ColorSurface
-    $restartTarget.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $restartTarget.FlatAppearance.BorderSize = 0
-    $restartTarget.FlatAppearance.MouseOverBackColor = $script:ColorSurface
-    $restartTarget.FlatAppearance.MouseDownBackColor = $script:ColorSelectedRow
-    $restartTarget.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+    # LBS-206 Layout C: the firmware-readback state is always passive and
+    # precedes the explicit restart action. The one-time default control is
+    # separate, and only appears when the guarded operation is admissible.
+    # The original 390x672 footprint and 65px restart panel are unchanged.
+    $restartTarget = New-Label -Text (Get-LocalizedString -Key 'BootNext.LayoutUnknown') -Font (New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Regular)) `
+        -ForeColor $script:ColorSecondary -X 16 -Y 3 -Width 358 -Height 23
+    $restartTarget.Name = 'RestartTargetLabel'
+    $restartTarget.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
     $restartTarget.AutoEllipsis = $true
     $restartTarget.TabStop = $false
-    $restartTarget.Location = New-Object Drawing.Point(16, 38)
-    $restartTarget.Size = New-Object Drawing.Size(358, 23)
-    $restartTarget.Name = 'RestartTargetLabel'
+    $restartTarget.Cursor = [Windows.Forms.Cursors]::Default
+    $restartTarget.AccessibleRole = [Windows.Forms.AccessibleRole]::StaticText
     $restartTarget.AccessibleName = $restartTarget.Text
+    $restartTarget.AccessibleDescription = $restartTarget.Text
     $restartTarget.Add_TextChanged({
         $this.AccessibleName = $this.Text
+        $this.AccessibleDescription = $this.Text
         if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($this,$this.Text) }
     })
-    $restartTarget.Add_Paint($pendingDisabledInkPainter)
-    $restartTarget.Add_Click({ if ($script:RestartTargetLabel -and $script:RestartTargetLabel.TabStop) { Use-DefaultForNextRestart } })
     $restartPanel.Controls.Add($restartTarget)
     $script:RestartTargetLabel = $restartTarget
+
+    $defaultOnce = New-Object System.Windows.Forms.Button
+    $defaultOnce.Name = 'RestartUseDefaultButton'
+    $defaultOnce.Text = Get-LocalizedString -Key 'BootNext.UseDefaultOnce'
+    $defaultOnce.Font = New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)
+    $defaultOnce.ForeColor = [Drawing.Color]::FromArgb(255,160,150)
+    $defaultOnce.BackColor = $script:ColorSelectedRow
+    $defaultOnce.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $defaultOnce.FlatAppearance.BorderColor = $script:ColorAccent
+    $defaultOnce.FlatAppearance.BorderSize = 1
+    $defaultOnce.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(81,37,34)
+    $defaultOnce.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(100,40,35)
+    $defaultOnce.Location = New-Object Drawing.Point(16,30)
+    $defaultOnce.Size = New-Object Drawing.Size(205,31)
+    $defaultOnce.Visible = $false
+    $defaultOnce.Enabled = $false
+    $defaultOnce.TabStop = $false
+    $defaultOnce.TabIndex = 0
+    $defaultOnce.Cursor = [Windows.Forms.Cursors]::Default
+    $defaultOnce.AccessibleName = $defaultOnce.Text
+    $defaultOnce.Add_Click({
+        if ($script:RestartUseDefaultButton -and
+            $script:RestartUseDefaultButton.Enabled -and
+            $script:RestartUseDefaultButton.Visible -and
+            -not $script:BootNextPendingGuid) { Use-DefaultForNextRestart }
+    })
+    $restartPanel.Controls.Add($defaultOnce)
+    $script:RestartUseDefaultButton = $defaultOnce
+    $restartButton.TabIndex = 1
     $Root.Controls.Add($restartPanel)
 
     # Dedicated footer height prevents Segoe UI/DPI clipping at the bottom edge.

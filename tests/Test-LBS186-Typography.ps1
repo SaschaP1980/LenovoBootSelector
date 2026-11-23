@@ -88,7 +88,7 @@ foreach ($name in @('ColorHeader','ColorBackground','ColorRow','ColorHover','Col
     Set-Variable -Scope Script -Name $name -Value ([Drawing.Color]::FromArgb([int]$m.Groups[1].Value,[int]$m.Groups[2].Value,[int]$m.Groups[3].Value))
 }
 $script:AppVersion = '1.5.1.0'
-$script:TestCapabilities = [pscustomobject]@{ State='Ready'; CanRefresh=$true; CanSetDefaultTarget=$true; IsChecking=$false; CanManageEntries=$true }
+$script:TestCapabilities = [pscustomobject]@{ State='Ready'; CanRefresh=$true; CanSetDefaultTarget=$true; CanSetBootNext=$true; IsChecking=$false; CanManageEntries=$true }
 $script:BackgroundRefreshState = [pscustomobject]@{ Active=$false }
 $script:UpdateState = [pscustomobject]@{ Status='UpToDate'; AvailableManifest=$null }
 $script:TestGuid = '{11111111-2222-3333-4444-555555555555}'
@@ -212,8 +212,16 @@ foreach ($locale in @('en-US','de-DE')) {
             $reboot=$script:RestartButton
             $pendingFooter=$script:RestartTargetLabel
             Assert-Lbs186 "$tag pending restart has readable disabled ink" (Test-Lbs186DisabledInk $reboot 34 "$tag restart")
-            Assert-Lbs186 "$tag pending footer has readable disabled ink" (Test-Lbs186DisabledInk $pendingFooter 25 "$tag footer")
-            Assert-Lbs186 "$tag pending interlock preserves restart and footer gates" (-not $reboot.Enabled -and -not $reboot.CanSelect -and -not $pendingFooter.Enabled -and -not $pendingFooter.TabStop -and $pendingFooter.AccessibleDescription -eq $pendingFooter.Text)
+            Assert-Lbs186 "$tag pending passive status retains readable amber text" (
+                $pendingFooter -is [Windows.Forms.Label] -and $pendingFooter.Enabled -and
+                $pendingFooter.ForeColor.ToArgb() -eq $script:ColorWarning.ToArgb() -and
+                (Test-Lbs186TextFit $pendingFooter $graphics $dpi -HeightOnly) -and
+                (Test-Lbs186Contrast $pendingFooter.ForeColor $script:ColorSurface 'pending-status'))
+            Assert-Lbs186 "$tag pending interlock preserves restart and one-time default gates" (
+                -not $reboot.Enabled -and -not $reboot.CanSelect -and
+                $pendingFooter.Enabled -and -not $pendingFooter.TabStop -and
+                $pendingFooter.AccessibleDescription -eq $pendingFooter.Text -and
+                (-not $script:RestartUseDefaultButton.Visible -or -not $script:RestartUseDefaultButton.Enabled))
             $defaultName=$script:DefaultButton.Controls[0]
             $disabledInk=[Drawing.Color]::FromArgb(146,146,146).ToArgb()
             Assert-Lbs186 "$tag pending default row is visibly gated" (-not $script:DefaultInteractionEnabled -and $script:DefaultButton.Cursor -eq [Windows.Forms.Cursors]::Default -and $defaultName.ForeColor.ToArgb() -eq $disabledInk -and $script:DefaultValueLabel.ForeColor.ToArgb() -eq $disabledInk -and $script:DefaultArrowLabel.ForeColor.ToArgb() -eq $disabledInk)
