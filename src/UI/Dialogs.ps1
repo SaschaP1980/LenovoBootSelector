@@ -153,8 +153,19 @@ function Show-LenovoNoticeDialog {
         [Parameter(Mandatory=$true)][string]$Message,
         [ValidateSet('Info','Warning','Error')][string]$Kind = 'Info',
         [string]$SecondaryButtonText,
-        [scriptblock]$SecondaryAction
+        [scriptblock]$SecondaryAction,
+        [switch]$PromoteSecondaryAction,
+        [string]$DismissButtonText
     )
+
+    # Only the available-update notice promotes the optional action.
+    # Require a named safe dismissal so Enter/Escape cannot install by default.
+    if ($PromoteSecondaryAction -and
+        ([string]::IsNullOrWhiteSpace($SecondaryButtonText) -or
+         -not $SecondaryAction -or
+         [string]::IsNullOrWhiteSpace($DismissButtonText))) {
+        throw 'Promoted notice actions require explicit install and dismiss labels.'
+    }
 
     $form = New-Object System.Windows.Forms.Form
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
@@ -193,16 +204,19 @@ function Show-LenovoNoticeDialog {
     if (-not [string]::IsNullOrWhiteSpace($SecondaryButtonText) -and $SecondaryAction) {
         $secondary = New-Object System.Windows.Forms.Button
         $secondary.Text = $SecondaryButtonText
-        $secondary.Font = New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular)
-        $secondary.ForeColor = $script:ColorPrimary
-        $secondary.BackColor = [Drawing.Color]::FromArgb(34,34,34)
+        $secondary.Font = if ($PromoteSecondaryAction) {
+            New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)
+        } else { New-Object Drawing.Font('Segoe UI', 8.4, [Drawing.FontStyle]::Regular) }
+        $secondary.ForeColor = if ($PromoteSecondaryAction) { [Drawing.Color]::White } else { $script:ColorPrimary }
+        $secondary.BackColor = if ($PromoteSecondaryAction) { $script:ColorAccent } else { [Drawing.Color]::FromArgb(34,34,34) }
         $secondary.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
         $secondary.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(70,70,70)
-        $secondary.FlatAppearance.BorderSize = 1
-        $secondary.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(46,46,46)
-        $secondary.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(38,38,38)
-        $secondary.Location = New-Object Drawing.Point(184,190)
+        $secondary.FlatAppearance.BorderSize = if ($PromoteSecondaryAction) { 0 } else { 1 }
+        $secondary.FlatAppearance.MouseOverBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(242,59,49) } else { [Drawing.Color]::FromArgb(46,46,46) }
+        $secondary.FlatAppearance.MouseDownBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(185,30,22) } else { [Drawing.Color]::FromArgb(38,38,38) }
+        $secondary.Location = if ($PromoteSecondaryAction) { New-Object Drawing.Point(306,190) } else { New-Object Drawing.Point(184,190) }
         $secondary.Size = New-Object Drawing.Size(146,34)
+        $secondary.TabIndex = if ($PromoteSecondaryAction) { 1 } else { 0 }
         $secondary.Cursor = [System.Windows.Forms.Cursors]::Hand
         $secondaryActionLocal = $SecondaryAction
         $dialogLocal = $form
@@ -220,24 +234,38 @@ function Show-LenovoNoticeDialog {
     }
 
     $ok = New-Object System.Windows.Forms.Button
-    $ok.Text = Get-LocalizedString -Key 'Common.OK'
-    $ok.Font = New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)
-    $ok.ForeColor = [Drawing.Color]::White
-    $ok.BackColor = $script:ColorAccent
+    $ok.Text = if ($PromoteSecondaryAction) { $DismissButtonText } else { Get-LocalizedString -Key 'Common.OK' }
+    $ok.Font = if ($PromoteSecondaryAction) {
+        New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Regular)
+    } else { New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold) }
+    $ok.ForeColor = if ($PromoteSecondaryAction) { $script:ColorPrimary } else { [Drawing.Color]::White }
+    $ok.BackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(34,34,34) } else { $script:ColorAccent }
     $ok.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $ok.FlatAppearance.BorderSize = 0
-    $ok.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(242,59,49)
-    $ok.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(185,30,22)
-    $ok.Location = New-Object Drawing.Point(342,190)
+    $ok.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(70,70,70)
+    $ok.FlatAppearance.BorderSize = if ($PromoteSecondaryAction) { 1 } else { 0 }
+    $ok.FlatAppearance.MouseOverBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(46,46,46) } else { [Drawing.Color]::FromArgb(242,59,49) }
+    $ok.FlatAppearance.MouseDownBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(38,38,38) } else { [Drawing.Color]::FromArgb(185,30,22) }
+    $ok.Location = if ($PromoteSecondaryAction) { New-Object Drawing.Point(184,190) } else { New-Object Drawing.Point(342,190) }
     $ok.Size = New-Object Drawing.Size(110,34)
+    $ok.TabIndex = if ($PromoteSecondaryAction) { 0 } else { 1 }
     $ok.Cursor = [System.Windows.Forms.Cursors]::Hand
-    $ok.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $ok.DialogResult = if ($PromoteSecondaryAction) { [System.Windows.Forms.DialogResult]::Cancel } else { [System.Windows.Forms.DialogResult]::OK }
     $root.Controls.Add($ok)
     $form.AcceptButton = $ok
     $form.CancelButton = $ok
     try {
         $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
         Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner -Role 'notice'
+        if ($PromoteSecondaryAction) {
+            # Safe dismissal receives initial focus even if the native tab
+            # traversal order or owner activation changes during ShowDialog.
+            $dismissButtonLocal = $ok
+            $form.Add_Shown({
+                if (-not $dismissButtonLocal.IsDisposed -and $dismissButtonLocal.CanFocus) {
+                    [void]$dismissButtonLocal.Focus()
+                }
+            }.GetNewClosure())
+        }
         if ($owner) { [void]$form.ShowDialog($owner) } else { [void]$form.ShowDialog() }
     }
     finally { $form.Dispose() }

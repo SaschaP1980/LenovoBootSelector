@@ -1,5 +1,5 @@
 {
-  "version": "1.5.7.0",
+  "version": "1.5.8.0",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
@@ -438,7 +438,7 @@
     },
     {
       "source": "src/Core/Localization.ps1",
-      "line": 634,
+      "line": 636,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { $text = $text -f @($Arguments) } catch { }"
@@ -739,7 +739,7 @@
     },
     {
       "source": "src/UI/Dialogs.ps1",
-      "line": 217,
+      "line": 231,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "} catch { }"
