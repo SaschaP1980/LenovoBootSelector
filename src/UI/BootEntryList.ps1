@@ -247,6 +247,34 @@ function Invoke-PopupRowsTextReconciliation {
     return [int]$updated
 }
 
+
+# UX01-V8: snapshot only an actually focused normal boot target. A stale
+# previously focused GUID must never pull focus away from another UI action.
+function Get-NormalBootFocusedGuid {
+    param($ContentPanel)
+    if ($script:IsManageEntriesMode -or -not $ContentPanel -or $ContentPanel.IsDisposed) { return '' }
+    foreach ($row in @($ContentPanel.Controls | Where-Object {
+        $_.Name -eq 'BootRow' -and -not $_.IsDisposed
+    })) {
+        if ($row.Focused) { return [string]$row.Tag }
+    }
+    return ''
+}
+
+function Restore-NormalBootFocusedGuid {
+    param($ContentPanel,[string]$Guid)
+    if ($script:IsManageEntriesMode -or -not $Guid -or -not $ContentPanel -or $ContentPanel.IsDisposed) { return }
+    foreach ($row in @($ContentPanel.Controls | Where-Object {
+        $_.Name -eq 'BootRow' -and -not $_.IsDisposed
+    })) {
+        if (([string]$row.Tag).ToLowerInvariant() -eq $Guid.ToLowerInvariant()) {
+            [void]$row.Focus()
+            Set-NormalBootRowVisible -Row $row
+            return
+        }
+    }
+}
+
 function Invoke-PopupRowsReconciliation {
     param(
         $ListPanel, $ContentPanel, $ScrollBar, $Snapshot,
@@ -255,6 +283,9 @@ function Invoke-PopupRowsReconciliation {
 
     $script:PopupRowsRefreshPending = $false
     $script:PopupRowsViewportPending = $false
+    $focusedNormalGuid = if (-not $Snapshot.Mode) {
+        Get-NormalBootFocusedGuid -ContentPanel $ContentPanel
+    } else { '' }
     if ($activeDrag) { Reset-ManageDragPreview }
     $previousSignatures = $script:PopupRowsRowSignatures
     $canReconcile = [object]::ReferenceEquals($script:PopupRowsContentPanel, $contentPanel) -and
@@ -281,6 +312,7 @@ function Invoke-PopupRowsReconciliation {
         $scaledRowHeight = [int][Math]::Round($baseRowHeight * $scale)
         $rowGap = [int][Math]::Round(4 * $scale)
         $y = 0
+        $keyboardTabIndex = 0
         $handlers = New-BootEntryInteractionHandlers
         if ($script:ManageContentDropPanel -ne $contentPanel) {
             $contentPanel.Add_DragEnter($handlers.DragEnter)
@@ -319,6 +351,12 @@ function Invoke-PopupRowsReconciliation {
                 $row.Location = [Drawing.Point]::new(0, $y)
                 $height = $row.Height
             }
+            if (-not $Snapshot.Mode) {
+                # A stable visual Tab order even when Controls are reused
+                # or created in a different native Z-order.
+                $row.TabIndex = $keyboardTabIndex
+                $keyboardTabIndex++
+            }
             $y += ($height + $rowGap)
         }
         if ($canReconcile) {
@@ -334,6 +372,9 @@ function Invoke-PopupRowsReconciliation {
         Save-PopupRowsRenderedSnapshot -ListPanel $listPanel -ContentPanel $contentPanel -Snapshot $snapshot
     }
     finally { $contentPanel.ResumeLayout() }
+    # Restore only if a normal row really owned focus before reconciliation.
+    # Switching to Restart/settings/Manage Entries must never steal focus.
+    Restore-NormalBootFocusedGuid -ContentPanel $ContentPanel -Guid $focusedNormalGuid
     return [int]$affected
 }
 

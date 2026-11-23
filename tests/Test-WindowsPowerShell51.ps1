@@ -30,6 +30,11 @@ $dragVisualProbe = Join-Path $root 'tests\Test-LBS172-DragVisual.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $dragVisualProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-172 native Manage Entries drag visual regression failed' }
 
+# UX01-V8 / LBS-197: real focusable normal rows, scroll and safe keyboard selection.
+$keyboardProbe = Join-Path $root 'tests\Test-LBS197-NormalKeyboard.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $keyboardProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-197 native normal popup keyboard regression failed' }
+
 & (Join-Path $root 'tests\Test-FunctionalCore.ps1')
 & (Join-Path $root 'tests\Test-StorageInfrastructure.ps1')
 & (Join-Path $root 'tests\Test-UIPresentation.ps1')
