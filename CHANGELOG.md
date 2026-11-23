@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.8.1 – Version-only updater availability Hotfix
+
+- Increase the release version only; no functional changes.
+- Publish v1.5.8.1 through the standard update manifest so installations running v1.5.8.0 can discover it as a newer version.
+
 ## v1.5.8.0 – Explicit update and safe deferral actions in available-version notice (LBS-202 / UX01-V13)
 
 - The available-update notice now labels the neutral left action Later / Später and makes Update now / Jetzt aktualisieren the red visual primary action on the right. The existing explanatory text and Maintenance → Update app tray path remain unchanged.
