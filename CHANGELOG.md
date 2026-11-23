@@ -1,5 +1,13 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.4.0 – Isolate incremental WinForms drag painting (LBS-172 / UX01-V7)
+
+- Deliver a deliberately narrow A/B diagnostic variant for the owner-reported horizontal striping on v1.5.3.0 at 100% on the external RTX 4090 display. The previous v1.5.3.0 build is the baseline with 150ms interpolated neighbor motion; this version tests immediate neighbor placement without that interpolation. A GPU or capture-device defect is not established.
+- Keep the existing 16ms WinForms timer only to coalesce rapid DragOver target changes. When cached neighbor rasters are available, move each affected PictureBox directly to its final slot in a single timer callback and stop; no successive one-pixel/eased intermediate row positions. The dragged source ghost still follows the pointer, the full-height dashed destination gap and exact drop decisions remain.
+- Continue to park the real nested row/child HWNDs until final commit/cancel handoff. If optional raster capture fails, retain the previous 150ms live-row fallback rather than changing its behavior. Preserve stable raster image and pencil/eye/grip identities, scroll hit testing, queue supersession, draft-only Save/Cancel and cleanup.
+- Extend the isolated native Windows PowerShell 5.1 LBS-172 regression from 105 to 111 checks across synthetic 250% and 100% physical-size fixtures. Require first-callback final placement, timer stop, no redundant intermediate moves, direct reverse retarget and existing bitmap ink/geometry/native row cleanup. Retain all 58 LBS-163 preview tests with the new direct-placement visual expectation.
+- This is a paint-frequency isolation experiment, not a demonstrated cure for the lines. Retest on the owner's external RTX/100% and internal Intel Iris Xe/250% displays with and without screen recording before UX01-V7 acceptance. No firmware, BootNext/BootOrder, TaskBroker, persistence, updater or user-confirmation semantics are changed.
+
 ## v1.5.3.0 – Park native boot rows during raster-only drag reflow (LBS-172 / UX01-V7)
 
 - Address continued drag paint corruption reported on both an integrated-graphics laptop panel at 250% Windows scaling and an external GPU/display path at 100%; neither GPU nor DPI is claimed to be the proven cause.
