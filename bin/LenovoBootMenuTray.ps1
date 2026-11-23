@@ -2280,7 +2280,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.8.1'
+$script:AppVersion = '1.5.9.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -12198,6 +12198,32 @@ function Get-TrayContextMenuLocation {
     )
 }
 
+# Escape belongs to this visible popup only. Child-local cancellation (alias editor,
+# default-target menu and active drag) must run before any parent dismissal.
+function Invoke-PopupEscapeDismissal {
+    param(
+        [System.Windows.Forms.Form]$Form,
+        [System.Windows.Forms.KeyEventArgs]$EventArgs
+    )
+    if (-not $Form -or -not $EventArgs -or
+        $EventArgs.KeyCode -ne [System.Windows.Forms.Keys]::Escape -or
+        $EventArgs.Modifiers -ne [System.Windows.Forms.Keys]::None) { return }
+    if (-not $Form.Visible -or -not $Form.ContainsFocus) { return }
+
+    # DropDown and OLE drag have independent Escape/cleanup lifecycles.
+    if ($script:DefaultContextMenu -and -not $script:DefaultContextMenu.IsDisposed -and
+        $script:DefaultContextMenu.Visible) { return }
+    if ($script:ManageActiveDragGuid -or $script:ManageDragLayout) { return }
+
+    $aliasEditor = $Form.Controls.Find('AliasEditor', $true) | Select-Object -First 1
+    if ($aliasEditor -and -not $aliasEditor.IsDisposed -and $aliasEditor.ContainsFocus) { return }
+
+    # Presentation-only: keep the Form, tray owner, workers and Manage draft alive.
+    $EventArgs.Handled = $true
+    $EventArgs.SuppressKeyPress = $true
+    $Form.Hide()
+}
+
 function New-PopupForm {
     param([double]$TargetScale = 1.0, [string]$ScaleSource = 'initial')
     if (-not $script:BootTypeToolTip) {
@@ -12212,6 +12238,7 @@ function New-PopupForm {
 
     $form = New-Object System.Windows.Forms.Form
     $form.Name = 'LenovoBootSelectorPopup'
+    $form.KeyPreview = $true
     Initialize-PopupDpiLayout -Form $form
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
     $form.ShowInTaskbar = $false
@@ -12246,6 +12273,11 @@ function New-PopupForm {
     })
 
     # v0.2.28: no window region is applied; the popup stays rectangular.
+
+    $form.Add_KeyDown({
+        param($sender, $eventArgs)
+        Invoke-PopupEscapeDismissal -Form $sender -EventArgs $eventArgs
+    })
 
     $form.Add_Deactivate({
         $capabilities = Get-CurrentSystemFunctionsCapabilities

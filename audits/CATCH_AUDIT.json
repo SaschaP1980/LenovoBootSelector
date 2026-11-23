@@ -1,5 +1,5 @@
 {
-  "version": "1.5.8.1",
+  "version": "1.5.9.0",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
@@ -844,14 +844,14 @@
     },
     {
       "source": "src/UI/Popup.ps1",
-      "line": 111,
+      "line": 143,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { [void](Refresh-SystemDefaultState) } catch { }"
     },
     {
       "source": "src/UI/Popup.ps1",
-      "line": 161,
+      "line": 193,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { return [Drawing.Icon]::new($iconPath) } catch { }"
