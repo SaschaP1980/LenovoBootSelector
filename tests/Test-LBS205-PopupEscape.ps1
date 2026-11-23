@@ -29,6 +29,7 @@ $script:ColorBackground = [Drawing.Color]::FromArgb(22,22,22)
 $script:ColorRow = [Drawing.Color]::FromArgb(31,31,31)
 $script:ColorPrimary = [Drawing.Color]::White
 $script:ColorSecondary = [Drawing.Color]::Gray
+$script:ColorSelectedRow = [Drawing.Color]::FromArgb(64,31,29)
 $script:ColorAccent = [Drawing.Color]::Red
 $script:BootTypeToolTip = $null
 function Assert-Lbs205([string]$Label,[bool]$Condition) {
