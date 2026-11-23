@@ -30,6 +30,11 @@ $dragVisualProbe = Join-Path $root 'tests\Test-LBS172-DragVisual.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $dragVisualProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-172 native Manage Entries drag visual regression failed' }
 
+# LBS-205: focused popup Escape routing, child precedence and draft safety.
+$popupEscapeProbe = Join-Path $root 'tests\Test-LBS205-PopupEscape.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $popupEscapeProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-205 native main popup Escape regression failed' }
+
 # LBS-200: isolated native WinForms tray-menu activation and dismissal probe.
 $trayMenuProbe = Join-Path $root 'tests\Test-LBS200-TrayMenu.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $trayMenuProbe

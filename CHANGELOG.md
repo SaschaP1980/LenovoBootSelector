@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.9.0 – Popup-scoped Escape dismissal (LBS-205)
+
+- Hide the focused main application popup with one Escape keypress from ordinary controls and keyboard-focusable boot rows, without disposing the form, exiting the tray, changing settings or triggering any privileged action.
+- Preserve local Escape precedence for the active Manage Entries alias editor, the open default-target menu, modal dialogs and in-progress drag cleanup. Hiding Manage Entries leaves its unsaved draft order, visibility and aliases intact for reopening.
+- Add an isolated Windows PowerShell 5.1 native WinForms regression for Escape routing, alias cancellation, nested-menu and drag precedence, safe hide/reopen, no-focus scope, English/German and synthetic 100%/250% DPI.
+
 ## v1.5.8.1 – Version-only updater availability Hotfix
 
 - Increase the release version only; no functional changes.
