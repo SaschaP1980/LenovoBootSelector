@@ -86,7 +86,8 @@ try {
     Reset-ManageDragPreview
     Check 'cleanup' (-not $script:ManageActiveDragGuid -and $null -eq $script:ManageDropPreview)
 
-    # Iteration 2: physical rows reflow while the draft order stays untouched.
+    # LBS-172 follow-up: cached raster views reflow while the original nested
+    # row HWNDs remain at their fixed slots; the draft order stays untouched.
     foreach ($scale in @(1.0,2.5)) {
         $script:ManageEntryOrder = @('a','b','c','d')
         $script:ManageActiveDragGuid = 'b'
@@ -102,10 +103,17 @@ try {
         Check "$scale immutable last destination" ($null -ne $visualLast -and $visualLast.InsertIndex -eq 3)
         Set-ManageDropPreview -Decision $visualLast
         Advance-ManageDragReflow -Progress 0.5
-        Check "$scale smooth in-between frame" ($rows[2].Top -lt [int](128*$scale) -and $rows[2].Top -gt [int](64*$scale))
+        Check "$scale smooth in-between frame" (
+            $script:ManageDragNeighborVisuals['c'].Top -lt [int](128*$scale) -and
+            $script:ManageDragNeighborVisuals['c'].Top -gt [int](64*$scale) -and
+            $rows[2].Top -eq [int](128*$scale))
         Advance-ManageDragReflow -Progress 1.0
-        Check "$scale first neighbor shifts up" ($rows[2].Top -eq [int](64*$scale))
-        Check "$scale second neighbor shifts up" ($rows[3].Top -eq [int](128*$scale))
+        Check "$scale first neighbor shifts up" (
+            $script:ManageDragNeighborVisuals['c'].Top -eq [int](64*$scale) -and
+            $rows[2].Top -eq [int](128*$scale))
+        Check "$scale second neighbor shifts up" (
+            $script:ManageDragNeighborVisuals['d'].Top -eq [int](128*$scale) -and
+            $rows[3].Top -eq [int](192*$scale))
         Check "$scale full-height final gap" ($script:ManageDragTargets['b'] -eq [int](192*$scale))
         Check "$scale placeholder geometry matches drop slot" (-not $script:ManageDragPlaceholder.IsDisposed -and $script:ManageDragPlaceholder.Top -eq [int](192*$scale) -and $script:ManageDragPlaceholder.Height -eq [int](60*$scale))
         Check "$scale reflow is draft-only" ((@($script:ManageEntryOrder) -join ',') -eq 'a,b,c,d')
@@ -124,10 +132,15 @@ try {
         Set-ManageDropPreview -Decision $visualFirst
         Advance-ManageDragReflow -Progress 1.0
         Check "$scale top gap is full row" ($script:ManageDragTargets['b'] -eq 0)
-        Check "$scale first row makes room" ($rows[0].Top -eq [int](64*$scale))
+        Check "$scale first row makes room" (
+            $script:ManageDragNeighborVisuals['a'].Top -eq [int](64*$scale) -and
+            $rows[0].Top -eq 0)
         Set-ManageDropPreview -Decision $null
         Advance-ManageDragReflow -Progress 1.0
-        Check "$scale invalid/cancel returns neighbors" ($rows[0].Top -eq 0 -and $rows[2].Top -eq [int](128*$scale))
+        Check "$scale invalid/cancel returns neighbors" (
+            $script:ManageDragNeighborVisuals['a'].Top -eq 0 -and
+            $script:ManageDragNeighborVisuals['c'].Top -eq [int](128*$scale) -and
+            $rows[0].Top -eq 0 -and $rows[2].Top -eq [int](128*$scale))
         Check "$scale invalid clears placeholder state" ($null -eq $script:ManageDropPreview -and -not $script:ManageDragPlaceholder.Visible)
         Reset-ManageDragPreview
         Check "$scale cancel restores all row slots" (

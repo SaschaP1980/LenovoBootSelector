@@ -160,6 +160,12 @@ foreach ($scale in @(2.5,1.0)) {
         Set-ManageDragFloatLocation -ScreenPoint $screen -ActivateVisual
         Assert-Lbs172 "$scale activate freezes real source" (-not $source.Visible -and $source.Top -eq $sourceTop)
         $neighbors = @($rows | Where-Object { -not [object]::ReferenceEquals($_,$source) })
+        $originalNeighborTops = @{}
+        $originalNeighborHandles = @{}
+        foreach ($neighbor in $neighbors) {
+            $originalNeighborTops[[string]$neighbor.Tag] = [int]$neighbor.Top
+            $originalNeighborHandles[[string]$neighbor.Tag] = $neighbor.Handle
+        }
         $flatImages = if ($script:ManageDragNeighborVisuals -is [System.Collections.IDictionary]) {
             @($script:ManageDragNeighborVisuals.Values)
         } else { @() }
@@ -208,21 +214,48 @@ foreach ($scale in @(2.5,1.0)) {
         Assert-Lbs172 "$scale no neighbor HWND reposition before frame" ($rows[2].Top -eq [int][Math]::Round(128*$scale))
         Advance-ManageDragReflow -Progress 0.5
         Assert-Lbs172 "$scale last queued decision is applied once" ($script:ManageDragRetargetCount -eq 1 -and $script:ManageDragTargets['b'] -eq [int][Math]::Round(192*$scale))
-        Assert-Lbs172 "$scale neighbors animate through intermediate position" ($rows[2].Top -lt [int][Math]::Round(128*$scale) -and $rows[2].Top -gt [int][Math]::Round(64*$scale))
+        Assert-Lbs172 "$scale neighbors animate through intermediate position" (
+            $script:ManageDragNeighborVisuals['c'].Top -lt [int][Math]::Round(128*$scale) -and
+            $script:ManageDragNeighborVisuals['c'].Top -gt [int][Math]::Round(64*$scale))
         Assert-Lbs172 "$scale raster neighbor follows preview position without revealing child HWNDs" (
-            $script:ManageDragNeighborVisuals['c'].Top -eq $rows[2].Top -and
+            $script:ManageDragNeighborVisuals['c'].Top -ne $rows[2].Top -and
             -not $rows[2].Visible)
+        Assert-Lbs172 "$scale hidden native neighbor HWND coordinates stay parked during eased reflow" (
+            @($neighbors | Where-Object { $_.Top -ne $originalNeighborTops[[string]$_.Tag] }).Count -eq 0)
+        Assert-Lbs172 "$scale hidden native neighbor HWND identities remain stable" (
+            @($neighbors | Where-Object { $_.Handle -ne $originalNeighborHandles[[string]$_.Tag] }).Count -eq 0)
+        $midRasterTop = [int]$script:ManageDragNeighborVisuals['c'].Top
+        $midRasterImage = $script:ManageDragNeighborVisuals['c'].Image
+        Set-ManageDropPreview -Decision $first
+        Advance-ManageDragReflow -Progress 0.0
+        Assert-Lbs172 "$scale reverse retarget starts at the actual moving raster top" (
+            $script:ManageDragStarts['c'] -eq $midRasterTop)
+        Assert-Lbs172 "$scale reverse retarget does not jump or recapture cached glyphs" (
+            $script:ManageDragNeighborVisuals['c'].Top -eq $midRasterTop -and
+            [object]::ReferenceEquals($midRasterImage,$script:ManageDragNeighborVisuals['c'].Image) -and
+            (Test-Lbs172VisibleInk -Bitmap $midRasterImage -Bounds $rows[2].Controls['BootTitleLabel'].Bounds))
+        Set-ManageDropPreview -Decision $last
         Advance-ManageDragReflow -Progress 1.0
-        Assert-Lbs172 "$scale live preview reaches final slot" ($rows[2].Top -eq [int][Math]::Round(64*$scale) -and $rows[3].Top -eq [int][Math]::Round(128*$scale))
+        Assert-Lbs172 "$scale live preview reaches final slot" (
+            $script:ManageDragNeighborVisuals['c'].Top -eq [int][Math]::Round(64*$scale) -and
+            $script:ManageDragNeighborVisuals['d'].Top -eq [int][Math]::Round(128*$scale))
+        Assert-Lbs172 "$scale all native neighbor rows stay parked after multiple reversals" (
+            @($neighbors | Where-Object { $_.Top -ne $originalNeighborTops[[string]$_.Tag] }).Count -eq 0)
         Assert-Lbs172 "$scale full-size placeholder tracks last slot" ($script:ManageDragPlaceholder.Visible -and $script:ManageDragPlaceholder.Top -eq [int][Math]::Round(192*$scale))
         Assert-Lbs172 "$scale order remains draft-only during drag" ((@($script:ManageEntryOrder) -join ',') -eq 'a,b,c,d' -and $script:TestSettingsWrites -eq 0)
         Set-ManageDropPreview -Decision $first
         Advance-ManageDragReflow -Progress 1.0
-        Assert-Lbs172 "$scale reverse direction moves gap to first slot" ($script:ManageDragTargets['b'] -eq 0 -and $rows[0].Top -eq [int][Math]::Round(64*$scale))
+        Assert-Lbs172 "$scale reverse direction moves gap to first slot" (
+            $script:ManageDragTargets['b'] -eq 0 -and
+            $script:ManageDragNeighborVisuals['a'].Top -eq [int][Math]::Round(64*$scale) -and
+            $rows[0].Top -eq $originalNeighborTops['a'])
         Set-ManageDropPreview -Decision $null
         Advance-ManageDragReflow -Progress 1.0
         Assert-Lbs172 "$scale invalid preview keeps a defined original-slot placeholder" ($script:ManageDragPlaceholder.Visible -and $script:ManageDragPlaceholder.Top -eq $sourceTop)
-        Assert-Lbs172 "$scale invalid preview restores all neighbors" ($rows[0].Top -eq 0 -and $rows[2].Top -eq [int][Math]::Round(128*$scale))
+        Assert-Lbs172 "$scale invalid preview restores all neighbors" (
+            $rows[0].Top -eq 0 -and $rows[2].Top -eq [int][Math]::Round(128*$scale) -and
+            $script:ManageDragNeighborVisuals['a'].Top -eq 0 -and
+            $script:ManageDragNeighborVisuals['c'].Top -eq [int][Math]::Round(128*$scale))
         Reset-ManageDragPreview
         Assert-Lbs172 "$scale cancellation restores source original slot and visibility" ($source.Visible -and $source.Top -eq $sourceTop)
         Assert-Lbs172 "$scale cancellation restores native neighbors and clears raster pictures" (
@@ -248,6 +281,8 @@ foreach ($scale in @(2.5,1.0)) {
         Set-ManageDropPreview -Decision $last
         Advance-ManageDragReflow -Progress 1.0
         Move-ManageEntry -MovedGuid 'b' -TargetGuid $last.TargetGuid -After:$last.After
+        Assert-Lbs172 "$scale valid drop defers all original neighbor moves until handoff" (
+            @($neighbors | Where-Object { $_.Top -ne $originalNeighborTops[[string]$_.Tag] }).Count -eq 0)
         Reset-ManageDragPreview -KeepPositions
         Assert-Lbs172 "$scale successful drop exactly matches preview order" ((@($script:ManageEntryOrder) -join ',') -eq 'a,c,d,b')
         Assert-Lbs172 "$scale successful drop keeps source visible in destination" ($source.Visible -and $source.Top -eq [int][Math]::Round(192*$scale))
@@ -265,5 +300,5 @@ foreach ($scale in @(2.5,1.0)) {
         $script:Popup = $null
     }
 }
-Write-Host "LBS172 DRAG TOTAL $script:checks/93"
-if ($script:checks -ne 93) { throw "LBS172 test total mismatch $script:checks" }
+Write-Host "LBS172 DRAG TOTAL $script:checks/105"
+if ($script:checks -ne 105) { throw "LBS172 test total mismatch $script:checks" }
