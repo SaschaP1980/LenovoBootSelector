@@ -521,9 +521,10 @@ def main():
         '$pendingDefault = [bool]$script:DefaultTargetChangePending' in default_ui and
         '$interactive = ($enabled -and -not [bool]$script:BootNextPendingGuid -and -not $pendingDefault)' in default_ui and
         '$script:DefaultInteractionEnabled = $interactive' in default_ui)
-    s.c('Default target chevron remains readable during background saving and Checking',
-        '$script:DefaultArrowLabel.Visible = (-not $checking -or $pendingDefault)' in default_ui and
-        "$script:DefaultArrowLabel.Text = if ($pendingDefault) { '…' } else { '›' }" in default_ui)
+    s.c('Default target chevron is hidden while saving/verifying and returns afterward',
+        '$script:DefaultArrowLabel.Visible = (-not $checking -and -not $pendingDefault)' in default_ui and
+        "$script:DefaultArrowLabel.Text = '›'" in default_ui and
+        "$script:DefaultValueLabel.Text = if ($pendingDefault) { Get-LocalizedString -Key $key }" in default_ui)
     s.has('Default target amber pending feedback',default_ui,
           '$script:DefaultValueLabel.ForeColor = if ($pendingDefault) { $script:ColorWarning }')
     s.has('Popup default target click uses interaction gate',popup_surface,'if ($script:DefaultInteractionEnabled -and $script:DefaultButton)')

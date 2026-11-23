@@ -139,6 +139,9 @@ try {
         $script:DefaultValueLabel.Text -match '(?i)(speicher|saving)' -and
         $script:DefaultValueLabel.ForeColor.ToArgb() -eq $script:ColorWarning.ToArgb() -and
         -not $script:RestartButton.Enabled)
+    Assert-Lbs206Default 'saving hides the separate redundant ellipsis without losing status text' (
+        -not $script:DefaultArrowLabel.Visible -and $script:DefaultArrowLabel.Text -eq '›' -and
+        $script:DefaultValueLabel.Text -match '(?i)(speicher|saving)')
     Assert-Lbs206Default 'requested pending never overwrites last verified default' ($script:DefaultGuid -ne $script:Requested)
     Start-DefaultTargetChange -Guid $script:DefaultGuid
     Assert-Lbs206Default 'rapid second click cannot replace the pending request' ($script:DefaultTargetChangeRequestedGuid -eq $script:Requested -and $script:MockWorkerCalls -eq 0)
@@ -149,6 +152,9 @@ try {
     [IO.File]::WriteAllText($script:DefaultTargetChangeProgressPath,'verifying')
     Complete-DefaultTargetChange
     Assert-Lbs206Default 'worker progress switches to verification without claiming saved state' ($script:DefaultTargetChangeStage -eq 'verifying' -and $script:DefaultGuid -ne $script:Requested)
+    Assert-Lbs206Default 'verifying hides the separate redundant ellipsis without losing status text' (
+        -not $script:DefaultArrowLabel.Visible -and $script:DefaultArrowLabel.Text -eq '›' -and
+        $script:DefaultValueLabel.Text -match '(?i)(prüf|verif|überprüf)')
     $script:MockSavedGuid=$script:Requested
     [IO.File]::WriteAllText((Join-Path $script:TaskBrokerLocalDir 'manager.txt'),$script:Requested)
     $good=[ordered]@{Success=$true;Operation='set';RequestedGuid=$script:Requested;SavedGuid=$script:Requested;NextGuid=$script:Requested;NextVerified=$true;Error=''}
@@ -160,6 +166,8 @@ try {
         $script:SelectedGuid -eq $script:Requested -and $script:NextBootFirmwareReadVerified)
     Assert-Lbs206Default 'successful completion clears amber state and restores restart' (
         $script:DefaultValueLabel.ForeColor.ToArgb() -ne $script:ColorWarning.ToArgb() -and $script:RestartButton.Enabled)
+    Assert-Lbs206Default 'normal selection chevron returns when save is fully verified' (
+        $script:DefaultArrowLabel.Visible -and $script:DefaultArrowLabel.Text -eq '›')
     $script:DefaultGuid='{11111111-1111-1111-1111-111111111111}'
     $script:MockSavedGuid=$script:DefaultGuid
     Start-DefaultTargetChange -Guid $script:Requested

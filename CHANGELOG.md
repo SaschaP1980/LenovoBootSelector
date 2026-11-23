@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.10.4 – Hide duplicate default-target progress ellipsis (LBS-206 Hotfix)
+
+- Hide the separate default-target menu indicator while the existing asynchronous save or verification status is shown. The localized amber **Saving …** / **Verifying …** label remains visible without a second trailing ellipsis; the normal selection chevron returns after the pending operation ends.
+- Extend the native Windows PowerShell 5.1 default-target regression to cover both pending stages and chevron restoration. Keep the existing asynchronous worker, system readback, interlocks, privileges, accessibility details, and 390×672 popup geometry unchanged.
+
 ## v1.5.10.3 – Nonblocking default-target save and truthful progress (LBS-206)
 
 - Changing the persistent Standard-Startziel now immediately shows an amber **Saving…** status for the chosen target; an unelevated child process executes the existing fixed, allowlisted DefaultSet/DefaultClear task and independently re-reads the saved default and firmware next-boot state. A **Verifying…** stage appears after the authorized task completes. No UI thread blocking while waiting for the SYSTEM task.
