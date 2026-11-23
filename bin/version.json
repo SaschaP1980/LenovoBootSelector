@@ -1,9 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "1.5.1.3",
+  "version": "1.5.2.0",
   "releaseProfile": "patch",
-  "protectedFragmentIntent": [
-    "ps:Get-FriendlyBootEntry"
-  ],
+  "protectedFragmentIntent": [],
   "repositoryDeleteIntent": []
 }

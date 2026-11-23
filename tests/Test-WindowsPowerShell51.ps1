@@ -24,6 +24,12 @@ foreach ($file in $files) {
     Write-Host "PASS  Parse $($file.FullName.Substring($root.Length + 1))"
 }
 Write-Host "PARSER TOTAL $pass/$($files.Count)"
+
+# LBS-172: isolate native snapshot-drag, fast reversals, cleanup and 100%/250% DPI.
+$dragVisualProbe = Join-Path $root 'tests\Test-LBS172-DragVisual.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $dragVisualProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-172 native Manage Entries drag visual regression failed' }
+
 & (Join-Path $root 'tests\Test-FunctionalCore.ps1')
 & (Join-Path $root 'tests\Test-StorageInfrastructure.ps1')
 & (Join-Path $root 'tests\Test-UIPresentation.ps1')
@@ -104,9 +110,4 @@ if ($LASTEXITCODE -ne 0) { throw 'LBS-186 native typography regression failed' }
 $liveLocalizationProbe = Join-Path $root 'tests\Test-LBS191-LiveLocalization.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $liveLocalizationProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-191 live localization regression failed' }
-
-# LBS-172: isolate native snapshot-drag, fast reversals, cleanup and 100%/250% DPI.
-$dragVisualProbe = Join-Path $root 'tests\Test-LBS172-DragVisual.ps1'
-& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $dragVisualProbe
-if ($LASTEXITCODE -ne 0) { throw 'LBS-172 native Manage Entries drag visual regression failed' }
 

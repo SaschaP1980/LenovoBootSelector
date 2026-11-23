@@ -50,6 +50,25 @@ function Get-ManageDropDecision {
 }
 # LBS-163 iteration 2: animate existing WinForms rows; no rows are rebuilt in a drag.
 # Slots are captured once, so the pointer decision never depends on animation frames.
+# Paint each drag row into one frozen surface before the OLE drag begins.
+# Avoid repeatedly painting nested eye, pencil, grip and text HWNDs in flight.
+function New-ManageDragRowRaster {
+    param($Row)
+    if (-not $Row -or $Row.IsDisposed -or $Row.Width -le 0 -or $Row.Height -le 0) {
+        throw [System.InvalidOperationException]::new('Drag row has no drawable surface.')
+    }
+    $Row.Refresh()
+    $bitmap = [Drawing.Bitmap]::new([int]$Row.Width,[int]$Row.Height)
+    try {
+        $Row.DrawToBitmap($bitmap,[Drawing.Rectangle]::new(0,0,$Row.Width,$Row.Height))
+        return $bitmap
+    }
+    catch {
+        $bitmap.Dispose()
+        throw
+    }
+}
+
 function Start-ManageDragReflow {
     param($SourceRow)
     if (-not $SourceRow -or -not $SourceRow.Parent -or -not $script:IsManageEntriesMode) { return }
@@ -76,6 +95,9 @@ function Start-ManageDragReflow {
     $script:ManageDragVisualActive = $false
     $script:ManageDragCaptureCount = 0
     $script:ManageDragCaptureErrorClass = ''
+    $script:ManageDragNeighborVisuals = @{}
+    $script:ManageDragNeighborImages = @()
+    $script:ManageDragNeighborCaptureCount = 0
     $script:ManageDragRetargetPending = $false
     $script:ManageDragQueuedDecision = $null
     $script:ManageDragRetargetCount = 0
@@ -92,8 +114,7 @@ function Start-ManageDragReflow {
     $bitmap = $null
     $ghost = $null
     try {
-        $bitmap = [Drawing.Bitmap]::new([int]$SourceRow.Width,[int]$SourceRow.Height)
-        $SourceRow.DrawToBitmap($bitmap,[Drawing.Rectangle]::new(0,0,$SourceRow.Width,$SourceRow.Height))
+        $bitmap = New-ManageDragRowRaster -Row $SourceRow
         $ghost = New-Object System.Windows.Forms.PictureBox
         $ghost.Name = 'ManageDragGhost'
         $ghost.Location = $SourceRow.Location
@@ -107,12 +128,50 @@ function Start-ManageDragReflow {
         $script:ManageDragGhost = $ghost
         $script:ManageDragGhostImage = $bitmap
         $script:ManageDragCaptureCount = 1
+
+        # One bitmap presentation per neighbor. Actual child HWNDs are only
+        # parked during the active drag; the underlying rows stay intact.
+        foreach ($slot in $slots) {
+            if ($slot.Guid -eq $script:ManageActiveDragGuid) { continue }
+            $neighborBitmap = New-ManageDragRowRaster -Row $slot.Row
+            $script:ManageDragNeighborImages += $neighborBitmap
+            $picture = New-Object System.Windows.Forms.PictureBox
+            $script:ManageDragNeighborVisuals[$slot.Guid] = $picture
+            $picture.Name = 'ManageDragNeighbor'
+            $picture.Tag = $slot.Guid
+            $picture.Location = $slot.Row.Location
+            $picture.Size = $slot.Row.Size
+            $picture.Image = $neighborBitmap
+            $picture.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Normal
+            $picture.BackColor = $slot.Row.BackColor
+            $picture.Enabled = $false
+            $picture.Visible = $false
+            $content.Controls.Add($picture)
+            $script:ManageDragNeighborCaptureCount++
+        }
     }
     catch {
         # A failing optional WinForms snapshot must never abort a reorder.
         # Fall back to the existing live-row movement and retain diagnostic
         # evidence; do not suppress the source drag or invent a success.
         $script:ManageDragCaptureErrorClass = $_.Exception.GetType().FullName
+        # All-or-nothing setup. A failed visual capture leaves the original
+        # safe live-row drag behavior available, never a partial raster layer.
+        if ($script:ManageDragNeighborVisuals -is [System.Collections.IDictionary]) {
+            foreach ($picture in @($script:ManageDragNeighborVisuals.Values)) {
+                if ($picture -and -not $picture.IsDisposed) {
+                    if ($picture.Parent) { $picture.Parent.Controls.Remove($picture) }
+                    $picture.Image = $null
+                    $picture.Dispose()
+                }
+            }
+        }
+        foreach ($neighborBitmap in @($script:ManageDragNeighborImages)) {
+            if ($neighborBitmap) { $neighborBitmap.Dispose() }
+        }
+        $script:ManageDragNeighborVisuals = $null
+        $script:ManageDragNeighborImages = $null
+        $script:ManageDragNeighborCaptureCount = 0
         if ($ghost) {
             if ($ghost.Parent) { $ghost.Parent.Controls.Remove($ghost) }
             $ghost.Image = $null
@@ -125,7 +184,8 @@ function Start-ManageDragReflow {
 
     $shadow = New-Object System.Windows.Forms.Panel
     $shadow.Name = 'ManageDragShadow'
-    $shadow.Size = $SourceRow.Size
+    # A thin trailing edge avoids the old full-height opaque dark rectangle.
+    $shadow.Size = [Drawing.Size]::new([Math]::Max(1,$SourceRow.Width-8),[Math]::Max(3,[int][Math]::Round($SourceRow.Height*0.08)))
     $shadow.BackColor = [Drawing.Color]::FromArgb(12,12,16)
     $shadow.Enabled = $false
     $shadow.Visible = $false
@@ -184,6 +244,16 @@ function Set-ManageDragFloatLocation {
             # and invalid destinations, avoiding a transient black hole.
             $script:ManageDragVisualActive = $true
             $script:ManageDragRow.Visible = $false
+            if ($script:ManageDragNeighborVisuals -is [System.Collections.IDictionary]) {
+                foreach ($slot in @($script:ManageDragLayout)) {
+                    if ($slot.Guid -eq $script:ManageActiveDragGuid -or $slot.Row.IsDisposed) { continue }
+                    $picture = $script:ManageDragNeighborVisuals[$slot.Guid]
+                    if ($picture -and -not $picture.IsDisposed) {
+                        $slot.Row.Visible = $false
+                        $picture.Visible = $true
+                    }
+                }
+            }
             if ($script:ManageDragPlaceholder -and -not $script:ManageDragPlaceholder.IsDisposed) {
                 $script:ManageDragPlaceholder.Visible = $true
             }
@@ -201,7 +271,7 @@ function Set-ManageDragFloatLocation {
     }
     if ($script:ManageDragShadow -and -not $script:ManageDragShadow.IsDisposed) {
         $left = $script:ManageDragRow.Left + 4
-        $shadowY = $y + 5
+        $shadowY = $y + $script:ManageDragRow.Height - [int][Math]::Floor($script:ManageDragShadow.Height/2.0)
         if ($script:ManageDragShadow.Left -ne $left -or $script:ManageDragShadow.Top -ne $shadowY) {
             $script:ManageDragShadow.Location = [Drawing.Point]::new($left,$shadowY)
         }
@@ -282,6 +352,12 @@ function Advance-ManageDragReflow {
                 $slot.Row.Top = $top
                 $script:ManageDragNeighborMoves++
             }
+            if ($script:ManageDragNeighborVisuals -is [System.Collections.IDictionary]) {
+                $picture = $script:ManageDragNeighborVisuals[$slot.Guid]
+                if ($picture -and -not $picture.IsDisposed -and $picture.Top -ne $top) {
+                    $picture.Top = $top
+                }
+            }
         }
     }
     finally { $script:ManageDragContent.ResumeLayout($false) }
@@ -328,6 +404,27 @@ function Stop-ManageDragReflow {
             }
             else { $script:ManageDragRow.Invalidate($true) }
         }
+        # Restore native rows at the final slot and synchronously paint them
+        # under the cached pictures, then dispose every transient surface.
+        if ($script:ManageDragVisualActive -and $script:ManageDragNeighborVisuals) {
+            foreach ($slot in @($script:ManageDragLayout)) {
+                if ($slot.Guid -eq $script:ManageActiveDragGuid -or $slot.Row.IsDisposed) { continue }
+                $slot.Row.Visible = $true
+                $slot.Row.Refresh()
+            }
+        }
+        if ($script:ManageDragNeighborVisuals -is [System.Collections.IDictionary]) {
+            foreach ($picture in @($script:ManageDragNeighborVisuals.Values)) {
+                if ($picture -and -not $picture.IsDisposed) {
+                    if ($picture.Parent) { $picture.Parent.Controls.Remove($picture) }
+                    $picture.Image = $null
+                    $picture.Dispose()
+                }
+            }
+        }
+        foreach ($neighborBitmap in @($script:ManageDragNeighborImages)) {
+            if ($neighborBitmap) { $neighborBitmap.Dispose() }
+        }
         foreach ($visual in @($script:ManageDragGhost,$script:ManageDragShadow,$script:ManageDragPlaceholder)) {
             if ($visual -and -not $visual.IsDisposed) {
                 if ($visual.Parent) { $visual.Parent.Controls.Remove($visual) }
@@ -346,6 +443,7 @@ function Stop-ManageDragReflow {
     if ($hadSession -and $script:RuntimeDiagnosticsAvailable) {
         Write-RuntimeDiagnosticEvent -Event 'MANAGE_DRAG_VISUAL' -Stage 'ui' -Success $true -Data (New-RuntimeDiagnosticData @{
             snapshotCaptures = [int]$script:ManageDragCaptureCount
+            neighborRasterCaptures = [int]$script:ManageDragNeighborCaptureCount
             fallbackClass = [string]$script:ManageDragCaptureErrorClass
             retargetsApplied = [int]$script:ManageDragRetargetCount
             retargetsSuperseded = [int]$script:ManageDragSupersededCount
@@ -357,6 +455,9 @@ function Stop-ManageDragReflow {
     $script:ManageDragShadow = $null
     $script:ManageDragGhost = $null
     $script:ManageDragGhostImage = $null
+    $script:ManageDragNeighborVisuals = $null
+    $script:ManageDragNeighborImages = $null
+    $script:ManageDragNeighborCaptureCount = 0
     $script:ManageDragVisualActive = $false
     $script:ManageDragLayout = $null
     $script:ManageDragContent = $null
