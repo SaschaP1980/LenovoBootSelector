@@ -723,13 +723,7 @@ function New-BootEntryInteractionHandlers {
             return
         }
 
-        try {
-            $entry = Get-EntryByGuid $guid
-            Start-BootNextSelection -Guid $guid
-        }
-        catch {
-            Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Boot.ChangeErrorTitle') -Heading (Get-LocalizedString -Key 'Boot.ChangeErrorHeading') -Message (Get-LocalizedString -Key 'Boot.ChangeErrorMessage') -Kind Error
-        }
+        Invoke-NormalBootTargetSelection -Guid $guid
     }
 
     $enterHandler = { param($sender,$eventArgs) Set-RowHoverState $sender $true }
@@ -1299,16 +1293,140 @@ function Update-BootEntryRowText {
     if ([string]$title.Text -cne [string]$text.Title) {
         $title.Text = [string]$text.Title
         $title.AccessibleDescription = [string]$text.Title
+        if (-not $script:IsManageEntriesMode) { $Row.AccessibleName = [string]$text.Title }
         if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($title,[string]$text.Title) }
         $changed = $true
     }
     if ([string]$subtitle.Text -cne [string]$text.Subtitle) {
         $subtitle.Text = [string]$text.Subtitle
         $subtitle.AccessibleDescription = [string]$text.Subtitle
+        if (-not $script:IsManageEntriesMode) { $Row.AccessibleDescription = [string]$text.Subtitle }
         if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($subtitle,[string]$text.Subtitle) }
         $changed = $true
     }
     return [bool]$changed
+}
+
+
+# UX01-V8: a real focusable native Panel preserves all existing mouse/paint
+# behavior, but exposes Up/Down/Home/End and Enter/Space as input keys. The
+# selected BootNext target is never changed by focus alone.
+function Initialize-NormalBootKeyboardRow {
+    if ('LenovoNormalBootKeyboardRow' -as [type]) { return }
+    $keyboardSource = @'
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+
+public sealed class LenovoNormalBootKeyboardRow : Panel
+{
+    public LenovoNormalBootKeyboardRow()
+    {
+        SetStyle(ControlStyles.Selectable, true);
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+        TabStop = true;
+    }
+
+    protected override bool IsInputKey(Keys keyData)
+    {
+        Keys key = keyData & Keys.KeyCode;
+        if (key == Keys.Up || key == Keys.Down || key == Keys.Home ||
+            key == Keys.End || key == Keys.Return || key == Keys.Space)
+            return true;
+        return base.IsInputKey(keyData);
+    }
+
+    protected override void OnGotFocus(EventArgs e)
+    {
+        base.OnGotFocus(e);
+        Invalidate();
+    }
+
+    protected override void OnLostFocus(EventArgs e)
+    {
+        base.OnLostFocus(e);
+        Invalidate();
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        if (!Focused) return;
+        Rectangle r = ClientRectangle;
+        r.Inflate(-3, -3);
+        if (r.Width > 0 && r.Height > 0)
+        {
+            using (Pen p = new Pen(Color.FromArgb(255, 110, 102), 2.0f))
+                e.Graphics.DrawRectangle(p, r);
+        }
+    }
+}
+'@
+    Add-Type -ReferencedAssemblies @('System.Windows.Forms','System.Drawing') -TypeDefinition $keyboardSource -ErrorAction Stop
+}
+
+# Keep the canonical BootNext controller as the sole selection owner. This
+# shared helper is called by both the existing pointer handler and keyboard
+# activation; moving focus never calls it.
+function Invoke-NormalBootTargetSelection {
+    param([string]$Guid)
+    $guid = [string]$Guid
+    if (-not $guid -or $script:IsManageEntriesMode) { return }
+    try {
+        $entry = Get-EntryByGuid $guid
+        Start-BootNextSelection -Guid $guid
+    }
+    catch {
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Boot.ChangeErrorTitle') -Heading (Get-LocalizedString -Key 'Boot.ChangeErrorHeading') -Message (Get-LocalizedString -Key 'Boot.ChangeErrorMessage') -Kind Error
+    }
+}
+
+# Works with the existing EntryScroll control, including when the content
+# panel has been moved by the custom scrollbar's ValueChanged handler.
+function Set-NormalBootRowVisible {
+    param($Row)
+    if (-not $Row -or $Row.IsDisposed -or -not $Row.Parent -or
+        $Row.Parent.Name -ne 'EntryContent') { return }
+    $content = $Row.Parent
+    $list = $content.Parent
+    if (-not $list -or $list.Name -ne 'EntryList') { return }
+    $scroll = $list.Controls['EntryScroll']
+    if (-not $scroll -or -not $scroll.Visible) { return }
+    $current = [int]$scroll.Value
+    $viewport = [Math]::Max(1,[int]$list.ClientSize.Height)
+    $desired = $current
+    if ($Row.Top -lt $current) { $desired = [int]$Row.Top }
+    elseif ($Row.Bottom -gt ($current + $viewport)) {
+        $desired = [int]$Row.Bottom - $viewport
+    }
+    $desired = [Math]::Max(0,[Math]::Min([int]$scroll.Maximum,$desired))
+    if ($scroll.Value -ne $desired) { $scroll.Value = $desired }
+    $content.Top = -[int]$scroll.Value
+}
+
+function Move-NormalBootKeyboardFocus {
+    param($Row,[System.Windows.Forms.Keys]$Key)
+    if ($script:IsManageEntriesMode -or -not $Row -or $Row.IsDisposed -or
+        -not $Row.Parent -or $Row.Parent.Name -ne 'EntryContent') { return }
+    $rows = @($Row.Parent.Controls | Where-Object {
+        $_.Name -eq 'BootRow' -and -not $_.IsDisposed -and $_.Enabled -and $_.Visible
+    } | Sort-Object Top)
+    if ($rows.Count -eq 0) { return }
+    $index = -1
+    for ($i = 0; $i -lt $rows.Count; $i++) {
+        if ([object]::ReferenceEquals($rows[$i],$Row)) { $index = $i; break }
+    }
+    if ($index -lt 0) { return }
+    switch ($Key) {
+        ([System.Windows.Forms.Keys]::Down) { $index = [Math]::Min($rows.Count-1,$index+1); break }
+        ([System.Windows.Forms.Keys]::Up) { $index = [Math]::Max(0,$index-1); break }
+        ([System.Windows.Forms.Keys]::Home) { $index = 0; break }
+        ([System.Windows.Forms.Keys]::End) { $index = $rows.Count-1; break }
+        default { return }
+    }
+    $target = $rows[$index]
+    [void]$target.Focus()
+    Set-NormalBootRowVisible -Row $target
 }
 
 function New-BootEntryRow {
@@ -1323,7 +1441,13 @@ $guidNormalized = ([string]$entry.Guid).ToLowerInvariant()
 $aliasEditActive = $script:IsManageEntriesMode -and $script:ManageAliasEditGuid -and ($guidNormalized -eq $script:ManageAliasEditGuid)
 $rowHeight = if ($aliasEditActive) { 92 } else { $baseRowHeight }
 
-$row = New-Object System.Windows.Forms.Panel
+if ($script:IsManageEntriesMode) {
+    $row = New-Object System.Windows.Forms.Panel
+}
+else {
+    Initialize-NormalBootKeyboardRow
+    $row = New-Object LenovoNormalBootKeyboardRow
+}
 $row.Name = 'BootRow'
 $row.Tag = $entry.Guid
 $row.Location = New-Object Drawing.Point(0, $y)
@@ -1387,6 +1511,11 @@ else {
 $rowText = Get-BootEntryRowText -Entry $entry
 $titleWidth = if ($script:IsManageEntriesMode) { if ($aliasEditActive) { 318 } else { 220 } } else { 284 }
 $titleText = [string]$rowText.Title
+if (-not $script:IsManageEntriesMode) {
+    $row.AccessibleRole = [System.Windows.Forms.AccessibleRole]::PushButton
+    $row.AccessibleName = [string]$rowText.Title
+    $row.AccessibleDescription = [string]$rowText.Subtitle
+}
 $title = New-Label -Text $titleText -Font (New-Object Drawing.Font('Segoe UI', 10.0, [Drawing.FontStyle]::Bold)) `
     -ForeColor $titleColor -X 58 -Y 6 -Width $titleWidth -Height 21
 $title.Name = 'BootTitleLabel'
@@ -1432,6 +1561,58 @@ if (-not $aliasEditActive) {
 
     if ($rowControls.Count -gt 0) {
         Connect-BootEntryRowInteractions -RowControls $rowControls -Handlers $Handlers
+    }
+
+    if (-not $script:IsManageEntriesMode) {
+        # Input keys are supplied by LenovoNormalBootKeyboardRow, not by
+        # intercepting global Form shortcuts or the Manage Entries editor.
+        $row.Add_KeyDown({
+            param($sender,$eventArgs)
+            if ($script:IsManageEntriesMode -or
+                $eventArgs.Modifiers -ne [System.Windows.Forms.Keys]::None) { return }
+            $key = $eventArgs.KeyCode
+            if ($key -in @([System.Windows.Forms.Keys]::Up,
+                           [System.Windows.Forms.Keys]::Down,
+                           [System.Windows.Forms.Keys]::Home,
+                           [System.Windows.Forms.Keys]::End)) {
+                Move-NormalBootKeyboardFocus -Row $sender -Key $key
+                $eventArgs.Handled = $true
+                $eventArgs.SuppressKeyPress = $true
+            }
+            elseif ($key -eq [System.Windows.Forms.Keys]::Return -or
+                    $key -eq [System.Windows.Forms.Keys]::Space) {
+                # Arm exactly one selection for the matching KeyUp. Do not
+                # SuppressKeyPress: WinForms also suppresses KeyUp for that
+                # physical keystroke (Microsoft keyboard event contract).
+                $eventArgs.Handled = $true
+                $script:NormalBootActivationArmedRow = $sender
+                $script:NormalBootActivationArmedKey = $key
+            }
+        })
+        $row.Add_KeyUp({
+            param($sender,$eventArgs)
+            $armed = [object]::ReferenceEquals($script:NormalBootActivationArmedRow,$sender) -and
+                ($script:NormalBootActivationArmedKey -eq $eventArgs.KeyCode)
+            if ($armed) {
+                $script:NormalBootActivationArmedRow = $null
+                $script:NormalBootActivationArmedKey = [System.Windows.Forms.Keys]::None
+            }
+            if ($script:IsManageEntriesMode -or
+                $eventArgs.Modifiers -ne [System.Windows.Forms.Keys]::None -or -not $armed) { return }
+            if (($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Return -or
+                 $eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Space) -and
+                $sender.Focused) {
+                $eventArgs.Handled = $true
+                Invoke-NormalBootTargetSelection -Guid ([string]$sender.Tag)
+            }
+        })
+        $row.Add_LostFocus({
+            param($sender,$eventArgs)
+            if ([object]::ReferenceEquals($script:NormalBootActivationArmedRow,$sender)) {
+                $script:NormalBootActivationArmedRow = $null
+                $script:NormalBootActivationArmedKey = [System.Windows.Forms.Keys]::None
+            }
+        })
     }
 
     return [pscustomobject]@{
