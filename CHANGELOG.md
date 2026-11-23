@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.10.6 – Do not toggle Manage Entries visibility on reorder-grip click (LBS-215 Hotfix)
+
+- Correct a confirmed Manage Entries misinteraction: a stationary click on the reorder grip no longer toggles visibility. The grip remains dedicated to dragging; clicking the eye, the existing row surface, and other row controls retains its established visibility behavior. The pencil continues to open alias editing.
+- Keep the original mouse drag/drop handlers, existing 350ms post-drag suppression, draft-only Save/Cancel semantics, graphics and layout, the fixed 390×672 popup with 402/436-unit normal/manage list viewport, and DE/EN wording unchanged. The owner independently approved retaining the fixed height (UX01-V4).
+- Add a focused 23-assertion native Windows PowerShell 5.1 WinForms interaction regression at synthetic 100%/250%, complementing existing LBS-166/LBS-172 native drag and DPI tests. No BootNext, firmware, persistent default, settings, SYSTEM task, updater or restart behavior is changed.
+
 ## v1.5.10.5 – Targeted tray contrast and scrollbar thumb hit-zone fix (LBS-213 Hotfix)
 
 - Improve the **Tray > Open** command foreground with scoped lighter red #FF6E66, preserving the global Lenovo brand accent, menu layout, typography, localization and all other items. Improve only the hidden storage-type glyph foreground to neutral #737373 while preserving all visibility state semantics.

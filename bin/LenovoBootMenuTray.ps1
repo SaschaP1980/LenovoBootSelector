@@ -2324,7 +2324,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.10.5'
+$script:AppVersion = '1.5.10.6'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -11171,7 +11171,7 @@ function Connect-BootEntryRowInteractions {
     $dragDropHandler = $Handlers.DragDrop
 
 foreach ($control in $RowControls) {
-    $control.Add_Click($clickHandler)
+    if ($control.Name -ne 'ManageReorderGrip') { $control.Add_Click($clickHandler) }
     $control.Add_MouseEnter($enterHandler)
     $control.Add_MouseLeave($leaveHandler)
     $control.Add_MouseWheel($wheelHandler)
