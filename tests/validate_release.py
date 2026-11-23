@@ -517,10 +517,15 @@ def main():
     s.has('LBS-28 default target consumes canonical checking capability',default_ui,'$checking = [bool]$capabilities.IsChecking')
     s.has('LBS-28 default target consumes canonical mutation capability',default_ui,'$enabled = [bool]$capabilities.CanSetDefaultTarget')
     s.has('Default target pending state stays visually readable',default_ui,'$visualEnabled = ($enabled -or $checking)')
-    s.c('Default target interaction remains separately gated',
-        '$interactive = ($enabled -and -not [bool]$script:BootNextPendingGuid)' in default_ui and
+    s.c('Default target interaction stays gated by both pending writers',
+        '$pendingDefault = [bool]$script:DefaultTargetChangePending' in default_ui and
+        '$interactive = ($enabled -and -not [bool]$script:BootNextPendingGuid -and -not $pendingDefault)' in default_ui and
         '$script:DefaultInteractionEnabled = $interactive' in default_ui)
-    s.has('Default target chevron is hidden only while checking',default_ui,'$script:DefaultArrowLabel.Visible = -not $checking')
+    s.c('Default target chevron remains readable during background saving and Checking',
+        '$script:DefaultArrowLabel.Visible = (-not $checking -or $pendingDefault)' in default_ui and
+        "$script:DefaultArrowLabel.Text = if ($pendingDefault) { '…' } else { '›' }" in default_ui)
+    s.has('Default target amber pending feedback',default_ui,
+          '$script:DefaultValueLabel.ForeColor = if ($pendingDefault) { $script:ColorWarning }')
     s.has('Popup default target click uses interaction gate',popup_surface,'if ($script:DefaultInteractionEnabled -and $script:DefaultButton)')
     s.has('Popup stores default target arrow for state updates',popup_surface,'$script:DefaultArrowLabel = $defaultArrow')
     ui=txt(root/'src/UI/UpdatePresentation.ps1'); infra=txt(root/'src/Infrastructure/UpdateClient.ps1'); transport=txt(root/'src/Infrastructure/UpdateTransport.ps1')

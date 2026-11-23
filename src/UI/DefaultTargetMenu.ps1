@@ -14,7 +14,7 @@
     $none.Checked = -not [bool]$script:DefaultGuid
     $none.Padding = New-Object System.Windows.Forms.Padding(18, 3, 32, 3)
     $none.Add_Click({
-        try { Set-DefaultGuid -Guid $null }
+        try { Start-DefaultTargetChange -Guid $null }
         catch { Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Settings.DefaultTarget') -Heading (Get-LocalizedString -Key 'Default.SaveErrorHeading') -Message (Get-LocalizedString -Key 'Default.SaveErrorMessage') -Kind Error }
     })
     [void]$menu.Items.Add($none)
@@ -26,7 +26,7 @@
         $item.Checked = ($script:DefaultGuid -and $entry.Guid -eq $script:DefaultGuid)
         $item.Padding = New-Object System.Windows.Forms.Padding(18, 3, 32, 3)
         $item.Add_Click({
-            try { Set-DefaultGuid -Guid ([string]$this.Tag) }
+            try { Start-DefaultTargetChange -Guid ([string]$this.Tag) }
             catch { Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Settings.DefaultTarget') -Heading (Get-LocalizedString -Key 'Default.SaveErrorHeading') -Message (Get-LocalizedString -Key 'Default.SaveErrorMessage') -Kind Error }
         })
         [void]$menu.Items.Add($item)
@@ -36,7 +36,7 @@
 
 function Show-DefaultTargetMenu {
     param([System.Windows.Forms.Control]$Owner)
-    if (Test-MaintenanceBusy -or (Test-BootTargetDriftDetected)) { return }
+    if ($script:DefaultTargetChangePending -or $script:BootNextPendingGuid -or (Test-MaintenanceBusy) -or (Test-BootTargetDriftDetected)) { return }
     if (-not $Owner -or $script:CurrentEntries.Count -eq 0 -or -not (Test-TaskBrokerReady)) { return }
     [void](Refresh-SystemDefaultState)
     try {
