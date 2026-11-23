@@ -1,5 +1,5 @@
 {
-  "version": "1.5.10.6",
+  "version": "1.5.11.0",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
@@ -480,7 +480,7 @@
     },
     {
       "source": "src/Core/Localization.ps1",
-      "line": 662,
+      "line": 666,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { $text = $text -f @($Arguments) } catch { }"
@@ -739,14 +739,14 @@
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 1499,
+      "line": 1510,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "} catch { }"
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 1501,
+      "line": 1512,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "$icon.Add_MouseLeave({ param($sender, $eventArgs) try { $script:BootTypeToolTip.Hide($sender) } catch { } })"

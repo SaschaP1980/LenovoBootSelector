@@ -1217,10 +1217,21 @@ function Add-NormalBootEntryControls {
         $Subtitle
     )
 
-    $checkText = if ($script:BootNextPendingGuid -and ([string]$entry.Guid -eq [string]$script:BootNextPendingGuid)) { '…' } elseif ($isSelected) { '✓' } else { '' }
+    $pending = [bool]($script:BootNextPendingGuid -and ([string]$entry.Guid -eq [string]$script:BootNextPendingGuid))
+    $checkText = if ($pending) { '…' } elseif ($isSelected) { '✓' } else { '' }
+    $statusHint = if ($pending) { Get-LocalizedString -Key 'BootNext.RowPendingHint' }
+        elseif ($isSelected) { Get-LocalizedString -Key 'BootNext.RowSelectedHint' }
+        else { '' }
     $check = New-Label -Text $checkText `
         -Font (New-Object Drawing.Font('Segoe UI Symbol', 12, [Drawing.FontStyle]::Bold)) `
         -ForeColor $(if ($script:BootNextPendingGuid -and ([string]$entry.Guid -eq [string]$script:BootNextPendingGuid)) { $script:ColorWarning } else { $script:ColorAccent }) -X 354 -Y 12 -Width 24 -Height 34
+    $check.Name = 'BootSelectionStatusGlyph'
+    if ($statusHint) {
+        $check.AccessibleRole = [Windows.Forms.AccessibleRole]::StaticText
+        $check.AccessibleName = [string]$statusHint
+        $check.AccessibleDescription = [string]$statusHint
+        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($check,[string]$statusHint) }
+    }
     $check.Tag = $entry.Guid
     $check.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $check.Cursor = [System.Windows.Forms.Cursors]::Hand
