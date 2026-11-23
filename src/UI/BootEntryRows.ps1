@@ -1476,7 +1476,7 @@ $marker.Tag = $entry.Guid
 $marker.AllowDrop = $script:IsManageEntriesMode
 $row.Controls.Add($marker)
 
-$iconColor = if ($isHidden) { [Drawing.Color]::FromArgb(105,105,105) } else { $entry.Accent }
+$iconColor = if ($isHidden) { [Drawing.Color]::FromArgb(115,115,115) } else { $entry.Accent }
 $titleColor = if ($isHidden) { [Drawing.Color]::FromArgb(175,175,175) } else { $script:ColorPrimary }
 $subtitleColor = if ($isHidden) { [Drawing.Color]::FromArgb(155,155,155) } else { $script:ColorSecondary }
 
