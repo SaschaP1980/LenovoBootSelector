@@ -308,8 +308,16 @@ function Set-ManageDragReflowTargets {
     $needsMotion = $false
     foreach ($slot in $slots) {
         if ($slot.Guid -ne $moved -and -not $slot.Row.IsDisposed) {
-            $script:ManageDragStarts[$slot.Guid] = [int]$slot.Row.Top
-            if ([int]$slot.Row.Top -ne [int]$targets[$slot.Guid]) { $needsMotion = $true }
+            # The raster, not the parked native row, owns the visible position.
+            # On a mid-flight reversal, start from the actual picture position
+            # instead of snapping to the original hidden HWND's static slot.
+            $surface = $slot.Row
+            if ($script:ManageDragNeighborVisuals -is [System.Collections.IDictionary]) {
+                $picture = $script:ManageDragNeighborVisuals[$slot.Guid]
+                if ($picture -and -not $picture.IsDisposed) { $surface = $picture }
+            }
+            $script:ManageDragStarts[$slot.Guid] = [int]$surface.Top
+            if ([int]$surface.Top -ne [int]$targets[$slot.Guid]) { $needsMotion = $true }
         }
     }
     $script:ManageDragTargets = $targets
@@ -332,7 +340,7 @@ function Advance-ManageDragReflow {
     if (-not $script:ManageDragLayout -or -not $script:ManageDragContent -or $script:ManageDragContent.IsDisposed) { return }
     if ($script:ManageDragRetargetPending) {
         # Apply the *last* decision once per 16ms UI timer frame, not every
-        # DragOver message. This bounds row HWND moves on rapid reversals.
+        # DragOver message. This bounds raster moves on rapid reversals.
         $decision = $script:ManageDragQueuedDecision
         $script:ManageDragRetargetPending = $false
         $script:ManageDragQueuedDecision = $null
@@ -348,15 +356,18 @@ function Advance-ManageDragReflow {
             $start = [int]$script:ManageDragStarts[$slot.Guid]
             $target = [int]$script:ManageDragTargets[$slot.Guid]
             $top = [int][Math]::Round($start + (($target-$start)*$ease))
-            if ($slot.Row.Top -ne $top) {
-                $slot.Row.Top = $top
-                $script:ManageDragNeighborMoves++
-            }
+            # Move exactly one presentation surface per frame. With a cached
+            # raster, the real multi-child row must remain at its immutable
+            # slot and never generate native HWND move/invalidation traffic.
+            # If capture failed, retain the original live-row fallback.
+            $surface = $slot.Row
             if ($script:ManageDragNeighborVisuals -is [System.Collections.IDictionary]) {
                 $picture = $script:ManageDragNeighborVisuals[$slot.Guid]
-                if ($picture -and -not $picture.IsDisposed -and $picture.Top -ne $top) {
-                    $picture.Top = $top
-                }
+                if ($picture -and -not $picture.IsDisposed) { $surface = $picture }
+            }
+            if ($surface.Top -ne $top) {
+                $surface.Top = $top
+                $script:ManageDragNeighborMoves++
             }
         }
     }
@@ -379,18 +390,26 @@ function Stop-ManageDragReflow {
             $moved = ([string]$script:ManageActiveDragGuid).ToLowerInvariant()
             foreach ($slot in @($script:ManageDragLayout)) {
                 if ($slot.Row.IsDisposed) { continue }
+                $destination = [int]$slot.Top
+                if ($KeepPositions -and $script:ManageDragTargets -and
+                    $script:ManageDragTargets.ContainsKey($slot.Guid)) {
+                    $destination = [int]$script:ManageDragTargets[$slot.Guid]
+                }
                 if ($slot.Guid -eq $moved) {
-                    # Position the parked real source behind the ghost BEFORE
-                    # its original child HWNDs become visible again.
-                    $destination = [int]$slot.Top
-                    if ($KeepPositions -and $script:ManageDragTargets -and
-                        $script:ManageDragTargets.ContainsKey($moved)) {
-                        $destination = [int]$script:ManageDragTargets[$moved]
-                    }
+                    # Restore the source once, behind the cached ghost, before
+                    # its original nested child HWNDs become visible again.
+                    $slot.Row.Top = $destination
+                }
+                elseif ($script:ManageDragNeighborVisuals -is [System.Collections.IDictionary] -and
+                        $script:ManageDragNeighborVisuals.ContainsKey($slot.Guid)) {
+                    # Cached neighbors remained fixed through every timer
+                    # frame. Make one final hidden HWND handoff at the exact
+                    # committed/invalid destination before restoring visibility.
                     $slot.Row.Top = $destination
                 }
                 elseif (-not $KeepPositions) {
-                    $slot.Row.Top = [int]$slot.Top
+                    # Existing live-row fallback: restore after cancel only.
+                    $slot.Row.Top = $destination
                 }
             }
         }
