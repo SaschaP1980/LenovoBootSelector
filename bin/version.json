@@ -1,9 +1,9 @@
 {
   "schemaVersion": 2,
-  "version": "1.5.10.1",
+  "version": "1.5.10.2",
   "releaseProfile": "patch",
   "protectedFragmentIntent": [
-    "ps:New-PopupForm"
+    "cs:protected override void OnRenderToolStripBackground"
   ],
   "repositoryDeleteIntent": []
 }

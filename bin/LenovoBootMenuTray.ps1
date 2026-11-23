@@ -93,7 +93,7 @@ function Get-LocalizationCatalogCore {
             'BootNext.AlignedLine' = 'Next: {Next} · matches default'
             'BootNext.DifferentLine' = 'Next: {Next} · default: {Default}'
             'BootNext.UnavailableLine' = 'Next boot target unavailable'
-            'BootNext.UseDefaultHint' = 'Set {Default} as the one-time target for the next restart'
+            'BootNext.UseDefaultHint' = 'Replaces the one-time next-boot target with the saved default “{Default}”. Does not restart the PC.'
             'BootNext.UseDefaultOnce' = 'Reset to default target'
             'BootNext.LayoutUnknown' = 'Next restart · unverified; check target'
             'BootNext.LayoutFirmwareOrder' = 'Verified · firmware order (no one-time target)'
@@ -379,7 +379,7 @@ function Get-LocalizationCatalogCore {
             'BootNext.AlignedLine' = 'Nächstes Ziel: {Next} · entspricht Standard'
             'BootNext.DifferentLine' = 'Nächstes Ziel: {Next} · Standard: {Default}'
             'BootNext.UnavailableLine' = 'Nächstes Startziel nicht verfügbar'
-            'BootNext.UseDefaultHint' = '{Default} einmalig für den nächsten Neustart vormerken'
+            'BootNext.UseDefaultHint' = 'Ersetzt das einmalige Startziel durch das gespeicherte Standardziel „{Default}“. Der Rechner wird nicht neu gestartet.'
             'BootNext.UseDefaultOnce' = 'Auf Standardziel zurücksetzen'
             'BootNext.LayoutUnknown' = 'Nächster Start · ungeprüft; Ziel prüfen'
             'BootNext.LayoutFirmwareOrder' = 'Geprüft · Firmware-Reihenfolge (kein Einmalziel)'
@@ -1594,11 +1594,24 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
             }
         }
 
-        // Submenus remain visually distinct without any red outer border.
+        // Submenus retain their original subdued edge. The standard-target
+        // root dropdown alone needs a neutral contrast boundary against the
+        // main popup's near-identical dark surfaces (#161616 vs #191919).
         if (submenu && dropDown.ClientSize.Width > 1 && dropDown.ClientSize.Height > 1)
         {
             using (Pen edgePen = new Pen(submenuEdge, 1f))
                 e.Graphics.DrawRectangle(edgePen, 0, 0, dropDown.ClientSize.Width - 1, dropDown.ClientSize.Height - 1);
+        }
+        if (!submenu &&
+            String.Equals(dropDown.Name, "DefaultTargetContextMenu", StringComparison.Ordinal) &&
+            dropDown.ClientSize.Width > 1 && dropDown.ClientSize.Height > 1)
+        {
+            float edgeWidth = Math.Max(1f, (float)Math.Round(e.Graphics.DpiX / 96f));
+            float offset = edgeWidth / 2f;
+            using (Pen edgePen = new Pen(Color.FromArgb(108, 108, 108), edgeWidth))
+                e.Graphics.DrawRectangle(edgePen, offset, offset,
+                    Math.Max(0f, dropDown.ClientSize.Width - edgeWidth),
+                    Math.Max(0f, dropDown.ClientSize.Height - edgeWidth));
         }
         e.Graphics.Restore(ownerState);
     }
@@ -2292,7 +2305,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.10.1'
+$script:AppVersion = '1.5.10.2'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -5863,6 +5876,8 @@ function Set-DefaultGuid {
 
 function New-DefaultTargetMenu {
     $menu = New-Object LenovoContextMenuStrip
+    # Only this owned dropdown gets a distinct neutral outside edge.
+    $menu.Name = 'DefaultTargetContextMenu'
     $menu.BackColor = [Drawing.Color]::FromArgb(22, 22, 22)
     $menu.ForeColor = $script:ColorPrimary
     $menu.Renderer = $script:MenuRenderer
