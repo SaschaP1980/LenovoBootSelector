@@ -128,6 +128,15 @@ foreach ($scale in @(2.5,1.0)) {
     try {
         Start-ManageDragReflow -SourceRow $source
         Assert-Lbs172 "$scale stable row-slot snapshot" (@($script:ManageDragLayout).Count -eq 4)
+        Assert-Lbs172 "$scale one owner-drawn composite drag canvas exists" (
+            $script:ManageDragCanvas -is [System.Windows.Forms.Control] -and
+            $script:ManageDragCanvas.Parent -eq $content)
+        Assert-Lbs172 "$scale canvas exposes actual optimized WinForms double buffering" (
+            $script:ManageDragCanvas -and $script:ManageDragCanvas.HasOptimizedPaintStyles)
+        Assert-Lbs172 "$scale drag images are state only, not independent child HWNDs" (
+            $script:ManageDragGhost -and -not $script:ManageDragGhost.IsHandleCreated -and
+            $null -eq $script:ManageDragGhost.Parent -and
+            (@($content.Controls | Where-Object { $_.Name -like 'ManageDrag*' }).Count -eq 1))
         Assert-Lbs172 "$scale native snapshot drag visual exists" (
             $script:ManageDragGhost -is [System.Windows.Forms.PictureBox] -and
             $null -ne $script:ManageDragGhost.Image)
@@ -174,6 +183,10 @@ foreach ($scale in @(2.5,1.0)) {
             @($flatImages | Where-Object { $_ -is [System.Windows.Forms.PictureBox] -and $null -ne $_.Image }).Count -eq 3)
         Assert-Lbs172 "$scale native multi-child neighbor HWNDs are parked" (
             @($neighbors | Where-Object { $_.Visible }).Count -eq 0)
+        Assert-Lbs172 "$scale neighbor raster state has no extra native HWND" (
+            @($flatImages | Where-Object { $_.IsHandleCreated -or $null -ne $_.Parent }).Count -eq 0 -and
+            $script:ManageDragCanvas.Visible -and
+            $script:ManageDragCanvas.Controls.Count -eq 0)
         $allGlyphs = ($flatImages.Count -eq 3)
         if ($allGlyphs) {
             foreach ($neighbor in $neighbors) {
@@ -195,6 +208,20 @@ foreach ($scale in @(2.5,1.0)) {
             $null -ne $script:ManageDragShadow -and
             $script:ManageDragShadow.Height -lt ($script:ManageDragGhost.Height/4) -and
             $script:ManageDragShadow.Top -ge ($script:ManageDragGhost.Top+$script:ManageDragGhost.Height-$script:ManageDragShadow.Height))
+        # Draw the actual owner-painted Control and assert physical raster ink
+        # survives compositing. This is native HWND paint evidence, not GPU CI.
+        $combined = [Drawing.Bitmap]::new($script:ManageDragCanvas.Width,$script:ManageDragCanvas.Height)
+        try {
+            $script:ManageDragCanvas.DrawToBitmap($combined,
+                [Drawing.Rectangle]::new(0,0,$combined.Width,$combined.Height))
+            $rowInk = [Drawing.Rectangle]::new(
+                $script:ManageDragGhost.Left+$pencilBefore.Left,
+                $script:ManageDragGhost.Top+$pencilBefore.Top,
+                $pencilBefore.Width,$pencilBefore.Height)
+            Assert-Lbs172 "$scale double-buffered composite physically paints source pencil" (
+                Test-Lbs172VisibleInk -Bitmap $combined -Bounds $rowInk)
+        }
+        finally { $combined.Dispose() }
 
         $lastPoint = $content.PointToScreen([Drawing.Point]::new(24,([int][Math]::Round(64*$scale)*3+$rows[3].Height-2)))
         $firstPoint = $content.PointToScreen([Drawing.Point]::new(24,2))
@@ -253,6 +280,10 @@ foreach ($scale in @(2.5,1.0)) {
         Assert-Lbs172 "$scale live preview reaches final slot" (
             $script:ManageDragNeighborVisuals['c'].Top -eq [int][Math]::Round(64*$scale) -and
             $script:ManageDragNeighborVisuals['d'].Top -eq [int][Math]::Round(128*$scale))
+        Assert-Lbs172 "$scale moving neighbor controls stay detached throughout preview" (
+            $script:ManageDragNeighborVisuals['c'].Parent -eq $null -and
+            -not $script:ManageDragNeighborVisuals['c'].IsHandleCreated -and
+            (@($content.Controls | Where-Object { $_.Name -like 'ManageDrag*' }).Count -eq 1))
         Assert-Lbs172 "$scale all native neighbor rows stay parked after multiple reversals" (
             @($neighbors | Where-Object { $_.Top -ne $originalNeighborTops[[string]$_.Tag] }).Count -eq 0)
         Assert-Lbs172 "$scale full-size placeholder tracks last slot" ($script:ManageDragPlaceholder.Visible -and $script:ManageDragPlaceholder.Top -eq [int][Math]::Round(192*$scale))
@@ -286,6 +317,8 @@ foreach ($scale in @(2.5,1.0)) {
             $null -eq $script:ManageDragShadow -and $null -eq $script:ManageDragPlaceholder -and $null -eq $script:ManageDragTimer)
         Assert-Lbs172 "$scale no orphaned WinForms drag visual controls" (
             @($content.Controls | Where-Object { $_.Name -like 'ManageDrag*' }).Count -eq 0)
+        Assert-Lbs172 "$scale canvas disposed and cleared on cancellation" (
+            $null -eq $script:ManageDragCanvas)
         Assert-Lbs172 "$scale no settings write on cancel" ($script:TestSettingsWrites -eq 0)
 
         # The committed drop must finalize the preview before making rows visible.
@@ -314,5 +347,5 @@ foreach ($scale in @(2.5,1.0)) {
         $script:Popup = $null
     }
 }
-Write-Host "LBS172 DRAG TOTAL $script:checks/111"
-if ($script:checks -ne 111) { throw "LBS172 test total mismatch $script:checks" }
+Write-Host "LBS172 DRAG TOTAL $script:checks/125"
+if ($script:checks -ne 125) { throw "LBS172 test total mismatch $script:checks" }

@@ -2225,7 +2225,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.4.0'
+$script:AppVersion = '1.5.5.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -9405,6 +9405,92 @@ function New-ManageDragRowRaster {
     }
 }
 
+# LBS-172: one actual HWND paints the dragged source, every cached neighbor,
+# its destination gap and short shadow in ONE optimized buffered WM_PAINT.
+# Snapshot PictureBoxes/Panels are detached state holders, not child HWNDs.
+function Initialize-ManageDragBufferedCanvas {
+    if ('LenovoDragBufferedCanvas' -as [type]) { return }
+    $canvasSource = @'
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Windows.Forms;
+
+public sealed class LenovoDragBufferedCanvas : Control
+{
+    private readonly List<PictureBox> neighbors = new List<PictureBox>();
+    public PictureBox Ghost { get; set; }
+    public Panel Shadow { get; set; }
+    public Panel Placeholder { get; set; }
+
+    public LenovoDragBufferedCanvas()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        SetStyle(ControlStyles.Selectable, false);
+        DoubleBuffered = true;
+        UpdateStyles();
+        TabStop = false;
+        Enabled = false;
+    }
+
+    public bool HasOptimizedPaintStyles
+    {
+        get {
+            return GetStyle(ControlStyles.UserPaint) &&
+                   GetStyle(ControlStyles.AllPaintingInWmPaint) &&
+                   GetStyle(ControlStyles.OptimizedDoubleBuffer);
+        }
+    }
+
+    public void AddNeighbor(PictureBox visual)
+    {
+        if (visual == null || visual.Parent != null || visual.IsHandleCreated)
+            throw new InvalidOperationException("Raster state cannot own child HWNDs.");
+        neighbors.Add(visual);
+    }
+
+    protected override void OnPaintBackground(PaintEventArgs e) { }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        g.Clear(BackColor); // Clear inside the same back-buffer transaction.
+
+        if (Placeholder != null && Placeholder.Visible)
+        {
+            Rectangle r = Placeholder.Bounds;
+            using (Brush b = new SolidBrush(Placeholder.BackColor))
+                g.FillRectangle(b, r);
+            using (Pen p = new Pen(Color.FromArgb(83, 88, 98), 1.0f))
+            {
+                p.DashStyle = DashStyle.Dash;
+                g.DrawRectangle(p, r.Left + 1, r.Top + 1,
+                    Math.Max(1, r.Width - 3), Math.Max(1, r.Height - 3));
+            }
+        }
+
+        foreach (PictureBox row in neighbors)
+        {
+            if (row != null && row.Visible && row.Image != null)
+                g.DrawImageUnscaled(row.Image, row.Left, row.Top);
+        }
+
+        if (Shadow != null && Shadow.Visible)
+        {
+            using (Brush b = new SolidBrush(Shadow.BackColor))
+                g.FillRectangle(b, Shadow.Bounds);
+        }
+
+        if (Ghost != null && Ghost.Visible && Ghost.Image != null)
+            g.DrawImageUnscaled(Ghost.Image, Ghost.Left, Ghost.Top);
+    }
+}
+'@
+    Add-Type -ReferencedAssemblies @('System.Windows.Forms','System.Drawing') -TypeDefinition $canvasSource -ErrorAction Stop
+}
+
 function Start-ManageDragReflow {
     param($SourceRow)
     if (-not $SourceRow -or -not $SourceRow.Parent -or -not $script:IsManageEntriesMode) { return }
@@ -9428,6 +9514,7 @@ function Start-ManageDragReflow {
     $script:ManageDragOriginalColor = $SourceRow.BackColor
     $script:ManageDragGhost = $null
     $script:ManageDragGhostImage = $null
+    $script:ManageDragCanvas = $null
     $script:ManageDragVisualActive = $false
     $script:ManageDragCaptureCount = 0
     $script:ManageDragCaptureErrorClass = ''
@@ -9460,7 +9547,7 @@ function Start-ManageDragReflow {
         $ghost.BackColor = $SourceRow.BackColor
         $ghost.Enabled = $false # Let OLE hit testing reach the drop-enabled content.
         $ghost.Visible = $false
-        $content.Controls.Add($ghost)
+        # Detached state: the real painter is the shared buffered canvas.
         $script:ManageDragGhost = $ghost
         $script:ManageDragGhostImage = $bitmap
         $script:ManageDragCaptureCount = 1
@@ -9482,9 +9569,23 @@ function Start-ManageDragReflow {
             $picture.BackColor = $slot.Row.BackColor
             $picture.Enabled = $false
             $picture.Visible = $false
-            $content.Controls.Add($picture)
             $script:ManageDragNeighborCaptureCount++
         }
+
+        Initialize-ManageDragBufferedCanvas
+        $canvas = New-Object LenovoDragBufferedCanvas
+        $canvas.Name = 'ManageDragCanvas'
+        $canvas.BackColor = $content.BackColor
+        $canvas.Location = [Drawing.Point]::Empty
+        $canvas.Size = $content.ClientSize
+        $canvas.Dock = [System.Windows.Forms.DockStyle]::Fill
+        $canvas.Ghost = $ghost
+        foreach ($picture in @($script:ManageDragNeighborVisuals.Values)) {
+            $canvas.AddNeighbor($picture)
+        }
+        $canvas.Visible = $false
+        $content.Controls.Add($canvas)
+        $script:ManageDragCanvas = $canvas
     }
     catch {
         # A failing optional WinForms snapshot must never abort a reorder.
@@ -9493,6 +9594,17 @@ function Start-ManageDragReflow {
         $script:ManageDragCaptureErrorClass = $_.Exception.GetType().FullName
         # All-or-nothing setup. A failed visual capture leaves the original
         # safe live-row drag behavior available, never a partial raster layer.
+        if ($script:ManageDragCanvas) {
+            if ($script:ManageDragCanvas.Parent) {
+                $script:ManageDragCanvas.Parent.Controls.Remove($script:ManageDragCanvas)
+            }
+            $script:ManageDragCanvas.Dispose()
+            $script:ManageDragCanvas = $null
+        }
+        elseif ($canvas) {
+            if ($canvas.Parent) { $canvas.Parent.Controls.Remove($canvas) }
+            $canvas.Dispose()
+        }
         if ($script:ManageDragNeighborVisuals -is [System.Collections.IDictionary]) {
             foreach ($picture in @($script:ManageDragNeighborVisuals.Values)) {
                 if ($picture -and -not $picture.IsDisposed) {
@@ -9525,26 +9637,32 @@ function Start-ManageDragReflow {
     $shadow.BackColor = [Drawing.Color]::FromArgb(12,12,16)
     $shadow.Enabled = $false
     $shadow.Visible = $false
-    $content.Controls.Add($shadow)
+    if (-not $script:ManageDragCanvas) { $content.Controls.Add($shadow) }
     $script:ManageDragShadow = $shadow
+    if ($script:ManageDragCanvas) { $script:ManageDragCanvas.Shadow = $shadow }
     $placeholder = New-Object System.Windows.Forms.Panel
     $placeholder.Name = 'ManageDragPlaceholder'
     $placeholder.Size = $SourceRow.Size
     $placeholder.BackColor = [Drawing.Color]::FromArgb(34,36,41)
     $placeholder.Enabled = $false
     $placeholder.Visible = $false
-    $placeholder.Add_Paint({
+    if (-not $script:ManageDragCanvas) { $placeholder.Add_Paint({
         param($sender,$eventArgs)
         $pen = New-Object Drawing.Pen([Drawing.Color]::FromArgb(83,88,98),1.0)
         $pen.DashStyle = [Drawing.Drawing2D.DashStyle]::Dash
         try { $eventArgs.Graphics.DrawRectangle($pen,1,1,[Math]::Max(1,$sender.Width-3),[Math]::Max(1,$sender.Height-3)) }
         finally { $pen.Dispose() }
-    })
-    $content.Controls.Add($placeholder)
-    $placeholder.SendToBack()
+    }) }
+    if (-not $script:ManageDragCanvas) {
+        $content.Controls.Add($placeholder)
+        $placeholder.SendToBack()
+        $shadow.BringToFront()
+    }
     $script:ManageDragPlaceholder = $placeholder
-    $shadow.BringToFront()
-    if ($script:ManageDragGhost) {
+    if ($script:ManageDragCanvas) {
+        $script:ManageDragCanvas.Placeholder = $placeholder
+    }
+    elseif ($script:ManageDragGhost) {
         $script:ManageDragGhost.BringToFront()
     }
     else {
@@ -9597,7 +9715,11 @@ function Set-ManageDragFloatLocation {
                 $script:ManageDragShadow.Visible = $true
             }
             $script:ManageDragGhost.Visible = $true
-            $script:ManageDragGhost.BringToFront()
+            if ($script:ManageDragCanvas) {
+                $script:ManageDragCanvas.Visible = $true
+                $script:ManageDragCanvas.BringToFront()
+            }
+            else { $script:ManageDragGhost.BringToFront() }
         }
         if ($script:ManageDragGhost.Top -ne $y) { $script:ManageDragGhost.Top = $y }
     }
@@ -9611,6 +9733,10 @@ function Set-ManageDragFloatLocation {
         if ($script:ManageDragShadow.Left -ne $left -or $script:ManageDragShadow.Top -ne $shadowY) {
             $script:ManageDragShadow.Location = [Drawing.Point]::new($left,$shadowY)
         }
+    }
+    # The WinForms paint queue coalesces this into one buffered raster frame.
+    if ($script:ManageDragCanvas -and $script:ManageDragVisualActive) {
+        $script:ManageDragCanvas.Invalidate()
     }
 }
 
@@ -9664,6 +9790,7 @@ function Set-ManageDragReflowTargets {
         # if the pointer temporarily produces a no-op or invalid candidate.
         $script:ManageDragPlaceholder.Visible = ([bool]$script:ManageDragVisualActive -or $null -ne $Decision)
     }
+    if ($script:ManageDragCanvas -and $script:ManageDragVisualActive) { $script:ManageDragCanvas.Invalidate() }
     $script:ManageDragAnimationStartUtc = [datetime]::UtcNow
     if ($script:ManageDragTimer) {
         if ($needsMotion) { $script:ManageDragTimer.Start() }
@@ -9717,6 +9844,7 @@ function Advance-ManageDragReflow {
         }
     }
     finally { $script:ManageDragContent.ResumeLayout($false) }
+    if ($script:ManageDragCanvas -and $script:ManageDragVisualActive) { $script:ManageDragCanvas.Invalidate() }
     if ($t -ge 1.0 -and $script:ManageDragTimer) { $script:ManageDragTimer.Stop() }
 }
 
@@ -9777,6 +9905,15 @@ function Stop-ManageDragReflow {
                 $slot.Row.Refresh()
             }
         }
+        # Remove the single buffered native HWND before releasing any cached
+        # bitmap; detached PictureBoxes and panels never owned child HWNDs.
+        if ($script:ManageDragCanvas) {
+            if ($script:ManageDragCanvas.Parent) {
+                $script:ManageDragCanvas.Parent.Controls.Remove($script:ManageDragCanvas)
+            }
+            $script:ManageDragCanvas.Dispose()
+            $script:ManageDragCanvas = $null
+        }
         if ($script:ManageDragNeighborVisuals -is [System.Collections.IDictionary]) {
             foreach ($picture in @($script:ManageDragNeighborVisuals.Values)) {
                 if ($picture -and -not $picture.IsDisposed) {
@@ -9819,6 +9956,7 @@ function Stop-ManageDragReflow {
     $script:ManageDragShadow = $null
     $script:ManageDragGhost = $null
     $script:ManageDragGhostImage = $null
+    $script:ManageDragCanvas = $null
     $script:ManageDragNeighborVisuals = $null
     $script:ManageDragNeighborImages = $null
     $script:ManageDragNeighborCaptureCount = 0
