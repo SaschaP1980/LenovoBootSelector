@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.10.1 – Reset-to-default clarity and asynchronous BootNext feedback (LBS-206 Hotfix)
+
+- Change the conditional action label to **Reset to default target / Auf Standardziel zurücksetzen**; show it only when the independently verified one-time firmware target differs from a valid stored default. Firmware-order, unverified, unavailable, aligned and pending states no longer offer a misleading reset.
+- Delegate deliberate reset activation to the existing allowlisted asynchronous BootNext selection controller. The stored-default row now shows orange pending state immediately and Restart remains interlocked until independent firmware readback; failures and timeouts use the existing visible failure path. No persistent default change, direct privileged writer bypass or automatic restart.
+- Keep the main popup visible while its own Standard boot target ContextMenuStrip owns focus. Close on genuine external focus changes, retain normal Escape and deliberate tray hide behavior, and avoid orphaned menus after clicking a choice.
+- Add native WinPS5.1 targeted regression tests and update Layout C role/label, 100%/250% DPI, focus, pending, safety and menu-deactivation coverage. Preserve the 390×672 UI footprint and list height.
+
 ## v1.5.10.0 – Explicit one-time default action and truthful next-restart status (LBS-206)
 
 - Implement the owner-selected Layout C within the unchanged 390×672 main popup: the passive firmware-readback next-restart status now sits above the explicit Restart Windows action. Show verified, firmware-order, unknown, unavailable and pending states distinctly, without implying a requested BootNext is already confirmed.

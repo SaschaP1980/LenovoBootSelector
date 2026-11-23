@@ -80,6 +80,12 @@ function New-PopupForm {
     })
 
     $form.Add_Deactivate({
+        # The default-target ToolStrip is part of this popup's own UI.
+        # A focus handoff to it must not hide the owner form underneath.
+        # The opening flag covers Deactivate before DropDown.Visible is set.
+        if ($script:DefaultTargetMenuOpening -or
+            ($script:DefaultContextMenu -and -not $script:DefaultContextMenu.IsDisposed -and
+             $script:DefaultContextMenu.Visible)) { return }
         $capabilities = Get-CurrentSystemFunctionsCapabilities
         if (-not $script:ExitRequested -and [string]$capabilities.State -ne 'Busy') { $this.Hide() }
     })

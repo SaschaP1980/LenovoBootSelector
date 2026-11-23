@@ -171,6 +171,12 @@ foreach ($locale in @('en-US','de-DE')) {
                 $menu.Show($script:Action,[Drawing.Point]::new(0,$script:Action.Height))
                 [System.Windows.Forms.Application]::DoEvents()
                 Assert-Lbs205 "$case child menu is native and visible" ($menu.Visible)
+                # Regression: native popup Deactivate must not hide its own
+                # still-open default-target menu. The previous handler did.
+                $deactivate = $form.GetType().GetMethod('OnDeactivate',([Reflection.BindingFlags]::Instance -bor [Reflection.BindingFlags]::NonPublic))
+                if (-not $deactivate) { throw 'Native Form.OnDeactivate method unavailable' }
+                [void]$deactivate.Invoke($form,[object[]]@([EventArgs]::Empty))
+                Assert-Lbs205 "$case menu-owned Deactivate preserves popup while menu open" ($form.Visible -and $menu.Visible)
                 Send-Lbs205Key $menu ([System.Windows.Forms.Keys]::Escape)
                 Assert-Lbs205 "$case menu Escape closes menu without popup dismissal" (
                     -not $menu.Visible -and $form.Visible)
