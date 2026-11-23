@@ -1,9 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "1.5.9.0",
+  "version": "1.5.10.0",
   "releaseProfile": "patch",
-  "protectedFragmentIntent": [
-    "ps:New-PopupForm"
-  ],
+  "protectedFragmentIntent": [],
   "repositoryDeleteIntent": []
 }

@@ -6,12 +6,21 @@ function Update-BootNextRestartInterlock {
     if ($script:RestartButton -and -not $script:RestartButton.IsDisposed) {
         $script:RestartButton.Enabled = -not $pending
     }
+    if ($script:RestartUseDefaultButton -and -not $script:RestartUseDefaultButton.IsDisposed -and $pending) {
+        # The separate one-time action is never available during readback.
+        $script:RestartUseDefaultButton.Enabled = $false
+        $script:RestartUseDefaultButton.TabStop = $false
+        $script:RestartUseDefaultButton.Visible = $false
+    }
     if ($script:RestartTargetLabel -and -not $script:RestartTargetLabel.IsDisposed -and $pending) {
         $entry = Get-EntryByGuid ([string]$script:BootNextPendingGuid)
         $title = if ($entry) { Get-EntryDisplayTitle -Entry $entry } else { Get-LocalizedString -Key 'BootNext.Unknown' }
         $text = Get-LocalizedString -Key 'BootNext.SelectionPendingFooter' -Values @{ Target=$title }
         $script:RestartTargetLabel.Text = $text
-        $script:RestartTargetLabel.Enabled = $false
+        # A passive Label stays enabled so pending amber ink remains readable;
+        # its lack of click handler and TabStop keep it non-interactive.
+        $script:RestartTargetLabel.Enabled = $true
+        if ($script:ColorWarning) { $script:RestartTargetLabel.ForeColor = $script:ColorWarning }
         $script:RestartTargetLabel.TabStop = $false
         $script:RestartTargetLabel.Cursor = [Windows.Forms.Cursors]::Default
         $script:RestartTargetLabel.AccessibleDescription = $text

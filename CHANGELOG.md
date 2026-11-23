@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.10.0 – Explicit one-time default action and truthful next-restart status (LBS-206)
+
+- Implement the owner-selected Layout C within the unchanged 390×672 main popup: the passive firmware-readback next-restart status now sits above the explicit Restart Windows action. Show verified, firmware-order, unknown, unavailable and pending states distinctly, without implying a requested BootNext is already confirmed.
+- Replace the ambiguous footer (change)/(ändern) click target with a separate, keyboard-focusable Use default once / Standard einmalig verwenden button. It appears only when a persistent default exists, differs from the verified one-time target (or firmware order applies), the BootNext capability is available and no selection is pending. The existing guarded one-time writer, verification, restart confirmation, persistent-default settings and Manage Entries capacity remain unchanged.
+- Add a native Windows PowerShell 5.1 EN/DE 100%/250% WinForms regression for state truth, real font fit, long names, accessible labels/tooltips, separate actions, safe focus/click admission and restart interlocks. Preserve previous LBS-186 typography coverage with the new passive status semantics.
+
 ## v1.5.9.0 – Popup-scoped Escape dismissal (LBS-205)
 
 - Hide the focused main application popup with one Escape keypress from ordinary controls and keyboard-focusable boot rows, without disposing the form, exiting the tray, changing settings or triggering any privileged action.
