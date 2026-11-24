@@ -438,12 +438,15 @@ function Add-PopupManageEntriesSection {
 
     # Entry-management overlay. It temporarily replaces the normal settings/footer
     # while the same boot list switches into edit mode.
-    # LBS-157: move this panel 34 design pixels down, leaving only 4px
-    # between Save/Cancel and the footer; the edit-mode list uses that space.
+    # LBS-231: the redundant instructional block is gone. Keep the action
+    # row and version footer at their original absolute positions; the list
+    # claims the recovered 72 design pixels in addition to LBS-157.
+    # A multiple of four preserves the absolute button positions across
+    # fractional quarter-step DPI scales without a one-pixel rounding drift.
     $managePanel = New-Object System.Windows.Forms.Panel
     $managePanel.Name = 'ManageEntriesPanel'
-    $managePanel.Location = New-Object Drawing.Point(0, 524)
-    $managePanel.Size = New-Object Drawing.Size(390, 148)
+    $managePanel.Location = New-Object Drawing.Point(0, 596)
+    $managePanel.Size = New-Object Drawing.Size(390, 76)
     $managePanel.BackColor = $script:ColorSurface
     $managePanel.Visible = $false
 
@@ -452,18 +455,6 @@ function Add-PopupManageEntriesSection {
     $manageDivider.Size = New-Object Drawing.Size(358, 1)
     $manageDivider.BackColor = [Drawing.Color]::FromArgb(54,54,54)
     $managePanel.Controls.Add($manageDivider)
-
-    $manageTitle = New-Label -Text (Get-LocalizedString -Key 'Manage.Title') -Font (New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)) `
-        -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 8 -Width 350 -Height 18
-    $managePanel.Controls.Add($manageTitle)
-
-    $manageHint = New-Label -Text (Get-LocalizedString -Key 'Manage.Hint') -Font (New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)) `
-        -ForeColor $script:ColorSecondary -X 16 -Y 28 -Width 358 -Height 20
-    $managePanel.Controls.Add($manageHint)
-
-    $manageSubHint = New-Label -Text (Get-LocalizedString -Key 'Manage.SubHint') -Font (New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)) `
-        -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 49 -Width 358 -Height 20
-    $managePanel.Controls.Add($manageSubHint)
 
     $cancelManage = New-Object System.Windows.Forms.Button
     $cancelManage.Text = Get-LocalizedString -Key 'Common.Cancel'
@@ -475,7 +466,7 @@ function Add-PopupManageEntriesSection {
     $cancelManage.FlatAppearance.BorderSize = 1
     $cancelManage.FlatAppearance.MouseOverBackColor = $script:ColorSelectedRow
     $cancelManage.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(58,27,25)
-    $cancelManage.Location = New-Object Drawing.Point(16, 78)
+    $cancelManage.Location = New-Object Drawing.Point(16, 6)
     $cancelManage.Size = New-Object Drawing.Size(126, 34)
     $cancelManage.Cursor = [System.Windows.Forms.Cursors]::Hand
     $cancelManage.Add_Click({ Stop-ManageEntriesMode })
@@ -491,7 +482,7 @@ function Add-PopupManageEntriesSection {
     $saveManage.FlatAppearance.BorderSize = 1
     $saveManage.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(190,35,28)
     $saveManage.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(185,30,22)
-    $saveManage.Location = New-Object Drawing.Point(150, 78)
+    $saveManage.Location = New-Object Drawing.Point(150, 6)
     $saveManage.Size = New-Object Drawing.Size(224, 34)
     # LBS-186: the native Flat button adapter dims disabled text against
     # the dark background. Repaint only the disabled interior using the
@@ -521,7 +512,7 @@ function Add-PopupManageEntriesSection {
     $script:ManageSaveButton = $saveManage
 
     $manageFooter = New-Object System.Windows.Forms.Panel
-    $manageFooter.Location = New-Object Drawing.Point(0, 116)
+    $manageFooter.Location = New-Object Drawing.Point(0, 44)
     $manageFooter.Size = New-Object Drawing.Size(390, 32)
     $manageFooter.BackColor = $script:ColorSurface
     $manageVersion = New-Label -Text ("v{0}" -f $script:AppVersion) -Font (New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Regular)) `
