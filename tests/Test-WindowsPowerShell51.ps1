@@ -35,6 +35,11 @@ $bootRowStateProbe = Join-Path $root 'tests\Test-LBS217-RowState.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $bootRowStateProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-217 native boot row state semantics regression failed' }
 
+# LBS-221 Hotfix: native alias-clear appearance, tooltip lifetime and draft-only behavior.
+$aliasClearProbe = Join-Path $root 'tests\Test-LBS221-AliasClear.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $aliasClearProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-221 native alias-clear regression failed' }
+
 # LBS-221: isolated native Manage action hover and drag-safe dark hint routing.
 $manageHoverProbe = Join-Path $root 'tests\Test-LBS221-ManageHover.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $manageHoverProbe
