@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.17.1 – Refine auxiliary popup focus and contrast (LBS-233)
+
+- Place initial keyboard focus in the auxiliary popup content rather than on the close glyph; keep the accessible close button and Escape dismissal.
+- Darken the modal owner with a 45 percent scrim and brighten the two settings navigation hover/highlight backgrounds without changing the global palette.
+
 ## v1.5.17.0 – Connect auxiliary popups to their navigation row (LBS-233)
 
 - Expand Further settings and the persistent-default picker only to the left, with work-area clamping and no right-side fallback.
