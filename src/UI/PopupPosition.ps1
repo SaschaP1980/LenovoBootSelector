@@ -141,16 +141,11 @@ function Get-TrayContextMenuLocation {
     )
 }
 
-# LBS-229: keep the auxiliary surface on the owner's monitor. Prefer a
-# non-overlapping side; when neither side fits, clamp an overlapping surface.
+# LBS-233: expand only to the left; clamp when a separate surface cannot fit.
 function Get-AuxiliaryPopupLocation {
-    param([Drawing.Rectangle]$WorkingArea,[Drawing.Rectangle]$OwnerBounds,[Drawing.Size]$SurfaceSize,[Drawing.Rectangle]$TriggerBounds = [Drawing.Rectangle]::Empty)
-    $gap = 8
-    $right = $OwnerBounds.Right + $gap
-    $left = $OwnerBounds.Left - $SurfaceSize.Width - $gap
-    $x = if ($right + $SurfaceSize.Width -le $WorkingArea.Right) { $right }
-        elseif ($left -ge $WorkingArea.Left) { $left }
-        else { $OwnerBounds.Left }
+    param([Drawing.Rectangle]$WorkingArea,[Drawing.Rectangle]$OwnerBounds,[Drawing.Size]$SurfaceSize,[Drawing.Rectangle]$TriggerBounds = [Drawing.Rectangle]::Empty,[double]$Scale = 1.0)
+    $gap = [int][Math]::Round(8*$Scale)
+    $x = $OwnerBounds.Left - $SurfaceSize.Width - $gap
     $x = [int][Math]::Max($WorkingArea.Left,[Math]::Min($WorkingArea.Right-$SurfaceSize.Width,$x))
     # Keep horizontal placement relative to the parent, vertical placement to the initiating row.
     $anchorY = if ($TriggerBounds.IsEmpty) { $OwnerBounds.Top } else { $TriggerBounds.Top }

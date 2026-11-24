@@ -12,6 +12,8 @@ public static class Lbs229Native {
     public static extern bool IsWindowEnabled(IntPtr hWnd);
     [DllImport("user32.dll")]
     public static extern IntPtr GetWindow(IntPtr hWnd, uint command);
+    [DllImport("user32.dll")]
+    public static extern int GetWindowLong(IntPtr hWnd, int index);
 }
 '@
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
@@ -124,7 +126,7 @@ try {
     Test-Lbs229Correction 'F01 row anchor' {
         $trigger = [Drawing.Rectangle]::new(0,400,390,38)
         $p = Get-AuxiliaryPopupLocation $area $anchor $size $trigger
-        Require-Lbs229Correction ($p.X -eq 398 -and $p.Y -eq 400) "Expected right side at trigger Y=400, got $p"
+        Require-Lbs229Correction ($p.X -eq -398 -and $p.Y -eq 400) "Expected left side at trigger Y=400, got $p"
     }
     Test-Lbs229Correction 'F01 negative-origin row anchor and bottom clamp' {
         $wa = [Drawing.Rectangle]::new(-1600,-300,1600,900)
@@ -388,8 +390,29 @@ try {
     if ($thirdFailures.Count) { throw ("LBS229 third correction RED: " + ($thirdFailures -join '; ')) }
     if ($CorrectionProbeOnly) { return }
 
+    # LBS-233: positive coverage for the approved left-only placement and the
+    # pure bridge geometry (screen coordinates, negative origin, 100/250%).
+    Initialize-AuxiliaryOwnerDimmer
+    foreach ($factor in @(1.0,2.5)) {
+        $gap = [int][Math]::Round(8*$factor)
+        $wa = [Drawing.Rectangle]::new(-2500,-400,4000,2000)
+        $main = [Drawing.Rectangle]::new(-700,0,975,1000)
+        $row = [Drawing.Rectangle]::new(-700,400,975,[int][Math]::Round(38*$factor))
+        $childSize = [Drawing.Size]::new(975,600)
+        $pos = Get-AuxiliaryPopupLocation $wa $main $childSize $row $factor
+        $childBounds = [Drawing.Rectangle]::new($pos,$childSize)
+        $bridge = [LenovoAuxiliaryConnector]::GetConnectorBounds($wa,$main,$row,$childBounds,$factor)
+        Assert-Lbs229 "LBS233 scale $factor left-only aligned bridge" ($childBounds.Right -eq $main.Left-$gap -and $bridge.Left -eq $childBounds.Right -and $bridge.Right -eq $row.Left -and $bridge.Top+[int][Math]::Floor($bridge.Height/2) -eq $row.Top+[int][Math]::Floor($row.Height/2))
+        $overlap = [Drawing.Rectangle]::new($main.Left,0,975,600)
+        Assert-Lbs229 "LBS233 scale $factor overlap omits bridge" ([LenovoAuxiliaryConnector]::GetConnectorBounds($wa,$main,$row,$overlap,$factor).IsEmpty)
+        $rightOnly = [Drawing.Rectangle]::new($main.Left-5,0,2300,1400)
+        $clamp = Get-AuxiliaryPopupLocation $rightOnly $main $childSize $row $factor
+        Assert-Lbs229 "LBS233 scale $factor never switches right" ($clamp.X -eq $rightOnly.Left)
+        $low = [Drawing.Rectangle]::new($childBounds.X,0,$childBounds.Width,100)
+        Assert-Lbs229 "LBS233 scale $factor vertically unsafe bridge omitted" ([LenovoAuxiliaryConnector]::GetConnectorBounds($wa,$main,$row,$low,$factor).IsEmpty)
+    }
     $p=Get-AuxiliaryPopupLocation $area $anchor $size
-    Assert-Lbs229 'right placement stays on owner monitor' ($p.X -eq 398 -and $p.Y -eq 0)
+    Assert-Lbs229 'left placement stays on owner monitor' ($p.X -eq -398 -and $p.Y -eq 0)
     $rightEdge=[Drawing.Rectangle]::new(1600,1200,390,400)
     $p=Get-AuxiliaryPopupLocation $area $rightEdge $size
     Assert-Lbs229 'left placement and bottom clamp' ($p.X -eq 1202 -and $p.Y -eq 1086)
@@ -549,6 +572,99 @@ try {
     $script:Busy=$true
     Show-ConfigurationPopup -Owner $owner
     Assert-Lbs229 'busy gate blocks settings popup entirely' (-not $script:ActiveAuxiliaryPopup -and $script:Actions.Count -eq 3)
+
+    # LBS-233: exercise the actual navigation rows and modal path, including
+    # real owner cutout, row paint, non-activating connector and layout loss.
+    $script:Busy = $false
+    $script:Drift = $false
+    $script:Ready = $true
+    $script:DefaultInteractionEnabled = $true
+    $script:DefaultTargetChangePending = $false
+    $script:BootNextPendingGuid = $null
+    $script:Scale = 1.0
+    $nativeOwner = New-Object Windows.Forms.Form
+    $nativeOwner.FormBorderStyle = [Windows.Forms.FormBorderStyle]::None
+    $nativeOwner.StartPosition = [Windows.Forms.FormStartPosition]::Manual
+    $nativeOwner.ClientSize = [Drawing.Size]::new(390,672)
+    $nativeOwner.ShowInTaskbar = $false
+    $nativeOwner.TopMost = $true
+    $nativeArea = [Windows.Forms.Screen]::FromControl($owner).WorkingArea
+    $nativeOwner.Location = [Drawing.Point]::new(($nativeArea.Right-$nativeOwner.Width),$nativeArea.Top)
+    $nativeRoot = New-Object Windows.Forms.Panel
+    $nativeRoot.Dock = [Windows.Forms.DockStyle]::Fill
+    $nativeOwner.Controls.Add($nativeRoot)
+    try {
+        $nativeOwner.Show()
+        [Windows.Forms.Application]::DoEvents()
+        foreach ($locale in @('de-DE','en-US')) {
+            $script:Locale = $locale
+            Add-PopupSettingsSection -Root $nativeRoot
+            foreach ($kind in @('SettingsPanel','DefaultPanel')) {
+                $script:Lbs233Row = $nativeRoot.Controls[$kind]
+                $script:Lbs233Owner = $nativeOwner
+                $script:Lbs233Observed = $false
+                $script:Lbs233Error = $null
+                $script:Lbs233Connector = $null
+                $script:Lbs233Dimmer = $null
+                $timer = New-Object Windows.Forms.Timer
+                $timer.Interval = 50
+                $timer.Add_Tick({
+                    param($sender,$eventArgs)
+                    $child = $script:ActiveAuxiliaryPopup
+                    if (-not $child -or -not $child.Visible) { return }
+                    $sender.Stop()
+                    try {
+                        $row = $script:Lbs233Row
+                        $parent = $script:Lbs233Owner
+                        $dim = @($parent.OwnedForms | Where-Object Name -eq 'AuxiliaryOwnerDimmer')
+                        Require-Lbs229Correction ($dim.Count -eq 1 -and $dim[0].Visible) 'Exactly one owner scrim'
+                        $script:Lbs233Dimmer = $dim[0]
+                        $bounds = $row.RectangleToScreen($row.ClientRectangle)
+                        $center = $dim[0].PointToClient([Drawing.Point]::new(($bounds.Left+8),($bounds.Top+8)))
+                        Require-Lbs229Correction ($dim[0].HighlightedRowBounds -eq $bounds -and $dim[0].Region -and -not $dim[0].Region.IsVisible($center) -and $dim[0].Region.IsVisible(1,1)) 'Only initiating row is excluded from dimming'
+                        Require-Lbs229Correction ($row.BackColor -eq $script:ColorHover -and -not [Lbs229Native]::IsWindowEnabled($parent.Handle)) 'Highlight must not reactivate the modal owner'
+                        $bmp = [Drawing.Bitmap]::new($row.Width,$row.Height)
+                        try {
+                            $row.DrawToBitmap($bmp,$row.ClientRectangle)
+                            Require-Lbs229Correction ($bmp.GetPixel(1,10).ToArgb() -eq $script:ColorAccent.ToArgb()) 'Red accent must be painted on actual initiating row'
+                        } finally { $bmp.Dispose() }
+                        $expected = [LenovoAuxiliaryConnector]::GetConnectorBounds([Windows.Forms.Screen]::FromControl($parent).WorkingArea,$parent.RectangleToScreen($parent.ClientRectangle),$bounds,$child.Bounds,1.0)
+                        $connectors = @($child.OwnedForms | Where-Object Name -eq 'AuxiliaryConnector')
+                        if (-not $expected.IsEmpty) {
+                            Require-Lbs229Correction ($connectors.Count -eq 1 -and $connectors[0].Visible -and $connectors[0].VisualBounds -eq $expected -and $connectors[0].Location -eq $expected.Location -and -not $connectors[0].ShowInTaskbar) ("Real bridge follows screen-coordinate geometry: expected=$expected count=$($connectors.Count) actual=$($connectors | ForEach-Object { 'bounds='+$_.Bounds+' visible='+$_.Visible+' taskbar='+$_.ShowInTaskbar }) child=$($child.Bounds) row=$bounds owner=$($parent.Bounds)")
+                            $script:Lbs233Connector = $connectors[0]
+                            Require-Lbs229Correction ($connectors[0].Region.IsVisible(1,[int][Math]::Floor($expected.Height/2)) -and -not $connectors[0].Region.IsVisible($expected.Width,[int][Math]::Floor($expected.Height/2)) -and -not $connectors[0].Region.IsVisible(1,$expected.Height)) 'Visible bridge must be clipped to approved geometry even if WinForms enlarges the backing window'
+                            $style = [Lbs229Native]::GetWindowLong($connectors[0].Handle,-20)
+                            Require-Lbs229Correction (($style -band 0x08000020) -eq 0x08000020) 'Bridge is non-activating and input-transparent'
+                            # A clipped trigger must immediately lose its bridge
+                            # and scrim hole; restoring it recreates safe geometry.
+                            $row.Left = 1
+                            Require-Lbs229Correction (-not $connectors[0].Visible -and $dim[0].HighlightedRowBounds.IsEmpty) 'Unsafe layout removes bridge and highlight'
+                            $row.Left = 0
+                            Require-Lbs229Correction ($connectors[0].Visible -and $dim[0].HighlightedRowBounds -eq $bounds) 'Restored layout restores bridge and highlight'
+                        } else {
+                            Require-Lbs229Correction (@($connectors | Where-Object Visible).Count -eq 0) 'Constrained native work area must omit bridge'
+                        }
+                        $script:Lbs233Observed = $true
+                    } catch { $script:Lbs233Error = $_ }
+                    finally { $child.Tag.Close.PerformClick() }
+                })
+                try {
+                    $timer.Start()
+                    $flags = [Reflection.BindingFlags]::Instance -bor [Reflection.BindingFlags]::NonPublic
+                    if ($kind -eq 'DefaultPanel') {
+                        [void]$script:Lbs233Row.GetType().GetMethod('OnKeyDown',$flags).Invoke($script:Lbs233Row,@([Windows.Forms.KeyEventArgs]::new([Windows.Forms.Keys]::Enter)))
+                    } else {
+                        [void]$script:Lbs233Row.GetType().GetMethod('OnClick',$flags).Invoke($script:Lbs233Row,@([EventArgs]::Empty))
+                    }
+                } finally { $timer.Stop(); $timer.Dispose() }
+                if ($script:Lbs233Error) { throw $script:Lbs233Error }
+                Assert-Lbs229 "LBS233 $locale $kind real navigation modal highlight and cleanup" ($script:Lbs233Observed -and $script:Lbs233Dimmer.IsDisposed -and (-not $script:Lbs233Connector -or $script:Lbs233Connector.IsDisposed) -and -not $script:ActiveAuxiliaryPopup -and $script:Lbs233Row.BackColor -ne $script:ColorHover -and [Lbs229Native]::IsWindowEnabled($nativeOwner.Handle))
+            }
+            foreach ($control in @($nativeRoot.Controls)) { $control.Dispose() }
+        }
+    } finally { $nativeOwner.Dispose() }
+    Assert-Lbs229 'LBS233 modal visual probes dispatch no action' ($script:Actions.Count -eq 3 -and $script:DefaultCalls.Count -eq 2 -and $script:BootCalls -eq 0)
 } finally {
     $owner.Dispose()
     $tray.Dispose()

@@ -44,7 +44,7 @@ function Update-DefaultUi {
         }
         if ($script:DefaultArrowLabel -and -not $script:DefaultArrowLabel.IsDisposed) {
             $script:DefaultArrowLabel.Visible = (-not $checking -and -not $pendingDefault)
-            $script:DefaultArrowLabel.Text = '›'
+            $script:DefaultArrowLabel.Text = '‹'
         }
         foreach ($child in $script:DefaultButton.Controls) {
             try {
