@@ -224,6 +224,36 @@ function Set-AuxiliaryControlBounds {
     finally { $Control.ResumeLayout($false) }
 }
 
+# Scroll position belongs to the custom bar; never let WinForms create a
+# competing native scrollbar. Focus reveal is read-only and does not select.
+function Set-AuxiliaryPopupControlVisible {
+    param([Windows.Forms.Control]$Control)
+    $form = $Control.FindForm()
+    if (-not $form -or -not $form.Tag.Scroll -or $Control.Parent -ne $form.Tag.Body) { return }
+    $state = $form.Tag
+    $bar = $state.Scroll
+    if ($Control.Top -lt $bar.Value) { $bar.Value = $Control.Top }
+    elseif ($Control.Bottom -gt $bar.Value + $state.Viewport.Height) {
+        $bar.Value = $Control.Bottom - $state.Viewport.Height
+    }
+}
+
+function Add-AuxiliaryPopupWheelHandlers {
+    param([Windows.Forms.Control]$Control)
+    $Control.Add_MouseWheel({
+        param($sender,$eventArgs)
+        if ($eventArgs -is [Windows.Forms.HandledMouseEventArgs] -and $eventArgs.Handled) { return }
+        $form = $sender.FindForm()
+        if (-not $form -or -not $form.Tag.Scroll -or $eventArgs.Delta -eq 0) { return }
+        $bar = $form.Tag.Scroll
+        if ($bar.Maximum -le 0) { return }
+        $steps = [Math]::Max(1,[int][Math]::Abs([Math]::Truncate($eventArgs.Delta / 120.0)))
+        $bar.Value = $bar.Value - [Math]::Sign($eventArgs.Delta)*$steps*$bar.SmallChange
+        if ($eventArgs -is [Windows.Forms.HandledMouseEventArgs]) { $eventArgs.Handled = $true }
+    })
+    foreach ($child in $Control.Controls) { Add-AuxiliaryPopupWheelHandlers -Control $child }
+}
+
 function Set-AuxiliaryPopupLayout {
     param([System.Windows.Forms.Form]$Form,[double]$Scale,[Drawing.Rectangle]$WorkingArea,[Drawing.Rectangle]$OwnerBounds,[Drawing.Rectangle]$TriggerBounds = [Drawing.Rectangle]::Empty)
     if ($Form.Tag.Scale -ne 0) { throw 'Auxiliary surface has already been scaled.' }
@@ -238,9 +268,22 @@ function Set-AuxiliaryPopupLayout {
     $state.Close.Left = [Math]::Max(0,$width-$state.Close.Width-[int][Math]::Round(12*$Scale))
     $state.Title.Width = [Math]::Max(1,$state.Close.Left-$state.Title.Left)
     $state.Subtitle.Width = [Math]::Max(1,$width-$state.Subtitle.Left-[int][Math]::Round(16*$Scale))
-    $state.Body.Size = [Drawing.Size]::new($width,[Math]::Max(1,$height-$state.Body.Top))
-    $state.Body.AutoScroll = $true
-    $state.Body.AutoScrollMinSize = [Drawing.Size]::new(0,[int][Math]::Round($state.ContentHeight*$Scale))
+    $viewportHeight = [Math]::Max(1,$height-$state.Viewport.Top)
+    $contentHeight = [Math]::Max($viewportHeight,[int][Math]::Round($state.ContentHeight*$Scale))
+    $range = $contentHeight-$viewportHeight
+    $gutter = if ($range -gt 0) { [Math]::Min($width-1,[int][Math]::Round(8*$Scale)) } else { 0 }
+    $state.Viewport.Size = [Drawing.Size]::new($width,$viewportHeight)
+    $state.Body.Bounds = [Drawing.Rectangle]::new(0,0,$width-$gutter,$contentHeight)
+    $state.Scroll.Bounds = [Drawing.Rectangle]::new($width-$gutter,0,$gutter,$viewportHeight)
+    $state.Scroll.LargeChange = $viewportHeight
+    $state.Scroll.SmallChange = [Math]::Max(1,[int][Math]::Round(60*$Scale))
+    $state.Scroll.Maximum = $range
+    $state.Scroll.Value = 0
+    $state.Scroll.Visible = ($range -gt 0 -and $gutter -gt 0)
+    foreach ($control in $state.Body.Controls) {
+        $control.Add_GotFocus({ param($sender,$eventArgs) Set-AuxiliaryPopupControlVisible -Control $sender })
+    }
+    Add-AuxiliaryPopupWheelHandlers -Control $Form
     $Form.Location = Get-AuxiliaryPopupLocation -WorkingArea $WorkingArea -OwnerBounds $OwnerBounds -SurfaceSize $Form.Size -TriggerBounds $TriggerBounds -Scale $Scale
 }
 

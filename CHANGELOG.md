@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.17.2 – Match auxiliary scrollbars to the main popup (LBS-233)
+
+- Reuse the existing red-thumb, dark-track scrollbar for overflowing auxiliary popup content instead of the native light Windows scrollbar.
+- Keep the header fixed, hide the scrollbar without overflow, and preserve pixel scrolling, keyboard reveal and existing modal selection semantics.
+
 ## v1.5.17.1 – Refine auxiliary popup focus and contrast (LBS-233)
 
 - Place initial keyboard focus in the auxiliary popup content rather than on the close glyph; keep the accessible close button and Escape dismissal.

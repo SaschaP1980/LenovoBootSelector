@@ -471,15 +471,29 @@ try {
                 Assert-Lbs229 "$case all visible ordered choices plus none" ($rows.Count -eq 15 -and -not $rows[0].Tag.Guid -and $rows[1].Tag.Guid -eq 'a')
                 Assert-Lbs229 "$case persistent marker independent of one-shot" ($selected.Count -eq 1 -and $selected[0].Tag.Guid -eq 'a' -and $selected[0].Controls['DefaultPickerSelected'])
                 Assert-Lbs229 "$case familiar row geometry and full accessible text" ($rows[1].Height -eq [int](60*$scale) -and $rows[1].Controls['DefaultPickerTitle'].AccessibleDescription -eq 'Corporate' -and $rows[1].Controls['DefaultPickerSubtitle'].Text -eq 'Internal SSD')
-                Assert-Lbs229 "$case long list scroll extent exceeds visible body" ($picker.Tag.Body.AutoScroll -and $picker.Tag.Body.AutoScrollMinSize.Height -gt $picker.Tag.Body.Height)
+                $bar=$picker.Tag.Scroll
+                Assert-Lbs229 "$case long list uses existing red/dark custom scrollbar" ($bar -is [LenovoVerticalScrollBar] -and -not $picker.Tag.Body.AutoScroll -and -not $picker.Tag.Viewport.AutoScroll -and $bar.TrackColor.ToArgb() -eq [Drawing.Color]::FromArgb(23,23,23).ToArgb() -and $bar.ThumbColor -eq $script:ColorAccent)
+                Assert-Lbs229 "$case scaled scroll extent and content clipping" ($bar.Maximum -eq [int](900*$scale)-$picker.Tag.Viewport.Height -and $bar.LargeChange -eq $picker.Tag.Viewport.Height -and $bar.Width -eq [int](8*$scale) -and $picker.Tag.Body.Right -eq $bar.Left)
+                $bar.Value=$bar.Maximum
+                Assert-Lbs229 "$case bottom scroll reaches final choice without overscroll" ($picker.Tag.Body.Top -eq -$bar.Maximum -and $picker.Tag.Body.Bottom -eq $picker.Tag.Viewport.Height -and $rows[-1].Bottom -eq $picker.Tag.Body.Height)
+                $bar.Value=0
             } finally { $picker.Dispose() }
         }
     }
     $small=New-ConfigurationPopup
     try {
         Set-AuxiliaryPopupLayout $small 2.5 ([Drawing.Rectangle]::new(-400,0,800,600)) ([Drawing.Rectangle]::new(-390,0,700,590))
-        Assert-Lbs229 'small work area clamps child and exposes scrolling' ($small.Width -le 800 -and $small.Height -le 600 -and $small.Tag.Body.AutoScroll -and $small.Tag.Close.Right -le $small.Width)
+        Assert-Lbs229 'small work area clamps child and exposes scrolling' ($small.Width -le 800 -and $small.Height -le 600 -and $small.Tag.Scroll.Maximum -gt 0 -and -not $small.Tag.Viewport.AutoScroll -and $small.Tag.Close.Right -le $small.Width)
     } finally { $small.Dispose() }
+    $savedEntries=$script:CurrentEntries
+    try {
+        $script:CurrentEntries=@($savedEntries | Select-Object -First 2)
+        $short=New-DefaultTargetPicker
+        try {
+            Set-AuxiliaryPopupLayout $short 1.0 $area $anchor
+            Assert-Lbs229 'short picker has no scroll range or reserved gutter' ($short.Tag.Scroll -is [LenovoVerticalScrollBar] -and $short.Tag.Scroll.Maximum -eq 0 -and $short.Tag.Body.Width -eq $short.Tag.Viewport.Width)
+        } finally { $short.Dispose() }
+    } finally { $script:CurrentEntries=$savedEntries }
     $script:DefaultTargetReadUncertain=$true
     $unknown=New-DefaultTargetPicker
     try { Assert-Lbs229 'uncertain read has no selected marker' (@($unknown.Tag.Body.Controls | Where-Object {$_.Tag.Selected}).Count -eq 0) } finally { $unknown.Dispose() }
@@ -542,6 +556,24 @@ try {
     Assert-Lbs229 'direct language choice dispatches existing language action' ($script:Actions.Count -eq 3 -and $script:Actions[2] -eq 'language-en')
     Invoke-Lbs229Modal 'default' {
         param($active)
+        $bar=$active.Tag.Scroll
+        $viewport=$active.Tag.Viewport
+        $rows=@($active.Tag.Body.Controls | Where-Object Name -eq 'DefaultPickerRow' | Sort-Object Top)
+        Assert-Lbs229 'actual overflow uses visible custom bar with fixed header' ($bar.Visible -and $bar.Maximum -gt 0 -and $viewport.Top -eq $active.Tag.Header.Bottom)
+        $bitmap=[Drawing.Bitmap]::new($bar.Width,$bar.Height)
+        try {
+            $bar.DrawToBitmap($bitmap,$bar.ClientRectangle)
+            Assert-Lbs229 'actual scrollbar paint has dark track and red thumb' ($bitmap.GetPixel(0,0).ToArgb() -eq $bar.TrackColor.ToArgb() -and $bitmap.GetPixel(3,5).ToArgb() -in @($bar.ThumbColor.ToArgb(),$bar.ThumbHoverColor.ToArgb()))
+        } finally { $bitmap.Dispose() }
+        $flags=[Reflection.BindingFlags]::Instance -bor [Reflection.BindingFlags]::NonPublic
+        $wheel=[Windows.Forms.HandledMouseEventArgs]::new([Windows.Forms.MouseButtons]::None,0,1,1,-120)
+        [void]$rows[0].GetType().GetMethod('OnMouseWheel',$flags).Invoke($rows[0],@($wheel))
+        Assert-Lbs229 'wheel scrolls content once without selecting target' ($wheel.Handled -and $bar.Value -eq $bar.SmallChange -and $active.Tag.Body.Top -eq -$bar.Value)
+        [void]$rows[0].Focus()
+        [void]$rows[0].GetType().GetMethod('OnKeyDown',$flags).Invoke($rows[0],@([Windows.Forms.KeyEventArgs]::new([Windows.Forms.Keys]::End)))
+        Assert-Lbs229 'End keyboard navigation reveals last focused row' ($rows[-1].Focused -and $bar.Value -eq $bar.Maximum -and $active.Tag.Body.Bottom -eq $viewport.Height)
+        [void]$rows[-1].GetType().GetMethod('OnKeyDown',$flags).Invoke($rows[-1],@([Windows.Forms.KeyEventArgs]::new([Windows.Forms.Keys]::Home)))
+        Assert-Lbs229 'Home keyboard navigation restores top' ($rows[0].Focused -and $bar.Value -eq 0)
         $active.Tag.Close.PerformClick()
     }
     Assert-Lbs229 'default cancellation performs no write' ($script:DefaultCalls.Count -eq 0)
