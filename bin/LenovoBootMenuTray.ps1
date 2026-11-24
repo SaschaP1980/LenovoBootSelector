@@ -2367,7 +2367,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.15.1'
+$script:AppVersion = '1.5.15.2'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -12541,8 +12541,9 @@ function Add-PopupHeaderSection {
     $refresh.BackColor = $script:ColorHeader
     $refresh.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $refresh.FlatAppearance.BorderSize = 0
-    $refresh.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(30, 30, 30)
-    $refresh.FlatAppearance.MouseDownBackColor = $script:ColorSelectedRow
+    $refresh.FlatAppearance.MouseOverBackColor = $script:ColorHeader
+    $refresh.FlatAppearance.MouseDownBackColor = $script:ColorHeader
+    $refresh.UseVisualStyleBackColor = $false
     $refresh.Location = New-Object Drawing.Point(340, 12)
     $refresh.Size = New-Object Drawing.Size(34, 34)
     $refresh.Cursor = [System.Windows.Forms.Cursors]::Hand
@@ -13037,7 +13038,11 @@ function New-AuxiliaryPopupForm {
     $close.ForeColor = $script:ColorPrimary
     $close.FlatStyle = [Windows.Forms.FlatStyle]::Flat
     $close.FlatAppearance.BorderSize = 0
-    $close.FlatAppearance.MouseOverBackColor = $script:ColorHover
+    $close.FlatAppearance.MouseOverBackColor = $script:ColorHeader
+    $close.FlatAppearance.MouseDownBackColor = $script:ColorHeader
+    $close.UseVisualStyleBackColor = $false
+    $close.Add_MouseEnter({ param($sender,$eventArgs) $sender.ForeColor = $script:ColorAccent })
+    $close.Add_MouseLeave({ param($sender,$eventArgs) $sender.ForeColor = $script:ColorPrimary })
     $close.Location = [Drawing.Point]::new(350,7)
     $close.Size = [Drawing.Size]::new(28,30)
     $close.DialogResult = [Windows.Forms.DialogResult]::Cancel
@@ -13659,10 +13664,75 @@ function Set-AuxiliaryPopupLayout {
     $Form.Location = Get-AuxiliaryPopupLocation -WorkingArea $WorkingArea -OwnerBounds $OwnerBounds -SurfaceSize $Form.Size -TriggerBounds $TriggerBounds
 }
 
+# Owner-local black scrim. A separate layered, non-activating owned window
+# dims the actual pixels (not desktop transparency or mutated control colors).
+# It has no taskbar entry, no input/focus role and no independent lifetime.
+function Initialize-AuxiliaryOwnerDimmer {
+    if ('LenovoAuxiliaryOwnerDimmer' -as [type]) { return }
+    $source = @'
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+
+public sealed class LenovoAuxiliaryOwnerDimmer : Form
+{
+    private Form parent;
+    public LenovoAuxiliaryOwnerDimmer(Form owner)
+    {
+        if (owner == null) throw new ArgumentNullException("owner");
+        parent = owner;
+        Name = "AuxiliaryOwnerDimmer";
+        AutoScaleMode = AutoScaleMode.None;
+        FormBorderStyle = FormBorderStyle.None;
+        ShowInTaskbar = false;
+        StartPosition = FormStartPosition.Manual;
+        BackColor = Color.Black;
+        Opacity = 0.35;
+        TopMost = owner.TopMost;
+        SyncBounds(null, EventArgs.Empty);
+        parent.LocationChanged += SyncBounds;
+        parent.SizeChanged += SyncBounds;
+    }
+
+    protected override bool ShowWithoutActivation { get { return true; } }
+
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            CreateParams cp = base.CreateParams;
+            // TOOLWINDOW, NOACTIVATE, TRANSPARENT (layered-window hit testing).
+            cp.ExStyle |= 0x00000080 | 0x08000000 | 0x00000020;
+            return cp;
+        }
+    }
+
+    private void SyncBounds(object sender, EventArgs args)
+    {
+        if (parent != null && !parent.IsDisposed && !IsDisposed)
+            Bounds = parent.RectangleToScreen(parent.ClientRectangle);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing && parent != null)
+        {
+            parent.LocationChanged -= SyncBounds;
+            parent.SizeChanged -= SyncBounds;
+            parent = null;
+        }
+        base.Dispose(disposing);
+    }
+}
+'@
+    Add-Type -ReferencedAssemblies @('System.Windows.Forms','System.Drawing') -TypeDefinition $source -ErrorAction Stop
+}
+
 # Modal ownership prevents competing main-popup selections while a child is
 # open. No business action is dispatched by this lifecycle function.
 function Show-OwnedAuxiliaryPopup {
     param([System.Windows.Forms.Form]$Form,[System.Windows.Forms.Control]$Owner)
+    $dimmer = $null
     try {
         if ($script:ActiveAuxiliaryPopup -or -not $Owner -or $Owner.IsDisposed) { return $null }
         $parent = $Owner.FindForm()
@@ -13672,13 +13742,21 @@ function Show-OwnedAuxiliaryPopup {
         $triggerBounds = $Owner.RectangleToScreen($Owner.ClientRectangle)
         Set-AuxiliaryPopupLayout -Form $Form -Scale ([double]$scale) -WorkingArea $screen.WorkingArea -OwnerBounds $parent.Bounds -TriggerBounds $triggerBounds
         $script:ActiveAuxiliaryPopup = $Form
+        Initialize-AuxiliaryOwnerDimmer
+        $dimmer = [LenovoAuxiliaryOwnerDimmer]::new($parent)
+        # Show without activation before the child, which retains its normal
+        # modal ownership, z-order and focus even on overlapping placement.
+        $dimmer.Show($parent)
         $result = $Form.ShowDialog($parent)
         if ($result -eq [Windows.Forms.DialogResult]::OK) { return $Form.Tag.Choice }
         return $null
     }
     finally {
-        if ([object]::ReferenceEquals($script:ActiveAuxiliaryPopup,$Form)) { $script:ActiveAuxiliaryPopup = $null }
-        $Form.Dispose()
+        try { if ($dimmer) { $dimmer.Dispose() } }
+        finally {
+            if ([object]::ReferenceEquals($script:ActiveAuxiliaryPopup,$Form)) { $script:ActiveAuxiliaryPopup = $null }
+            $Form.Dispose()
+        }
     }
 }
 

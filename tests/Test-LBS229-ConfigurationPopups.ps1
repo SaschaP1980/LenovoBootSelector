@@ -10,6 +10,8 @@ using System.Runtime.InteropServices;
 public static class Lbs229Native {
     [DllImport("user32.dll")]
     public static extern bool IsWindowEnabled(IntPtr hWnd);
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetWindow(IntPtr hWnd, uint command);
 }
 '@
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
@@ -63,7 +65,7 @@ function Get-LocalizedString { param([string]$Key,$Values) Get-LocalizedStringCo
 function Get-OrderedEntriesForUi { return @($script:CurrentEntries) }
 function Get-EntryByGuid($Guid) { return ($script:CurrentEntries | Where-Object Guid -eq $Guid | Select-Object -First 1) }
 function Get-EntryDisplayTitle($Entry) { return [string]$Entry.Title }
-function Get-CurrentSystemFunctionsCapabilities { return [pscustomobject]@{ State=$(if ($script:Busy) {'Busy'} elseif ($script:Ready) {'Ready'} else {'Checking'});CanSetDefaultTarget=$script:Ready;IsChecking=(-not $script:Ready) } }
+function Get-CurrentSystemFunctionsCapabilities { return [pscustomobject]@{ State=$(if ($script:Busy) {'Busy'} elseif ($script:Ready) {'Ready'} else {'Checking'});CanSetDefaultTarget=$script:Ready;CanRefresh=$script:Ready;IsChecking=(-not $script:Ready) } }
 function Test-MaintenanceBusy { return $script:Busy }
 function Test-BootTargetDriftDetected { return $script:Drift }
 function Test-TaskBrokerReady { return $script:Ready }
@@ -202,6 +204,90 @@ try {
     $script:HeaderStatusLabel = $null
     $script:Locale = 'en-US'
     if ($correctionFailures.Count) { throw ("LBS229 correction RED: " + ($correctionFailures -join '; ')) }
+    # F07/F08: exercise real native glyph events and both modal lifetimes.
+    $secondFailures = [Collections.Generic.List[string]]::new()
+    function Test-Lbs229SecondCorrection([string]$Name,[scriptblock]$Action) {
+        try { & $Action; Write-Host "PASS LBS229 second correction $Name" }
+        catch { $secondFailures.Add("$Name : $_"); Write-Host "RED LBS229 second correction $Name : $_" }
+    }
+    function Invoke-Lbs229MouseEvent($Control,[string]$Method) {
+        $flags = [Reflection.BindingFlags]::Instance -bor [Reflection.BindingFlags]::NonPublic
+        [void]$Control.GetType().GetMethod($Method,$flags).Invoke($Control,@([EventArgs]::Empty))
+    }
+    function Test-Lbs229Above([IntPtr]$Upper,[IntPtr]$Lower) {
+        # GW_HWNDPREV walks toward the top of native z-order.
+        $h = $Lower
+        for ($i=0; $i -lt 512; $i++) {
+            $h = [Lbs229Native]::GetWindow($h,3)
+            if ($h -eq [IntPtr]::Zero) { return $false }
+            if ($h -eq $Upper) { return $true }
+        }
+        return $false
+    }
+    foreach ($kind in @('configuration','default')) {
+        $surface = if ($kind -eq 'configuration') { New-ConfigurationPopup } else { New-DefaultTargetPicker }
+        try {
+            Test-Lbs229SecondCorrection "F07 $kind close glyph hover" {
+                $close = $surface.Tag.Close
+                $idle = $close.ForeColor
+                Invoke-Lbs229MouseEvent $close 'OnMouseEnter'
+                Require-Lbs229Correction ($close.ForeColor -eq $script:ColorAccent -and $close.FlatAppearance.MouseOverBackColor -eq $close.BackColor -and $close.FlatAppearance.MouseDownBackColor -eq $close.BackColor) 'Close must turn red with unchanged background'
+                Invoke-Lbs229MouseEvent $close 'OnMouseLeave'
+                Require-Lbs229Correction ($close.ForeColor -eq $idle) 'Close restores idle glyph'
+            }
+            Test-Lbs229SecondCorrection "F08 $kind actual modal dimming and restoration" {
+                $originalBounds = $owner.Bounds
+                $originalOpacity = $owner.Opacity
+                $script:DimProbeError = $null
+                $script:DimProbeSeen = $false
+                $timer = New-Object Windows.Forms.Timer
+                $timer.Interval = 50
+                $timer.Add_Tick({
+                    param($sender,$eventArgs)
+                    $child = $script:ActiveAuxiliaryPopup
+                    if (-not $child -or -not $child.Visible) { return }
+                    $sender.Stop()
+                    try {
+                        $dim = @($owner.OwnedForms | Where-Object Name -eq 'AuxiliaryOwnerDimmer')
+                        Require-Lbs229Correction ($dim.Count -eq 1 -and $dim[0].Visible -and $dim[0].BackColor -eq [Drawing.Color]::Black -and $dim[0].Opacity -ge 0.25 -and $dim[0].Opacity -le 0.5) 'Expected one visible black translucent owner dimmer'
+                        Require-Lbs229Correction ($dim[0].Bounds -eq $owner.RectangleToScreen($owner.ClientRectangle) -and -not $dim[0].ShowInTaskbar -and $child.Opacity -eq 1.0 -and [Lbs229Native]::IsWindowEnabled($child.Handle) -and -not [Lbs229Native]::IsWindowEnabled($owner.Handle)) 'Dimmer must cover only owner client area; child remains opaque and enabled'
+                        Require-Lbs229Correction ((Test-Lbs229Above $dim[0].Handle $owner.Handle) -and (Test-Lbs229Above $child.Handle $dim[0].Handle)) 'Native z-order must keep the scrim above the owner and below the active child'
+                        $script:DimProbeSeen = $true
+                    } catch { $script:DimProbeError = $_ }
+                    finally { $child.Tag.Close.PerformClick() }
+                })
+                try {
+                    $timer.Start()
+                    [void](Show-OwnedAuxiliaryPopup -Form $surface -Owner $owner)
+                } finally { $timer.Stop(); $timer.Dispose() }
+                if ($script:DimProbeError) { throw $script:DimProbeError }
+                Require-Lbs229Correction ($script:DimProbeSeen -and @($owner.OwnedForms | Where-Object Name -eq 'AuxiliaryOwnerDimmer').Count -eq 0 -and $owner.Bounds -eq $originalBounds -and $owner.Opacity -eq $originalOpacity -and [Lbs229Native]::IsWindowEnabled($owner.Handle)) 'Owner must restore immediately without residual dimmer or geometry changes'
+            }
+        } finally { if (-not $surface.IsDisposed) { $surface.Dispose() } }
+    }
+    Test-Lbs229SecondCorrection 'F07 main refresh glyph background and hover' {
+        $rootPanel = New-Object Windows.Forms.Panel
+        try {
+            Add-PopupHeaderSection -Root $rootPanel
+            $refresh = $script:RefreshButton
+            Require-Lbs229Correction ($refresh.FlatAppearance.MouseOverBackColor -eq $refresh.BackColor -and $refresh.FlatAppearance.MouseDownBackColor -eq $refresh.BackColor) 'Refresh hover and press must preserve header background'
+            Invoke-Lbs229MouseEvent $refresh 'OnMouseEnter'
+            Require-Lbs229Correction ($refresh.ForeColor -eq $script:ColorAccent) 'Refresh hover glyph must use existing accent'
+            Invoke-Lbs229MouseEvent $refresh 'OnMouseLeave'
+            Require-Lbs229Correction ($refresh.ForeColor -eq $script:ColorSecondary) 'Refresh idle glyph restores'
+        } finally { $rootPanel.Dispose(); $script:RefreshButton = $null; $script:HeaderStatusLabel = $null }
+    }
+    Test-Lbs229SecondCorrection 'F08 failed modal show restores owner' {
+        $invalid = New-ConfigurationPopup
+        $invalid.Enabled = $false
+        $failed = $false
+        try {
+            try { [void](Show-OwnedAuxiliaryPopup -Form $invalid -Owner $owner) }
+            catch { $failed = $true }
+            Require-Lbs229Correction ($failed -and $invalid.IsDisposed -and -not $script:ActiveAuxiliaryPopup -and @($owner.OwnedForms | Where-Object Name -eq 'AuxiliaryOwnerDimmer').Count -eq 0 -and [Lbs229Native]::IsWindowEnabled($owner.Handle)) 'Failed ShowDialog must release scrim, child and modal guard'
+        } finally { if (-not $invalid.IsDisposed) { $invalid.Dispose() } }
+    }
+    if ($secondFailures.Count) { throw ("LBS229 second correction RED: " + ($secondFailures -join '; ')) }
     if ($CorrectionProbeOnly) { return }
 
     $p=Get-AuxiliaryPopupLocation $area $anchor $size
@@ -291,7 +377,11 @@ try {
             if (-not $active -or -not $active.Visible) { return }
             $sender.Stop()
             $script:ModalObserved=$true
-            try { & $script:ModalAction $active }
+            try {
+                $dim = @($owner.OwnedForms | Where-Object Name -eq 'AuxiliaryOwnerDimmer')
+                Require-Lbs229Correction ($dim.Count -eq 1 -and $dim[0].Visible -and (Test-Lbs229Above $active.Handle $dim[0].Handle)) 'Existing modal route must keep owner dimmed below child'
+                & $script:ModalAction $active
+            }
             catch { $script:ModalError=$_ }
             finally { if ($active.DialogResult -eq [Windows.Forms.DialogResult]::None) { $active.DialogResult=[Windows.Forms.DialogResult]::Cancel } }
         })
@@ -301,7 +391,7 @@ try {
             else { Show-ConfigurationPopup -Owner $owner }
         } finally { $timer.Stop(); $timer.Dispose() }
         if ($script:ModalError) { throw $script:ModalError }
-        Assert-Lbs229 "$Kind modal actually shown, ownership released" ($script:ModalObserved -and -not $script:ActiveAuxiliaryPopup -and $owner.Visible -and [Lbs229Native]::IsWindowEnabled($owner.Handle))
+        Assert-Lbs229 "$Kind modal actually shown, ownership released" ($script:ModalObserved -and -not $script:ActiveAuxiliaryPopup -and $owner.Visible -and [Lbs229Native]::IsWindowEnabled($owner.Handle) -and @($owner.OwnedForms | Where-Object Name -eq 'AuxiliaryOwnerDimmer').Count -eq 0)
     }
     Invoke-Lbs229Modal 'configuration' {
         param($active)

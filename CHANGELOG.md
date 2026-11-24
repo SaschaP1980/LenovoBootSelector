@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.15.2 – Modal owner dimming and glyph-only header feedback (LBS-229 Hotfix)
+
+- Dim the main popup uniformly with an owner-local black translucent layer while either auxiliary modal is open; retain the fully opaque active child, native modal admission and unchanged parent/child geometry. Dispose the layer on every modal exit.
+- Remove hover and pressed background boxes from both auxiliary close glyphs and the main refresh glyph; use red glyph feedback while retaining native keyboard focus and active refresh semantics.
+- Extend focused native WinForms regression coverage for both modal lifetimes, owner restoration and glyph states. No connector/notch or other UX backlog change.
+
 ## v1.5.15.1 – Anchor configuration popups and distinguish refresh status (LBS-229 Hotfix)
 
 - Anchor auxiliary popups to their full initiating navigation rows; retain owner-monitor side preference and clamp, and unify Further settings and Default hover and keyboard activation.
