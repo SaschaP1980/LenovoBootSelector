@@ -2367,7 +2367,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.15.2'
+$script:AppVersion = '1.5.15.3'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -12480,6 +12480,19 @@ function Load-BootStateFromExistingCache {
 # Lenovo Boot Selector - popup section composition.
 # Domain-specific WinForms builders extracted from New-PopupForm by LBS-29.
 
+# Keep native Button rendering for every active-owner state. This overlay
+# is presentation-only and exists only for the auxiliary modal lifetime.
+function Paint-ModalOwnerRefreshGlyph {
+    param([Windows.Forms.Button]$Button,[Windows.Forms.PaintEventArgs]$EventArgs)
+    if (-not $script:ActiveAuxiliaryPopup) { return }
+    $brush = [Drawing.SolidBrush]::new($Button.BackColor)
+    try { $EventArgs.Graphics.FillRectangle($brush,$Button.ClientRectangle) }
+    finally { $brush.Dispose() }
+    $flags = [Windows.Forms.TextFormatFlags]::HorizontalCenter -bor [Windows.Forms.TextFormatFlags]::VerticalCenter -bor [Windows.Forms.TextFormatFlags]::SingleLine -bor [Windows.Forms.TextFormatFlags]::NoPrefix
+    $ink = if ($Button.Enabled) { $Button.ForeColor } else { [Drawing.SystemColors]::GrayText }
+    [Windows.Forms.TextRenderer]::DrawText($EventArgs.Graphics,$Button.Text,$Button.Font,$Button.ClientRectangle,$ink,$flags)
+}
+
 function Add-PopupHeaderSection {
     param([Parameter(Mandatory=$true)]$Root)
 
@@ -12548,6 +12561,10 @@ function Add-PopupHeaderSection {
     $refresh.Size = New-Object Drawing.Size(34, 34)
     $refresh.Cursor = [System.Windows.Forms.Cursors]::Hand
     $script:RefreshButton = $refresh
+    # Native flat buttons can retain their default/focus outline while the
+    # top-level owner is disabled by ShowDialog. Keep the real Button and its
+    # native painting for the active owner; redraw only the inactive glyph.
+    $refresh.Add_Paint({ param($sender,$eventArgs) Paint-ModalOwnerRefreshGlyph -Button $sender -EventArgs $eventArgs })
     $refresh.Add_MouseEnter({
         $script:RefreshButtonHovered = $true
         Update-RefreshButtonVisual
@@ -13733,6 +13750,7 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
 function Show-OwnedAuxiliaryPopup {
     param([System.Windows.Forms.Form]$Form,[System.Windows.Forms.Control]$Owner)
     $dimmer = $null
+    $ownerRefreshButton = $null
     try {
         if ($script:ActiveAuxiliaryPopup -or -not $Owner -or $Owner.IsDisposed) { return $null }
         $parent = $Owner.FindForm()
@@ -13742,6 +13760,10 @@ function Show-OwnedAuxiliaryPopup {
         $triggerBounds = $Owner.RectangleToScreen($Owner.ClientRectangle)
         Set-AuxiliaryPopupLayout -Form $Form -Scale ([double]$scale) -WorkingArea $screen.WorkingArea -OwnerBounds $parent.Bounds -TriggerBounds $triggerBounds
         $script:ActiveAuxiliaryPopup = $Form
+        if ($script:RefreshButton -and -not $script:RefreshButton.IsDisposed -and [object]::ReferenceEquals($script:RefreshButton.FindForm(),$parent)) {
+            $ownerRefreshButton = $script:RefreshButton
+            $ownerRefreshButton.Refresh()
+        }
         Initialize-AuxiliaryOwnerDimmer
         $dimmer = [LenovoAuxiliaryOwnerDimmer]::new($parent)
         # Show without activation before the child, which retains its normal
@@ -13755,7 +13777,8 @@ function Show-OwnedAuxiliaryPopup {
         try { if ($dimmer) { $dimmer.Dispose() } }
         finally {
             if ([object]::ReferenceEquals($script:ActiveAuxiliaryPopup,$Form)) { $script:ActiveAuxiliaryPopup = $null }
-            $Form.Dispose()
+            try { $Form.Dispose() }
+            finally { if ($ownerRefreshButton -and -not $ownerRefreshButton.IsDisposed) { $ownerRefreshButton.Refresh() } }
         }
     }
 }

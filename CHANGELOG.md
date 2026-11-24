@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.15.3 – Suppress inactive Refresh outline during auxiliary modals (LBS-229 Hotfix)
+
+- Suppress the native Refresh focus/default outline only while either owned auxiliary modal is active, preserving the glyph, native Button behavior and normal active-owner focus rendering.
+- Repaint the exact owner Refresh control at modal entry and cleanup, including failed modal start; retain the accepted dimmer, hover, layout and action semantics.
+- Add focused WinForms bitmap regression checks for both real modal paths and native active-painter restoration.
+
 ## v1.5.15.2 – Modal owner dimming and glyph-only header feedback (LBS-229 Hotfix)
 
 - Dim the main popup uniformly with an owner-local black translucent layer while either auxiliary modal is open; retain the fully opaque active child, native modal admission and unchanged parent/child geometry. Dispose the layer on every modal exit.
