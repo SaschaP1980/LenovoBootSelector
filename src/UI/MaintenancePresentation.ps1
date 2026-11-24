@@ -166,12 +166,12 @@ function Update-MaintenanceUi {
 function Show-MaintenanceSuccessDialog {
     param([Parameter(Mandatory=$true)][ValidateSet('Setup','Repair','Migrate','Reinitialize','Remove')][string]$Mode)
     if ($Mode -eq 'Remove') {
-        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Maintenance.SuccessRemovedTitle') -Heading (Get-LocalizedString -Key 'Maintenance.SuccessRemovedHeading') -Message (Get-LocalizedString -Key 'Maintenance.SuccessRemovedMessage') -Kind Info
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Maintenance.SuccessRemovedTitle') -Heading (Get-LocalizedString -Key 'Maintenance.SuccessRemovedHeading') -Message (Get-LocalizedString -Key 'Maintenance.SuccessRemovedMessage') -Kind Success
         return
     }
     if ($Mode -eq 'Reinitialize') {
-        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Maintenance.SuccessReinitializedTitle') -Heading (Get-LocalizedString -Key 'Maintenance.SuccessReinitializedHeading') -Message (Get-LocalizedString -Key 'Maintenance.SuccessReinitializedMessage') -Kind Info
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Maintenance.SuccessReinitializedTitle') -Heading (Get-LocalizedString -Key 'Maintenance.SuccessReinitializedHeading') -Message (Get-LocalizedString -Key 'Maintenance.SuccessReinitializedMessage') -Kind Success
         return
     }
-    Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Maintenance.SuccessReadyTitle') -Heading (Get-LocalizedString -Key 'Maintenance.SuccessReadyHeading') -Message (Get-LocalizedString -Key 'Maintenance.SuccessReadyMessage') -Kind Info
+    Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Maintenance.SuccessReadyTitle') -Heading (Get-LocalizedString -Key 'Maintenance.SuccessReadyHeading') -Message (Get-LocalizedString -Key 'Maintenance.SuccessReadyMessage') -Kind Success
 }

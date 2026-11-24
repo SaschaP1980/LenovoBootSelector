@@ -1,7 +1,10 @@
 {
   "schemaVersion": 2,
-  "version": "1.5.17.4",
+  "version": "1.5.18.0",
   "releaseProfile": "patch",
-  "protectedFragmentIntent": [],
+  "protectedFragmentIntent": [
+    "ps:Save-RuntimeDiagnosticsFromUi",
+    "ps:Show-LenovoNoticeDialog"
+  ],
   "repositoryDeleteIntent": []
 }
