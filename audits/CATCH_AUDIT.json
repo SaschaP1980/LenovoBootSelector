@@ -1,5 +1,5 @@
 {
-  "version": "1.5.12.1",
+  "version": "1.5.13.0",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
@@ -14,7 +14,7 @@
     "self_repair_best_effort",
     "telemetry_best_effort"
   ],
-  "count": 149,
+  "count": 151,
   "entries": [
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
@@ -480,7 +480,7 @@
     },
     {
       "source": "src/Core/Localization.ps1",
-      "line": 670,
+      "line": 674,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { $text = $text -f @($Arguments) } catch { }"
@@ -690,126 +690,140 @@
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 901,
+      "line": 921,
+      "category": "presentation_best_effort",
+      "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
+      "code": "try { Hide-DarkActionTooltip } catch { }"
+    },
+    {
+      "source": "src/UI/BootEntryRows.ps1",
+      "line": 983,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleName) } catch { }"
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 907,
+      "line": 989,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { Hide-DarkActionTooltip } catch { }"
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 917,
+      "line": 999,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { Hide-DarkActionTooltip } catch { }"
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 924,
+      "line": 1006,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { Hide-DarkActionTooltip } catch { }"
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 929,
+      "line": 1011,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { Hide-DarkActionTooltip } catch { }"
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 944,
-      "category": "presentation_best_effort",
-      "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
-      "code": "} catch { }"
-    },
-    {
-      "source": "src/UI/BootEntryRows.ps1",
-      "line": 951,
-      "category": "presentation_best_effort",
-      "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
-      "code": "} catch { }"
-    },
-    {
-      "source": "src/UI/BootEntryRows.ps1",
-      "line": 959,
-      "category": "presentation_best_effort",
-      "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
-      "code": "} catch { }"
-    },
-    {
-      "source": "src/UI/BootEntryRows.ps1",
-      "line": 1191,
+      "line": 1024,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleDescription) } catch { }"
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 1197,
+      "line": 1039,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
-      "code": "try { Hide-DarkActionTooltip } catch { }"
+      "code": "} catch { }"
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 1213,
+      "line": 1047,
+      "category": "presentation_best_effort",
+      "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
+      "code": "} catch { }"
+    },
+    {
+      "source": "src/UI/BootEntryRows.ps1",
+      "line": 1056,
+      "category": "presentation_best_effort",
+      "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
+      "code": "} catch { }"
+    },
+    {
+      "source": "src/UI/BootEntryRows.ps1",
+      "line": 1297,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleDescription) } catch { }"
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 1219,
+      "line": 1303,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { Hide-DarkActionTooltip } catch { }"
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 1223,
+      "line": 1319,
+      "category": "presentation_best_effort",
+      "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
+      "code": "try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleDescription) } catch { }"
+    },
+    {
+      "source": "src/UI/BootEntryRows.ps1",
+      "line": 1325,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { Hide-DarkActionTooltip } catch { }"
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 1258,
+      "line": 1329,
+      "category": "presentation_best_effort",
+      "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
+      "code": "try { Hide-DarkActionTooltip } catch { }"
+    },
+    {
+      "source": "src/UI/BootEntryRows.ps1",
+      "line": 1364,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { Show-DarkActionTooltip -Owner $sender -Text (Get-LocalizedString -Key 'Manage.ReorderHint') } catch { }"
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 1264,
+      "line": 1370,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { Hide-DarkActionTooltip } catch { }"
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 1269,
+      "line": 1375,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { Hide-DarkActionTooltip } catch { }"
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 1578,
+      "line": 1684,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "} catch { }"
     },
     {
       "source": "src/UI/BootEntryRows.ps1",
-      "line": 1580,
+      "line": 1686,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "$icon.Add_MouseLeave({ param($sender, $eventArgs) try { $script:BootTypeToolTip.Hide($sender) } catch { } })"
