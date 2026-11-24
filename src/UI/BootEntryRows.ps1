@@ -764,6 +764,8 @@ function New-BootEntryInteractionHandlers {
         $script:ManageDragGuid = $null
         $script:ManageLastDragUtc = [datetime]::UtcNow
         $script:ManageActiveDragGuid = ([string]$guid).ToLowerInvariant()
+        # LBS-221: close action help before capturing the row or entering OLE drag.
+        try { Hide-DarkActionTooltip } catch { }
         $sourceRow = Get-BootRowFromControl $sender
         if ($sourceRow) { Start-ManageDragReflow -SourceRow $sourceRow }
         try { [void]$sender.DoDragDrop($guid, [System.Windows.Forms.DragDropEffects]::Move) }
@@ -1117,12 +1119,18 @@ $state.AccessibleDescription = if ($isHidden) { Get-LocalizedString -Key 'Manage
 $state.Location = New-Object Drawing.Point(286, 12)
 $state.Size = New-Object Drawing.Size(32, 34)
 $state.BackColor = [Drawing.Color]::Transparent
+$state.ForeColor = if ($isHidden) { [Drawing.Color]::FromArgb(115,115,115) } else { $script:ColorAccent }
 $state.Cursor = [System.Windows.Forms.Cursors]::Hand
 $state.AllowDrop = $true
 $state.Add_Paint({
     param($sender,$eventArgs)
     $hidden = ([string]$sender.AccessibleName -eq 'hidden')
-    $color = if ($hidden) { [Drawing.Color]::FromArgb(115,115,115) } else { $script:ColorAccent }
+    $hover = -not $script:ManageActiveDragGuid -and ($sender.ForeColor -eq [Drawing.Color]::FromArgb(160,160,160) -or $sender.ForeColor -eq [Drawing.Color]::FromArgb(255,110,102))
+    $color = if ($hidden) {
+        if ($hover) { [Drawing.Color]::FromArgb(160,160,160) } else { [Drawing.Color]::FromArgb(115,115,115) }
+    } else {
+        if ($hover) { [Drawing.Color]::FromArgb(255,110,102) } else { $script:ColorAccent }
+    }
     $geometry = Get-LenovoManageEyeGlyphGeometry -ClientSize $sender.ClientSize -Dpi $eventArgs.Graphics.DpiX
     $eventArgs.Graphics.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $pen = New-Object Drawing.Pen($color, $geometry.Stroke)
@@ -1144,10 +1152,15 @@ $state.Add_Paint({
 })
 $state.Add_MouseEnter({
     param($sender,$eventArgs)
+    if ($script:ManageActiveDragGuid) { return }
+    $sender.ForeColor = if ($sender.AccessibleName -eq 'hidden') { [Drawing.Color]::FromArgb(160,160,160) } else { [Drawing.Color]::FromArgb(255,110,102) }
+    $sender.Invalidate()
     try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleDescription) } catch { }
 })
 $state.Add_MouseLeave({
     param($sender,$eventArgs)
+    $sender.ForeColor = if ($sender.AccessibleName -eq 'hidden') { [Drawing.Color]::FromArgb(115,115,115) } else { $script:ColorAccent }
+    $sender.Invalidate()
     try { Hide-DarkActionTooltip } catch { }
 })
 $row.Controls.Add($state)
@@ -1161,6 +1174,7 @@ $editAlias.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
 $editAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
 $editAlias.Add_MouseEnter({
     param($sender,$eventArgs)
+    if ($script:ManageActiveDragGuid) { return }
     $sender.ForeColor = $script:ColorAccent
     Set-RowHoverState $sender $true
     try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleDescription) } catch { }
@@ -1195,11 +1209,32 @@ $grip.Tag = $entry.Guid
 $grip.Location = New-Object Drawing.Point(350, 12)
 $grip.Size = New-Object Drawing.Size(26, 34)
 $grip.BackColor = [Drawing.Color]::Transparent
+$grip.ForeColor = [Drawing.Color]::FromArgb(145,145,145)
 $grip.Cursor = [System.Windows.Forms.Cursors]::SizeAll
 $grip.AllowDrop = $true
 $grip.Add_Paint({
     param($sender,$eventArgs)
-    Paint-LenovoManageGripGlyph -Graphics $eventArgs.Graphics -ClientSize $sender.ClientSize -Color ([Drawing.Color]::FromArgb(145,145,145))
+    $color = if ($script:ManageActiveDragGuid) { [Drawing.Color]::FromArgb(145,145,145) } else { $sender.ForeColor }
+    Paint-LenovoManageGripGlyph -Graphics $eventArgs.Graphics -ClientSize $sender.ClientSize -Color $color
+})
+$grip.Add_MouseEnter({
+    param($sender,$eventArgs)
+    if ($script:ManageActiveDragGuid) { return }
+    $sender.ForeColor = [Drawing.Color]::FromArgb(220,220,220)
+    $sender.Invalidate()
+    try { Show-DarkActionTooltip -Owner $sender -Text (Get-LocalizedString -Key 'Manage.ReorderHint') } catch { }
+})
+$grip.Add_MouseLeave({
+    param($sender,$eventArgs)
+    $sender.ForeColor = [Drawing.Color]::FromArgb(145,145,145)
+    $sender.Invalidate()
+    try { Hide-DarkActionTooltip } catch { }
+})
+$grip.Add_MouseDown({
+    param($sender,$eventArgs)
+    if ($eventArgs.Button -eq [Windows.Forms.MouseButtons]::Left) {
+        try { Hide-DarkActionTooltip } catch { }
+    }
 })
 $row.Controls.Add($grip)
 

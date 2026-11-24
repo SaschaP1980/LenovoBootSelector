@@ -35,6 +35,11 @@ $bootRowStateProbe = Join-Path $root 'tests\Test-LBS217-RowState.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $bootRowStateProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-217 native boot row state semantics regression failed' }
 
+# LBS-221: isolated native Manage action hover and drag-safe dark hint routing.
+$manageHoverProbe = Join-Path $root 'tests\Test-LBS221-ManageHover.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $manageHoverProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-221 native Manage hover regression failed' }
+
 # LBS-215: isolate native Manage grip click routing and unchanged drag admission.
 $gripClickProbe = Join-Path $root 'tests\Test-LBS215-GripClick.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $gripClickProbe
