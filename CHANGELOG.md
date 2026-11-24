@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.13.1 – Distinguish alias cue from entered text (LBS-224 Hotfix)
+
+- Render the existing cue in italic Segoe UI at the existing point size, with muted blue-gray #8FA6BF instead of neutral gray. Actual alias text remains regular and unchanged.
+- Own and dispose the separate cue font without touching the editor font; retain existing DPI scaling, cue behavior, geometry, tooltip, input, fallback and draft semantics.
+- Extend the focused native alias-cue suite to 114 assertions, including actual chromatic screen raster and italic/regular distinction across DE/EN and synthetic 96/240 DPI.
+
 ## v1.5.13.0 – Alias editor contextual original-name cue (LBS-224)
 
 - Replace the permanent right-side original-name hint with a localized cue inside the empty alias field and a contextual dark field tooltip. Use a nonselectable hit-transparent label after native EDIT cue contrast proved insufficient on the dark field.
