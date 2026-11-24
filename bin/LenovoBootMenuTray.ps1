@@ -2367,7 +2367,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.17.3'
+$script:AppVersion = '1.5.17.4'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -6316,12 +6316,19 @@ function Show-LenovoOwnedDialog {
     param([Windows.Forms.Form]$Form,[Windows.Forms.Form]$Owner)
     $previous = $script:ActiveOwnedDialog
     $dimmer = $null
+    $auxiliaryOwner = $null
+    $returnFocus = $null
+    if ($Owner -and -not $Owner.IsDisposed -and [object]::ReferenceEquals($Owner,$script:ActiveAuxiliaryPopup)) {
+        $auxiliaryOwner = $Owner
+        $returnFocus = $Owner.Tag.Body.Controls | Where-Object { $_.Focused } | Select-Object -First 1
+    }
     $script:ActiveOwnedDialog = $Form
     try {
         if ($Owner -and -not $Owner.IsDisposed -and $Owner.Visible) {
             # The main owner's existing scrim remains alive; dim the immediate
             # modal owner only, without a navigation cutout or connector.
             if ($script:ActiveAuxiliaryPopup) {
+                if ($auxiliaryOwner) { $auxiliaryOwner.Tag.Close.Refresh() }
                 Initialize-AuxiliaryOwnerDimmer
                 $dimmer = [LenovoAuxiliaryOwnerDimmer]::new($Owner,$null,$Form,1.0,$script:ColorHover,$script:ColorAccent)
                 $dimmer.Show($Owner)
@@ -6332,7 +6339,15 @@ function Show-LenovoOwnedDialog {
     }
     finally {
         try { if ($dimmer) { $dimmer.Dispose() } }
-        finally { $script:ActiveOwnedDialog = $previous }
+        finally {
+            $script:ActiveOwnedDialog = $previous
+            if ($auxiliaryOwner -and -not $auxiliaryOwner.IsDisposed -and $auxiliaryOwner.Visible -and
+                [object]::ReferenceEquals($auxiliaryOwner,$script:ActiveAuxiliaryPopup)) {
+                if ($returnFocus -and -not $returnFocus.IsDisposed -and $returnFocus.CanFocus -and
+                    $auxiliaryOwner.ContainsFocus) { [void]$returnFocus.Focus() }
+                $auxiliaryOwner.Tag.Close.Refresh()
+            }
+        }
     }
 }
 
@@ -13109,6 +13124,22 @@ function New-AuxiliaryPopupForm {
     $close.FlatAppearance.MouseOverBackColor = $script:ColorHeader
     $close.FlatAppearance.MouseDownBackColor = $script:ColorHeader
     $close.UseVisualStyleBackColor = $false
+    # The close button remains a native keyboard-accessible CancelButton.
+    # Native default/focus ink must not survive on an inactive modal owner.
+    $close.Add_Paint({
+        param($sender,$eventArgs)
+        if ([Windows.Forms.SystemInformation]::HighContrast) { return }
+        $form = $sender.FindForm()
+        if (-not $form) { return }
+        if ($sender.Focused -and $form.ContainsFocus -and -not $script:ActiveOwnedDialog) { return }
+        $background = New-Object Drawing.SolidBrush($sender.BackColor)
+        try { $eventArgs.Graphics.FillRectangle($background,$sender.ClientRectangle) }
+        finally { $background.Dispose() }
+        $flags = [Windows.Forms.TextFormatFlags]::HorizontalCenter -bor [Windows.Forms.TextFormatFlags]::VerticalCenter -bor [Windows.Forms.TextFormatFlags]::SingleLine -bor [Windows.Forms.TextFormatFlags]::NoPrefix -bor [Windows.Forms.TextFormatFlags]::PreserveGraphicsClipping
+        [Windows.Forms.TextRenderer]::DrawText($eventArgs.Graphics,$sender.Text,$sender.Font,$sender.ClientRectangle,$sender.ForeColor,$flags)
+    })
+    $close.Add_GotFocus({ $this.Invalidate() })
+    $close.Add_LostFocus({ $this.Invalidate() })
     $close.Add_MouseEnter({ param($sender,$eventArgs) $sender.ForeColor = $script:ColorAccent })
     $close.Add_MouseLeave({ param($sender,$eventArgs) $sender.ForeColor = $script:ColorPrimary })
     $close.Location = [Drawing.Point]::new(350,7)
@@ -13202,6 +13233,21 @@ function Test-ConfigurationActionAvailable {
 
 function Update-ConfigurationPopupPresentation {
     param([System.Windows.Forms.Form]$Form)
+    # Move focus before disabling the current action. WinForms would otherwise
+    # fall through to the header's CancelButton when the final row is disabled.
+    # Do not move an explicitly selected close button or focus in another window.
+    if ($Form.ContainsFocus) {
+        $focused = $Form.Tag.Body.Controls | Where-Object { $_.Focused } | Select-Object -First 1
+        if ($focused -and $focused.Tag -and -not (Test-ConfigurationActionAvailable -Action ([string]$focused.Tag))) {
+            $eligible = @($Form.Tag.Body.Controls | Where-Object {
+                $_.TabStop -and $_.CanFocus -and $_.Tag -and
+                (Test-ConfigurationActionAvailable -Action ([string]$_.Tag))
+            } | Sort-Object TabIndex)
+            $target = $eligible | Where-Object { $_.TabIndex -gt $focused.TabIndex } | Select-Object -First 1
+            if (-not $target) { $target = $eligible | Select-Object -Last 1 }
+            if ($target) { [void]$target.Focus() }
+        }
+    }
     foreach ($control in $Form.Tag.Body.Controls) {
         $action = [string]$control.Tag
         if (-not $action) { continue }

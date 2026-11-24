@@ -704,6 +704,72 @@ try {
         }
     } finally { $nativeOwner.Dispose() }
     Assert-Lbs229 'LBS233 modal visual probes dispatch no action' ($script:Actions.Count -eq 3 -and $script:DefaultCalls.Count -eq 2 -and $script:BootCalls -eq 0)
+    # LBS-233 focus regression: model the actual async upload state without network.
+    $script:Busy=$false
+    Invoke-Lbs229Modal 'configuration' {
+        param($active)
+        $upload=$active.Tag.Body.Controls['ConfigurationAction-diagnostics-upload']
+        [void]$upload.Focus()
+        Assert-Lbs229 'upload action holds keyboard focus before disabling' ($upload.Focused)
+        $script:DiagnosticsUploadMenuItem.Enabled=$false
+        try {
+            Update-ConfigurationPopupPresentation -Form $active
+            Assert-Lbs229 'disabled final action hands focus to eligible body control, never close glyph' (-not $upload.Enabled -and $active.Tag.Body.ContainsFocus -and -not $active.Tag.Close.Focused)
+        } finally { $script:DiagnosticsUploadMenuItem.Enabled=$true }
+        Update-ConfigurationPopupPresentation -Form $active
+        # Check restoration on the same real owned window using a content control.
+        [void]$upload.Focus()
+        $restore=New-Object Windows.Forms.Form
+        $restore.Add_Shown({ $this.DialogResult=[Windows.Forms.DialogResult]::Cancel })
+        try {
+            [void](Show-LenovoOwnedDialog -Form $restore -Owner $active)
+            Assert-Lbs229 'nested notice restores eligible originating body focus' ($upload.Focused -and $active.Visible -and -not $active.Tag.Close.Focused)
+        } finally { $restore.Dispose() }
+        # Force the legitimate keyboard close focus; inactive rendering must
+        # still suppress its outline while a nested notice owns the window.
+        [void]$active.Tag.Close.Focus()
+        Assert-Lbs229 'close button remains keyboard focusable and CancelButton' ($active.Tag.Close.Focused -and $active.Tag.Close.TabStop -and $active.CancelButton -eq $active.Tag.Close)
+        $notice=New-Object Windows.Forms.Form
+        $notice.ShowInTaskbar=$false
+        $notice.TopMost=$true
+        $script:FocusNoticeError=$null
+        $notice.Add_Shown({
+            param($sender,$eventArgs)
+            try {
+                $parent=$script:ActiveAuxiliaryPopup
+                $close=$parent.Tag.Close
+                $bitmap=[Drawing.Bitmap]::new($close.Width,$close.Height)
+                try {
+                    $close.DrawToBitmap($bitmap,$close.ClientRectangle)
+                    $background=$close.BackColor.ToArgb()
+                    $edgeInk=0
+                    for ($x=0;$x -lt $bitmap.Width;$x++) {
+                        foreach ($y in @(0,1,($bitmap.Height-2),($bitmap.Height-1))) {
+                            if ($bitmap.GetPixel($x,$y).ToArgb() -ne $background) { $edgeInk++ }
+                        }
+                    }
+                    for ($y=2;$y -lt $bitmap.Height-2;$y++) {
+                        foreach ($x in @(0,1,($bitmap.Width-2),($bitmap.Width-1))) {
+                            if ($bitmap.GetPixel($x,$y).ToArgb() -ne $background) { $edgeInk++ }
+                        }
+                    }
+                    $glyphInk=0
+                    for ($x=2;$x -lt $bitmap.Width-2;$x++) {
+                        for ($y=2;$y -lt $bitmap.Height-2;$y++) {
+                            if ($bitmap.GetPixel($x,$y).ToArgb() -ne $background) { $glyphInk++ }
+                        }
+                    }
+                    Require-Lbs229Correction ($edgeInk -eq 0 -and $glyphInk -gt 0) "Inactive close glyph must retain X without outline: edge ink=$edgeInk glyph ink=$glyphInk"
+                } finally { $bitmap.Dispose() }
+            } catch { $script:FocusNoticeError=$_ }
+            finally { $sender.DialogResult=[Windows.Forms.DialogResult]::Cancel }
+        })
+        try {
+            [void](Show-LenovoOwnedDialog -Form $notice -Owner $active)
+            if ($script:FocusNoticeError) { throw $script:FocusNoticeError }
+            Assert-Lbs229 'nested notice closes with no inactive close outline' ($active.Visible -and -not $script:ActiveOwnedDialog)
+        } finally { $notice.Dispose() }
+    }
     # Exercise every remaining settings action without real privileged/network effects.
     $script:Busy=$false
     $script:UpdateInstallMenuItem.Enabled=$true
