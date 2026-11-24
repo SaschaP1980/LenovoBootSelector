@@ -481,6 +481,16 @@ Multiple workflow runs on the same release branch are acceptable during correcti
 - Run #18 succeeded.
 - Exactly one publication PR (#28), one `v0.6.3.0` tag and one merge were produced.
 
+### v1.5.17.0 verified recovery after PR/tag creation (LBS-233)
+
+The original [release run 45398684565](https://github.com/SaschaP1980/LenovoBootSelector/actions/runs/45398684565) failed before activation: the combined-status response omitted `release/tag` even though a later exact-head read returned all eight successful contexts. Delayed visibility is consistent with the evidence; its precise cause is unproven. Main and the public pointer were unchanged, but the publication PR and annotated source tag already existed.
+
+Do not blindly rerun the normal orchestrator in this state: it rejects an existing tag. Do not replace the tag, recreate the PR, publish a parallel release, or merge merely because a later status read is green.
+
+With explicit owner continuation, [one-shot recovery run 45400486677](https://github.com/SaschaP1980/LenovoBootSelector/actions/runs/45400486677) used an isolated operations-only ref, not another release branch. It pinned the existing main, candidate, final PR head, work SHA, tag object and source commit; rebuilt both packages twice at the original publication timestamp; matched the original hashes, sizes, source tree and full PR tree; verified historical ZIP integrity and reran the permanent validators. The unchanged canonical pre-activation helper rejected an intentionally wrong base before passing on the exact real base. Only then did it squash-merge the existing PR with a head-match guard, remove the existing release/work refs, run the unchanged final verifier, dispatch the trusted Worker workflow and remove the temporary recovery ref. The original tag and publication content were preserved. Final verification and the separate [Worker health-only run](https://github.com/SaschaP1980/LenovoBootSelector/actions/runs/45400560863) both passed. Full evidence: [LBS-233 rolling recovery record](https://github.com/SaschaP1980/LenovoBootSelector/issues/233#issuecomment-7131798548).
+
+This is a verified historical recovery, not a generic executable resume feature or authorization to bypass a gate. A permanent bounded status-visibility retry and tested, fail-closed post-PR/tag resume mechanism remain separate potential engineering improvements. Any future recovery must reconcile its own exact state, preserve immutable artifacts, fail closed on mismatches, and obtain fresh canonical pre-activation and final-verification evidence.
+
 ## Post-release verification checklist
 
 Do not declare a release complete until all relevant items are verified:

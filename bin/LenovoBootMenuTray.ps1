@@ -2367,7 +2367,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.17.0'
+$script:AppVersion = '1.5.17.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -12688,12 +12688,18 @@ function Test-PopupNavigationRowInteractive {
     return (-not (Test-MaintenanceBusy))
 }
 
+# Shared by pointer hover and the modal-owner highlight; other UI hover colors
+# intentionally retain their existing palette.
+function Get-PopupNavigationHoverColor {
+    return [Drawing.Color]::FromArgb(48,48,48)
+}
+
 function Set-PopupNavigationRowHover {
     param([Windows.Forms.Control]$Control,[bool]$Hover)
     $row = Get-PopupNavigationRow -Control $Control
     if (-not $row -or $row.IsDisposed) { return }
     $inside = $Hover -or ($row.Visible -and $row.RectangleToScreen($row.ClientRectangle).Contains([Windows.Forms.Cursor]::Position))
-    $row.BackColor = if ($inside -and (Test-PopupNavigationRowInteractive -Row $row)) { [Drawing.Color]::FromArgb(38,38,38) } else { $script:ColorSurface }
+    $row.BackColor = if ($inside -and (Test-PopupNavigationRowInteractive -Row $row)) { Get-PopupNavigationHoverColor } else { $script:ColorSurface }
 }
 
 function Invoke-PopupNavigationRow {
@@ -13029,6 +13035,7 @@ function New-AuxiliaryPopupForm {
     $tip.ShowAlways = $true
     $header = New-Object Windows.Forms.Panel
     $header.Name = 'AuxiliaryHeader'
+    $header.TabIndex = 1
     $header.BackColor = $script:ColorHeader
     $header.Size = [Drawing.Size]::new(390,64)
     $titleLabel = New-Label -Text $Title -Font $large -ForeColor $script:ColorPrimary -X 16 -Y 7 -Width 318 -Height 26
@@ -13058,11 +13065,17 @@ function New-AuxiliaryPopupForm {
     $form.Controls.Add($header)
     $body = New-Object Windows.Forms.Panel
     $body.Name = 'AuxiliaryBody'
+    $body.TabIndex = 0
     $body.Location = [Drawing.Point]::new(0,64)
     $body.Size = [Drawing.Size]::new(390,$form.ClientSize.Height-64)
     $form.Controls.Add($body)
     $form.CancelButton = $close
-    $form.ActiveControl = $close
+    # Keep the accessible close button in the tab order and as CancelButton,
+    # but do not give it the initial keyboard focus (native focus outline).
+    $form.Add_Shown({
+        param($sender,$eventArgs)
+        [void]$sender.Tag.Body.SelectNextControl($null,$true,$true,$true,$false)
+    })
     $form.Tag = [pscustomobject]@{
         Choice=$null; Scale=0.0; Header=$header; Title=$titleLabel; Subtitle=$subtitleLabel
         Close=$close; Body=$body; ContentHeight=$ContentHeight; Tip=$tip
@@ -13812,7 +13825,7 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.Manual;
         BackColor = Color.Black;
-        Opacity = 0.35;
+        Opacity = 0.45;
         TopMost = owner.TopMost;
         parent.LocationChanged += SyncBounds;
         parent.SizeChanged += SyncBounds;
@@ -14007,7 +14020,7 @@ function Show-OwnedAuxiliaryPopup {
             $ownerRefreshButton.Refresh()
         }
         Initialize-AuxiliaryOwnerDimmer
-        $dimmer = [LenovoAuxiliaryOwnerDimmer]::new($parent,$Owner,$Form,[double]$scale,$script:ColorHover,$script:ColorAccent)
+        $dimmer = [LenovoAuxiliaryOwnerDimmer]::new($parent,$Owner,$Form,[double]$scale,(Get-PopupNavigationHoverColor),$script:ColorAccent)
         # Show without activation before the child, which retains its normal
         # modal ownership, z-order and focus even on overlapping placement.
         $dimmer.Show($parent)

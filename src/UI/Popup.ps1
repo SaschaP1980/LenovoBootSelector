@@ -389,7 +389,7 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.Manual;
         BackColor = Color.Black;
-        Opacity = 0.35;
+        Opacity = 0.45;
         TopMost = owner.TopMost;
         parent.LocationChanged += SyncBounds;
         parent.SizeChanged += SyncBounds;
@@ -584,7 +584,7 @@ function Show-OwnedAuxiliaryPopup {
             $ownerRefreshButton.Refresh()
         }
         Initialize-AuxiliaryOwnerDimmer
-        $dimmer = [LenovoAuxiliaryOwnerDimmer]::new($parent,$Owner,$Form,[double]$scale,$script:ColorHover,$script:ColorAccent)
+        $dimmer = [LenovoAuxiliaryOwnerDimmer]::new($parent,$Owner,$Form,[double]$scale,(Get-PopupNavigationHoverColor),$script:ColorAccent)
         # Show without activation before the child, which retains its normal
         # modal ownership, z-order and focus even on overlapping placement.
         $dimmer.Show($parent)
