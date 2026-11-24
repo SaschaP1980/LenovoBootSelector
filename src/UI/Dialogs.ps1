@@ -159,12 +159,19 @@ function Show-LenovoOwnedDialog {
     param([Windows.Forms.Form]$Form,[Windows.Forms.Form]$Owner)
     $previous = $script:ActiveOwnedDialog
     $dimmer = $null
+    $auxiliaryOwner = $null
+    $returnFocus = $null
+    if ($Owner -and -not $Owner.IsDisposed -and [object]::ReferenceEquals($Owner,$script:ActiveAuxiliaryPopup)) {
+        $auxiliaryOwner = $Owner
+        $returnFocus = $Owner.Tag.Body.Controls | Where-Object { $_.Focused } | Select-Object -First 1
+    }
     $script:ActiveOwnedDialog = $Form
     try {
         if ($Owner -and -not $Owner.IsDisposed -and $Owner.Visible) {
             # The main owner's existing scrim remains alive; dim the immediate
             # modal owner only, without a navigation cutout or connector.
             if ($script:ActiveAuxiliaryPopup) {
+                if ($auxiliaryOwner) { $auxiliaryOwner.Tag.Close.Refresh() }
                 Initialize-AuxiliaryOwnerDimmer
                 $dimmer = [LenovoAuxiliaryOwnerDimmer]::new($Owner,$null,$Form,1.0,$script:ColorHover,$script:ColorAccent)
                 $dimmer.Show($Owner)
@@ -175,7 +182,15 @@ function Show-LenovoOwnedDialog {
     }
     finally {
         try { if ($dimmer) { $dimmer.Dispose() } }
-        finally { $script:ActiveOwnedDialog = $previous }
+        finally {
+            $script:ActiveOwnedDialog = $previous
+            if ($auxiliaryOwner -and -not $auxiliaryOwner.IsDisposed -and $auxiliaryOwner.Visible -and
+                [object]::ReferenceEquals($auxiliaryOwner,$script:ActiveAuxiliaryPopup)) {
+                if ($returnFocus -and -not $returnFocus.IsDisposed -and $returnFocus.CanFocus -and
+                    $auxiliaryOwner.ContainsFocus) { [void]$returnFocus.Focus() }
+                $auxiliaryOwner.Tag.Close.Refresh()
+            }
+        }
     }
 }
 
