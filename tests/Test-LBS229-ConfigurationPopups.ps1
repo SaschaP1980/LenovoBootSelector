@@ -1,4 +1,5 @@
 ﻿#requires -version 5.1
+param([switch]$CorrectionProbeOnly)
 # LBS-229: actual native owned forms, no live firmware or privileged actions.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -108,6 +109,101 @@ $area=[Drawing.Rectangle]::new(-1000,-100,3000,1700)
 $anchor=[Drawing.Rectangle]::new(0,0,390,672)
 $size=[Drawing.Size]::new(390,514)
 try {
+    # LBS229-F01–F06: focused correction contracts. Keep each check independent
+    # so the published basis reports all observed failures rather than stopping at F01.
+    $correctionFailures = [Collections.Generic.List[string]]::new()
+    function Test-Lbs229Correction([string]$Name,[scriptblock]$Action) {
+        try { & $Action; Write-Host "PASS LBS229 correction $Name" }
+        catch { $correctionFailures.Add("$Name : $_"); Write-Host "RED LBS229 correction $Name : $_" }
+    }
+    function Require-Lbs229Correction([bool]$Pass,[string]$Detail) {
+        if (-not $Pass) { throw $Detail }
+    }
+    Test-Lbs229Correction 'F01 row anchor' {
+        $trigger = [Drawing.Rectangle]::new(0,400,390,38)
+        $p = Get-AuxiliaryPopupLocation $area $anchor $size $trigger
+        Require-Lbs229Correction ($p.X -eq 398 -and $p.Y -eq 400) "Expected right side at trigger Y=400, got $p"
+    }
+    Test-Lbs229Correction 'F01 negative-origin row anchor and bottom clamp' {
+        $wa = [Drawing.Rectangle]::new(-1600,-300,1600,900)
+        $parent = [Drawing.Rectangle]::new(-430,-100,390,672)
+        $trigger = [Drawing.Rectangle]::new(-430,410,390,38)
+        $p = Get-AuxiliaryPopupLocation $wa $parent $size $trigger
+        Require-Lbs229Correction ($p.X -eq -828 -and $p.Y -eq 86) "Expected left side and clamped trigger Y=86, got $p"
+    }
+    Test-Lbs229Correction 'F02 full-width focusable settings row' {
+        $rootPanel = New-Object Windows.Forms.Panel
+        try {
+            Add-PopupSettingsSection -Root $rootPanel
+            $more = $rootPanel.Controls['SettingsPanel']
+            $default = $rootPanel.Controls['DefaultPanel']
+            Require-Lbs229Correction ($more.GetType() -eq $default.GetType() -and $more.Width -eq $default.Width -and $more.Height -eq $default.Height -and $more.AccessibleRole -eq [Windows.Forms.AccessibleRole]::PushButton -and $more.TabStop) 'Further settings must use the same full-width keyboard row affordance as Default'
+        } finally { $rootPanel.Dispose() }
+    }
+    Test-Lbs229Correction 'F03 disabled configuration action treatment' {
+        $config = New-ConfigurationPopup
+        try {
+            $install = $config.Tag.Body.Controls['ConfigurationAction-update-install']
+            $enabled = $config.Tag.Body.Controls['ConfigurationAction-update-check']
+            Require-Lbs229Correction (-not $install.Enabled -and $enabled.Enabled -and $install.ForeColor -ne $enabled.ForeColor -and $install.FlatAppearance.BorderColor -ne $enabled.FlatAppearance.BorderColor -and $install.Cursor -eq [Windows.Forms.Cursors]::Default) 'Disabled install must have muted foreground/border and no hand cursor'
+        } finally { $config.Dispose() }
+    }
+    . (Join-Path $root 'src\Application\RefreshRuntime.ps1')
+    . (Join-Path $root 'src\UI\RefreshPresentation.ps1')
+    $script:HeaderStatusLabel = New-Object Windows.Forms.Label
+    $owner.Controls.Add($script:HeaderStatusLabel)
+    $script:BackgroundRefreshState = New-BackgroundRefreshRuntimeState
+    $script:BackgroundRefreshState.Process = [pscustomobject]@{}
+    $script:UpdateState = [pscustomobject]@{ Status='Idle'; AvailableManifest=$null; CheckProcess=$null; CheckMode='' }
+    foreach ($locale in @('en-US','de-DE')) {
+        $script:Locale = $locale
+        Test-Lbs229Correction "F04 $locale startup header" {
+            $script:BackgroundRefreshState.ActiveRequest = [pscustomobject]@{ Origin='Startup' }
+            Update-HeaderRefreshStatus
+            $expected = if ($script:Locale -eq 'de-DE') { 'Initialisiere Anwendung …' } else { 'Initializing application …' }
+            Require-Lbs229Correction ($script:HeaderStatusLabel.Text -eq $expected -and -not $script:HeaderUpdateInteractionEnabled) "Expected $expected, got $($script:HeaderStatusLabel.Text)"
+        }
+        Test-Lbs229Correction "F05 $locale warm popup header" {
+            $script:BackgroundRefreshState.ActiveRequest = [pscustomobject]@{ Origin='Popup' }
+            Update-HeaderRefreshStatus
+            $expected = if ($script:Locale -eq 'de-DE') { 'Aktualisiere Anwendungsstatus …' } else { 'Refreshing application state …' }
+            Require-Lbs229Correction ($script:HeaderStatusLabel.Text -eq $expected -and -not $script:HeaderUpdateInteractionEnabled) "Expected $expected, got $($script:HeaderStatusLabel.Text)"
+        }
+        Test-Lbs229Correction "F06 $locale manual refresh precedence" {
+            $script:BackgroundRefreshState.ActiveRequest = [pscustomobject]@{ Origin='Manual' }
+            $script:UpdateState.CheckMode = 'Popup'
+            $script:UpdateState.CheckProcess = [pscustomobject]@{}
+            $script:UpdateState.Status = 'Checking'
+            Update-HeaderRefreshStatus
+            Require-Lbs229Correction ($script:HeaderStatusLabel.Text -eq (Get-LocalizedString -Key 'Header.Refreshing')) 'Manual boot refresh retains boot-specific status even during a legitimate popup update check'
+        }
+        Test-Lbs229Correction "F05 $locale independent popup update lifetime" {
+            $script:BackgroundRefreshState.Process = $null
+            $script:BackgroundRefreshState.ActiveRequest = $null
+            Update-HeaderRefreshStatus
+            $expected = if ($script:Locale -eq 'de-DE') { 'Aktualisiere Anwendungsstatus …' } else { 'Refreshing application state …' }
+            Require-Lbs229Correction ($script:HeaderStatusLabel.Text -eq $expected -and -not $script:HeaderUpdateInteractionEnabled) "Expected $expected during remaining popup update work, got $($script:HeaderStatusLabel.Text)"
+        }
+        Test-Lbs229Correction "F05 $locale terminal update available" {
+            $script:UpdateState.CheckProcess = $null
+            $script:UpdateState.CheckMode = ''
+            $script:UpdateState.Status = 'UpdateAvailable'
+            $script:UpdateState.AvailableManifest = [pscustomobject]@{ Version='9.9.9.9' }
+            Update-HeaderRefreshStatus
+            Require-Lbs229Correction ($script:HeaderStatusLabel.Text -eq (Get-LocalizedString -Key 'Update.Available') -and $script:HeaderUpdateInteractionEnabled) 'Terminal verified update availability regains its interactive header'
+        }
+        $script:BackgroundRefreshState.Process = [pscustomobject]@{}
+        $script:UpdateState.Status = 'Idle'
+        $script:UpdateState.AvailableManifest = $null
+    }
+    $script:BackgroundRefreshState = $null
+    $script:UpdateState = $null
+    $script:HeaderStatusLabel.Dispose()
+    $script:HeaderStatusLabel = $null
+    $script:Locale = 'en-US'
+    if ($correctionFailures.Count) { throw ("LBS229 correction RED: " + ($correctionFailures -join '; ')) }
+    if ($CorrectionProbeOnly) { return }
+
     $p=Get-AuxiliaryPopupLocation $area $anchor $size
     Assert-Lbs229 'right placement stays on owner monitor' ($p.X -eq 398 -and $p.Y -eq 0)
     $rightEdge=[Drawing.Rectangle]::new(1600,1200,390,400)

@@ -121,6 +121,7 @@ function Start-PopupUpdateCheck {
     }
     $started = Start-UpdateCheckWorkflow -State $script:UpdateState -Mode 'Popup' -RuntimeSessionId $script:RuntimeSessionId -CompletionAction { Complete-PopupUpdateCheck } -TimerFactory $timerFactory -StartFailureMessage (Get-LocalizedString -Key 'Update.CheckStartFailed')
     Update-UpdateMenuState
+    Update-HeaderRefreshStatus
     return [bool]$started.Started
 }
 

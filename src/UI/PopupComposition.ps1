@@ -80,7 +80,7 @@ function Add-PopupHeaderSection {
         if (Test-MaintenanceBusy) { return }
         $script:LastStatusText = Get-LocalizedString -Key 'Status.BootTargetsRefreshing'
         Update-PopupRows -Reason 'manual-refresh-start'
-        Start-BackgroundBootRefresh -RefreshStorage
+        Start-BackgroundBootRefresh -RefreshStorage -Origin Manual
         Update-RefreshButtonVisual
     })
     $header.Controls.Add($refresh)
@@ -176,6 +176,53 @@ function Add-PopupBootEntryListSection {
     $Root.Controls.Add($listPanel)
 }
 
+# The two top-level navigation rows share one hit/hover surface, including
+# transparent child labels. Leaving a child within the row must not clear it.
+function Get-PopupNavigationRow {
+    param([Windows.Forms.Control]$Control)
+    if ($Control -is [Windows.Forms.Panel]) { return $Control }
+    return $Control.Parent
+}
+
+function Test-PopupNavigationRowInteractive {
+    param([Windows.Forms.Control]$Row)
+    if (-not $Row -or $Row.IsDisposed -or -not $Row.Enabled -or $script:IsManageEntriesMode) { return $false }
+    if ($Row.Name -eq 'DefaultPanel') { return [bool]$script:DefaultInteractionEnabled }
+    return (-not (Test-MaintenanceBusy))
+}
+
+function Set-PopupNavigationRowHover {
+    param([Windows.Forms.Control]$Control,[bool]$Hover)
+    $row = Get-PopupNavigationRow -Control $Control
+    if (-not $row -or $row.IsDisposed) { return }
+    $inside = $Hover -or ($row.Visible -and $row.RectangleToScreen($row.ClientRectangle).Contains([Windows.Forms.Cursor]::Position))
+    $row.BackColor = if ($inside -and (Test-PopupNavigationRowInteractive -Row $row)) { [Drawing.Color]::FromArgb(38,38,38) } else { $script:ColorSurface }
+}
+
+function Invoke-PopupNavigationRow {
+    param([Windows.Forms.Control]$Control)
+    $row = Get-PopupNavigationRow -Control $Control
+    if (-not (Test-PopupNavigationRowInteractive -Row $row)) { return }
+    if ($row.Name -eq 'DefaultPanel') { Show-DefaultTargetMenu -Owner $row }
+    elseif ($row.Name -eq 'SettingsPanel') { Show-ConfigurationPopup -Owner $row }
+}
+
+function Add-PopupNavigationRowHandlers {
+    param([Windows.Forms.Control]$Row)
+    foreach ($control in @($Row) + @($Row.Controls)) {
+        $control.Add_MouseEnter({ param($sender,$eventArgs) Set-PopupNavigationRowHover -Control $sender -Hover $true })
+        $control.Add_MouseLeave({ param($sender,$eventArgs) Set-PopupNavigationRowHover -Control $sender -Hover $false })
+        $control.Add_Click({ param($sender,$eventArgs) Invoke-PopupNavigationRow -Control $sender })
+    }
+    $Row.Add_KeyDown({
+        param($sender,$eventArgs)
+        if ($eventArgs.Modifiers -eq [Windows.Forms.Keys]::None -and $eventArgs.KeyCode -in @([Windows.Forms.Keys]::Enter,[Windows.Forms.Keys]::Space)) {
+            $eventArgs.SuppressKeyPress = $true
+            Invoke-PopupNavigationRow -Control $sender
+        }
+    })
+}
+
 function Add-PopupSettingsSection {
     param([Parameter(Mandatory=$true)]$Root)
 
@@ -193,37 +240,27 @@ function Add-PopupSettingsSection {
     $configSection.Controls.Add($configLabel)
     $Root.Controls.Add($configSection)
 
-    $settings = New-Object System.Windows.Forms.Panel
+    Initialize-NormalBootKeyboardRow
+    $settings = New-Object LenovoNormalBootKeyboardRow
     $settings.Name = 'SettingsPanel'
+    $settings.AccessibleRole = [Windows.Forms.AccessibleRole]::PushButton
+    $settings.AccessibleName = Get-LocalizedString -Key 'Settings.More'
     $settings.Location = New-Object Drawing.Point(0, 510)
     $settings.Size = New-Object Drawing.Size(390, 38)
     $settings.BackColor = $script:ColorSurface
+    $settings.Cursor = [Windows.Forms.Cursors]::Hand
 
-    $more = New-Object System.Windows.Forms.Button
+    $more = New-Label -Text $settings.AccessibleName -Font (New-Object Drawing.Font('Segoe UI',9.0)) -ForeColor $script:ColorPrimary -X 16 -Y 8 -Width 330 -Height 22
     $more.Name = 'MoreSettingsButton'
-    $more.Text = Get-LocalizedString -Key 'Settings.More'
-    $more.AccessibleName = $more.Text
-    $more.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
-    $more.ForeColor = $script:ColorPrimary
-    $more.BackColor = $script:ColorSurface
-    $more.FlatStyle = [Windows.Forms.FlatStyle]::Flat
-    $more.FlatAppearance.BorderSize = 0
-    $more.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(38,38,38)
-    $more.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
-    $more.Location = [Drawing.Point]::new(12,2)
-    $more.Size = [Drawing.Size]::new(366,34)
     $more.Cursor = [Windows.Forms.Cursors]::Hand
-    $more.Add_Click({ Show-ConfigurationPopup -Owner $this })
     $settings.Controls.Add($more)
     $moreArrow = New-Label -Text '›' -Font (New-Object Drawing.Font('Segoe UI',10.0)) -ForeColor $script:ColorSecondary -X 352 -Y 7 -Width 22 -Height 23
     $moreArrow.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $moreArrow.Cursor = [Windows.Forms.Cursors]::Hand
-    $moreArrow.Add_Click({ Show-ConfigurationPopup -Owner $this })
     $settings.Controls.Add($moreArrow)
-    $moreArrow.BringToFront()
+    Add-PopupNavigationRowHandlers -Row $settings
     $Root.Controls.Add($settings)
 
-    Initialize-NormalBootKeyboardRow
     $defaultPanel = New-Object LenovoNormalBootKeyboardRow
     $defaultPanel.AccessibleRole = [Windows.Forms.AccessibleRole]::PushButton
     $defaultPanel.Name = 'DefaultPanel'
@@ -253,27 +290,7 @@ function Add-PopupSettingsSection {
     $defaultPanel.Controls.Add($defaultArrow)
     $script:DefaultArrowLabel = $defaultArrow
 
-    $defaultRowEnter = {
-        if ($script:DefaultInteractionEnabled -and $script:DefaultButton) { $script:DefaultButton.BackColor = [Drawing.Color]::FromArgb(38,38,38) }
-    }
-    $defaultRowLeave = {
-        if ($script:DefaultButton) { $script:DefaultButton.BackColor = $script:ColorSurface }
-    }
-    $defaultRowClick = {
-        if ($script:DefaultInteractionEnabled -and $script:DefaultButton) { Show-DefaultTargetMenu -Owner $script:DefaultButton }
-    }
-    foreach ($control in @($defaultPanel,$defaultName,$defaultValue,$defaultArrow)) {
-        $control.Add_MouseEnter($defaultRowEnter)
-        $control.Add_MouseLeave($defaultRowLeave)
-        $control.Add_Click($defaultRowClick)
-    }
-    $defaultPanel.Add_KeyDown({
-        param($sender,$eventArgs)
-        if ($eventArgs.Modifiers -eq [Windows.Forms.Keys]::None -and $eventArgs.KeyCode -in @([Windows.Forms.Keys]::Enter,[Windows.Forms.Keys]::Space)) {
-            $eventArgs.SuppressKeyPress = $true
-            if ($script:DefaultInteractionEnabled) { Show-DefaultTargetMenu -Owner $sender }
-        }
-    })
+    Add-PopupNavigationRowHandlers -Row $defaultPanel
     $script:DefaultButton = $defaultPanel
     $Root.Controls.Add($defaultPanel)
 
@@ -614,8 +631,13 @@ function Update-ConfigurationPopupPresentation {
             $selected = $language -and $item.Checked
             $control.Text = if ($selected) { ('✓ ' + $item.Text) } else { [string]$item.Text }
             $control.AccessibleName = [string]$control.Text
-            $control.BackColor = if ($selected) { $script:ColorSelectedRow } else { $script:ColorSurface }
-            $control.FlatAppearance.BorderColor = if ($selected) { $script:ColorAccent } else { [Drawing.Color]::FromArgb(82,82,82) }
+            $control.ForeColor = if ($control.Enabled) { $script:ColorPrimary } else { [Drawing.Color]::FromArgb(146,146,146) }
+            $control.BackColor = if (-not $control.Enabled) { [Drawing.Color]::FromArgb(35,35,35) } elseif ($selected) { $script:ColorSelectedRow } else { [Drawing.Color]::FromArgb(34,34,34) }
+            $control.FlatAppearance.BorderColor = if (-not $control.Enabled) { [Drawing.Color]::FromArgb(58,58,58) } elseif ($selected) { $script:ColorAccent } else { [Drawing.Color]::FromArgb(68,68,68) }
+            $control.FlatAppearance.MouseOverBackColor = if ($control.Enabled) { $script:ColorHover } else { $control.BackColor }
+            $control.FlatAppearance.MouseDownBackColor = if ($control.Enabled) { $script:ColorSelectedRow } else { $control.BackColor }
+            $control.Cursor = if ($control.Enabled) { [Windows.Forms.Cursors]::Hand } else { [Windows.Forms.Cursors]::Default }
+            $control.Invalidate()
         }
     }
 }
@@ -656,8 +678,30 @@ function Add-ConfigurationActionButton {
     $button.ForeColor = $script:ColorPrimary
     $button.BackColor = $script:ColorSurface
     $button.FlatStyle = [Windows.Forms.FlatStyle]::Flat
-    $button.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(82,82,82)
+    $button.FlatAppearance.BorderSize = 1
+    $button.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(68,68,68)
     $button.FlatAppearance.MouseOverBackColor = $script:ColorHover
+    $button.FlatAppearance.MouseDownBackColor = $script:ColorSelectedRow
+    # WinForms native flat buttons dim disabled ink against dark surfaces.
+    # Paint only the disabled interior; native Enabled and High Contrast remain authoritative.
+    $button.Add_Paint({
+        param($sender,$eventArgs)
+        if ($sender.Enabled -or [Windows.Forms.SystemInformation]::HighContrast) { return }
+        $inner = $sender.ClientRectangle
+        $border = $sender.FlatAppearance.BorderSize
+        $inner.Inflate(-$border,-$border)
+        if ($inner.Width -le 0 -or $inner.Height -le 0) { return }
+        $background = New-Object Drawing.SolidBrush($sender.BackColor)
+        try { $eventArgs.Graphics.FillRectangle($background,$inner) }
+        finally { $background.Dispose() }
+        $scale = [Math]::Max(1.0,[double]$sender.FindForm().Tag.Scale)
+        $pad = [int][Math]::Round(5*$scale)
+        $inner.X += $pad
+        $inner.Width -= 2*$pad
+        if ($inner.Width -le 0) { return }
+        $flags = [Windows.Forms.TextFormatFlags]::Left -bor [Windows.Forms.TextFormatFlags]::VerticalCenter -bor [Windows.Forms.TextFormatFlags]::SingleLine -bor [Windows.Forms.TextFormatFlags]::EndEllipsis -bor [Windows.Forms.TextFormatFlags]::NoPrefix -bor [Windows.Forms.TextFormatFlags]::PreserveGraphicsClipping
+        [Windows.Forms.TextRenderer]::DrawText($eventArgs.Graphics,$sender.Text,$sender.Font,$inner,$sender.ForeColor,$flags)
+    })
     $button.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
     $button.UseMnemonic = $false
     $button.Cursor = [Windows.Forms.Cursors]::Hand

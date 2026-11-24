@@ -148,6 +148,8 @@ function Get-LocalizationCatalogCore {
             'Status.SystemFunctionsRepairRequired' = 'System functions need to be repaired.'
             'Status.SystemFunctionsSetupRequired' = 'System functions need to be set up.'
             'Header.Refreshing' = 'Updating boot targets…'
+            'Header.InitializingApplication' = 'Initializing application …'
+            'Header.RefreshingApplication' = 'Refreshing application state …'
             'Update.Available' = 'New app version available'
             'Tray.Open' = 'Open Lenovo Boot Selector'
             'Tray.Maintenance' = 'Maintenance'
@@ -455,6 +457,8 @@ function Get-LocalizationCatalogCore {
             'Status.SystemFunctionsRepairRequired' = 'Systemfunktionen müssen repariert werden.'
             'Status.SystemFunctionsSetupRequired' = 'Systemfunktionen müssen eingerichtet werden.'
             'Header.Refreshing' = 'Aktualisiere Bootziele…'
+            'Header.InitializingApplication' = 'Initialisiere Anwendung …'
+            'Header.RefreshingApplication' = 'Aktualisiere Anwendungsstatus …'
             'Update.Available' = 'Neue App-Version verfügbar'
             'Tray.Open' = 'Lenovo Boot Selector öffnen'
             'Tray.Maintenance' = 'Wartung'
@@ -2363,7 +2367,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.15.0'
+$script:AppVersion = '1.5.15.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -3446,14 +3450,27 @@ function Update-HeaderRefreshStatus {
     try {
         $updateAvailable = ($script:UpdateState -and [string]$script:UpdateState.Status -eq 'UpdateAvailable' -and $null -ne $script:UpdateState.AvailableManifest)
     } catch { }
-    $showStatus = ($active -or $updateAvailable)
+    # Active request provenance affects presentation only, never worker admission.
+    # Initial readiness wins until it ends; a deliberate manual refresh wins
+    # over coexisting read-only popup checks. Popup work can outlive boot work.
+    $origin = if ($active) { [string]$script:BackgroundRefreshState.ActiveRequest.Origin } else { '' }
+    $pendingOrigin = if ($active) { [string]$script:BackgroundRefreshState.PendingRequest.Origin } else { '' }
+    $popupUpdateActive = ($script:UpdateState -and $script:UpdateState.CheckProcess -and [string]$script:UpdateState.CheckMode -eq 'Popup')
+    $refreshKey = if ($active -and $origin -eq 'Startup') { 'Header.InitializingApplication' }
+        elseif ($active -and ($origin -eq 'Manual' -or $pendingOrigin -eq 'Manual')) { 'Header.Refreshing' }
+        elseif (($active -and ($origin -eq 'Popup' -or $pendingOrigin -eq 'Popup')) -or $popupUpdateActive) { 'Header.RefreshingApplication' }
+        elseif ($active) { 'Header.Refreshing' }
+        else { '' }
+    $refreshVisible = -not [string]::IsNullOrEmpty($refreshKey)
+    $showStatus = ($refreshVisible -or $updateAvailable)
 
     # LBS-174: status may appear/disappear, but title geometry belongs only
     # to Add-PopupHeaderSection and must not be mutated by refresh state.
 
     if ($script:HeaderStatusLabel -and -not $script:HeaderStatusLabel.IsDisposed) {
-        $script:HeaderStatusLabel.Text = if ($active) {
-            Get-LocalizedString -Key 'Header.Refreshing'
+        $script:HeaderStatusLabel.Text = if ($refreshVisible) {
+            if ($refreshKey -eq 'Header.Refreshing') { Get-LocalizedString -Key 'Header.Refreshing' }
+            else { Get-LocalizedString -Key $refreshKey }
         }
         elseif ($updateAvailable) {
             Get-LocalizedString -Key 'Update.Available'
@@ -3463,7 +3480,7 @@ function Update-HeaderRefreshStatus {
         }
         $script:HeaderStatusLabel.Visible = $showStatus
     }
-    Set-HeaderUpdateInteractionState -Enabled (-not $active -and $updateAvailable)
+    Set-HeaderUpdateInteractionState -Enabled (-not $refreshVisible -and $updateAvailable)
 }
 
 function Update-RefreshButtonVisual {
@@ -5016,6 +5033,7 @@ function Start-PopupUpdateCheck {
     }
     $started = Start-UpdateCheckWorkflow -State $script:UpdateState -Mode 'Popup' -RuntimeSessionId $script:RuntimeSessionId -CompletionAction { Complete-PopupUpdateCheck } -TimerFactory $timerFactory -StartFailureMessage (Get-LocalizedString -Key 'Update.CheckStartFailed')
     Update-UpdateMenuState
+    Update-HeaderRefreshStatus
     return [bool]$started.Started
 }
 
@@ -8792,12 +8810,14 @@ function Invoke-DefaultTargetWorker {
 function New-BackgroundRefreshRequest {
     param(
         [bool]$RefreshStorage,
-        [bool]$RefreshFirmware
+        [bool]$RefreshFirmware,
+        [ValidateSet('Background','Startup','Popup','Manual')][string]$Origin = 'Background'
     )
 
     [pscustomobject]@{
         RefreshStorage  = [bool]$RefreshStorage
         RefreshFirmware = [bool]$RefreshFirmware
+        Origin          = $Origin
     }
 }
 
@@ -8842,6 +8862,16 @@ function Test-BackgroundRefreshRequestEscalation {
     return $false
 }
 
+# Coalesced equivalent requests retain the most meaningful presentation
+# origin without adding work. Startup readiness must never be relabeled.
+function Merge-BackgroundRefreshOrigin {
+    param([string]$Current,[string]$Requested)
+    foreach ($origin in @('Startup','Manual','Popup','Background')) {
+        if ($Current -eq $origin -or $Requested -eq $origin) { return $origin }
+    }
+    return 'Background'
+}
+
 function Add-BackgroundRefreshPendingRequest {
     param(
         [Parameter(Mandatory=$true)]$State,
@@ -8849,12 +8879,13 @@ function Add-BackgroundRefreshPendingRequest {
     )
 
     if (-not $State.PendingRequest) {
-        $State.PendingRequest = New-BackgroundRefreshRequest -RefreshStorage:$Request.RefreshStorage -RefreshFirmware:$Request.RefreshFirmware
+        $State.PendingRequest = New-BackgroundRefreshRequest -RefreshStorage:$Request.RefreshStorage -RefreshFirmware:$Request.RefreshFirmware -Origin $Request.Origin
         return $State.PendingRequest
     }
 
     if ($Request.RefreshStorage) { $State.PendingRequest.RefreshStorage = $true }
     if ($Request.RefreshFirmware) { $State.PendingRequest.RefreshFirmware = $true }
+    $State.PendingRequest.Origin = Merge-BackgroundRefreshOrigin -Current $State.PendingRequest.Origin -Requested $Request.Origin
     return $State.PendingRequest
 }
 
@@ -9511,12 +9542,12 @@ function Complete-BackgroundBootRefresh {
     if ($pending) {
         if ($pending.RefreshFirmware) { $script:FirmwareCacheUtc = [datetime]::MinValue }
         $pendingStorage = [bool]$pending.RefreshStorage
-        Start-BackgroundBootRefresh -RefreshStorage:$pendingStorage
+        Start-BackgroundBootRefresh -RefreshStorage:$pendingStorage -Origin $pending.Origin
     }
 }
 
 function Start-BackgroundBootRefresh {
-    param([switch]$RefreshStorage)
+    param([switch]$RefreshStorage,[ValidateSet('Background','Startup','Popup','Manual')][string]$Origin = 'Background')
 
     if ($script:DefaultTargetChangePending) {
         Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_SUPPRESSED' -Stage 'default' -Success $true -Data (New-RuntimeDiagnosticData @{ reason='default-target-changing' })
@@ -9531,7 +9562,7 @@ function Start-BackgroundBootRefresh {
         -RefreshStorage ([bool]$RefreshStorage) `
         -FirmwareCacheText $script:FirmwareCacheText `
         -FirmwareCacheUtc $script:FirmwareCacheUtc
-    $request = New-BackgroundRefreshRequest -RefreshStorage ([bool]$RefreshStorage) -RefreshFirmware ([bool]$refreshFirmware)
+    $request = New-BackgroundRefreshRequest -RefreshStorage ([bool]$RefreshStorage) -RefreshFirmware ([bool]$refreshFirmware) -Origin $Origin
 
     if (Test-BackgroundRefreshActive -State $script:BackgroundRefreshState) {
         try {
@@ -9542,6 +9573,10 @@ function Start-BackgroundBootRefresh {
                 if (Test-BackgroundRefreshRequestEscalation -ActiveRequest $script:BackgroundRefreshState.ActiveRequest -Requested $request) {
                     [void](Add-BackgroundRefreshPendingRequest -State $script:BackgroundRefreshState -Request $request)
                 }
+                else {
+                    $script:BackgroundRefreshState.ActiveRequest.Origin = Merge-BackgroundRefreshOrigin -Current $script:BackgroundRefreshState.ActiveRequest.Origin -Requested $request.Origin
+                }
+                Update-RefreshButtonVisual
                 return
             }
         }
@@ -12524,7 +12559,7 @@ function Add-PopupHeaderSection {
         if (Test-MaintenanceBusy) { return }
         $script:LastStatusText = Get-LocalizedString -Key 'Status.BootTargetsRefreshing'
         Update-PopupRows -Reason 'manual-refresh-start'
-        Start-BackgroundBootRefresh -RefreshStorage
+        Start-BackgroundBootRefresh -RefreshStorage -Origin Manual
         Update-RefreshButtonVisual
     })
     $header.Controls.Add($refresh)
@@ -12620,6 +12655,53 @@ function Add-PopupBootEntryListSection {
     $Root.Controls.Add($listPanel)
 }
 
+# The two top-level navigation rows share one hit/hover surface, including
+# transparent child labels. Leaving a child within the row must not clear it.
+function Get-PopupNavigationRow {
+    param([Windows.Forms.Control]$Control)
+    if ($Control -is [Windows.Forms.Panel]) { return $Control }
+    return $Control.Parent
+}
+
+function Test-PopupNavigationRowInteractive {
+    param([Windows.Forms.Control]$Row)
+    if (-not $Row -or $Row.IsDisposed -or -not $Row.Enabled -or $script:IsManageEntriesMode) { return $false }
+    if ($Row.Name -eq 'DefaultPanel') { return [bool]$script:DefaultInteractionEnabled }
+    return (-not (Test-MaintenanceBusy))
+}
+
+function Set-PopupNavigationRowHover {
+    param([Windows.Forms.Control]$Control,[bool]$Hover)
+    $row = Get-PopupNavigationRow -Control $Control
+    if (-not $row -or $row.IsDisposed) { return }
+    $inside = $Hover -or ($row.Visible -and $row.RectangleToScreen($row.ClientRectangle).Contains([Windows.Forms.Cursor]::Position))
+    $row.BackColor = if ($inside -and (Test-PopupNavigationRowInteractive -Row $row)) { [Drawing.Color]::FromArgb(38,38,38) } else { $script:ColorSurface }
+}
+
+function Invoke-PopupNavigationRow {
+    param([Windows.Forms.Control]$Control)
+    $row = Get-PopupNavigationRow -Control $Control
+    if (-not (Test-PopupNavigationRowInteractive -Row $row)) { return }
+    if ($row.Name -eq 'DefaultPanel') { Show-DefaultTargetMenu -Owner $row }
+    elseif ($row.Name -eq 'SettingsPanel') { Show-ConfigurationPopup -Owner $row }
+}
+
+function Add-PopupNavigationRowHandlers {
+    param([Windows.Forms.Control]$Row)
+    foreach ($control in @($Row) + @($Row.Controls)) {
+        $control.Add_MouseEnter({ param($sender,$eventArgs) Set-PopupNavigationRowHover -Control $sender -Hover $true })
+        $control.Add_MouseLeave({ param($sender,$eventArgs) Set-PopupNavigationRowHover -Control $sender -Hover $false })
+        $control.Add_Click({ param($sender,$eventArgs) Invoke-PopupNavigationRow -Control $sender })
+    }
+    $Row.Add_KeyDown({
+        param($sender,$eventArgs)
+        if ($eventArgs.Modifiers -eq [Windows.Forms.Keys]::None -and $eventArgs.KeyCode -in @([Windows.Forms.Keys]::Enter,[Windows.Forms.Keys]::Space)) {
+            $eventArgs.SuppressKeyPress = $true
+            Invoke-PopupNavigationRow -Control $sender
+        }
+    })
+}
+
 function Add-PopupSettingsSection {
     param([Parameter(Mandatory=$true)]$Root)
 
@@ -12637,37 +12719,27 @@ function Add-PopupSettingsSection {
     $configSection.Controls.Add($configLabel)
     $Root.Controls.Add($configSection)
 
-    $settings = New-Object System.Windows.Forms.Panel
+    Initialize-NormalBootKeyboardRow
+    $settings = New-Object LenovoNormalBootKeyboardRow
     $settings.Name = 'SettingsPanel'
+    $settings.AccessibleRole = [Windows.Forms.AccessibleRole]::PushButton
+    $settings.AccessibleName = Get-LocalizedString -Key 'Settings.More'
     $settings.Location = New-Object Drawing.Point(0, 510)
     $settings.Size = New-Object Drawing.Size(390, 38)
     $settings.BackColor = $script:ColorSurface
+    $settings.Cursor = [Windows.Forms.Cursors]::Hand
 
-    $more = New-Object System.Windows.Forms.Button
+    $more = New-Label -Text $settings.AccessibleName -Font (New-Object Drawing.Font('Segoe UI',9.0)) -ForeColor $script:ColorPrimary -X 16 -Y 8 -Width 330 -Height 22
     $more.Name = 'MoreSettingsButton'
-    $more.Text = Get-LocalizedString -Key 'Settings.More'
-    $more.AccessibleName = $more.Text
-    $more.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
-    $more.ForeColor = $script:ColorPrimary
-    $more.BackColor = $script:ColorSurface
-    $more.FlatStyle = [Windows.Forms.FlatStyle]::Flat
-    $more.FlatAppearance.BorderSize = 0
-    $more.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(38,38,38)
-    $more.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
-    $more.Location = [Drawing.Point]::new(12,2)
-    $more.Size = [Drawing.Size]::new(366,34)
     $more.Cursor = [Windows.Forms.Cursors]::Hand
-    $more.Add_Click({ Show-ConfigurationPopup -Owner $this })
     $settings.Controls.Add($more)
     $moreArrow = New-Label -Text '›' -Font (New-Object Drawing.Font('Segoe UI',10.0)) -ForeColor $script:ColorSecondary -X 352 -Y 7 -Width 22 -Height 23
     $moreArrow.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $moreArrow.Cursor = [Windows.Forms.Cursors]::Hand
-    $moreArrow.Add_Click({ Show-ConfigurationPopup -Owner $this })
     $settings.Controls.Add($moreArrow)
-    $moreArrow.BringToFront()
+    Add-PopupNavigationRowHandlers -Row $settings
     $Root.Controls.Add($settings)
 
-    Initialize-NormalBootKeyboardRow
     $defaultPanel = New-Object LenovoNormalBootKeyboardRow
     $defaultPanel.AccessibleRole = [Windows.Forms.AccessibleRole]::PushButton
     $defaultPanel.Name = 'DefaultPanel'
@@ -12697,27 +12769,7 @@ function Add-PopupSettingsSection {
     $defaultPanel.Controls.Add($defaultArrow)
     $script:DefaultArrowLabel = $defaultArrow
 
-    $defaultRowEnter = {
-        if ($script:DefaultInteractionEnabled -and $script:DefaultButton) { $script:DefaultButton.BackColor = [Drawing.Color]::FromArgb(38,38,38) }
-    }
-    $defaultRowLeave = {
-        if ($script:DefaultButton) { $script:DefaultButton.BackColor = $script:ColorSurface }
-    }
-    $defaultRowClick = {
-        if ($script:DefaultInteractionEnabled -and $script:DefaultButton) { Show-DefaultTargetMenu -Owner $script:DefaultButton }
-    }
-    foreach ($control in @($defaultPanel,$defaultName,$defaultValue,$defaultArrow)) {
-        $control.Add_MouseEnter($defaultRowEnter)
-        $control.Add_MouseLeave($defaultRowLeave)
-        $control.Add_Click($defaultRowClick)
-    }
-    $defaultPanel.Add_KeyDown({
-        param($sender,$eventArgs)
-        if ($eventArgs.Modifiers -eq [Windows.Forms.Keys]::None -and $eventArgs.KeyCode -in @([Windows.Forms.Keys]::Enter,[Windows.Forms.Keys]::Space)) {
-            $eventArgs.SuppressKeyPress = $true
-            if ($script:DefaultInteractionEnabled) { Show-DefaultTargetMenu -Owner $sender }
-        }
-    })
+    Add-PopupNavigationRowHandlers -Row $defaultPanel
     $script:DefaultButton = $defaultPanel
     $Root.Controls.Add($defaultPanel)
 
@@ -13058,8 +13110,13 @@ function Update-ConfigurationPopupPresentation {
             $selected = $language -and $item.Checked
             $control.Text = if ($selected) { ('✓ ' + $item.Text) } else { [string]$item.Text }
             $control.AccessibleName = [string]$control.Text
-            $control.BackColor = if ($selected) { $script:ColorSelectedRow } else { $script:ColorSurface }
-            $control.FlatAppearance.BorderColor = if ($selected) { $script:ColorAccent } else { [Drawing.Color]::FromArgb(82,82,82) }
+            $control.ForeColor = if ($control.Enabled) { $script:ColorPrimary } else { [Drawing.Color]::FromArgb(146,146,146) }
+            $control.BackColor = if (-not $control.Enabled) { [Drawing.Color]::FromArgb(35,35,35) } elseif ($selected) { $script:ColorSelectedRow } else { [Drawing.Color]::FromArgb(34,34,34) }
+            $control.FlatAppearance.BorderColor = if (-not $control.Enabled) { [Drawing.Color]::FromArgb(58,58,58) } elseif ($selected) { $script:ColorAccent } else { [Drawing.Color]::FromArgb(68,68,68) }
+            $control.FlatAppearance.MouseOverBackColor = if ($control.Enabled) { $script:ColorHover } else { $control.BackColor }
+            $control.FlatAppearance.MouseDownBackColor = if ($control.Enabled) { $script:ColorSelectedRow } else { $control.BackColor }
+            $control.Cursor = if ($control.Enabled) { [Windows.Forms.Cursors]::Hand } else { [Windows.Forms.Cursors]::Default }
+            $control.Invalidate()
         }
     }
 }
@@ -13100,8 +13157,30 @@ function Add-ConfigurationActionButton {
     $button.ForeColor = $script:ColorPrimary
     $button.BackColor = $script:ColorSurface
     $button.FlatStyle = [Windows.Forms.FlatStyle]::Flat
-    $button.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(82,82,82)
+    $button.FlatAppearance.BorderSize = 1
+    $button.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(68,68,68)
     $button.FlatAppearance.MouseOverBackColor = $script:ColorHover
+    $button.FlatAppearance.MouseDownBackColor = $script:ColorSelectedRow
+    # WinForms native flat buttons dim disabled ink against dark surfaces.
+    # Paint only the disabled interior; native Enabled and High Contrast remain authoritative.
+    $button.Add_Paint({
+        param($sender,$eventArgs)
+        if ($sender.Enabled -or [Windows.Forms.SystemInformation]::HighContrast) { return }
+        $inner = $sender.ClientRectangle
+        $border = $sender.FlatAppearance.BorderSize
+        $inner.Inflate(-$border,-$border)
+        if ($inner.Width -le 0 -or $inner.Height -le 0) { return }
+        $background = New-Object Drawing.SolidBrush($sender.BackColor)
+        try { $eventArgs.Graphics.FillRectangle($background,$inner) }
+        finally { $background.Dispose() }
+        $scale = [Math]::Max(1.0,[double]$sender.FindForm().Tag.Scale)
+        $pad = [int][Math]::Round(5*$scale)
+        $inner.X += $pad
+        $inner.Width -= 2*$pad
+        if ($inner.Width -le 0) { return }
+        $flags = [Windows.Forms.TextFormatFlags]::Left -bor [Windows.Forms.TextFormatFlags]::VerticalCenter -bor [Windows.Forms.TextFormatFlags]::SingleLine -bor [Windows.Forms.TextFormatFlags]::EndEllipsis -bor [Windows.Forms.TextFormatFlags]::NoPrefix -bor [Windows.Forms.TextFormatFlags]::PreserveGraphicsClipping
+        [Windows.Forms.TextRenderer]::DrawText($eventArgs.Graphics,$sender.Text,$sender.Font,$inner,$sender.ForeColor,$flags)
+    })
     $button.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
     $button.UseMnemonic = $false
     $button.Cursor = [Windows.Forms.Cursors]::Hand
@@ -13320,7 +13399,7 @@ function Get-TrayContextMenuLocation {
 # LBS-229: keep the auxiliary surface on the owner's monitor. Prefer a
 # non-overlapping side; when neither side fits, clamp an overlapping surface.
 function Get-AuxiliaryPopupLocation {
-    param([Drawing.Rectangle]$WorkingArea,[Drawing.Rectangle]$OwnerBounds,[Drawing.Size]$SurfaceSize)
+    param([Drawing.Rectangle]$WorkingArea,[Drawing.Rectangle]$OwnerBounds,[Drawing.Size]$SurfaceSize,[Drawing.Rectangle]$TriggerBounds = [Drawing.Rectangle]::Empty)
     $gap = 8
     $right = $OwnerBounds.Right + $gap
     $left = $OwnerBounds.Left - $SurfaceSize.Width - $gap
@@ -13328,7 +13407,9 @@ function Get-AuxiliaryPopupLocation {
         elseif ($left -ge $WorkingArea.Left) { $left }
         else { $OwnerBounds.Left }
     $x = [int][Math]::Max($WorkingArea.Left,[Math]::Min($WorkingArea.Right-$SurfaceSize.Width,$x))
-    $y = [int][Math]::Max($WorkingArea.Top,[Math]::Min($WorkingArea.Bottom-$SurfaceSize.Height,$OwnerBounds.Top))
+    # Keep horizontal placement relative to the parent, vertical placement to the initiating row.
+    $anchorY = if ($TriggerBounds.IsEmpty) { $OwnerBounds.Top } else { $TriggerBounds.Top }
+    $y = [int][Math]::Max($WorkingArea.Top,[Math]::Min($WorkingArea.Bottom-$SurfaceSize.Height,$anchorY))
     return [Drawing.Point]::new($x,$y)
 }
 
@@ -13513,7 +13594,7 @@ function Show-OrTogglePopup {
     # refresh begins. Maintenance/missing-system-function states never launch a
     # competing worker; slow firmware/storage work stays in the hidden child.
     if ($canUseSystemState -and -not $maintenanceBusy) {
-        Start-BackgroundBootRefresh -RefreshStorage:($null -eq $script:StorageContext)
+        Start-BackgroundBootRefresh -RefreshStorage:($null -eq $script:StorageContext) -Origin Popup
     }
 }
 
@@ -13559,7 +13640,7 @@ function Set-AuxiliaryControlBounds {
 }
 
 function Set-AuxiliaryPopupLayout {
-    param([System.Windows.Forms.Form]$Form,[double]$Scale,[Drawing.Rectangle]$WorkingArea,[Drawing.Rectangle]$OwnerBounds)
+    param([System.Windows.Forms.Form]$Form,[double]$Scale,[Drawing.Rectangle]$WorkingArea,[Drawing.Rectangle]$OwnerBounds,[Drawing.Rectangle]$TriggerBounds = [Drawing.Rectangle]::Empty)
     if ($Form.Tag.Scale -ne 0) { throw 'Auxiliary surface has already been scaled.' }
     if ($Scale -lt 1.0 -or $Scale -gt 5.0) { throw 'Invalid auxiliary scale.' }
     Set-AuxiliaryControlBounds -Control $Form -Scale $Scale
@@ -13575,7 +13656,7 @@ function Set-AuxiliaryPopupLayout {
     $state.Body.Size = [Drawing.Size]::new($width,[Math]::Max(1,$height-$state.Body.Top))
     $state.Body.AutoScroll = $true
     $state.Body.AutoScrollMinSize = [Drawing.Size]::new(0,[int][Math]::Round($state.ContentHeight*$Scale))
-    $Form.Location = Get-AuxiliaryPopupLocation -WorkingArea $WorkingArea -OwnerBounds $OwnerBounds -SurfaceSize $Form.Size
+    $Form.Location = Get-AuxiliaryPopupLocation -WorkingArea $WorkingArea -OwnerBounds $OwnerBounds -SurfaceSize $Form.Size -TriggerBounds $TriggerBounds
 }
 
 # Modal ownership prevents competing main-popup selections while a child is
@@ -13588,7 +13669,8 @@ function Show-OwnedAuxiliaryPopup {
         if (-not $parent -or -not $parent.Visible) { return $null }
         $screen = [Windows.Forms.Screen]::FromControl($parent)
         $scale = (Get-LenovoUiCoordinateScale -Screen $screen).Factor
-        Set-AuxiliaryPopupLayout -Form $Form -Scale ([double]$scale) -WorkingArea $screen.WorkingArea -OwnerBounds $parent.Bounds
+        $triggerBounds = $Owner.RectangleToScreen($Owner.ClientRectangle)
+        Set-AuxiliaryPopupLayout -Form $Form -Scale ([double]$scale) -WorkingArea $screen.WorkingArea -OwnerBounds $parent.Bounds -TriggerBounds $triggerBounds
         $script:ActiveAuxiliaryPopup = $Form
         $result = $Form.ShowDialog($parent)
         if ($result -eq [Windows.Forms.DialogResult]::OK) { return $Form.Tag.Choice }
@@ -13913,7 +13995,7 @@ try {
             [void](Load-BootStateFromExistingCache)
             [void](Refresh-SystemDefaultState)
             Complete-LegacyDefaultMigration
-            Start-BackgroundBootRefresh -RefreshStorage
+            Start-BackgroundBootRefresh -RefreshStorage -Origin Startup
         }
     } catch { }
     try { Update-AutostartUi | Out-Null } catch { }
