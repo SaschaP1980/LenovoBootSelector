@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.11.1 – Avoid redundant verified BootNext selection (LBS-219 Hotfix)
+
+- Repeated activation of the same allowlisted, firmware-readback-verified one-shot next-boot target is idempotent: preserve the confirmed checkmark, status, restart state and focus without pending UI or another SYSTEM worker.
+- Keep cold Checking/deferred admission, unverified or cached next-boot state, concurrent refresh, missing targets, default-change and maintenance interlocks, different-target selection and independent firmware verification on the existing guarded path. Pointer and Enter/Space continue to share the normal controller.
+- Extend the mocked native Windows PowerShell 5.1 BootNext controller regression from 57 to 72 assertions. No change to firmware writers, TaskBroker privileges, BootOrder, persistent defaults, keyboard wiring, localization, row geometry or DPI.
+
 ## v1.5.11.0 – UX-04 boot-row state clarification (LBS-217)
 
 - Give the existing confirmed-next-boot checkmark and not-yet-confirmed pending ellipsis localized, noncolor descriptions, accessible text and native hover ToolTips. The status descriptions explicitly distinguish a pending request from a confirmed firmware next-boot selection. An idle indicator remains silent. No new or speculative row-level error/disabled states are introduced.
