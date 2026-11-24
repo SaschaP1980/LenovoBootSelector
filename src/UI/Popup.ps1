@@ -25,17 +25,16 @@ function Invoke-PopupEscapeDismissal {
 
 function New-PopupForm {
     param([double]$TargetScale = 1.0, [string]$ScaleSource = 'initial')
-    if (-not $script:BootTypeToolTip) {
-        $script:BootTypeToolTip = New-Object System.Windows.Forms.ToolTip
-        $script:BootTypeToolTip.InitialDelay = 350
-        $script:BootTypeToolTip.ReshowDelay = 100
-        $script:BootTypeToolTip.AutoPopDelay = 8000
-        $script:BootTypeToolTip.ShowAlways = $true
-        $script:BootTypeToolTip.UseAnimation = $true
-        $script:BootTypeToolTip.UseFading = $true
-    }
-
     $form = New-Object System.Windows.Forms.Form
+    if (-not $script:BootTypeToolTip) {
+        $script:BootTypeToolTip = New-LenovoDarkTooltip -Animate
+        $form.Add_Disposed({
+            if ($script:BootTypeToolTip) {
+                $script:BootTypeToolTip.Dispose()
+                $script:BootTypeToolTip = $null
+            }
+        })
+    }
     $form.Name = 'LenovoBootSelectorPopup'
     $form.KeyPreview = $true
     Initialize-PopupDpiLayout -Form $form

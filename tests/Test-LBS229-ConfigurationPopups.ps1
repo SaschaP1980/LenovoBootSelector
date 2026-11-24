@@ -26,6 +26,7 @@ Add-Type -TypeDefinition ($template.Substring($begin,$end-$begin)) -ReferencedAs
 . (Join-Path $root 'src\Core\Localization.ps1')
 . (Join-Path $root 'src\UI\BootEntryList.ps1')
 . (Join-Path $root 'src\UI\BootEntryRows.ps1')
+. (Join-Path $root 'src\UI\MenuAppearance.ps1')
 . (Join-Path $root 'src\UI\PopupComposition.ps1')
 . (Join-Path $root 'src\UI\PopupPosition.ps1')
 . (Join-Path $root 'src\UI\Popup.ps1')

@@ -150,57 +150,182 @@ function Initialize-LenovoMenuAppearance {
     # custom drop-down classes. No delayed BeginInvoke/tail-paint workaround.
 }
 
+# LBS-244: common rendering, independent native ToolTip instances and timing.
+function New-LenovoDarkTooltip {
+    param([int]$InitialDelay = 350,[int]$ReshowDelay = 100,[int]$AutoPopDelay = 8000,[switch]$Animate)
+    if (-not ('LenovoDarkTooltip' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+
+public sealed class LenovoDarkTooltip : ToolTip {
+    private readonly Func<Control, double> coordinateScale;
+    private Control manualOwner;
+    private Form manualForm;
+    private string manualText;
+    private static readonly Color Surface = Color.FromArgb(28,28,28);
+    private static readonly Color Ink = Color.FromArgb(238,238,238);
+    private static readonly Color Edge = Color.FromArgb(76,76,76);
+    private const TextFormatFlags Flags = TextFormatFlags.WordBreak |
+        TextFormatFlags.TextBoxControl | TextFormatFlags.NoPrefix |
+        TextFormatFlags.NoPadding;
+
+    public LenovoDarkTooltip(Func<Control, double> scale, int initial, int reshow, int duration, bool animate) {
+        if (scale == null) throw new ArgumentNullException("scale");
+        coordinateScale = scale;
+        OwnerDraw = !SystemInformation.HighContrast;
+        ShowAlways = true;
+        UseAnimation = animate;
+        UseFading = animate;
+        InitialDelay = initial;
+        ReshowDelay = reshow;
+        AutoPopDelay = duration;
+        StripAmpersands = false;
+        if (OwnerDraw) {
+            BackColor = Surface;
+            ForeColor = Ink;
+            Popup += OnHintPopup;
+            Draw += OnHintDraw;
+        }
+    }
+
+    private static double ValidScale(double scale) {
+        if (Double.IsNaN(scale) || Double.IsInfinity(scale) || scale < 1 || scale > 5)
+            throw new ArgumentOutOfRangeException("scale");
+        return scale;
+    }
+
+    private static int Px(double n, double scale) {
+        return Math.Max(1, (int)Math.Round(n * ValidScale(scale), MidpointRounding.AwayFromZero));
+    }
+
+    private static Font HintFont(double scale) {
+        // Pixel units: the effective WinForms coordinate scale already
+        // accounts for awareness/system DPI. Do not multiply point fonts.
+        return new Font("Segoe UI", (float)(8.5 * 96.0 / 72.0 * ValidScale(scale)),
+            FontStyle.Regular, GraphicsUnit.Pixel);
+    }
+
+    public static Size MeasureHint(string text, double scale, Rectangle work) {
+        if (work.Width <= 0 || work.Height <= 0) throw new ArgumentException("Invalid work area.");
+        int px = Px(10,scale), py = Px(6,scale);
+        int maxWidth = Math.Min(work.Width, Px(340,scale));
+        int textWidth = Math.Max(1,maxWidth - 2 * px);
+        using (Font font = HintFont(scale)) {
+            Size measured = TextRenderer.MeasureText(text ?? String.Empty, font,
+                new Size(textWidth,32767), Flags);
+            int width = Math.Min(maxWidth, Math.Max(Px(120,scale), measured.Width + 2 * px));
+            int height = Math.Min(work.Height, Math.Max(Px(30,scale), measured.Height + 2 * py));
+            return new Size(Math.Max(1,width), Math.Max(1,height));
+        }
+    }
+
+    public static Point PlaceHint(Rectangle anchor, Size hint, Rectangle work, double scale) {
+        int gap = Px(8,scale);
+        int x = anchor.Right + gap;
+        if ((long)x + hint.Width > work.Right) x = anchor.Left - hint.Width - gap;
+        int y = anchor.Top + (anchor.Height - hint.Height)/2;
+        x = Math.Max(work.Left,Math.Min(work.Right - hint.Width,x));
+        y = Math.Max(work.Top,Math.Min(work.Bottom - hint.Height,y));
+        return new Point(x,y);
+    }
+
+    public static void PaintHint(Graphics graphics, Rectangle bounds, string text, double scale) {
+        int px = Px(10,scale), py = Px(6,scale);
+        using (SolidBrush bg = new SolidBrush(Surface))
+        using (Pen border = new Pen(Edge))
+        using (Font font = HintFont(scale)) {
+            graphics.FillRectangle(bg,bounds);
+            graphics.DrawRectangle(border,bounds.X,bounds.Y,Math.Max(0,bounds.Width-1),Math.Max(0,bounds.Height-1));
+            Rectangle body = new Rectangle(bounds.X+px,bounds.Y+py,
+                Math.Max(1,bounds.Width-2*px),Math.Max(1,bounds.Height-2*py));
+            TextRenderer.DrawText(graphics,text ?? String.Empty,font,body,Ink,Flags);
+        }
+    }
+
+    private void OnHintPopup(object sender, PopupEventArgs e) {
+        Control owner = e.AssociatedControl;
+        if (owner == null || owner.IsDisposed) { e.Cancel = true; return; }
+        string text = Object.ReferenceEquals(owner,manualOwner) ? manualText : GetToolTip(owner);
+        if (String.IsNullOrWhiteSpace(text)) { e.Cancel = true; return; }
+        e.ToolTipSize = MeasureHint(text,coordinateScale(owner),Screen.FromControl(owner).WorkingArea);
+    }
+
+    private void OnHintDraw(object sender, DrawToolTipEventArgs e) {
+        Control owner = e.AssociatedControl;
+        if (owner == null || owner.IsDisposed) return;
+        PaintHint(e.Graphics,e.Bounds,e.ToolTipText,coordinateScale(owner));
+    }
+
+    public Control ManualOwner { get { return manualOwner; } }
+
+    public void ShowManual(Control owner, string text) {
+        if (owner == null || owner.IsDisposed || !owner.Visible || String.IsNullOrWhiteSpace(text)) return;
+        HideManual();
+        manualOwner = owner;
+        manualText = text;
+        manualForm = owner.FindForm();
+        owner.VisibleChanged += OnManualOwnerVisibility;
+        owner.HandleDestroyed += OnManualOwnerEnded;
+        owner.Disposed += OnManualOwnerEnded;
+        if (manualForm != null) manualForm.Deactivate += OnManualOwnerEnded;
+        try {
+            double scale = coordinateScale(owner);
+            Rectangle work = Screen.FromControl(owner).WorkingArea;
+            Rectangle anchor = new Rectangle(owner.PointToScreen(Point.Empty),owner.Size);
+            Point client = owner.PointToClient(PlaceHint(anchor,MeasureHint(text,scale,work),work,scale));
+            Show(text,owner,client.X,client.Y,AutoPopDelay);
+        } catch {
+            HideManual();
+            throw;
+        }
+    }
+
+    private void OnManualOwnerVisibility(object sender, EventArgs e) {
+        if (manualOwner != null && !manualOwner.Visible) HideManual();
+    }
+
+    private void OnManualOwnerEnded(object sender, EventArgs e) { HideManual(); }
+
+    public void HideManual() {
+        Control owner = manualOwner;
+        Form form = manualForm;
+        manualOwner = null;
+        manualForm = null;
+        manualText = null;
+        if (owner != null) {
+            owner.VisibleChanged -= OnManualOwnerVisibility;
+            owner.HandleDestroyed -= OnManualOwnerEnded;
+            owner.Disposed -= OnManualOwnerEnded;
+        }
+        if (form != null) form.Deactivate -= OnManualOwnerEnded;
+        if (owner != null && !owner.IsDisposed && owner.IsHandleCreated) Hide(owner);
+    }
+
+    protected override void Dispose(bool disposing) {
+        if (disposing) HideManual();
+        base.Dispose(disposing);
+    }
+}
+'@ -ReferencedAssemblies System.Windows.Forms,System.Drawing -ErrorAction Stop
+    }
+    $scale = [Func[Windows.Forms.Control,double]]{
+        param($owner)
+        if (Get-Command Get-LenovoUiCoordinateScale -ErrorAction SilentlyContinue) {
+            return [double](Get-LenovoUiCoordinateScale -Screen ([Windows.Forms.Screen]::FromControl($owner))).Factor
+        }
+        # Isolated native fixtures need not load the application's DPI provider.
+        $graphics = $owner.CreateGraphics()
+        try { return [Math]::Max(1.0,[Math]::Min(5.0,[double]$graphics.DpiX / 96.0)) }
+        finally { $graphics.Dispose() }
+    }
+    return [LenovoDarkTooltip]::new($scale,$InitialDelay,$ReshowDelay,$AutoPopDelay,[bool]$Animate)
+}
+
 function Ensure-DarkActionTooltip {
     if (-not $script:DarkActionTooltip) {
-        $script:DarkActionTooltipFont = New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Regular)
-        $tip = New-Object System.Windows.Forms.ToolTip
-        $tip.OwnerDraw = $true
-        $tip.ShowAlways = $true
-        $tip.UseAnimation = $false
-        $tip.UseFading = $false
-        $tip.InitialDelay = 0
-        $tip.ReshowDelay = 0
-        $tip.AutoPopDelay = 3500
-        $tip.BackColor = [Drawing.Color]::FromArgb(28,28,28)
-        $tip.ForeColor = [Drawing.Color]::FromArgb(238,238,238)
-        $tip.Add_Popup({
-            param($sender,$eventArgs)
-            $text = [string]$script:DarkActionTooltipText
-            if ([string]::IsNullOrWhiteSpace($text)) { return }
-            $measured = [System.Windows.Forms.TextRenderer]::MeasureText(
-                $text,
-                $script:DarkActionTooltipFont,
-                (New-Object Drawing.Size(320,0)),
-                ([System.Windows.Forms.TextFormatFlags]::SingleLine -bor [System.Windows.Forms.TextFormatFlags]::NoPadding)
-            )
-            $width = [Math]::Min(340, [Math]::Max(120, $measured.Width + 20))
-            $height = [Math]::Max(30, $measured.Height + 12)
-            $eventArgs.ToolTipSize = New-Object Drawing.Size($width,$height)
-        })
-        $tip.Add_Draw({
-            param($sender,$eventArgs)
-            $bounds = $eventArgs.Bounds
-            $bg = New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(28,28,28))
-            $border = New-Object Drawing.Pen([Drawing.Color]::FromArgb(76,76,76),1)
-            try {
-                $eventArgs.Graphics.FillRectangle($bg, $bounds)
-                $eventArgs.Graphics.DrawRectangle($border, 0, 0, [Math]::Max(0,$bounds.Width-1), [Math]::Max(0,$bounds.Height-1))
-                $textRect = New-Object Drawing.Rectangle(9, 0, [Math]::Max(1,$bounds.Width-18), $bounds.Height)
-                [System.Windows.Forms.TextRenderer]::DrawText(
-                    $eventArgs.Graphics,
-                    [string]$script:DarkActionTooltipText,
-                    $script:DarkActionTooltipFont,
-                    $textRect,
-                    [Drawing.Color]::FromArgb(238,238,238),
-                    ([System.Windows.Forms.TextFormatFlags]::VerticalCenter -bor [System.Windows.Forms.TextFormatFlags]::SingleLine -bor [System.Windows.Forms.TextFormatFlags]::NoPadding)
-                )
-            }
-            finally {
-                $border.Dispose()
-                $bg.Dispose()
-            }
-        })
-        $script:DarkActionTooltip = $tip
+        $script:DarkActionTooltip = New-LenovoDarkTooltip -InitialDelay 0 -ReshowDelay 0 -AutoPopDelay 3500
     }
     return $script:DarkActionTooltip
 }
@@ -210,37 +335,13 @@ function Show-DarkActionTooltip {
         [Parameter(Mandatory=$true)][System.Windows.Forms.Control]$Owner,
         [Parameter(Mandatory=$true)][string]$Text
     )
-    if ([string]::IsNullOrWhiteSpace($Text) -or -not $Owner -or $Owner.IsDisposed) { return }
+    if ([string]::IsNullOrWhiteSpace($Text) -or $Owner.IsDisposed -or -not $Owner.Visible) { return }
     $tip = Ensure-DarkActionTooltip
-    $script:DarkActionTooltipText = $Text
-    $script:DarkActionTooltipOwner = $Owner
-
-    $measured = [System.Windows.Forms.TextRenderer]::MeasureText(
-        $Text,
-        $script:DarkActionTooltipFont,
-        (New-Object Drawing.Size(320,0)),
-        ([System.Windows.Forms.TextFormatFlags]::SingleLine -bor [System.Windows.Forms.TextFormatFlags]::NoPadding)
-    )
-    $width = [Math]::Min(340, [Math]::Max(120, $measured.Width + 20))
-    $height = [Math]::Max(30, $measured.Height + 12)
-    $work = [System.Windows.Forms.Screen]::FromControl($Owner).WorkingArea
-    $ownerTopLeft = $Owner.PointToScreen([System.Drawing.Point]::Empty)
-    $x = $ownerTopLeft.X + $Owner.Width + 8
-    if (($x + $width) -gt $work.Right) { $x = $ownerTopLeft.X - $width - 8 }
-    if ($x -lt $work.Left) { $x = [Math]::Max($work.Left, [Math]::Min($work.Right - $width, $ownerTopLeft.X)) }
-    $y = $ownerTopLeft.Y + [int](($Owner.Height - $height) / 2)
-    if ($y -lt $work.Top) { $y = $work.Top }
-    if (($y + $height) -gt $work.Bottom) { $y = $work.Bottom - $height }
-    $clientPoint = $Owner.PointToClient((New-Object Drawing.Point($x,$y)))
-
-    try { $tip.Hide($Owner) } catch { }
-    $tip.Show($Text, $Owner, $clientPoint.X, $clientPoint.Y, 3500)
+    $tip.ShowManual($Owner,$Text)
+    $script:DarkActionTooltipOwner = $tip.ManualOwner
 }
 
 function Hide-DarkActionTooltip {
-    if ($script:DarkActionTooltip -and $script:DarkActionTooltipOwner) {
-        try { $script:DarkActionTooltip.Hide($script:DarkActionTooltipOwner) } catch { }
-    }
+    if ($script:DarkActionTooltip) { $script:DarkActionTooltip.HideManual() }
     $script:DarkActionTooltipOwner = $null
-    $script:DarkActionTooltipText = $null
 }
