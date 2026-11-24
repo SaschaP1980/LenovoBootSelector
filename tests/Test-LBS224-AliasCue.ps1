@@ -41,17 +41,18 @@ function Get-ProductCueInk {
     $graphics=[Drawing.Graphics]::FromImage($bitmap)
     try {
         $graphics.CopyFromScreen($Editor.PointToScreen([Drawing.Point]::Empty),[Drawing.Point]::Empty,$Editor.Size)
-        $bright=0; $dark=0; $peak=0
+        $bright=0; $dark=0; $peak=0; $blueGray=0
         for ($y=0;$y -lt $bitmap.Height;$y++) {
             for ($x=12;$x -lt [Math]::Min(240,$bitmap.Width);$x++) {
                 $px=$bitmap.GetPixel($x,$y)
                 $v=[Math]::Min($px.R,[Math]::Min($px.G,$px.B))
                 if ($v -ge 130) { $bright++ }
+                if ($v -ge 130 -and ($px.B - $px.R) -ge 30 -and ($px.G - $px.R) -ge 10) { $blueGray++ }
                 if ($v -le 30) { $dark++ }
                 if ($v -gt $peak) { $peak=$v }
             }
         }
-        return [pscustomobject]@{bright=$bright;dark=$dark;peak=$peak}
+        return [pscustomobject]@{bright=$bright;dark=$dark;peak=$peak;blueGray=$blueGray}
     } finally { $graphics.Dispose(); $bitmap.Dispose() }
 }
 $script:ColorAccent=[Drawing.Color]::FromArgb(225,37,27)
@@ -106,7 +107,8 @@ foreach ($locale in @('en-US','de-DE')) {
             Start-Sleep -Milliseconds 100
             $ink=Get-ProductCueInk -Editor $editor
             Write-Host ('LBS224_PRODUCT_CUE_RASTER ' + $prefix + ' ' + ($ink | ConvertTo-Json -Compress))
-            Assert-AliasCue "$prefix actual visible dark-theme cue raster" ($cue.ForeColor -eq [Drawing.Color]::FromArgb(155,155,155) -and $cue.BackColor -eq $editor.BackColor -and $ink.bright -gt 10 -and $ink.dark -gt 100)
+            Assert-AliasCue "$prefix actual visible blue-gray dark-theme cue raster" ($cue.ForeColor -eq [Drawing.Color]::FromArgb(143,166,191) -and $cue.BackColor -eq $editor.BackColor -and $ink.bright -gt 10 -and $ink.dark -gt 100 -and $ink.blueGray -gt 3)
+            Assert-AliasCue "$prefix italic cue distinct from regular native text at unchanged size" ($cue.Font.Style -eq [Drawing.FontStyle]::Italic -and $editor.Font.Style -eq [Drawing.FontStyle]::Regular -and $cue.Font.FontFamily.Name -eq $editor.Font.FontFamily.Name -and [Math]::Abs($cue.Font.SizeInPoints-$editor.Font.SizeInPoints) -lt 0.05 -and $editor.ForeColor -eq $script:ColorPrimary -and $cue.ForeColor -ne $editor.ForeColor)
             $hit=[Lbs224ProductNative]::HitTest($cue.Handle,0x0084,[IntPtr]0,[IntPtr]0).ToInt64()
             $point=$cue.PointToScreen([Drawing.Point]::new(20,5))
             $nativeHit=[Lbs224ProductNative]::WindowFromPoint($point)
@@ -180,5 +182,5 @@ try {
     Assert-AliasCue 'Uninitialized helper retains original instruction' ($hint -and $hint.Text -eq 'Leave empty = original name' -and $null -eq $frame.Controls['AliasCueLabel'])
     Assert-AliasCue 'Fallback retains truly empty editor and no draft side effect' ($frame.Controls['AliasEditor'].Text -eq '' -and $script:SaveStateCalls -eq 0 -and $script:DraftCalls -eq 0)
 } finally { $fallback.Dispose() }
-Write-Host "LBS224 ALIAS CUE TOTAL $script:checks/110"
-if ($script:checks -ne 110) { throw "Expected 110 native alias cue assertions, got $script:checks" }
+Write-Host "LBS224 ALIAS CUE TOTAL $script:checks/114"
+if ($script:checks -ne 114) { throw "Expected 114 native alias cue assertions, got $script:checks" }
