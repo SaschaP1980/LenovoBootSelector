@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.15.0 – Separate configuration from everyday boot selection (LBS-229)
+
+- Keep persistent Default directly reachable in the fixed main popup; replace the duplicated Autostart row with Further settings, a flat owned WinForms popup with Autostart, direct language buttons, System functions, Updates and Diagnostics.
+- Replace the compact Default context menu with a dedicated picker showing familiar colored boot-target rows, descriptions and verified persistent-default selection. Preserve immediate guarded asynchronous selection, the clear-default option and status/readback semantics.
+- Position auxiliary surfaces on the owner monitor with side preference and work-area scrolling; preserve main geometry, Manage draft, tray menu, existing action owners, privilege boundaries and explicit confirmations.
+
 ## v1.5.14.0 – Limit custom boot entry aliases (LBS-227)
 
 - Limit native alias typing and clipboard paste to 30 UTF-16 code units; validate changed aliases at the shared draft admission boundary and keep invalid edited input open with localized feedback.

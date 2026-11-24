@@ -35,6 +35,11 @@ $bootRowStateProbe = Join-Path $root 'tests\Test-LBS217-RowState.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $bootRowStateProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-217 native boot row state semantics regression failed' }
 
+# LBS-229: native owned settings and persistent-default picker, no actual system writes.
+$configurationProbe = Join-Path $root 'tests\Test-LBS229-ConfigurationPopups.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $configurationProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-229 native configuration popup regression failed' }
+
 # LBS-227: native EDIT length limit and actual draft/settings legacy preservation.
 $aliasLimitProbe = Join-Path $root 'tests\Test-LBS227-AliasLimit.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $aliasLimitProbe

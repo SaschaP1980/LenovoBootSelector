@@ -10,9 +10,8 @@ function Invoke-PopupEscapeDismissal {
         $EventArgs.Modifiers -ne [System.Windows.Forms.Keys]::None) { return }
     if (-not $Form.Visible -or -not $Form.ContainsFocus) { return }
 
-    # DropDown and OLE drag have independent Escape/cleanup lifecycles.
-    if ($script:DefaultContextMenu -and -not $script:DefaultContextMenu.IsDisposed -and
-        $script:DefaultContextMenu.Visible) { return }
+    # Owned auxiliary forms and OLE drag have independent Escape/cleanup lifecycles.
+    if ($script:ActiveAuxiliaryPopup) { return }
     if ($script:ManageActiveDragGuid -or $script:ManageDragLayout) { return }
 
     $aliasEditor = $Form.Controls.Find('AliasEditor', $true) | Select-Object -First 1
@@ -80,12 +79,9 @@ function New-PopupForm {
     })
 
     $form.Add_Deactivate({
-        # The default-target ToolStrip is part of this popup's own UI.
-        # A focus handoff to it must not hide the owner form underneath.
-        # The opening flag covers Deactivate before DropDown.Visible is set.
-        if ($script:DefaultTargetMenuOpening -or
-            ($script:DefaultContextMenu -and -not $script:DefaultContextMenu.IsDisposed -and
-             $script:DefaultContextMenu.Visible)) { return }
+        # The owned auxiliary Form is part of this popup's UI. The
+        # ownership flag covers Deactivate before the child becomes visible.
+        if ($script:ActiveAuxiliaryPopup) { return }
         $capabilities = Get-CurrentSystemFunctionsCapabilities
         if (-not $script:ExitRequested -and [string]$capabilities.State -ne 'Busy') { $this.Hide() }
     })
@@ -130,6 +126,10 @@ function Position-Popup {
 
 function Show-OrTogglePopup {
     param([switch]$FromTrayClick)
+    if ($script:ActiveAuxiliaryPopup -and -not $script:ActiveAuxiliaryPopup.IsDisposed) {
+        [void]$script:ActiveAuxiliaryPopup.Activate()
+        return
+    }
     if (-not $script:Popup -or $script:Popup.IsDisposed) {
         $initialScreen = [System.Windows.Forms.Screen]::PrimaryScreen
         $initialScale = Get-LenovoUiCoordinateScale -Screen $initialScreen
@@ -186,6 +186,10 @@ function Show-OrTogglePopup {
 # Explicit launcher re-entry is SHOW, never the tray-icon toggle (which hides
 # an already visible popup). This runs on the existing WinForms UI thread.
 function Show-OrActivatePopup {
+    if ($script:ActiveAuxiliaryPopup -and -not $script:ActiveAuxiliaryPopup.IsDisposed) {
+        [void]$script:ActiveAuxiliaryPopup.Activate()
+        return
+    }
     if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) {
         [void]$script:Popup.Activate()
         return
@@ -201,3 +205,63 @@ function Load-TrayIcon {
     return [Drawing.SystemIcons]::Application
 }
 
+# Auxiliary forms are built at 96-DPI design bounds, then scaled once using
+# the same effective coordinate factor as the main popup. Keep font points
+# and the main popup's immutable metrics independent.
+function Set-AuxiliaryControlBounds {
+    param([System.Windows.Forms.Control]$Control,[double]$Scale)
+    $Control.SuspendLayout()
+    try {
+        if ($Control -is [System.Windows.Forms.Form]) {
+            $Control.ClientSize = [Drawing.Size]::new([int][Math]::Round($Control.ClientSize.Width*$Scale),[int][Math]::Round($Control.ClientSize.Height*$Scale))
+        }
+        else {
+            $b = $Control.Bounds
+            $Control.Bounds = [Drawing.Rectangle]::new([int][Math]::Round($b.X*$Scale),[int][Math]::Round($b.Y*$Scale),[int][Math]::Round($b.Width*$Scale),[int][Math]::Round($b.Height*$Scale))
+        }
+        foreach ($child in $Control.Controls) { Set-AuxiliaryControlBounds -Control $child -Scale $Scale }
+    }
+    finally { $Control.ResumeLayout($false) }
+}
+
+function Set-AuxiliaryPopupLayout {
+    param([System.Windows.Forms.Form]$Form,[double]$Scale,[Drawing.Rectangle]$WorkingArea,[Drawing.Rectangle]$OwnerBounds)
+    if ($Form.Tag.Scale -ne 0) { throw 'Auxiliary surface has already been scaled.' }
+    if ($Scale -lt 1.0 -or $Scale -gt 5.0) { throw 'Invalid auxiliary scale.' }
+    Set-AuxiliaryControlBounds -Control $Form -Scale $Scale
+    $state = $Form.Tag
+    $state.Scale = $Scale
+    $width = [Math]::Max(1,[Math]::Min($Form.ClientSize.Width,$WorkingArea.Width-12))
+    $height = [Math]::Max(1,[Math]::Min($Form.ClientSize.Height,$WorkingArea.Height-12))
+    $Form.ClientSize = [Drawing.Size]::new($width,$height)
+    $state.Header.Width = $width
+    $state.Close.Left = [Math]::Max(0,$width-$state.Close.Width-[int][Math]::Round(12*$Scale))
+    $state.Title.Width = [Math]::Max(1,$state.Close.Left-$state.Title.Left)
+    $state.Subtitle.Width = [Math]::Max(1,$width-$state.Subtitle.Left-[int][Math]::Round(16*$Scale))
+    $state.Body.Size = [Drawing.Size]::new($width,[Math]::Max(1,$height-$state.Body.Top))
+    $state.Body.AutoScroll = $true
+    $state.Body.AutoScrollMinSize = [Drawing.Size]::new(0,[int][Math]::Round($state.ContentHeight*$Scale))
+    $Form.Location = Get-AuxiliaryPopupLocation -WorkingArea $WorkingArea -OwnerBounds $OwnerBounds -SurfaceSize $Form.Size
+}
+
+# Modal ownership prevents competing main-popup selections while a child is
+# open. No business action is dispatched by this lifecycle function.
+function Show-OwnedAuxiliaryPopup {
+    param([System.Windows.Forms.Form]$Form,[System.Windows.Forms.Control]$Owner)
+    try {
+        if ($script:ActiveAuxiliaryPopup -or -not $Owner -or $Owner.IsDisposed) { return $null }
+        $parent = $Owner.FindForm()
+        if (-not $parent -or -not $parent.Visible) { return $null }
+        $screen = [Windows.Forms.Screen]::FromControl($parent)
+        $scale = (Get-LenovoUiCoordinateScale -Screen $screen).Factor
+        Set-AuxiliaryPopupLayout -Form $Form -Scale ([double]$scale) -WorkingArea $screen.WorkingArea -OwnerBounds $parent.Bounds
+        $script:ActiveAuxiliaryPopup = $Form
+        $result = $Form.ShowDialog($parent)
+        if ($result -eq [Windows.Forms.DialogResult]::OK) { return $Form.Tag.Choice }
+        return $null
+    }
+    finally {
+        if ([object]::ReferenceEquals($script:ActiveAuxiliaryPopup,$Form)) { $script:ActiveAuxiliaryPopup = $null }
+        $Form.Dispose()
+    }
+}

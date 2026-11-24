@@ -1,5 +1,5 @@
 {
-  "version": "1.5.14.0",
+  "version": "1.5.15.0",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
@@ -14,7 +14,7 @@
     "self_repair_best_effort",
     "telemetry_best_effort"
   ],
-  "count": 152,
+  "count": 151,
   "entries": [
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
@@ -480,7 +480,7 @@
     },
     {
       "source": "src/Core/Localization.ps1",
-      "line": 676,
+      "line": 690,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { $text = $text -f @($Arguments) } catch { }"
@@ -836,15 +836,8 @@
       "code": "$icon.Add_MouseLeave({ param($sender, $eventArgs) try { $script:BootTypeToolTip.Hide($sender) } catch { } })"
     },
     {
-      "source": "src/UI/DefaultTargetMenu.ps1",
-      "line": 44,
-      "category": "presentation_best_effort",
-      "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
-      "code": "} catch { }"
-    },
-    {
       "source": "src/UI/DefaultTargetPresentation.ps1",
-      "line": 56,
+      "line": 59,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "} catch { }"
@@ -977,7 +970,7 @@
     },
     {
       "source": "src/UI/Popup.ps1",
-      "line": 199,
+      "line": 203,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { return [Drawing.Icon]::new($iconPath) } catch { }"

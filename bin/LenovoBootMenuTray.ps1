@@ -88,6 +88,13 @@ function Get-LocalizationCatalogCore {
             'Popup.Customize' = 'CUSTOMIZE'
             'Status.ScrollPositionFailed' = 'The scroll position could not be updated.'
             'Settings.Title' = 'SETTINGS'
+            'Settings.More' = 'Further settings'
+            'Settings.General' = 'GENERAL'
+            'Settings.Updates' = 'UPDATES'
+            'Settings.Diagnostics' = 'DIAGNOSTICS'
+            'Settings.DefaultPickerCurrent' = 'Current default: {Target}'
+            'Settings.DefaultPickerNoneHint' = 'Do not configure a persistent default'
+            'Settings.DefaultPickerSelected' = 'Current persistent default'
             'Settings.Autostart' = 'Start with Windows'
             'Settings.DefaultTarget' = 'Default boot target'
             'Settings.NoDefaultTarget' = 'No default target'
@@ -388,6 +395,13 @@ function Get-LocalizationCatalogCore {
             'Popup.Customize' = 'ANPASSEN'
             'Status.ScrollPositionFailed' = 'Scrollposition konnte nicht aktualisiert werden.'
             'Settings.Title' = 'EINSTELLUNGEN'
+            'Settings.More' = 'Weitere Einstellungen'
+            'Settings.General' = 'ALLGEMEIN'
+            'Settings.Updates' = 'UPDATES'
+            'Settings.Diagnostics' = 'DIAGNOSE'
+            'Settings.DefaultPickerCurrent' = 'Aktuelles Standardziel: {Target}'
+            'Settings.DefaultPickerNoneHint' = 'Kein dauerhaftes Startziel festlegen'
+            'Settings.DefaultPickerSelected' = 'Aktuelles dauerhaftes Standardziel'
             'Settings.Autostart' = 'Mit Windows starten'
             'Settings.DefaultTarget' = 'Standard-Startziel'
             'Settings.NoDefaultTarget' = 'Kein Standardziel'
@@ -2349,7 +2363,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.14.0'
+$script:AppVersion = '1.5.15.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -2458,7 +2472,7 @@ $script:DefaultArrowLabel = $null
 $script:DefaultInteractionEnabled = $false
 $script:RestartTargetLabel = $null
 $script:RestartUseDefaultButton = $null
-$script:DefaultContextMenu = $null
+$script:ActiveAuxiliaryPopup = $null
 $script:DefaultContextRoot = $null
 $script:LegacySessionRestoreRegistryPath = 'HKCU:\Volatile Environment'
 $script:LegacySessionRestoreValueName = 'LenovoBootMenuTrayDefaultRestoreProcessed'
@@ -5831,6 +5845,8 @@ function Update-DefaultUi {
         $script:DefaultInteractionEnabled = $interactive
         if (-not $interactive) { $script:DefaultButton.BackColor = $script:ColorSurface }
         $script:DefaultButton.Enabled = $visualEnabled
+        $script:DefaultButton.TabStop = $interactive
+        $script:DefaultButton.AccessibleName = Get-LocalizedString -Key 'Settings.DefaultTarget'
         $script:DefaultButton.Cursor = if ($interactive) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
 
         if ($script:DefaultValueLabel -and -not $script:DefaultValueLabel.IsDisposed) {
@@ -5846,6 +5862,7 @@ function Update-DefaultUi {
             } else { [string]$script:DefaultValueLabel.Text }
             $script:DefaultValueLabel.AccessibleName = $description
             $script:DefaultValueLabel.AccessibleDescription = $description
+            $script:DefaultButton.AccessibleDescription = $description
             if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($script:DefaultValueLabel,$description) }
             $script:DefaultValueLabel.ForeColor = if ($pendingDefault) { $script:ColorWarning } elseif ($interactive) { $script:ColorPrimary } else { $mutedInk }
         }
@@ -5956,78 +5973,150 @@ function Set-DefaultGuid {
     }
 }
 
-function New-DefaultTargetMenu {
-    $menu = New-Object LenovoContextMenuStrip
-    # Only this owned dropdown gets a distinct neutral outside edge.
-    $menu.Name = 'DefaultTargetContextMenu'
-    $menu.BackColor = [Drawing.Color]::FromArgb(22, 22, 22)
-    $menu.ForeColor = $script:ColorPrimary
-    $menu.Renderer = $script:MenuRenderer
-    $menu.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
-    $menu.Padding = New-Object System.Windows.Forms.Padding(0, 2, 0, 2)
-    $menu.TargetWidth = 260
-    Initialize-LenovoMenuAppearance -Menu $menu
+# LBS-229: persistent-default selection deliberately uses a separate
+# presentation row, never the normal BootNext row's action handler.
+function Test-DefaultPickerInteraction {
+    if ($script:IsManageEntriesMode -or $script:DefaultTargetChangePending -or $script:BootNextPendingGuid -or (Test-MaintenanceBusy) -or (Test-BootTargetDriftDetected)) { return $false }
+    $capabilities = Get-CurrentSystemFunctionsCapabilities
+    return [bool]([string]$capabilities.State -eq 'Ready' -and $capabilities.CanSetDefaultTarget)
+}
 
-    $none = New-Object System.Windows.Forms.ToolStripMenuItem((Get-LocalizedString -Key 'Settings.NoDefaultTarget'))
-    $none.Checked = -not [bool]$script:DefaultGuid
-    $none.Padding = New-Object System.Windows.Forms.Padding(18, 3, 32, 3)
-    $none.Add_Click({
-        try { Start-DefaultTargetChange -Guid $null }
-        catch { Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Settings.DefaultTarget') -Heading (Get-LocalizedString -Key 'Default.SaveErrorHeading') -Message (Get-LocalizedString -Key 'Default.SaveErrorMessage') -Kind Error }
-    })
-    [void]$menu.Items.Add($none)
-    [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+function Get-DefaultPickerSnapshot {
+    $guids = @(Get-OrderedEntriesForUi | ForEach-Object { [string]$_.Guid })
+    return ('{0}|{1}|{2}' -f [string]$script:DefaultGuid,[bool]$script:DefaultTargetReadUncertain,($guids -join ','))
+}
 
-    foreach ($entry in @(Get-OrderedEntriesForUi)) {
-        $item = New-Object System.Windows.Forms.ToolStripMenuItem((Get-EntryDisplayTitle -Entry $entry))
-        $item.Tag = $entry.Guid
-        $item.Checked = ($script:DefaultGuid -and $entry.Guid -eq $script:DefaultGuid)
-        $item.Padding = New-Object System.Windows.Forms.Padding(18, 3, 32, 3)
-        $item.Add_Click({
-            try { Start-DefaultTargetChange -Guid ([string]$this.Tag) }
-            catch { Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Settings.DefaultTarget') -Heading (Get-LocalizedString -Key 'Default.SaveErrorHeading') -Message (Get-LocalizedString -Key 'Default.SaveErrorMessage') -Kind Error }
-        })
-        [void]$menu.Items.Add($item)
+function Set-DefaultPickerHover {
+    param([System.Windows.Forms.Control]$Control,[bool]$Hover)
+    $row = $Control
+    while ($row -and $row.Name -ne 'DefaultPickerRow') { $row = $row.Parent }
+    if (-not $row) { return }
+    if (-not $Hover -and $row.ClientRectangle.Contains($row.PointToClient([Windows.Forms.Cursor]::Position))) { return }
+    $row.BackColor = if ($row.Tag.Selected) { $script:ColorSelectedRow } elseif ($Hover) { $script:ColorHover } else { $script:ColorRow }
+}
+
+function Invoke-DefaultPickerRow {
+    param([System.Windows.Forms.Control]$Control)
+    $row = $Control
+    while ($row -and $row.Name -ne 'DefaultPickerRow') { $row = $row.Parent }
+    if (-not $row -or -not $row.Enabled -or -not (Test-DefaultPickerInteraction)) { return }
+    $form = $row.FindForm()
+    if ($form.Tag.DefaultSnapshot -ne (Get-DefaultPickerSnapshot)) { $form.DialogResult = [Windows.Forms.DialogResult]::Cancel; return }
+    $form.Tag.Choice = [pscustomobject]@{ Guid=$row.Tag.Guid }
+    $form.DialogResult = [Windows.Forms.DialogResult]::OK
+}
+
+function Add-DefaultPickerRow {
+    param($Form,$Entry,[int]$Y)
+    Initialize-NormalBootKeyboardRow
+    $guid = if ($Entry) { [string]$Entry.Guid } else { $null }
+    $titleText = if ($Entry) { Get-EntryDisplayTitle -Entry $Entry } else { Get-LocalizedString -Key 'Settings.NoDefaultTarget' }
+    $subtitleText = if ($Entry) { [string]$Entry.Subtitle } else { Get-LocalizedString -Key 'Settings.DefaultPickerNoneHint' }
+    $selected = (-not $script:DefaultTargetReadUncertain -and [string]$script:DefaultGuid -eq [string]$guid)
+    $row = New-Object LenovoNormalBootKeyboardRow
+    $row.Name = 'DefaultPickerRow'
+    $row.Tag = [pscustomobject]@{ Guid=$guid; Selected=$selected }
+    $row.Location = [Drawing.Point]::new(0,$Y)
+    $row.Size = [Drawing.Size]::new(370,60)
+    $row.BackColor = if ($selected) { $script:ColorSelectedRow } else { $script:ColorRow }
+    $row.AccessibleRole = [Windows.Forms.AccessibleRole]::PushButton
+    $row.AccessibleName = [string]$titleText
+    $row.AccessibleDescription = if ($selected) { ((Get-LocalizedString -Key 'Settings.DefaultPickerSelected') + '. ' + $subtitleText) } else { $subtitleText }
+    $row.Cursor = [Windows.Forms.Cursors]::Hand
+    $marker = New-Object Windows.Forms.Panel
+    $marker.Size = [Drawing.Size]::new(3,60)
+    $marker.BackColor = if ($selected) { $script:ColorAccent } else { $script:ColorRow }
+    $row.Controls.Add($marker)
+    $symbol = if ($Entry) { [string]$Entry.Symbol } else { '○' }
+    $accent = if ($Entry) { $Entry.Accent } else { $script:ColorSecondary }
+    $icon = New-Label -Text $symbol -Font $Form.Tag.Symbol -ForeColor $accent -X 22 -Y 7 -Width 28 -Height 44
+    $row.Controls.Add($icon)
+    $title = New-Label -Text $titleText -Font $Form.Tag.Bold -ForeColor $script:ColorPrimary -X 58 -Y 6 -Width 270 -Height 21
+    $title.Name = 'DefaultPickerTitle'
+    $title.AccessibleDescription = $titleText
+    $Form.Tag.Tip.SetToolTip($title,$titleText)
+    $row.Controls.Add($title)
+    $subtitle = New-Label -Text $subtitleText -Font $Form.Tag.Regular -ForeColor $script:ColorSecondary -X 58 -Y 28 -Width 270 -Height 26
+    $subtitle.Name = 'DefaultPickerSubtitle'
+    $subtitle.AccessibleDescription = $subtitleText
+    $Form.Tag.Tip.SetToolTip($subtitle,$subtitleText)
+    $row.Controls.Add($subtitle)
+    if ($selected) {
+        $check = New-Label -Text '✓' -Font $Form.Tag.Symbol -ForeColor ([Drawing.Color]::FromArgb(255,110,102)) -X 334 -Y 7 -Width 30 -Height 44
+        $check.Name = 'DefaultPickerSelected'
+        $check.AccessibleName = Get-LocalizedString -Key 'Settings.DefaultPickerSelected'
+        $row.Controls.Add($check)
     }
-    return $menu
+    foreach ($control in @($row)+@($row.Controls)) {
+        $control.Add_Click({ param($sender,$eventArgs) Invoke-DefaultPickerRow -Control $sender })
+        $control.Add_MouseEnter({ param($sender,$eventArgs) Set-DefaultPickerHover -Control $sender -Hover $true })
+        $control.Add_MouseLeave({ param($sender,$eventArgs) Set-DefaultPickerHover -Control $sender -Hover $false })
+    }
+    $row.Add_KeyDown({
+        param($sender,$eventArgs)
+        if ($eventArgs.Modifiers -ne [Windows.Forms.Keys]::None) { return }
+        $key = $eventArgs.KeyCode
+        if ($key -in @([Windows.Forms.Keys]::Enter,[Windows.Forms.Keys]::Space)) {
+            $eventArgs.SuppressKeyPress = $true
+            Invoke-DefaultPickerRow -Control $sender
+        }
+        elseif ($key -in @([Windows.Forms.Keys]::Up,[Windows.Forms.Keys]::Down,[Windows.Forms.Keys]::Home,[Windows.Forms.Keys]::End)) {
+            $eventArgs.SuppressKeyPress = $true
+            $rows = @($sender.Parent.Controls | Where-Object { $_.Name -eq 'DefaultPickerRow' -and $_.Enabled } | Sort-Object Top)
+            $index = [array]::IndexOf($rows,$sender)
+            if ($rows.Count -eq 0 -or $index -lt 0) { return }
+            $target = if ($key -eq [Windows.Forms.Keys]::Home) { 0 }
+                elseif ($key -eq [Windows.Forms.Keys]::End) { $rows.Count-1 }
+                elseif ($key -eq [Windows.Forms.Keys]::Up) { [Math]::Max(0,$index-1) }
+                else { [Math]::Min($rows.Count-1,$index+1) }
+            [void]$rows[$target].Focus()
+            $sender.Parent.ScrollControlIntoView($rows[$target])
+        }
+    })
+    $Form.Tag.Body.Controls.Add($row)
+}
+
+function New-DefaultTargetPicker {
+    $entries = @(Get-OrderedEntriesForUi)
+    $subtitle = Get-LocalizedString -Key 'Settings.DefaultPickerCurrent' -Values @{ Target=(Get-DefaultEntryTitle) }
+    $form = New-AuxiliaryPopupForm -Name 'LenovoDefaultTargetPicker' -Title (Get-LocalizedString -Key 'Settings.DefaultTarget') -Subtitle $subtitle -ContentHeight (60+60*$entries.Count)
+    Add-DefaultPickerRow -Form $form -Entry $null -Y 0
+    $y = 60
+    foreach ($entry in $entries) {
+        Add-DefaultPickerRow -Form $form -Entry $entry -Y $y
+        $y += 60
+    }
+    $form.Tag.DefaultSnapshot = Get-DefaultPickerSnapshot
+    # If an independently completing refresh changes the selection inventory or
+    # the verified default while the modal picker is open, dismiss stale choices.
+    $timer = New-Object Windows.Forms.Timer
+    $timer.Interval = 250
+    $timer.Add_Tick({
+        $active = $script:ActiveAuxiliaryPopup
+        if ($active -and $active.Name -eq 'LenovoDefaultTargetPicker' -and
+            (-not (Test-DefaultPickerInteraction) -or $active.Tag.DefaultSnapshot -ne (Get-DefaultPickerSnapshot))) {
+            $active.DialogResult = [Windows.Forms.DialogResult]::Cancel
+        }
+    })
+    $form.Tag.Timer = $timer
+    $form.Add_Shown({ $this.Tag.Timer.Start() })
+    return $form
 }
 
 function Show-DefaultTargetMenu {
     param([System.Windows.Forms.Control]$Owner)
-    if ($script:DefaultTargetChangePending -or $script:BootNextPendingGuid -or (Test-MaintenanceBusy) -or (Test-BootTargetDriftDetected)) { return }
+    if ($script:ActiveAuxiliaryPopup -or -not (Test-DefaultPickerInteraction)) { return }
     if (-not $Owner -or $script:CurrentEntries.Count -eq 0 -or -not (Test-TaskBrokerReady)) { return }
     [void](Refresh-SystemDefaultState)
+    $choice = Show-OwnedAuxiliaryPopup -Form (New-DefaultTargetPicker) -Owner $Owner
+    if (-not $choice -or -not (Test-DefaultPickerInteraction)) { return }
+    # The canonical asynchronous controller rechecks capability, current GUID
+    # and allowlist before any write. Close and focus alone are read-only.
     try {
-        if ($script:DefaultContextMenu) { $script:DefaultContextMenu.Dispose() }
-    } catch { }
-    $script:DefaultContextMenu = New-DefaultTargetMenu
-    $script:DefaultContextMenu.Add_Closed({
-        param($sender,$eventArgs)
-        if (-not [object]::ReferenceEquals($sender,$script:DefaultContextMenu)) { return }
-        $script:DefaultTargetMenuOpening = $false
-        # An actual click/focus transfer outside LBS still closes the popup;
-        # a selected menu item, local Escape or owner click does not.
-        $external = $eventArgs.CloseReason -eq [Windows.Forms.ToolStripDropDownCloseReason]::AppFocusChange -or
-                    $eventArgs.CloseReason -eq [Windows.Forms.ToolStripDropDownCloseReason]::AppClicked
-        if ($external -and $script:Popup -and -not $script:Popup.IsDisposed -and
-            $script:Popup.Visible -and -not $script:Popup.ContainsFocus -and
-            -not $script:ExitRequested) {
-            $capabilities = Get-CurrentSystemFunctionsCapabilities
-            if ([string]$capabilities.State -ne 'Busy') { $script:Popup.Hide() }
-        }
-    })
-    $ownerScreen = [System.Windows.Forms.Screen]::FromControl($Owner)
-    $ownerScale = (Get-PopupMonitorDpiScale -Screen $ownerScreen).Factor
-    [void](Set-LenovoMenuDpiLayout -Menu $script:DefaultContextMenu -Scale ([double]$ownerScale))
-    $script:DefaultTargetMenuOpening = $true
-    try {
-        $script:DefaultContextMenu.Show($Owner, (New-Object Drawing.Point(0, $Owner.Height)))
+        if ($choice.Guid) { Start-DefaultTargetChange -Guid ([string]$choice.Guid) }
+        else { Start-DefaultTargetChange -Guid $null }
     }
-    catch {
-        $script:DefaultTargetMenuOpening = $false
-        throw
-    }
-    if (-not $script:DefaultContextMenu.Visible) { $script:DefaultTargetMenuOpening = $false }
+    catch { Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Settings.DefaultTarget') -Heading (Get-LocalizedString -Key 'Default.SaveErrorHeading') -Message (Get-LocalizedString -Key 'Default.SaveErrorMessage') -Kind Error }
 }
 
 
@@ -12554,32 +12643,33 @@ function Add-PopupSettingsSection {
     $settings.Size = New-Object Drawing.Size(390, 38)
     $settings.BackColor = $script:ColorSurface
 
-    $autostartText = New-Label -Text (Get-LocalizedString -Key 'Settings.Autostart') -Font (New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)) `
-        -ForeColor $script:ColorPrimary -X 16 -Y 8 -Width 280 -Height 22
-    $autostartText.Cursor = [System.Windows.Forms.Cursors]::Hand
-    $settings.Controls.Add($autostartText)
-    $script:AutostartTextLabel = $autostartText
-
-    $autostart = New-Object LenovoCheckBox
-    $autostart.Name = 'AutostartCheckbox'
-    $autostart.Text = ''
-    $autostart.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
-    $autostart.ForeColor = $script:ColorPrimary
-    $autostart.BackColor = $script:ColorSurface
-    $autostart.AccentColor = $script:ColorAccent
-    $autostart.Location = New-Object Drawing.Point(348, 7)
-    $autostart.Size = New-Object Drawing.Size(26, 24)
-    $autostart.Add_CheckedChanged({
-        if (-not $script:UpdatingAutostartUi) {
-            Set-AutostartFromUi -Enabled:$this.Checked
-        }
-    })
-    $autostartText.Add_Click({ if ($script:AutostartCheckbox) { $script:AutostartCheckbox.Checked = -not $script:AutostartCheckbox.Checked } })
-    $script:AutostartCheckbox = $autostart
-    $settings.Controls.Add($autostart)
+    $more = New-Object System.Windows.Forms.Button
+    $more.Name = 'MoreSettingsButton'
+    $more.Text = Get-LocalizedString -Key 'Settings.More'
+    $more.AccessibleName = $more.Text
+    $more.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
+    $more.ForeColor = $script:ColorPrimary
+    $more.BackColor = $script:ColorSurface
+    $more.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $more.FlatAppearance.BorderSize = 0
+    $more.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(38,38,38)
+    $more.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
+    $more.Location = [Drawing.Point]::new(12,2)
+    $more.Size = [Drawing.Size]::new(366,34)
+    $more.Cursor = [Windows.Forms.Cursors]::Hand
+    $more.Add_Click({ Show-ConfigurationPopup -Owner $this })
+    $settings.Controls.Add($more)
+    $moreArrow = New-Label -Text '›' -Font (New-Object Drawing.Font('Segoe UI',10.0)) -ForeColor $script:ColorSecondary -X 352 -Y 7 -Width 22 -Height 23
+    $moreArrow.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+    $moreArrow.Cursor = [Windows.Forms.Cursors]::Hand
+    $moreArrow.Add_Click({ Show-ConfigurationPopup -Owner $this })
+    $settings.Controls.Add($moreArrow)
+    $moreArrow.BringToFront()
     $Root.Controls.Add($settings)
 
-    $defaultPanel = New-Object System.Windows.Forms.Panel
+    Initialize-NormalBootKeyboardRow
+    $defaultPanel = New-Object LenovoNormalBootKeyboardRow
+    $defaultPanel.AccessibleRole = [Windows.Forms.AccessibleRole]::PushButton
     $defaultPanel.Name = 'DefaultPanel'
     $defaultPanel.Location = New-Object Drawing.Point(0, 548)
     $defaultPanel.Size = New-Object Drawing.Size(390, 38)
@@ -12621,6 +12711,13 @@ function Add-PopupSettingsSection {
         $control.Add_MouseLeave($defaultRowLeave)
         $control.Add_Click($defaultRowClick)
     }
+    $defaultPanel.Add_KeyDown({
+        param($sender,$eventArgs)
+        if ($eventArgs.Modifiers -eq [Windows.Forms.Keys]::None -and $eventArgs.KeyCode -in @([Windows.Forms.Keys]::Enter,[Windows.Forms.Keys]::Space)) {
+            $eventArgs.SuppressKeyPress = $true
+            if ($script:DefaultInteractionEnabled) { Show-DefaultTargetMenu -Owner $sender }
+        }
+    })
     $script:DefaultButton = $defaultPanel
     $Root.Controls.Add($defaultPanel)
 
@@ -12844,6 +12941,239 @@ function Add-PopupManageEntriesSection {
     $Root.Controls.Add($managePanel)
 }
 
+# Shared visual shell for the two configuration-specific surfaces. Shared
+# fonts and the local tooltip belong to this Form, not to the main popup.
+function New-AuxiliaryPopupForm {
+    param([string]$Name,[string]$Title,[AllowEmptyString()][string]$Subtitle,[int]$ContentHeight)
+    $form = New-Object Windows.Forms.Form
+    $form.Name = $Name
+    $form.Text = $Title
+    $form.AccessibleName = $Title
+    $form.AutoScaleMode = [Windows.Forms.AutoScaleMode]::None
+    $form.FormBorderStyle = [Windows.Forms.FormBorderStyle]::None
+    $form.ShowInTaskbar = $false
+    $form.TopMost = $true
+    $form.KeyPreview = $true
+    $form.StartPosition = [Windows.Forms.FormStartPosition]::Manual
+    $form.BackColor = $script:ColorBackground
+    $form.ClientSize = [Drawing.Size]::new(390,[Math]::Min(540,64+$ContentHeight))
+    $regular = [Drawing.Font]::new('Segoe UI',[single]9.0)
+    $bold = [Drawing.Font]::new('Segoe UI',[single]10.0,[Drawing.FontStyle]::Bold)
+    $heading = [Drawing.Font]::new('Segoe UI',[single]8.5,[Drawing.FontStyle]::Bold)
+    $large = [Drawing.Font]::new('Segoe UI',[single]11.5,[Drawing.FontStyle]::Bold)
+    $symbol = [Drawing.Font]::new('Segoe UI Symbol',[single]18.0)
+    $tip = New-Object Windows.Forms.ToolTip
+    $tip.InitialDelay = 350
+    $tip.AutoPopDelay = 8000
+    $tip.ShowAlways = $true
+    $header = New-Object Windows.Forms.Panel
+    $header.Name = 'AuxiliaryHeader'
+    $header.BackColor = $script:ColorHeader
+    $header.Size = [Drawing.Size]::new(390,64)
+    $titleLabel = New-Label -Text $Title -Font $large -ForeColor $script:ColorPrimary -X 16 -Y 7 -Width 318 -Height 26
+    $subtitleLabel = New-Label -Text $Subtitle -Font $regular -ForeColor $script:ColorSecondary -X 16 -Y 34 -Width 358 -Height 23
+    $subtitleLabel.AccessibleDescription = $Subtitle
+    $tip.SetToolTip($subtitleLabel,$Subtitle)
+    $header.Controls.Add($titleLabel)
+    $header.Controls.Add($subtitleLabel)
+    $close = New-Object Windows.Forms.Button
+    $close.Name = 'AuxiliaryClose'
+    $close.Text = '×'
+    $close.AccessibleName = Get-LocalizedString -Key 'Common.Close'
+    $close.Font = $symbol
+    $close.BackColor = $script:ColorHeader
+    $close.ForeColor = $script:ColorPrimary
+    $close.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $close.FlatAppearance.BorderSize = 0
+    $close.FlatAppearance.MouseOverBackColor = $script:ColorHover
+    $close.Location = [Drawing.Point]::new(350,7)
+    $close.Size = [Drawing.Size]::new(28,30)
+    $close.DialogResult = [Windows.Forms.DialogResult]::Cancel
+    $header.Controls.Add($close)
+    $form.Controls.Add($header)
+    $body = New-Object Windows.Forms.Panel
+    $body.Name = 'AuxiliaryBody'
+    $body.Location = [Drawing.Point]::new(0,64)
+    $body.Size = [Drawing.Size]::new(390,$form.ClientSize.Height-64)
+    $form.Controls.Add($body)
+    $form.CancelButton = $close
+    $form.ActiveControl = $close
+    $form.Tag = [pscustomobject]@{
+        Choice=$null; Scale=0.0; Header=$header; Title=$titleLabel; Subtitle=$subtitleLabel
+        Close=$close; Body=$body; ContentHeight=$ContentHeight; Tip=$tip
+        Regular=$regular; Bold=$bold; Heading=$heading; Symbol=$symbol
+        Fonts=@($regular,$bold,$heading,$large,$symbol); Timer=$null; DefaultSnapshot=$null
+    }
+    $form.Add_Disposed({
+        param($sender,$eventArgs)
+        $state = $sender.Tag
+        if ($state.Timer) { $state.Timer.Stop(); $state.Timer.Dispose() }
+        $state.Tip.Dispose()
+        foreach ($font in $state.Fonts) { $font.Dispose() }
+    })
+    $form.Add_Paint({
+        param($sender,$eventArgs)
+        $pen = [Drawing.Pen]::new([Drawing.Color]::FromArgb(108,108,108))
+        try { $eventArgs.Graphics.DrawRectangle($pen,0,0,[Math]::Max(0,$sender.ClientSize.Width-1),[Math]::Max(0,$sender.ClientSize.Height-1)) }
+        finally { $pen.Dispose() }
+    })
+    return $form
+}
+
+function Get-ConfigurationActionMenuItem {
+    param([string]$Action)
+    switch ($Action) {
+        'autostart' { return $script:AutostartMenuItem }
+        'language-de' { return $script:LanguageGermanMenuItem }
+        'language-en' { return $script:LanguageEnglishMenuItem }
+        'system-setup' { return $script:TaskBrokerSetupMenuItem }
+        'system-remove' { return $script:TaskBrokerRemoveMenuItem }
+        'update-check' { return $script:UpdateCheckMenuItem }
+        'update-install' { return $script:UpdateInstallMenuItem }
+        'diagnostics-save' { return $script:RuntimeDiagnosticMenuItem }
+        'diagnostics-upload' { return $script:DiagnosticsUploadMenuItem }
+    }
+    return $null
+}
+
+function Test-ConfigurationActionAvailable {
+    param([string]$Action)
+    $item = Get-ConfigurationActionMenuItem -Action $Action
+    return [bool]($item -and -not $item.IsDisposed -and $item.Available -and $item.Enabled -and -not (Test-MaintenanceBusy))
+}
+
+function Update-ConfigurationPopupPresentation {
+    param([System.Windows.Forms.Form]$Form)
+    foreach ($control in $Form.Tag.Body.Controls) {
+        $action = [string]$control.Tag
+        if (-not $action) { continue }
+        $item = Get-ConfigurationActionMenuItem -Action $action
+        $control.Enabled = Test-ConfigurationActionAvailable -Action $action
+        if (-not $item) { continue }
+        if ($control -is [Windows.Forms.CheckBox]) {
+            $control.Checked = [bool]$item.Checked
+        }
+        elseif ($control -is [Windows.Forms.Button]) {
+            $language = $action -like 'language-*'
+            $selected = $language -and $item.Checked
+            $control.Text = if ($selected) { ('✓ ' + $item.Text) } else { [string]$item.Text }
+            $control.AccessibleName = [string]$control.Text
+            $control.BackColor = if ($selected) { $script:ColorSelectedRow } else { $script:ColorSurface }
+            $control.FlatAppearance.BorderColor = if ($selected) { $script:ColorAccent } else { [Drawing.Color]::FromArgb(82,82,82) }
+        }
+    }
+}
+
+function Invoke-ConfigurationPopupAction {
+    param([System.Windows.Forms.Control]$Control)
+    $action = [string]$Control.Tag
+    if (-not (Test-ConfigurationActionAvailable -Action $action)) { return }
+    $form = $Control.FindForm()
+    $item = Get-ConfigurationActionMenuItem -Action $action
+    if ($action -eq 'autostart') {
+        # The existing tray handler owns the actual toggle and verification.
+        $item.PerformClick()
+        Update-ConfigurationPopupPresentation -Form $form
+        return
+    }
+    if ($action -like 'language-*' -and $item.Checked) { return }
+    # Close the child before the existing action starts a modal dialog,
+    # rebuilds the main popup, or starts an asynchronous operation.
+    $form.Tag.Choice = [pscustomobject]@{ Action=$action }
+    $form.DialogResult = [Windows.Forms.DialogResult]::OK
+}
+
+function Add-ConfigurationHeading {
+    param($Form,[string]$Key,[int]$Y)
+    $label = New-Label -Text (Get-LocalizedString -Key $Key) -Font $Form.Tag.Heading -ForeColor $script:ColorSecondary -X 16 -Y $Y -Width 350 -Height 22
+    $Form.Tag.Body.Controls.Add($label)
+}
+
+function Add-ConfigurationActionButton {
+    param($Form,[string]$Action,[string]$Key,[int]$Y,[int]$X=16,[int]$Width=350)
+    $button = New-Object Windows.Forms.Button
+    $button.Name = 'ConfigurationAction-' + $Action
+    $button.Tag = $Action
+    $button.Text = Get-LocalizedString -Key $Key
+    $button.AccessibleName = $button.Text
+    $button.Font = $Form.Tag.Regular
+    $button.ForeColor = $script:ColorPrimary
+    $button.BackColor = $script:ColorSurface
+    $button.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $button.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(82,82,82)
+    $button.FlatAppearance.MouseOverBackColor = $script:ColorHover
+    $button.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
+    $button.UseMnemonic = $false
+    $button.Cursor = [Windows.Forms.Cursors]::Hand
+    $button.Location = [Drawing.Point]::new($X,$Y)
+    $button.Size = [Drawing.Size]::new($Width,34)
+    $button.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })
+    $Form.Tag.Body.Controls.Add($button)
+}
+
+function New-ConfigurationPopup {
+    $form = New-AuxiliaryPopupForm -Name 'LenovoConfigurationPopup' -Title (Get-LocalizedString -Key 'Settings.More') -Subtitle 'Lenovo Boot Selector' -ContentHeight 450
+    Add-ConfigurationHeading -Form $form -Key 'Settings.General' -Y 6
+    $autostartLabel = New-Label -Text (Get-LocalizedString -Key 'Settings.Autostart') -Font $form.Tag.Regular -ForeColor $script:ColorPrimary -X 16 -Y 30 -Width 306 -Height 30
+    $autostartLabel.Tag = 'autostart'
+    $autostartLabel.Cursor = [Windows.Forms.Cursors]::Hand
+    $autostartLabel.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })
+    $form.Tag.Body.Controls.Add($autostartLabel)
+    $check = New-Object LenovoCheckBox
+    $check.Name = 'ConfigurationAutostart'
+    $check.Tag = 'autostart'
+    $check.AutoCheck = $false
+    $check.AccessibleName = $autostartLabel.Text
+    $check.Font = $form.Tag.Regular
+    $check.BackColor = $script:ColorBackground
+    $check.AccentColor = $script:ColorAccent
+    $check.Location = [Drawing.Point]::new(332,30)
+    $check.Size = [Drawing.Size]::new(34,30)
+    $check.Add_GotFocus({ $this.BackColor = $script:ColorHover })
+    $check.Add_LostFocus({ $this.BackColor = $script:ColorBackground })
+    $check.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })
+    $form.Tag.Body.Controls.Add($check)
+    $language = New-Label -Text (Get-LocalizedString -Key 'Settings.Language') -Font $form.Tag.Regular -ForeColor $script:ColorPrimary -X 16 -Y 66 -Width 350 -Height 22
+    $form.Tag.Body.Controls.Add($language)
+    Add-ConfigurationActionButton -Form $form -Action 'language-de' -Key 'Language.German' -Y 90 -Width 171
+    Add-ConfigurationActionButton -Form $form -Action 'language-en' -Key 'Language.English' -Y 90 -X 195 -Width 171
+    Add-ConfigurationHeading -Form $form -Key 'Maintenance.Caption' -Y 132
+    Add-ConfigurationActionButton -Form $form -Action 'system-setup' -Key 'Maintenance.Setup' -Y 156
+    Add-ConfigurationActionButton -Form $form -Action 'system-remove' -Key 'Maintenance.Remove' -Y 194
+    Add-ConfigurationHeading -Form $form -Key 'Settings.Updates' -Y 236
+    Add-ConfigurationActionButton -Form $form -Action 'update-check' -Key 'Update.Check' -Y 260
+    Add-ConfigurationActionButton -Form $form -Action 'update-install' -Key 'Update.Install' -Y 298
+    Add-ConfigurationHeading -Form $form -Key 'Settings.Diagnostics' -Y 340
+    Add-ConfigurationActionButton -Form $form -Action 'diagnostics-save' -Key 'Diagnostics.Save' -Y 364
+    Add-ConfigurationActionButton -Form $form -Action 'diagnostics-upload' -Key 'Diagnostics.Upload' -Y 402
+    Update-ConfigurationPopupPresentation -Form $form
+    # Reflect existing presentation state only; do not poll firmware/network.
+    $timer = New-Object Windows.Forms.Timer
+    $timer.Interval = 250
+    $timer.Add_Tick({
+        if ($script:ActiveAuxiliaryPopup -and $script:ActiveAuxiliaryPopup.Name -eq 'LenovoConfigurationPopup') {
+            Update-ConfigurationPopupPresentation -Form $script:ActiveAuxiliaryPopup
+        }
+    })
+    $form.Tag.Timer = $timer
+    $form.Add_Shown({ $this.Tag.Timer.Start() })
+    return $form
+}
+
+function Show-ConfigurationPopup {
+    param([System.Windows.Forms.Control]$Owner)
+    if ($script:ActiveAuxiliaryPopup -or $script:IsManageEntriesMode -or (Test-MaintenanceBusy)) { return }
+    [void](Update-TaskBrokerUiState -Fast)
+    [void](Update-AutostartUi)
+    Update-UpdateMenuState
+    Update-LanguageMenuState
+    $choice = Show-OwnedAuxiliaryPopup -Form (New-ConfigurationPopup) -Owner $Owner
+    if ($choice -and (Test-ConfigurationActionAvailable -Action $choice.Action)) {
+        $item = Get-ConfigurationActionMenuItem -Action $choice.Action
+        $item.PerformClick()
+    }
+}
+
 # LBS-132: icon-relative placement is pure geometry; shell discovery is best effort.
 function Get-PopupLocationFromAnchor {
     param(
@@ -12987,6 +13317,21 @@ function Get-TrayContextMenuLocation {
     )
 }
 
+# LBS-229: keep the auxiliary surface on the owner's monitor. Prefer a
+# non-overlapping side; when neither side fits, clamp an overlapping surface.
+function Get-AuxiliaryPopupLocation {
+    param([Drawing.Rectangle]$WorkingArea,[Drawing.Rectangle]$OwnerBounds,[Drawing.Size]$SurfaceSize)
+    $gap = 8
+    $right = $OwnerBounds.Right + $gap
+    $left = $OwnerBounds.Left - $SurfaceSize.Width - $gap
+    $x = if ($right + $SurfaceSize.Width -le $WorkingArea.Right) { $right }
+        elseif ($left -ge $WorkingArea.Left) { $left }
+        else { $OwnerBounds.Left }
+    $x = [int][Math]::Max($WorkingArea.Left,[Math]::Min($WorkingArea.Right-$SurfaceSize.Width,$x))
+    $y = [int][Math]::Max($WorkingArea.Top,[Math]::Min($WorkingArea.Bottom-$SurfaceSize.Height,$OwnerBounds.Top))
+    return [Drawing.Point]::new($x,$y)
+}
+
 # Escape belongs to this visible popup only. Child-local cancellation (alias editor,
 # default-target menu and active drag) must run before any parent dismissal.
 function Invoke-PopupEscapeDismissal {
@@ -12999,9 +13344,8 @@ function Invoke-PopupEscapeDismissal {
         $EventArgs.Modifiers -ne [System.Windows.Forms.Keys]::None) { return }
     if (-not $Form.Visible -or -not $Form.ContainsFocus) { return }
 
-    # DropDown and OLE drag have independent Escape/cleanup lifecycles.
-    if ($script:DefaultContextMenu -and -not $script:DefaultContextMenu.IsDisposed -and
-        $script:DefaultContextMenu.Visible) { return }
+    # Owned auxiliary forms and OLE drag have independent Escape/cleanup lifecycles.
+    if ($script:ActiveAuxiliaryPopup) { return }
     if ($script:ManageActiveDragGuid -or $script:ManageDragLayout) { return }
 
     $aliasEditor = $Form.Controls.Find('AliasEditor', $true) | Select-Object -First 1
@@ -13069,12 +13413,9 @@ function New-PopupForm {
     })
 
     $form.Add_Deactivate({
-        # The default-target ToolStrip is part of this popup's own UI.
-        # A focus handoff to it must not hide the owner form underneath.
-        # The opening flag covers Deactivate before DropDown.Visible is set.
-        if ($script:DefaultTargetMenuOpening -or
-            ($script:DefaultContextMenu -and -not $script:DefaultContextMenu.IsDisposed -and
-             $script:DefaultContextMenu.Visible)) { return }
+        # The owned auxiliary Form is part of this popup's UI. The
+        # ownership flag covers Deactivate before the child becomes visible.
+        if ($script:ActiveAuxiliaryPopup) { return }
         $capabilities = Get-CurrentSystemFunctionsCapabilities
         if (-not $script:ExitRequested -and [string]$capabilities.State -ne 'Busy') { $this.Hide() }
     })
@@ -13119,6 +13460,10 @@ function Position-Popup {
 
 function Show-OrTogglePopup {
     param([switch]$FromTrayClick)
+    if ($script:ActiveAuxiliaryPopup -and -not $script:ActiveAuxiliaryPopup.IsDisposed) {
+        [void]$script:ActiveAuxiliaryPopup.Activate()
+        return
+    }
     if (-not $script:Popup -or $script:Popup.IsDisposed) {
         $initialScreen = [System.Windows.Forms.Screen]::PrimaryScreen
         $initialScale = Get-LenovoUiCoordinateScale -Screen $initialScreen
@@ -13175,6 +13520,10 @@ function Show-OrTogglePopup {
 # Explicit launcher re-entry is SHOW, never the tray-icon toggle (which hides
 # an already visible popup). This runs on the existing WinForms UI thread.
 function Show-OrActivatePopup {
+    if ($script:ActiveAuxiliaryPopup -and -not $script:ActiveAuxiliaryPopup.IsDisposed) {
+        [void]$script:ActiveAuxiliaryPopup.Activate()
+        return
+    }
     if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) {
         [void]$script:Popup.Activate()
         return
@@ -13188,6 +13537,67 @@ function Load-TrayIcon {
         try { return [Drawing.Icon]::new($iconPath) } catch { }
     }
     return [Drawing.SystemIcons]::Application
+}
+
+# Auxiliary forms are built at 96-DPI design bounds, then scaled once using
+# the same effective coordinate factor as the main popup. Keep font points
+# and the main popup's immutable metrics independent.
+function Set-AuxiliaryControlBounds {
+    param([System.Windows.Forms.Control]$Control,[double]$Scale)
+    $Control.SuspendLayout()
+    try {
+        if ($Control -is [System.Windows.Forms.Form]) {
+            $Control.ClientSize = [Drawing.Size]::new([int][Math]::Round($Control.ClientSize.Width*$Scale),[int][Math]::Round($Control.ClientSize.Height*$Scale))
+        }
+        else {
+            $b = $Control.Bounds
+            $Control.Bounds = [Drawing.Rectangle]::new([int][Math]::Round($b.X*$Scale),[int][Math]::Round($b.Y*$Scale),[int][Math]::Round($b.Width*$Scale),[int][Math]::Round($b.Height*$Scale))
+        }
+        foreach ($child in $Control.Controls) { Set-AuxiliaryControlBounds -Control $child -Scale $Scale }
+    }
+    finally { $Control.ResumeLayout($false) }
+}
+
+function Set-AuxiliaryPopupLayout {
+    param([System.Windows.Forms.Form]$Form,[double]$Scale,[Drawing.Rectangle]$WorkingArea,[Drawing.Rectangle]$OwnerBounds)
+    if ($Form.Tag.Scale -ne 0) { throw 'Auxiliary surface has already been scaled.' }
+    if ($Scale -lt 1.0 -or $Scale -gt 5.0) { throw 'Invalid auxiliary scale.' }
+    Set-AuxiliaryControlBounds -Control $Form -Scale $Scale
+    $state = $Form.Tag
+    $state.Scale = $Scale
+    $width = [Math]::Max(1,[Math]::Min($Form.ClientSize.Width,$WorkingArea.Width-12))
+    $height = [Math]::Max(1,[Math]::Min($Form.ClientSize.Height,$WorkingArea.Height-12))
+    $Form.ClientSize = [Drawing.Size]::new($width,$height)
+    $state.Header.Width = $width
+    $state.Close.Left = [Math]::Max(0,$width-$state.Close.Width-[int][Math]::Round(12*$Scale))
+    $state.Title.Width = [Math]::Max(1,$state.Close.Left-$state.Title.Left)
+    $state.Subtitle.Width = [Math]::Max(1,$width-$state.Subtitle.Left-[int][Math]::Round(16*$Scale))
+    $state.Body.Size = [Drawing.Size]::new($width,[Math]::Max(1,$height-$state.Body.Top))
+    $state.Body.AutoScroll = $true
+    $state.Body.AutoScrollMinSize = [Drawing.Size]::new(0,[int][Math]::Round($state.ContentHeight*$Scale))
+    $Form.Location = Get-AuxiliaryPopupLocation -WorkingArea $WorkingArea -OwnerBounds $OwnerBounds -SurfaceSize $Form.Size
+}
+
+# Modal ownership prevents competing main-popup selections while a child is
+# open. No business action is dispatched by this lifecycle function.
+function Show-OwnedAuxiliaryPopup {
+    param([System.Windows.Forms.Form]$Form,[System.Windows.Forms.Control]$Owner)
+    try {
+        if ($script:ActiveAuxiliaryPopup -or -not $Owner -or $Owner.IsDisposed) { return $null }
+        $parent = $Owner.FindForm()
+        if (-not $parent -or -not $parent.Visible) { return $null }
+        $screen = [Windows.Forms.Screen]::FromControl($parent)
+        $scale = (Get-LenovoUiCoordinateScale -Screen $screen).Factor
+        Set-AuxiliaryPopupLayout -Form $Form -Scale ([double]$scale) -WorkingArea $screen.WorkingArea -OwnerBounds $parent.Bounds
+        $script:ActiveAuxiliaryPopup = $Form
+        $result = $Form.ShowDialog($parent)
+        if ($result -eq [Windows.Forms.DialogResult]::OK) { return $Form.Tag.Choice }
+        return $null
+    }
+    finally {
+        if ([object]::ReferenceEquals($script:ActiveAuxiliaryPopup,$Form)) { $script:ActiveAuxiliaryPopup = $null }
+        $Form.Dispose()
+    }
 }
 
 

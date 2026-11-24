@@ -21,7 +21,7 @@ Assert-Lbs206Default 'dedicated guarded default-target worker exists' (Test-Path
 $source = [IO.File]::ReadAllText((Join-Path $root 'src\App\LenovoBootSelector.template.ps1'))
 $menu = [IO.File]::ReadAllText((Join-Path $root 'src\UI\DefaultTargetMenu.ps1'))
 Assert-Lbs206Default 'menu choices enqueue an async default change' (
-    $menu.Contains('Start-DefaultTargetChange -Guid ([string]$this.Tag)') -and
+    $menu.Contains('Start-DefaultTargetChange -Guid ([string]$choice.Guid)') -and
     $menu.Contains('Start-DefaultTargetChange -Guid $null') -and
     -not $menu.Contains('try { Set-DefaultGuid -Guid'))
 Assert-Lbs206Default 'default worker skips tray mutex and has isolated CLI entry' (

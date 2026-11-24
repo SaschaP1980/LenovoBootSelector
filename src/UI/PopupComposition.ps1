@@ -199,32 +199,33 @@ function Add-PopupSettingsSection {
     $settings.Size = New-Object Drawing.Size(390, 38)
     $settings.BackColor = $script:ColorSurface
 
-    $autostartText = New-Label -Text (Get-LocalizedString -Key 'Settings.Autostart') -Font (New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)) `
-        -ForeColor $script:ColorPrimary -X 16 -Y 8 -Width 280 -Height 22
-    $autostartText.Cursor = [System.Windows.Forms.Cursors]::Hand
-    $settings.Controls.Add($autostartText)
-    $script:AutostartTextLabel = $autostartText
-
-    $autostart = New-Object LenovoCheckBox
-    $autostart.Name = 'AutostartCheckbox'
-    $autostart.Text = ''
-    $autostart.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
-    $autostart.ForeColor = $script:ColorPrimary
-    $autostart.BackColor = $script:ColorSurface
-    $autostart.AccentColor = $script:ColorAccent
-    $autostart.Location = New-Object Drawing.Point(348, 7)
-    $autostart.Size = New-Object Drawing.Size(26, 24)
-    $autostart.Add_CheckedChanged({
-        if (-not $script:UpdatingAutostartUi) {
-            Set-AutostartFromUi -Enabled:$this.Checked
-        }
-    })
-    $autostartText.Add_Click({ if ($script:AutostartCheckbox) { $script:AutostartCheckbox.Checked = -not $script:AutostartCheckbox.Checked } })
-    $script:AutostartCheckbox = $autostart
-    $settings.Controls.Add($autostart)
+    $more = New-Object System.Windows.Forms.Button
+    $more.Name = 'MoreSettingsButton'
+    $more.Text = Get-LocalizedString -Key 'Settings.More'
+    $more.AccessibleName = $more.Text
+    $more.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
+    $more.ForeColor = $script:ColorPrimary
+    $more.BackColor = $script:ColorSurface
+    $more.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $more.FlatAppearance.BorderSize = 0
+    $more.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(38,38,38)
+    $more.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
+    $more.Location = [Drawing.Point]::new(12,2)
+    $more.Size = [Drawing.Size]::new(366,34)
+    $more.Cursor = [Windows.Forms.Cursors]::Hand
+    $more.Add_Click({ Show-ConfigurationPopup -Owner $this })
+    $settings.Controls.Add($more)
+    $moreArrow = New-Label -Text '›' -Font (New-Object Drawing.Font('Segoe UI',10.0)) -ForeColor $script:ColorSecondary -X 352 -Y 7 -Width 22 -Height 23
+    $moreArrow.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+    $moreArrow.Cursor = [Windows.Forms.Cursors]::Hand
+    $moreArrow.Add_Click({ Show-ConfigurationPopup -Owner $this })
+    $settings.Controls.Add($moreArrow)
+    $moreArrow.BringToFront()
     $Root.Controls.Add($settings)
 
-    $defaultPanel = New-Object System.Windows.Forms.Panel
+    Initialize-NormalBootKeyboardRow
+    $defaultPanel = New-Object LenovoNormalBootKeyboardRow
+    $defaultPanel.AccessibleRole = [Windows.Forms.AccessibleRole]::PushButton
     $defaultPanel.Name = 'DefaultPanel'
     $defaultPanel.Location = New-Object Drawing.Point(0, 548)
     $defaultPanel.Size = New-Object Drawing.Size(390, 38)
@@ -266,6 +267,13 @@ function Add-PopupSettingsSection {
         $control.Add_MouseLeave($defaultRowLeave)
         $control.Add_Click($defaultRowClick)
     }
+    $defaultPanel.Add_KeyDown({
+        param($sender,$eventArgs)
+        if ($eventArgs.Modifiers -eq [Windows.Forms.Keys]::None -and $eventArgs.KeyCode -in @([Windows.Forms.Keys]::Enter,[Windows.Forms.Keys]::Space)) {
+            $eventArgs.SuppressKeyPress = $true
+            if ($script:DefaultInteractionEnabled) { Show-DefaultTargetMenu -Owner $sender }
+        }
+    })
     $script:DefaultButton = $defaultPanel
     $Root.Controls.Add($defaultPanel)
 
@@ -487,4 +495,237 @@ function Add-PopupManageEntriesSection {
     $manageFooter.Controls.Add($manageVersion)
     $managePanel.Controls.Add($manageFooter)
     $Root.Controls.Add($managePanel)
+}
+
+# Shared visual shell for the two configuration-specific surfaces. Shared
+# fonts and the local tooltip belong to this Form, not to the main popup.
+function New-AuxiliaryPopupForm {
+    param([string]$Name,[string]$Title,[AllowEmptyString()][string]$Subtitle,[int]$ContentHeight)
+    $form = New-Object Windows.Forms.Form
+    $form.Name = $Name
+    $form.Text = $Title
+    $form.AccessibleName = $Title
+    $form.AutoScaleMode = [Windows.Forms.AutoScaleMode]::None
+    $form.FormBorderStyle = [Windows.Forms.FormBorderStyle]::None
+    $form.ShowInTaskbar = $false
+    $form.TopMost = $true
+    $form.KeyPreview = $true
+    $form.StartPosition = [Windows.Forms.FormStartPosition]::Manual
+    $form.BackColor = $script:ColorBackground
+    $form.ClientSize = [Drawing.Size]::new(390,[Math]::Min(540,64+$ContentHeight))
+    $regular = [Drawing.Font]::new('Segoe UI',[single]9.0)
+    $bold = [Drawing.Font]::new('Segoe UI',[single]10.0,[Drawing.FontStyle]::Bold)
+    $heading = [Drawing.Font]::new('Segoe UI',[single]8.5,[Drawing.FontStyle]::Bold)
+    $large = [Drawing.Font]::new('Segoe UI',[single]11.5,[Drawing.FontStyle]::Bold)
+    $symbol = [Drawing.Font]::new('Segoe UI Symbol',[single]18.0)
+    $tip = New-Object Windows.Forms.ToolTip
+    $tip.InitialDelay = 350
+    $tip.AutoPopDelay = 8000
+    $tip.ShowAlways = $true
+    $header = New-Object Windows.Forms.Panel
+    $header.Name = 'AuxiliaryHeader'
+    $header.BackColor = $script:ColorHeader
+    $header.Size = [Drawing.Size]::new(390,64)
+    $titleLabel = New-Label -Text $Title -Font $large -ForeColor $script:ColorPrimary -X 16 -Y 7 -Width 318 -Height 26
+    $subtitleLabel = New-Label -Text $Subtitle -Font $regular -ForeColor $script:ColorSecondary -X 16 -Y 34 -Width 358 -Height 23
+    $subtitleLabel.AccessibleDescription = $Subtitle
+    $tip.SetToolTip($subtitleLabel,$Subtitle)
+    $header.Controls.Add($titleLabel)
+    $header.Controls.Add($subtitleLabel)
+    $close = New-Object Windows.Forms.Button
+    $close.Name = 'AuxiliaryClose'
+    $close.Text = '×'
+    $close.AccessibleName = Get-LocalizedString -Key 'Common.Close'
+    $close.Font = $symbol
+    $close.BackColor = $script:ColorHeader
+    $close.ForeColor = $script:ColorPrimary
+    $close.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $close.FlatAppearance.BorderSize = 0
+    $close.FlatAppearance.MouseOverBackColor = $script:ColorHover
+    $close.Location = [Drawing.Point]::new(350,7)
+    $close.Size = [Drawing.Size]::new(28,30)
+    $close.DialogResult = [Windows.Forms.DialogResult]::Cancel
+    $header.Controls.Add($close)
+    $form.Controls.Add($header)
+    $body = New-Object Windows.Forms.Panel
+    $body.Name = 'AuxiliaryBody'
+    $body.Location = [Drawing.Point]::new(0,64)
+    $body.Size = [Drawing.Size]::new(390,$form.ClientSize.Height-64)
+    $form.Controls.Add($body)
+    $form.CancelButton = $close
+    $form.ActiveControl = $close
+    $form.Tag = [pscustomobject]@{
+        Choice=$null; Scale=0.0; Header=$header; Title=$titleLabel; Subtitle=$subtitleLabel
+        Close=$close; Body=$body; ContentHeight=$ContentHeight; Tip=$tip
+        Regular=$regular; Bold=$bold; Heading=$heading; Symbol=$symbol
+        Fonts=@($regular,$bold,$heading,$large,$symbol); Timer=$null; DefaultSnapshot=$null
+    }
+    $form.Add_Disposed({
+        param($sender,$eventArgs)
+        $state = $sender.Tag
+        if ($state.Timer) { $state.Timer.Stop(); $state.Timer.Dispose() }
+        $state.Tip.Dispose()
+        foreach ($font in $state.Fonts) { $font.Dispose() }
+    })
+    $form.Add_Paint({
+        param($sender,$eventArgs)
+        $pen = [Drawing.Pen]::new([Drawing.Color]::FromArgb(108,108,108))
+        try { $eventArgs.Graphics.DrawRectangle($pen,0,0,[Math]::Max(0,$sender.ClientSize.Width-1),[Math]::Max(0,$sender.ClientSize.Height-1)) }
+        finally { $pen.Dispose() }
+    })
+    return $form
+}
+
+function Get-ConfigurationActionMenuItem {
+    param([string]$Action)
+    switch ($Action) {
+        'autostart' { return $script:AutostartMenuItem }
+        'language-de' { return $script:LanguageGermanMenuItem }
+        'language-en' { return $script:LanguageEnglishMenuItem }
+        'system-setup' { return $script:TaskBrokerSetupMenuItem }
+        'system-remove' { return $script:TaskBrokerRemoveMenuItem }
+        'update-check' { return $script:UpdateCheckMenuItem }
+        'update-install' { return $script:UpdateInstallMenuItem }
+        'diagnostics-save' { return $script:RuntimeDiagnosticMenuItem }
+        'diagnostics-upload' { return $script:DiagnosticsUploadMenuItem }
+    }
+    return $null
+}
+
+function Test-ConfigurationActionAvailable {
+    param([string]$Action)
+    $item = Get-ConfigurationActionMenuItem -Action $Action
+    return [bool]($item -and -not $item.IsDisposed -and $item.Available -and $item.Enabled -and -not (Test-MaintenanceBusy))
+}
+
+function Update-ConfigurationPopupPresentation {
+    param([System.Windows.Forms.Form]$Form)
+    foreach ($control in $Form.Tag.Body.Controls) {
+        $action = [string]$control.Tag
+        if (-not $action) { continue }
+        $item = Get-ConfigurationActionMenuItem -Action $action
+        $control.Enabled = Test-ConfigurationActionAvailable -Action $action
+        if (-not $item) { continue }
+        if ($control -is [Windows.Forms.CheckBox]) {
+            $control.Checked = [bool]$item.Checked
+        }
+        elseif ($control -is [Windows.Forms.Button]) {
+            $language = $action -like 'language-*'
+            $selected = $language -and $item.Checked
+            $control.Text = if ($selected) { ('✓ ' + $item.Text) } else { [string]$item.Text }
+            $control.AccessibleName = [string]$control.Text
+            $control.BackColor = if ($selected) { $script:ColorSelectedRow } else { $script:ColorSurface }
+            $control.FlatAppearance.BorderColor = if ($selected) { $script:ColorAccent } else { [Drawing.Color]::FromArgb(82,82,82) }
+        }
+    }
+}
+
+function Invoke-ConfigurationPopupAction {
+    param([System.Windows.Forms.Control]$Control)
+    $action = [string]$Control.Tag
+    if (-not (Test-ConfigurationActionAvailable -Action $action)) { return }
+    $form = $Control.FindForm()
+    $item = Get-ConfigurationActionMenuItem -Action $action
+    if ($action -eq 'autostart') {
+        # The existing tray handler owns the actual toggle and verification.
+        $item.PerformClick()
+        Update-ConfigurationPopupPresentation -Form $form
+        return
+    }
+    if ($action -like 'language-*' -and $item.Checked) { return }
+    # Close the child before the existing action starts a modal dialog,
+    # rebuilds the main popup, or starts an asynchronous operation.
+    $form.Tag.Choice = [pscustomobject]@{ Action=$action }
+    $form.DialogResult = [Windows.Forms.DialogResult]::OK
+}
+
+function Add-ConfigurationHeading {
+    param($Form,[string]$Key,[int]$Y)
+    $label = New-Label -Text (Get-LocalizedString -Key $Key) -Font $Form.Tag.Heading -ForeColor $script:ColorSecondary -X 16 -Y $Y -Width 350 -Height 22
+    $Form.Tag.Body.Controls.Add($label)
+}
+
+function Add-ConfigurationActionButton {
+    param($Form,[string]$Action,[string]$Key,[int]$Y,[int]$X=16,[int]$Width=350)
+    $button = New-Object Windows.Forms.Button
+    $button.Name = 'ConfigurationAction-' + $Action
+    $button.Tag = $Action
+    $button.Text = Get-LocalizedString -Key $Key
+    $button.AccessibleName = $button.Text
+    $button.Font = $Form.Tag.Regular
+    $button.ForeColor = $script:ColorPrimary
+    $button.BackColor = $script:ColorSurface
+    $button.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $button.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(82,82,82)
+    $button.FlatAppearance.MouseOverBackColor = $script:ColorHover
+    $button.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
+    $button.UseMnemonic = $false
+    $button.Cursor = [Windows.Forms.Cursors]::Hand
+    $button.Location = [Drawing.Point]::new($X,$Y)
+    $button.Size = [Drawing.Size]::new($Width,34)
+    $button.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })
+    $Form.Tag.Body.Controls.Add($button)
+}
+
+function New-ConfigurationPopup {
+    $form = New-AuxiliaryPopupForm -Name 'LenovoConfigurationPopup' -Title (Get-LocalizedString -Key 'Settings.More') -Subtitle 'Lenovo Boot Selector' -ContentHeight 450
+    Add-ConfigurationHeading -Form $form -Key 'Settings.General' -Y 6
+    $autostartLabel = New-Label -Text (Get-LocalizedString -Key 'Settings.Autostart') -Font $form.Tag.Regular -ForeColor $script:ColorPrimary -X 16 -Y 30 -Width 306 -Height 30
+    $autostartLabel.Tag = 'autostart'
+    $autostartLabel.Cursor = [Windows.Forms.Cursors]::Hand
+    $autostartLabel.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })
+    $form.Tag.Body.Controls.Add($autostartLabel)
+    $check = New-Object LenovoCheckBox
+    $check.Name = 'ConfigurationAutostart'
+    $check.Tag = 'autostart'
+    $check.AutoCheck = $false
+    $check.AccessibleName = $autostartLabel.Text
+    $check.Font = $form.Tag.Regular
+    $check.BackColor = $script:ColorBackground
+    $check.AccentColor = $script:ColorAccent
+    $check.Location = [Drawing.Point]::new(332,30)
+    $check.Size = [Drawing.Size]::new(34,30)
+    $check.Add_GotFocus({ $this.BackColor = $script:ColorHover })
+    $check.Add_LostFocus({ $this.BackColor = $script:ColorBackground })
+    $check.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })
+    $form.Tag.Body.Controls.Add($check)
+    $language = New-Label -Text (Get-LocalizedString -Key 'Settings.Language') -Font $form.Tag.Regular -ForeColor $script:ColorPrimary -X 16 -Y 66 -Width 350 -Height 22
+    $form.Tag.Body.Controls.Add($language)
+    Add-ConfigurationActionButton -Form $form -Action 'language-de' -Key 'Language.German' -Y 90 -Width 171
+    Add-ConfigurationActionButton -Form $form -Action 'language-en' -Key 'Language.English' -Y 90 -X 195 -Width 171
+    Add-ConfigurationHeading -Form $form -Key 'Maintenance.Caption' -Y 132
+    Add-ConfigurationActionButton -Form $form -Action 'system-setup' -Key 'Maintenance.Setup' -Y 156
+    Add-ConfigurationActionButton -Form $form -Action 'system-remove' -Key 'Maintenance.Remove' -Y 194
+    Add-ConfigurationHeading -Form $form -Key 'Settings.Updates' -Y 236
+    Add-ConfigurationActionButton -Form $form -Action 'update-check' -Key 'Update.Check' -Y 260
+    Add-ConfigurationActionButton -Form $form -Action 'update-install' -Key 'Update.Install' -Y 298
+    Add-ConfigurationHeading -Form $form -Key 'Settings.Diagnostics' -Y 340
+    Add-ConfigurationActionButton -Form $form -Action 'diagnostics-save' -Key 'Diagnostics.Save' -Y 364
+    Add-ConfigurationActionButton -Form $form -Action 'diagnostics-upload' -Key 'Diagnostics.Upload' -Y 402
+    Update-ConfigurationPopupPresentation -Form $form
+    # Reflect existing presentation state only; do not poll firmware/network.
+    $timer = New-Object Windows.Forms.Timer
+    $timer.Interval = 250
+    $timer.Add_Tick({
+        if ($script:ActiveAuxiliaryPopup -and $script:ActiveAuxiliaryPopup.Name -eq 'LenovoConfigurationPopup') {
+            Update-ConfigurationPopupPresentation -Form $script:ActiveAuxiliaryPopup
+        }
+    })
+    $form.Tag.Timer = $timer
+    $form.Add_Shown({ $this.Tag.Timer.Start() })
+    return $form
+}
+
+function Show-ConfigurationPopup {
+    param([System.Windows.Forms.Control]$Owner)
+    if ($script:ActiveAuxiliaryPopup -or $script:IsManageEntriesMode -or (Test-MaintenanceBusy)) { return }
+    [void](Update-TaskBrokerUiState -Fast)
+    [void](Update-AutostartUi)
+    Update-UpdateMenuState
+    Update-LanguageMenuState
+    $choice = Show-OwnedAuxiliaryPopup -Form (New-ConfigurationPopup) -Owner $Owner
+    if ($choice -and (Test-ConfigurationActionAvailable -Action $choice.Action)) {
+        $item = Get-ConfigurationActionMenuItem -Action $choice.Action
+        $item.PerformClick()
+    }
 }
