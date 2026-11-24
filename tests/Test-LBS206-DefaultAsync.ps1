@@ -140,7 +140,7 @@ try {
         $script:DefaultValueLabel.ForeColor.ToArgb() -eq $script:ColorWarning.ToArgb() -and
         -not $script:RestartButton.Enabled)
     Assert-Lbs206Default 'saving hides the separate redundant ellipsis without losing status text' (
-        -not $script:DefaultArrowLabel.Visible -and $script:DefaultArrowLabel.Text -eq '›' -and
+        -not $script:DefaultArrowLabel.Visible -and $script:DefaultArrowLabel.Text -eq '‹' -and
         $script:DefaultValueLabel.Text -match '(?i)(speicher|saving)')
     Assert-Lbs206Default 'requested pending never overwrites last verified default' ($script:DefaultGuid -ne $script:Requested)
     Start-DefaultTargetChange -Guid $script:DefaultGuid
@@ -153,7 +153,7 @@ try {
     Complete-DefaultTargetChange
     Assert-Lbs206Default 'worker progress switches to verification without claiming saved state' ($script:DefaultTargetChangeStage -eq 'verifying' -and $script:DefaultGuid -ne $script:Requested)
     Assert-Lbs206Default 'verifying hides the separate redundant ellipsis without losing status text' (
-        -not $script:DefaultArrowLabel.Visible -and $script:DefaultArrowLabel.Text -eq '›' -and
+        -not $script:DefaultArrowLabel.Visible -and $script:DefaultArrowLabel.Text -eq '‹' -and
         $script:DefaultValueLabel.Text -match '(?i)(prüf|verif|überprüf)')
     $script:MockSavedGuid=$script:Requested
     [IO.File]::WriteAllText((Join-Path $script:TaskBrokerLocalDir 'manager.txt'),$script:Requested)
@@ -167,7 +167,7 @@ try {
     Assert-Lbs206Default 'successful completion clears amber state and restores restart' (
         $script:DefaultValueLabel.ForeColor.ToArgb() -ne $script:ColorWarning.ToArgb() -and $script:RestartButton.Enabled)
     Assert-Lbs206Default 'normal selection chevron returns when save is fully verified' (
-        $script:DefaultArrowLabel.Visible -and $script:DefaultArrowLabel.Text -eq '›')
+        $script:DefaultArrowLabel.Visible -and $script:DefaultArrowLabel.Text -eq '‹')
     $script:DefaultGuid='{11111111-1111-1111-1111-111111111111}'
     $script:MockSavedGuid=$script:DefaultGuid
     Start-DefaultTargetChange -Guid $script:Requested

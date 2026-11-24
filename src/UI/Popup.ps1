@@ -241,7 +241,7 @@ function Set-AuxiliaryPopupLayout {
     $state.Body.Size = [Drawing.Size]::new($width,[Math]::Max(1,$height-$state.Body.Top))
     $state.Body.AutoScroll = $true
     $state.Body.AutoScrollMinSize = [Drawing.Size]::new(0,[int][Math]::Round($state.ContentHeight*$Scale))
-    $Form.Location = Get-AuxiliaryPopupLocation -WorkingArea $WorkingArea -OwnerBounds $OwnerBounds -SurfaceSize $Form.Size -TriggerBounds $TriggerBounds
+    $Form.Location = Get-AuxiliaryPopupLocation -WorkingArea $WorkingArea -OwnerBounds $OwnerBounds -SurfaceSize $Form.Size -TriggerBounds $TriggerBounds -Scale $Scale
 }
 
 # Owner-local black scrim. A separate layered, non-activating owned window
@@ -254,13 +254,135 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 
+// A visual-only bridge; the existing modal forms retain their native bounds.
+public sealed class LenovoAuxiliaryConnector : Form
+{
+    private Color fill;
+    public Rectangle VisualBounds { get; private set; }
+    public LenovoAuxiliaryConnector()
+    {
+        Name = "AuxiliaryConnector";
+        AutoScaleMode = AutoScaleMode.None;
+        FormBorderStyle = FormBorderStyle.None;
+        ShowInTaskbar = false;
+        StartPosition = FormStartPosition.Manual;
+        Opacity = 0.99;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer |
+                 ControlStyles.AllPaintingInWmPaint, true);
+    }
+
+    protected override bool ShowWithoutActivation { get { return true; } }
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            CreateParams cp = base.CreateParams;
+            cp.ExStyle |= 0x00000080 | 0x08000000 | 0x00000020;
+            return cp;
+        }
+    }
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == 0x0084) { m.Result = new IntPtr(-1); return; } // HTTRANSPARENT
+        base.WndProc(ref m);
+    }
+
+    // All inputs are in screen coordinates. Never draw across the owner or
+    // outside the actual work area; no right-side or overlapping bridge.
+    public static Rectangle GetConnectorBounds(Rectangle work, Rectangle owner,
+        Rectangle row, Rectangle child, double scale)
+    {
+        if (scale < 1.0 || scale > 5.0 || row.Width <= 0 || row.Height <= 0 ||
+            !owner.Contains(row) || !work.Contains(row) || !work.Contains(child) ||
+            row.Left != owner.Left || child.Right >= row.Left)
+            return Rectangle.Empty;
+        int gap = row.Left - child.Right;
+        if (gap < 3 || gap > (int)Math.Round(8 * scale)) return Rectangle.Empty;
+        int half = Math.Max(2, (int)Math.Round(7 * scale));
+        int center = row.Top + row.Height / 2;
+        if (center - half <= child.Top || center + half >= child.Bottom ||
+            center - half < row.Top || center + half >= row.Bottom)
+            return Rectangle.Empty;
+        Rectangle bridge = new Rectangle(child.Right, center - half, gap, 2 * half + 1);
+        return work.Contains(bridge) ? bridge : Rectangle.Empty;
+    }
+
+    private Point[] Triangle()
+    {
+        // WinForms enforces a native minimum size (16x16 on the hosted
+        // Windows runner). The visible region must use the requested geometry,
+        // never the larger backing window dimensions.
+        return new Point[] { new Point(0, 0), new Point(VisualBounds.Width - 1, VisualBounds.Height / 2),
+            new Point(0, VisualBounds.Height - 1) };
+    }
+
+    public void SetGeometry(Rectangle bounds, Color color)
+    {
+        fill = color;
+        VisualBounds = bounds;
+        Bounds = bounds;
+        using (var path = new System.Drawing.Drawing2D.GraphicsPath())
+        {
+            path.AddPolygon(Triangle());
+            Region old = Region;
+            Region = new Region(path);
+            if (old != null) old.Dispose();
+        }
+        Invalidate();
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        using (var brush = new SolidBrush(fill))
+        using (var pen = new Pen(Color.FromArgb(108, 108, 108)))
+        {
+            Point[] triangle = Triangle();
+            e.Graphics.FillPolygon(brush, triangle);
+            e.Graphics.DrawLines(pen, triangle);
+        }
+    }
+}
+
 public sealed class LenovoAuxiliaryOwnerDimmer : Form
 {
     private Form parent;
-    public LenovoAuxiliaryOwnerDimmer(Form owner)
+    private Form child;
+    private Control row;
+    private Control rowContainer;
+    private readonly double scale;
+    private readonly Color highlight;
+    private readonly Color accent;
+    private Color previousRowColor;
+    private bool rowHighlighted;
+    private bool childShown;
+    private LenovoAuxiliaryConnector connector;
+    public Rectangle HighlightedRowBounds { get; private set; }
+
+    public LenovoAuxiliaryOwnerDimmer(Form owner, Control trigger, Form surface,
+        double coordinateScale, Color highlightColor, Color accentColor)
     {
         if (owner == null) throw new ArgumentNullException("owner");
         parent = owner;
+        child = surface;
+        scale = coordinateScale;
+        highlight = highlightColor;
+        accent = accentColor;
+        if (trigger != null && (trigger.Name == "SettingsPanel" || trigger.Name == "DefaultPanel")
+            && trigger.FindForm() == owner)
+        {
+            row = trigger;
+            rowContainer = row.Parent;
+            previousRowColor = row.BackColor;
+            row.Paint += PaintRow;
+            row.BackColorChanged += KeepRowHighlight;
+            row.LocationChanged += SyncBounds;
+            row.SizeChanged += SyncBounds;
+            row.VisibleChanged += SyncBounds;
+            row.ParentChanged += SyncBounds;
+            row.Disposed += SyncBounds;
+            if (rowContainer != null) rowContainer.Layout += SyncBounds;
+        }
         Name = "AuxiliaryOwnerDimmer";
         AutoScaleMode = AutoScaleMode.None;
         FormBorderStyle = FormBorderStyle.None;
@@ -269,9 +391,16 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
         BackColor = Color.Black;
         Opacity = 0.35;
         TopMost = owner.TopMost;
-        SyncBounds(null, EventArgs.Empty);
         parent.LocationChanged += SyncBounds;
         parent.SizeChanged += SyncBounds;
+        parent.Layout += SyncBounds;
+        parent.VisibleChanged += SyncBounds;
+        child.LocationChanged += SyncBounds;
+        child.SizeChanged += SyncBounds;
+        child.VisibleChanged += SyncBounds;
+        child.Shown += SurfaceShown;
+        child.Disposed += SyncBounds;
+        SyncBounds(null, EventArgs.Empty);
     }
 
     protected override bool ShowWithoutActivation { get { return true; } }
@@ -287,19 +416,146 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
         }
     }
 
+    private Rectangle GetVisibleRow(Rectangle ownerBounds)
+    {
+        if (row == null || row.IsDisposed || row.Disposing || !row.Visible ||
+            row.FindForm() != parent || row.Parent != rowContainer)
+            return Rectangle.Empty;
+        Rectangle bounds = row.RectangleToScreen(row.ClientRectangle);
+        if (!ownerBounds.Contains(bounds) || bounds.Width <= 0 || bounds.Height <= 0)
+            return Rectangle.Empty;
+        for (Control c = row.Parent; c != null; c = c.Parent)
+        {
+            if (!c.RectangleToScreen(c.ClientRectangle).Contains(bounds))
+                return Rectangle.Empty;
+            if (c == parent) break;
+        }
+        return bounds;
+    }
+
+    private void SetRowHighlight(bool enabled)
+    {
+        if (row == null || row.IsDisposed || row.Disposing || rowHighlighted == enabled) return;
+        rowHighlighted = enabled;
+        row.BackColor = enabled ? highlight : previousRowColor;
+        row.Invalidate();
+    }
+    private void KeepRowHighlight(object sender, EventArgs args)
+    {
+        if (rowHighlighted && row.BackColor != highlight) row.BackColor = highlight;
+    }
+    private void PaintRow(object sender, PaintEventArgs args)
+    {
+        if (!rowHighlighted) return;
+        using (var brush = new SolidBrush(accent))
+            args.Graphics.FillRectangle(brush, 0, 0, Math.Max(1, (int)Math.Round(3 * scale)), row.Height);
+    }
+    private void SurfaceShown(object sender, EventArgs args)
+    {
+        childShown = true;
+        SyncBounds(sender, args);
+    }
+    private void HideConnector()
+    {
+        if (connector != null && !connector.IsDisposed) connector.Hide();
+    }
+
     private void SyncBounds(object sender, EventArgs args)
     {
-        if (parent != null && !parent.IsDisposed && !IsDisposed)
-            Bounds = parent.RectangleToScreen(parent.ClientRectangle);
+        if (parent == null || parent.IsDisposed || parent.Disposing || IsDisposed || Disposing)
+        {
+            HideConnector();
+            return;
+        }
+        Rectangle ownerBounds = parent.RectangleToScreen(parent.ClientRectangle);
+        Bounds = ownerBounds;
+        Rectangle rowBounds = GetVisibleRow(ownerBounds);
+        bool usable = parent.Visible && child != null && !child.IsDisposed && !child.Disposing &&
+            !rowBounds.IsEmpty;
+        HighlightedRowBounds = usable ? rowBounds : Rectangle.Empty;
+        Region next = null;
+        if (usable)
+        {
+            next = new Region(ClientRectangle);
+            Rectangle hole = rowBounds;
+            hole.Offset(-ownerBounds.Left, -ownerBounds.Top);
+            next.Exclude(hole);
+        }
+        Region old = Region;
+        Region = next;
+        if (old != null) old.Dispose();
+        SetRowHighlight(usable);
+
+        if (!usable || !child.Visible || !childShown)
+        {
+            HideConnector();
+            return;
+        }
+        Rectangle bridge = LenovoAuxiliaryConnector.GetConnectorBounds(
+            Screen.FromControl(parent).WorkingArea, ownerBounds, rowBounds, child.Bounds, scale);
+        if (bridge.IsEmpty)
+        {
+            HideConnector();
+            return;
+        }
+        Color fill = child.BackColor;
+        Control header = child.Controls["AuxiliaryHeader"];
+        if (header != null && header.RectangleToScreen(header.ClientRectangle).Contains(
+                new Point(child.Right - 1, bridge.Top + bridge.Height / 2)))
+            fill = header.BackColor;
+        if (connector == null || connector.IsDisposed)
+        {
+            connector = new LenovoAuxiliaryConnector();
+            connector.TopMost = child.TopMost;
+        }
+        connector.SetGeometry(bridge, fill);
+        if (!connector.Visible)
+        {
+            connector.Owner = child;
+            connector.Show();
+        }
     }
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing && parent != null)
+        if (disposing)
         {
-            parent.LocationChanged -= SyncBounds;
-            parent.SizeChanged -= SyncBounds;
-            parent = null;
+            if (parent != null)
+            {
+                parent.LocationChanged -= SyncBounds;
+                parent.SizeChanged -= SyncBounds;
+                parent.Layout -= SyncBounds;
+                parent.VisibleChanged -= SyncBounds;
+                parent = null;
+            }
+            if (child != null)
+            {
+                child.LocationChanged -= SyncBounds;
+                child.SizeChanged -= SyncBounds;
+                child.VisibleChanged -= SyncBounds;
+                child.Shown -= SurfaceShown;
+                child.Disposed -= SyncBounds;
+                child = null;
+            }
+            if (row != null)
+            {
+                row.Paint -= PaintRow;
+                row.BackColorChanged -= KeepRowHighlight;
+                row.LocationChanged -= SyncBounds;
+                row.SizeChanged -= SyncBounds;
+                row.VisibleChanged -= SyncBounds;
+                row.ParentChanged -= SyncBounds;
+                row.Disposed -= SyncBounds;
+                if (rowContainer != null) rowContainer.Layout -= SyncBounds;
+                SetRowHighlight(false);
+                row = null;
+                rowContainer = null;
+            }
+            if (connector != null)
+            {
+                connector.Dispose();
+                connector = null;
+            }
         }
         base.Dispose(disposing);
     }
@@ -328,7 +584,7 @@ function Show-OwnedAuxiliaryPopup {
             $ownerRefreshButton.Refresh()
         }
         Initialize-AuxiliaryOwnerDimmer
-        $dimmer = [LenovoAuxiliaryOwnerDimmer]::new($parent)
+        $dimmer = [LenovoAuxiliaryOwnerDimmer]::new($parent,$Owner,$Form,[double]$scale,$script:ColorHover,$script:ColorAccent)
         # Show without activation before the child, which retains its normal
         # modal ownership, z-order and focus even on overlapping placement.
         $dimmer.Show($parent)
@@ -341,7 +597,10 @@ function Show-OwnedAuxiliaryPopup {
         finally {
             if ([object]::ReferenceEquals($script:ActiveAuxiliaryPopup,$Form)) { $script:ActiveAuxiliaryPopup = $null }
             try { $Form.Dispose() }
-            finally { if ($ownerRefreshButton -and -not $ownerRefreshButton.IsDisposed) { $ownerRefreshButton.Refresh() } }
+            finally {
+                if ($dimmer -and $Owner -and -not $Owner.IsDisposed -and $Owner.Name -in @('SettingsPanel','DefaultPanel')) { Set-PopupNavigationRowHover -Control $Owner -Hover $false }
+                if ($ownerRefreshButton -and -not $ownerRefreshButton.IsDisposed) { $ownerRefreshButton.Refresh() }
+            }
         }
     }
 }

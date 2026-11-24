@@ -272,7 +272,7 @@ function Add-PopupSettingsSection {
     $more.Name = 'MoreSettingsButton'
     $more.Cursor = [Windows.Forms.Cursors]::Hand
     $settings.Controls.Add($more)
-    $moreArrow = New-Label -Text '›' -Font (New-Object Drawing.Font('Segoe UI',10.0)) -ForeColor $script:ColorSecondary -X 352 -Y 7 -Width 22 -Height 23
+    $moreArrow = New-Label -Text '‹' -Font (New-Object Drawing.Font('Segoe UI',10.0)) -ForeColor $script:ColorSecondary -X 352 -Y 7 -Width 22 -Height 23
     $moreArrow.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $moreArrow.Cursor = [Windows.Forms.Cursors]::Hand
     $settings.Controls.Add($moreArrow)
@@ -300,7 +300,7 @@ function Add-PopupSettingsSection {
     $defaultPanel.Controls.Add($defaultValue)
     $script:DefaultValueLabel = $defaultValue
 
-    $defaultArrow = New-Label -Text '›' -Font (New-Object Drawing.Font('Segoe UI', 10.0, [Drawing.FontStyle]::Regular)) `
+    $defaultArrow = New-Label -Text '‹' -Font (New-Object Drawing.Font('Segoe UI', 10.0, [Drawing.FontStyle]::Regular)) `
         -ForeColor $script:ColorSecondary -X 352 -Y 7 -Width 22 -Height 23
     $defaultArrow.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $defaultArrow.Cursor = [System.Windows.Forms.Cursors]::Hand

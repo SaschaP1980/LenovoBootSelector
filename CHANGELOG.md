@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.17.0 – Connect auxiliary popups to their navigation row (LBS-233)
+
+- Expand Further settings and the persistent-default picker only to the left, with work-area clamping and no right-side fallback.
+- Keep the initiating row visually highlighted with a red accent and bridge its center to the auxiliary surface when screen geometry permits; omit the non-interactive bridge on overlap or unsafe placement.
+- Preserve modal admission, focus, dismissal and action ownership; extend native geometry regression coverage.
+
 ## v1.5.16.0 – Reclaim Manage Entries viewport space (LBS-231)
 
 - Remove the permanent Changes heading and both instructional lines; keep contextual action tooltips and alias cue text.
