@@ -2367,7 +2367,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.17.2'
+$script:AppVersion = '1.5.17.3'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -2477,6 +2477,7 @@ $script:DefaultInteractionEnabled = $false
 $script:RestartTargetLabel = $null
 $script:RestartUseDefaultButton = $null
 $script:ActiveAuxiliaryPopup = $null
+$script:ActiveOwnedDialog = $null
 $script:DefaultContextRoot = $null
 $script:LegacySessionRestoreRegistryPath = 'HKCU:\Volatile Environment'
 $script:LegacySessionRestoreValueName = 'LenovoBootMenuTrayDefaultRestoreProcessed'
@@ -5581,25 +5582,41 @@ function Update-TrayLocalizedText {
     Update-LanguageMenuState
 }
 
-function Rebuild-PopupForLocale {
-    $wasVisible = ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible)
-    try {
-        if ($script:Popup -and -not $script:Popup.IsDisposed) {
-            $script:Popup.Hide()
-            $script:Popup.Dispose()
+# Retain the native window, DPI, scroll position and modal ownership.
+function Update-PopupLocalePresentation {
+    if (-not $script:Popup -or $script:Popup.IsDisposed) {
+        $script:Popup = New-PopupForm
+    }
+    $textKeys = [ordered]@{
+        SectionLabel='Popup.NextBootSection'
+        ManageEntriesButton='Popup.Customize'
+        ConfigurationSectionLabel='Settings.Title'
+        MoreSettingsButton='Settings.More'
+        DefaultTargetNameLabel='Settings.DefaultTarget'
+        RestartActionButton='Action.RestartWindows'
+        RestartUseDefaultButton='BootNext.UseDefaultOnce'
+        ManageCancelButton='Common.Cancel'
+        ManageSaveButton='Manage.Save'
+    }
+    if ($script:Popup.Controls) {
+        foreach ($name in $textKeys.Keys) {
+            foreach ($control in $script:Popup.Controls.Find($name,$true)) {
+                $control.Text = Get-LocalizedString -Key $textKeys[$name]
+            }
         }
-    } catch { }
-
-    $script:Popup = New-PopupForm
-    try { Update-AutostartUi | Out-Null } catch { }
-    try { Update-MaintenanceUi } catch { }
-    try { Update-ManageEntriesUiState } catch { }
-    try { Update-PopupRows } catch { }
-
-    if ($wasVisible) {
-        Position-Popup
-        $script:Popup.Show()
-        $script:Popup.Activate()
+        foreach ($row in $script:Popup.Controls.Find('SettingsPanel',$true)) {
+            $row.AccessibleName = Get-LocalizedString -Key 'Settings.More'
+        }
+        if ($script:HeaderStatusLabel) { $script:HeaderStatusLabel.AccessibleDescription = Get-LocalizedString -Key 'Popup.HeaderUpdateAccessible' }
+        if ($script:RestartUseDefaultButton) { $script:RestartUseDefaultButton.AccessibleName = $script:RestartUseDefaultButton.Text }
+        if ($script:BootTypeToolTip -and $script:RefreshButton) { $script:BootTypeToolTip.SetToolTip($script:RefreshButton,(Get-LocalizedString -Key 'Action.RefreshBootTargets')) }
+    }
+    Update-AutostartUi | Out-Null
+    Update-MaintenanceUi
+    Update-ManageEntriesUiState
+    Update-PopupRows -Reason 'language-change'
+    if ($script:ActiveAuxiliaryPopup -and -not $script:ActiveAuxiliaryPopup.IsDisposed -and $script:ActiveAuxiliaryPopup.Name -eq 'LenovoConfigurationPopup') {
+        Update-ConfigurationPopupLocale -Form $script:ActiveAuxiliaryPopup
     }
 }
 
@@ -5621,7 +5638,7 @@ function Set-LanguageFromUi {
 
     if ($after -ne $before) {
         Update-CachedBootEntryLocalization
-        Rebuild-PopupForLocale
+        Update-PopupLocalePresentation
     }
     return $after
 }
@@ -6286,6 +6303,39 @@ function Prepare-LenovoDialogDpiLayout {
     Register-LenovoDialogDpiWindowDiagnostics -Form $Form -Role $Role -Screen $screen -RequestedScale ([double]$scale.Factor)
 }
 
+# Resolve the deepest visible modal owner at display time, not at worker start.
+# Closing settings during a worker does not reopen it or an abandoned main popup.
+function Get-LenovoDialogOwner {
+    foreach ($candidate in @($script:ActiveOwnedDialog,$script:ActiveAuxiliaryPopup,$script:Popup)) {
+        if ($candidate -and -not $candidate.IsDisposed -and $candidate.Visible) { return $candidate }
+    }
+    return $null
+}
+
+function Show-LenovoOwnedDialog {
+    param([Windows.Forms.Form]$Form,[Windows.Forms.Form]$Owner)
+    $previous = $script:ActiveOwnedDialog
+    $dimmer = $null
+    $script:ActiveOwnedDialog = $Form
+    try {
+        if ($Owner -and -not $Owner.IsDisposed -and $Owner.Visible) {
+            # The main owner's existing scrim remains alive; dim the immediate
+            # modal owner only, without a navigation cutout or connector.
+            if ($script:ActiveAuxiliaryPopup) {
+                Initialize-AuxiliaryOwnerDimmer
+                $dimmer = [LenovoAuxiliaryOwnerDimmer]::new($Owner,$null,$Form,1.0,$script:ColorHover,$script:ColorAccent)
+                $dimmer.Show($Owner)
+            }
+            return $Form.ShowDialog($Owner)
+        }
+        return $Form.ShowDialog()
+    }
+    finally {
+        try { if ($dimmer) { $dimmer.Dispose() } }
+        finally { $script:ActiveOwnedDialog = $previous }
+    }
+}
+
 function Show-LenovoNoticeDialog {
     param(
         [Parameter(Mandatory=$true)][string]$Title,
@@ -6394,7 +6444,7 @@ function Show-LenovoNoticeDialog {
     $form.AcceptButton = $ok
     $form.CancelButton = $ok
     try {
-        $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
+        $owner = Get-LenovoDialogOwner
         Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner -Role 'notice'
         if ($PromoteSecondaryAction) {
             # Safe dismissal receives initial focus even if the native tab
@@ -6406,7 +6456,7 @@ function Show-LenovoNoticeDialog {
                 }
             }.GetNewClosure())
         }
-        if ($owner) { [void]$form.ShowDialog($owner) } else { [void]$form.ShowDialog() }
+        [void](Show-LenovoOwnedDialog -Form $form -Owner $owner)
     }
     finally { $form.Dispose() }
 }
@@ -6470,9 +6520,9 @@ function Show-LocaleMigrationDialog {
     $form.AcceptButton = $english
 
     try {
-        $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
+        $owner = Get-LenovoDialogOwner
         Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner -Role 'language-migration'
-        if ($owner) { [void]$form.ShowDialog($owner) } else { [void]$form.ShowDialog() }
+        [void](Show-LenovoOwnedDialog -Form $form -Owner $owner)
         return [string]$form.Tag
     }
     finally { $form.Dispose() }
@@ -6590,10 +6640,9 @@ function Show-LenovoSystemFunctionsDialog {
     $form.Add_KeyDown({ param($sender,$eventArgs) if ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Escape) { $sender.DialogResult = [System.Windows.Forms.DialogResult]::No; $sender.Close() } })
 
     try {
-        $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
+        $owner = Get-LenovoDialogOwner
         Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner -Role 'system-functions'
-        if ($owner) { return $form.ShowDialog($owner) }
-        return $form.ShowDialog()
+        return (Show-LenovoOwnedDialog -Form $form -Owner $owner)
     }
     finally { $form.Dispose() }
 }
@@ -6682,10 +6731,9 @@ function Show-LenovoRestartDialog {
     $form.Add_KeyDown({ param($sender, $eventArgs) if ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Escape) { $sender.DialogResult = [System.Windows.Forms.DialogResult]::No; $sender.Close() } })
 
     try {
-        $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
+        $owner = Get-LenovoDialogOwner
         Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner -Role 'restart-confirmation'
-        if ($owner) { return $form.ShowDialog($owner) }
-        return $form.ShowDialog()
+        return (Show-LenovoOwnedDialog -Form $form -Owner $owner)
     }
     finally {
         $form.Dispose()
@@ -12740,6 +12788,7 @@ function Add-PopupSettingsSection {
 
     $configLabel = New-Label -Text (Get-LocalizedString -Key 'Settings.Title') -Font (New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 2 -Width 220 -Height 17
+    $configLabel.Name = 'ConfigurationSectionLabel'
     $configSection.Controls.Add($configLabel)
     $Root.Controls.Add($configSection)
 
@@ -12774,6 +12823,7 @@ function Add-PopupSettingsSection {
 
     $defaultName = New-Label -Text (Get-LocalizedString -Key 'Settings.DefaultTarget') -Font (New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)) `
         -ForeColor $script:ColorPrimary -X 16 -Y 8 -Width 144 -Height 22
+    $defaultName.Name = 'DefaultTargetNameLabel'
     $defaultName.Cursor = [System.Windows.Forms.Cursors]::Hand
     $defaultPanel.Controls.Add($defaultName)
 
@@ -12815,6 +12865,7 @@ function Add-PopupRestartSection {
     $restartPanel.BackColor = $script:ColorSurface
 
     $restartButton = New-Object System.Windows.Forms.Button
+    $restartButton.Name = 'RestartActionButton'
     $restartButton.Text = Get-LocalizedString -Key 'Action.RestartWindows'
     $restartButton.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
     $restartButton.ForeColor = $script:ColorPrimary
@@ -12942,6 +12993,7 @@ function Add-PopupManageEntriesSection {
     $managePanel.Controls.Add($manageDivider)
 
     $cancelManage = New-Object System.Windows.Forms.Button
+    $cancelManage.Name = 'ManageCancelButton'
     $cancelManage.Text = Get-LocalizedString -Key 'Common.Cancel'
     $cancelManage.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
     $cancelManage.ForeColor = $script:ColorPrimary
@@ -12958,6 +13010,7 @@ function Add-PopupManageEntriesSection {
     $managePanel.Controls.Add($cancelManage)
 
     $saveManage = New-Object System.Windows.Forms.Button
+    $saveManage.Name = 'ManageSaveButton'
     $saveManage.Text = Get-LocalizedString -Key 'Manage.Save'
     $saveManage.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
     $saveManage.ForeColor = [Drawing.Color]::FromArgb(146,146,146)
@@ -13107,7 +13160,7 @@ function New-AuxiliaryPopupForm {
         Choice=$null; Scale=0.0; Header=$header; Title=$titleLabel; Subtitle=$subtitleLabel
         Close=$close; Body=$body; Viewport=$viewport; Scroll=$scroll; ContentHeight=$ContentHeight; Tip=$tip
         Regular=$regular; Bold=$bold; Heading=$heading; Symbol=$symbol
-        Fonts=@($regular,$bold,$heading,$large,$symbol); Timer=$null; DefaultSnapshot=$null
+        Fonts=@($regular,$bold,$heading,$large,$symbol); Timer=$null; DefaultSnapshot=$null; ActionInProgress=$false
     }
     $form.Add_Disposed({
         param($sender,$eventArgs)
@@ -13180,22 +13233,25 @@ function Invoke-ConfigurationPopupAction {
     if (-not (Test-ConfigurationActionAvailable -Action $action)) { return }
     $form = $Control.FindForm()
     $item = Get-ConfigurationActionMenuItem -Action $action
-    if ($action -eq 'autostart') {
-        # The existing tray handler owns the actual toggle and verification.
-        $item.PerformClick()
-        Update-ConfigurationPopupPresentation -Form $form
-        return
-    }
+    if (-not $form -or $form.IsDisposed -or $form.Tag.ActionInProgress) { return }
     if ($action -like 'language-*' -and $item.Checked) { return }
-    # Close the child before the existing action starts a modal dialog,
-    # rebuilds the main popup, or starts an asynchronous operation.
-    $form.Tag.Choice = [pscustomobject]@{ Action=$action }
-    $form.DialogResult = [Windows.Forms.DialogResult]::OK
+    # The existing tray handlers still own all operations and confirmations.
+    # Keep the settings modal alive throughout synchronous dispatch; asynchronous
+    # result dialogs resolve the currently visible owner when they complete.
+    $form.Tag.ActionInProgress = $true
+    try { $item.PerformClick() }
+    finally {
+        if (-not $form.IsDisposed) {
+            $form.Tag.ActionInProgress = $false
+            Update-ConfigurationPopupPresentation -Form $form
+        }
+    }
 }
 
 function Add-ConfigurationHeading {
     param($Form,[string]$Key,[int]$Y)
     $label = New-Label -Text (Get-LocalizedString -Key $Key) -Font $Form.Tag.Heading -ForeColor $script:ColorSecondary -X 16 -Y $Y -Width 350 -Height 22
+    $label.Name = 'ConfigurationLocale-' + $Key
     $Form.Tag.Body.Controls.Add($label)
 }
 
@@ -13243,10 +13299,27 @@ function Add-ConfigurationActionButton {
     $Form.Tag.Body.Controls.Add($button)
 }
 
+function Update-ConfigurationPopupLocale {
+    param([Windows.Forms.Form]$Form)
+    $title = Get-LocalizedString -Key 'Settings.More'
+    $Form.Text = $title
+    $Form.AccessibleName = $title
+    $Form.Tag.Title.Text = $title
+    $Form.Tag.Close.AccessibleName = Get-LocalizedString -Key 'Common.Close'
+    foreach ($control in $Form.Tag.Body.Controls) {
+        if ($control.Name.StartsWith('ConfigurationLocale-')) {
+            $control.Text = Get-LocalizedString -Key $control.Name.Substring('ConfigurationLocale-'.Length)
+        }
+    }
+    $Form.Tag.Body.Controls['ConfigurationAutostart'].AccessibleName = Get-LocalizedString -Key 'Settings.Autostart'
+    Update-ConfigurationPopupPresentation -Form $Form
+}
+
 function New-ConfigurationPopup {
     $form = New-AuxiliaryPopupForm -Name 'LenovoConfigurationPopup' -Title (Get-LocalizedString -Key 'Settings.More') -Subtitle 'Lenovo Boot Selector' -ContentHeight 450
     Add-ConfigurationHeading -Form $form -Key 'Settings.General' -Y 6
     $autostartLabel = New-Label -Text (Get-LocalizedString -Key 'Settings.Autostart') -Font $form.Tag.Regular -ForeColor $script:ColorPrimary -X 16 -Y 30 -Width 306 -Height 30
+    $autostartLabel.Name = 'ConfigurationLocale-Settings.Autostart'
     $autostartLabel.Tag = 'autostart'
     $autostartLabel.Cursor = [Windows.Forms.Cursors]::Hand
     $autostartLabel.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })
@@ -13266,6 +13339,7 @@ function New-ConfigurationPopup {
     $check.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })
     $form.Tag.Body.Controls.Add($check)
     $language = New-Label -Text (Get-LocalizedString -Key 'Settings.Language') -Font $form.Tag.Regular -ForeColor $script:ColorPrimary -X 16 -Y 66 -Width 350 -Height 22
+    $language.Name = 'ConfigurationLocale-Settings.Language'
     $form.Tag.Body.Controls.Add($language)
     Add-ConfigurationActionButton -Form $form -Action 'language-de' -Key 'Language.German' -Y 90 -Width 171
     Add-ConfigurationActionButton -Form $form -Action 'language-en' -Key 'Language.English' -Y 90 -X 195 -Width 171
@@ -13299,11 +13373,7 @@ function Show-ConfigurationPopup {
     [void](Update-AutostartUi)
     Update-UpdateMenuState
     Update-LanguageMenuState
-    $choice = Show-OwnedAuxiliaryPopup -Form (New-ConfigurationPopup) -Owner $Owner
-    if ($choice -and (Test-ConfigurationActionAvailable -Action $choice.Action)) {
-        $item = Get-ConfigurationActionMenuItem -Action $choice.Action
-        $item.PerformClick()
-    }
+    [void](Show-OwnedAuxiliaryPopup -Form (New-ConfigurationPopup) -Owner $Owner)
 }
 
 # LBS-132: icon-relative placement is pure geometry; shell discovery is best effort.
@@ -13474,7 +13544,7 @@ function Invoke-PopupEscapeDismissal {
     if (-not $Form.Visible -or -not $Form.ContainsFocus) { return }
 
     # Owned auxiliary forms and OLE drag have independent Escape/cleanup lifecycles.
-    if ($script:ActiveAuxiliaryPopup) { return }
+    if ($script:ActiveAuxiliaryPopup -or $script:ActiveOwnedDialog) { return }
     if ($script:ManageActiveDragGuid -or $script:ManageDragLayout) { return }
 
     $aliasEditor = $Form.Controls.Find('AliasEditor', $true) | Select-Object -First 1
@@ -13544,7 +13614,7 @@ function New-PopupForm {
     $form.Add_Deactivate({
         # The owned auxiliary Form is part of this popup's UI. The
         # ownership flag covers Deactivate before the child becomes visible.
-        if ($script:ActiveAuxiliaryPopup) { return }
+        if ($script:ActiveAuxiliaryPopup -or $script:ActiveOwnedDialog) { return }
         $capabilities = Get-CurrentSystemFunctionsCapabilities
         if (-not $script:ExitRequested -and [string]$capabilities.State -ne 'Busy') { $this.Hide() }
     })
@@ -13589,6 +13659,10 @@ function Position-Popup {
 
 function Show-OrTogglePopup {
     param([switch]$FromTrayClick)
+    if ($script:ActiveOwnedDialog -and -not $script:ActiveOwnedDialog.IsDisposed) {
+        [void]$script:ActiveOwnedDialog.Activate()
+        return
+    }
     if ($script:ActiveAuxiliaryPopup -and -not $script:ActiveAuxiliaryPopup.IsDisposed) {
         [void]$script:ActiveAuxiliaryPopup.Activate()
         return
@@ -13649,6 +13723,10 @@ function Show-OrTogglePopup {
 # Explicit launcher re-entry is SHOW, never the tray-icon toggle (which hides
 # an already visible popup). This runs on the existing WinForms UI thread.
 function Show-OrActivatePopup {
+    if ($script:ActiveOwnedDialog -and -not $script:ActiveOwnedDialog.IsDisposed) {
+        [void]$script:ActiveOwnedDialog.Activate()
+        return
+    }
     if ($script:ActiveAuxiliaryPopup -and -not $script:ActiveAuxiliaryPopup.IsDisposed) {
         [void]$script:ActiveAuxiliaryPopup.Activate()
         return

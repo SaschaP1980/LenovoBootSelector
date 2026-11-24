@@ -1136,6 +1136,7 @@ $script:DefaultInteractionEnabled = $false
 $script:RestartTargetLabel = $null
 $script:RestartUseDefaultButton = $null
 $script:ActiveAuxiliaryPopup = $null
+$script:ActiveOwnedDialog = $null
 $script:DefaultContextRoot = $null
 $script:LegacySessionRestoreRegistryPath = 'HKCU:\Volatile Environment'
 $script:LegacySessionRestoreValueName = 'LenovoBootMenuTrayDefaultRestoreProcessed'
