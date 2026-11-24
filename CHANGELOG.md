@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.17.4 – Correct auxiliary close-glyph focus feedback (LBS-233)
+
+- Transfer focus to eligible settings content before disabling an active action, including during asynchronous diagnostic upload.
+- Suppress inactive close-button focus outlines while preserving the native keyboard focus indicator, CancelButton, Tab and Escape behavior.
+- Restore eligible originating content focus after nested dialogs without changing action ownership, modality or upload logic.
+
 ## v1.5.17.3 – Preserve settings and main popup across actions (LBS-233)
 
 - Keep the Further settings modal visible during language, maintenance, update and diagnostics actions; delegate exactly once to existing handlers.
