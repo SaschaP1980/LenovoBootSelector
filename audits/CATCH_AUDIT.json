@@ -1,5 +1,5 @@
 {
-  "version": "1.5.18.0",
+  "version": "1.5.19.0",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
@@ -14,7 +14,7 @@
     "self_repair_best_effort",
     "telemetry_best_effort"
   ],
-  "count": 145,
+  "count": 142,
   "entries": [
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
@@ -250,69 +250,62 @@
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
       "line": 2423,
-      "category": "cleanup_best_effort",
-      "reason": "Cleanup/dispose failure must not replace the primary operation result.",
-      "code": "try { $script:DarkActionTooltipFont.Dispose() } catch { }"
-    },
-    {
-      "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2426,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { $backgroundRefreshContext.Process.Refresh() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2427,
+      "line": 2424,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { if (-not $backgroundRefreshContext.Process.HasExited) { $backgroundRefreshContext.Process.Kill() } } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2428,
+      "line": 2425,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $backgroundRefreshContext.Process.Dispose() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2434,
+      "line": 2431,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $script:DiagnosticsUploadTimer.Stop(); $script:DiagnosticsUploadTimer.Dispose() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2438,
+      "line": 2435,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { $script:DiagnosticsUploadState.Client.CancelPendingRequests() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2447,
+      "line": 2444,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { Stop-LbsActivationListener -Listener $activationListener } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2451,
+      "line": 2448,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $activationEvent.Dispose() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2457,
+      "line": 2454,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $mutex.ReleaseMutex() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2460,
+      "line": 2457,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $mutex.Dispose() } catch { }"
@@ -906,29 +899,15 @@
       "code": "} catch { }"
     },
     {
-      "source": "src/UI/MenuAppearance.ps1",
-      "line": 236,
-      "category": "cleanup_best_effort",
-      "reason": "Cleanup/dispose failure must not replace the primary operation result.",
-      "code": "try { $tip.Hide($Owner) } catch { }"
-    },
-    {
-      "source": "src/UI/MenuAppearance.ps1",
-      "line": 242,
-      "category": "cleanup_best_effort",
-      "reason": "Cleanup/dispose failure must not replace the primary operation result.",
-      "code": "try { $script:DarkActionTooltip.Hide($script:DarkActionTooltipOwner) } catch { }"
-    },
-    {
       "source": "src/UI/Popup.ps1",
-      "line": 153,
+      "line": 152,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { [void](Refresh-SystemDefaultState) } catch { }"
     },
     {
       "source": "src/UI/Popup.ps1",
-      "line": 211,
+      "line": 210,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { return [Drawing.Icon]::new($iconPath) } catch { }"

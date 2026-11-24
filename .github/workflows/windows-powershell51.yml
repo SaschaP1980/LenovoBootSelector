@@ -171,6 +171,8 @@ jobs:
               storageInfrastructure = Get-TestTotal $logText '^STORAGE INFRA TOTAL\s+(\d+)/(\d+)\s*$'
               uiPresentation = Get-TestTotal $logText '^UI PRESENTATION TOTAL\s+(\d+)/(\d+)\s*$'
               popupDpiLayout = Get-TestTotal $logText '^POPUP DPI TOTAL\s+(\d+)/(\d+)\s*$'
+              tooltipSource = Get-TestTotal $logText '^LBS244 SOURCE TOTAL\s+(\d+)/(\d+)\s*$'
+              tooltipNative = Get-TestTotal $logText '^LBS244 TOOLTIP TOTAL\s+(\d+)/(\d+)\s*$'
               typography = Get-TestTotal $logText '^LBS186 TYPOGRAPHY TOTAL\s+(\d+)/(\d+)\s*$'
               manageGrip = Get-TestTotal $logText '^LBS166 GRIP TOTAL\s+(\d+)/(\d+)\s*$'
               manageViewport = Get-TestTotal $logText '^LBS157 VIEWPORT TOTAL\s+(\d+)/(\d+)\s*$'
@@ -203,6 +205,8 @@ jobs:
               'storageInfrastructure',
               'uiPresentation',
               'popupDpiLayout',
+              'tooltipSource',
+              'tooltipNative',
               'typography',
               'manageGrip',
               'manageViewport',
@@ -241,6 +245,8 @@ jobs:
               $totals.storageInfrastructure.passed +
               $totals.uiPresentation.passed +
               $totals.popupDpiLayout.passed +
+              $totals.tooltipSource.passed +
+              $totals.tooltipNative.passed +
               $totals.typography.passed +
               $totals.manageGrip.passed +
               $totals.manageViewport.passed +
@@ -270,6 +276,8 @@ jobs:
               $totals.storageInfrastructure.expected +
               $totals.uiPresentation.expected +
               $totals.popupDpiLayout.expected +
+              $totals.tooltipSource.expected +
+              $totals.tooltipNative.expected +
               $totals.typography.expected +
               $totals.manageGrip.expected +
               $totals.manageViewport.expected +

@@ -555,10 +555,7 @@ function New-AuxiliaryPopupForm {
     $heading = [Drawing.Font]::new('Segoe UI',[single]8.5,[Drawing.FontStyle]::Bold)
     $large = [Drawing.Font]::new('Segoe UI',[single]11.5,[Drawing.FontStyle]::Bold)
     $symbol = [Drawing.Font]::new('Segoe UI Symbol',[single]18.0)
-    $tip = New-Object Windows.Forms.ToolTip
-    $tip.InitialDelay = 350
-    $tip.AutoPopDelay = 8000
-    $tip.ShowAlways = $true
+    $tip = New-LenovoDarkTooltip -Animate
     $header = New-Object Windows.Forms.Panel
     $header.Name = 'AuxiliaryHeader'
     $header.TabIndex = 1
