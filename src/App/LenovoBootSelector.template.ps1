@@ -2419,9 +2419,6 @@ finally {
         try { Hide-DarkActionTooltip } catch { }
         try { $script:DarkActionTooltip.Dispose() } catch { }
     }
-    if ($script:DarkActionTooltipFont) {
-        try { $script:DarkActionTooltipFont.Dispose() } catch { }
-    }
     if ($backgroundRefreshContext -and $backgroundRefreshContext.Process) {
         try { $backgroundRefreshContext.Process.Refresh() } catch { }
         try { if (-not $backgroundRefreshContext.Process.HasExited) { $backgroundRefreshContext.Process.Kill() } } catch { }

@@ -1,10 +1,12 @@
 {
   "schemaVersion": 2,
-  "version": "1.5.18.0",
+  "version": "1.5.19.0",
   "releaseProfile": "patch",
   "protectedFragmentIntent": [
-    "ps:Save-RuntimeDiagnosticsFromUi",
-    "ps:Show-LenovoNoticeDialog"
+    "ps:Ensure-DarkActionTooltip",
+    "ps:Hide-DarkActionTooltip",
+    "ps:New-PopupForm",
+    "ps:Show-DarkActionTooltip"
   ],
   "repositoryDeleteIntent": []
 }

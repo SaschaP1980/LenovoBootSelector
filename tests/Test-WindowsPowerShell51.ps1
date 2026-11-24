@@ -112,6 +112,12 @@ $dialogProbe = Join-Path $root 'tests\Test-LBS242-DialogComposition.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $dialogProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-242 native regular dialog composition regression failed' }
 
+# LBS-244: permanent focused source and native tooltip renderer contracts.
+& (Join-Path $root 'tests\Test-LBS244-TooltipSource.ps1')
+$tooltipProbe = Join-Path $root 'tests\Test-LBS244-Tooltips.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $tooltipProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-244 native tooltip regression failed' }
+
 # UX01-V8 / LBS-197: real focusable normal rows, scroll and safe keyboard selection.
 $keyboardProbe = Join-Path $root 'tests\Test-LBS197-NormalKeyboard.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $keyboardProbe

@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.19.0 – Consistent dark WinForms tooltips (LBS-244)
+
+- Share dark tooltip rendering and text measurement across the main popup, Manage Entries and auxiliary settings, while retaining native context-specific timing and ownership.
+- Wrap long and multiline hints, preserve literal ampersands and accessible descriptions, and constrain explicit tooltip placement to the monitor work area.
+- Retain independent form lifetimes and clean up manual tooltip owners when controls become hidden or disposed.
+- Keep the accepted UI layouts, keyboard and boot/security behavior unchanged.
+
 ## v1.5.18.0 – Consistent compact dialogs and status feedback (LBS-242)
 
 - Align regular notice, migration, maintenance and restart presentation with shared content-measured layout, consistent typography, action bar and semantic success icons.

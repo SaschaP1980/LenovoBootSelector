@@ -15,6 +15,7 @@ $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 . (Join-Path $root 'src\UI\BootEntryList.ps1')
 . (Join-Path $root 'src\Core\EntryPreferences.ps1')
 . (Join-Path $root 'src\UI\BootEntryRows.ps1')
+. (Join-Path $root 'src\UI\MenuAppearance.ps1')
 . (Join-Path $root 'src\UI\Popup.ps1')
 Initialize-NormalBootKeyboardRow
 
