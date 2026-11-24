@@ -117,7 +117,7 @@ try {
     $script:StorageContext = $null
     $script:Popup = $null
 
-    Start-BackgroundBootRefresh
+    Start-BackgroundBootRefresh -Origin Startup
     $firstProcess = $script:BackgroundRefreshState.Process
     $firstTimer = $script:BackgroundRefreshState.Timer
     Assert-RefreshControllerTest 'Idle request starts one worker' ($script:TestWorkerStarts -eq 1)
@@ -125,18 +125,18 @@ try {
     Assert-RefreshControllerTest 'Fresh cache keeps firmware work false' (-not [bool]$script:BackgroundRefreshState.ActiveRequest.RefreshFirmware)
     Assert-RefreshControllerTest 'Controller starts completion timer' ([bool]$firstTimer.Started)
 
-    Start-BackgroundBootRefresh
-    Assert-RefreshControllerTest 'Equivalent active request does not queue pending work' ($null -eq $script:BackgroundRefreshState.PendingRequest)
+    Start-BackgroundBootRefresh -Origin Popup
+    Assert-RefreshControllerTest 'Equivalent active request does not queue pending work' ($null -eq $script:BackgroundRefreshState.PendingRequest -and $script:BackgroundRefreshState.ActiveRequest.Origin -eq 'Startup')
     Assert-RefreshControllerTest 'Equivalent active request does not start another worker' ($script:TestWorkerStarts -eq 1)
 
-    Start-BackgroundBootRefresh -RefreshStorage
-    Assert-RefreshControllerTest 'Storage escalation is coalesced as pending' ([bool]$script:BackgroundRefreshState.PendingRequest.RefreshStorage)
+    Start-BackgroundBootRefresh -RefreshStorage -Origin Manual
+    Assert-RefreshControllerTest 'Storage escalation is coalesced as pending' ([bool]$script:BackgroundRefreshState.PendingRequest.RefreshStorage -and $script:BackgroundRefreshState.PendingRequest.Origin -eq 'Manual')
     Assert-RefreshControllerTest 'Storage escalation also requests firmware refresh' ([bool]$script:BackgroundRefreshState.PendingRequest.RefreshFirmware)
 
     $firstProcess.HasExited = $true
     Complete-BackgroundBootRefresh
     Assert-RefreshControllerTest 'Completion continues pending request with second worker' ($script:TestWorkerStarts -eq 2)
-    Assert-RefreshControllerTest 'Pending continuation becomes active storage request' ([bool]$script:BackgroundRefreshState.ActiveRequest.RefreshStorage)
+    Assert-RefreshControllerTest 'Pending continuation becomes active storage request' ([bool]$script:BackgroundRefreshState.ActiveRequest.RefreshStorage -and $script:BackgroundRefreshState.ActiveRequest.Origin -eq 'Manual')
     Assert-RefreshControllerTest 'Completed process is disposed' ([bool]$firstProcess.Disposed)
     Assert-RefreshControllerTest 'Completed timer is stopped and disposed' ([bool]$firstTimer.Stopped -and [bool]$firstTimer.Disposed)
 

@@ -179,7 +179,7 @@ function Show-OrTogglePopup {
     # refresh begins. Maintenance/missing-system-function states never launch a
     # competing worker; slow firmware/storage work stays in the hidden child.
     if ($canUseSystemState -and -not $maintenanceBusy) {
-        Start-BackgroundBootRefresh -RefreshStorage:($null -eq $script:StorageContext)
+        Start-BackgroundBootRefresh -RefreshStorage:($null -eq $script:StorageContext) -Origin Popup
     }
 }
 
@@ -225,7 +225,7 @@ function Set-AuxiliaryControlBounds {
 }
 
 function Set-AuxiliaryPopupLayout {
-    param([System.Windows.Forms.Form]$Form,[double]$Scale,[Drawing.Rectangle]$WorkingArea,[Drawing.Rectangle]$OwnerBounds)
+    param([System.Windows.Forms.Form]$Form,[double]$Scale,[Drawing.Rectangle]$WorkingArea,[Drawing.Rectangle]$OwnerBounds,[Drawing.Rectangle]$TriggerBounds = [Drawing.Rectangle]::Empty)
     if ($Form.Tag.Scale -ne 0) { throw 'Auxiliary surface has already been scaled.' }
     if ($Scale -lt 1.0 -or $Scale -gt 5.0) { throw 'Invalid auxiliary scale.' }
     Set-AuxiliaryControlBounds -Control $Form -Scale $Scale
@@ -241,7 +241,7 @@ function Set-AuxiliaryPopupLayout {
     $state.Body.Size = [Drawing.Size]::new($width,[Math]::Max(1,$height-$state.Body.Top))
     $state.Body.AutoScroll = $true
     $state.Body.AutoScrollMinSize = [Drawing.Size]::new(0,[int][Math]::Round($state.ContentHeight*$Scale))
-    $Form.Location = Get-AuxiliaryPopupLocation -WorkingArea $WorkingArea -OwnerBounds $OwnerBounds -SurfaceSize $Form.Size
+    $Form.Location = Get-AuxiliaryPopupLocation -WorkingArea $WorkingArea -OwnerBounds $OwnerBounds -SurfaceSize $Form.Size -TriggerBounds $TriggerBounds
 }
 
 # Modal ownership prevents competing main-popup selections while a child is
@@ -254,7 +254,8 @@ function Show-OwnedAuxiliaryPopup {
         if (-not $parent -or -not $parent.Visible) { return $null }
         $screen = [Windows.Forms.Screen]::FromControl($parent)
         $scale = (Get-LenovoUiCoordinateScale -Screen $screen).Factor
-        Set-AuxiliaryPopupLayout -Form $Form -Scale ([double]$scale) -WorkingArea $screen.WorkingArea -OwnerBounds $parent.Bounds
+        $triggerBounds = $Owner.RectangleToScreen($Owner.ClientRectangle)
+        Set-AuxiliaryPopupLayout -Form $Form -Scale ([double]$scale) -WorkingArea $screen.WorkingArea -OwnerBounds $parent.Bounds -TriggerBounds $triggerBounds
         $script:ActiveAuxiliaryPopup = $Form
         $result = $Form.ShowDialog($parent)
         if ($result -eq [Windows.Forms.DialogResult]::OK) { return $Form.Tag.Choice }
