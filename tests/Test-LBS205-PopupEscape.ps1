@@ -117,7 +117,7 @@ foreach ($locale in @('en-US','de-DE')) {
         $script:ManageAliasEditGuid = $null
         $script:ManageActiveDragGuid = $null
         $script:ManageDragLayout = $null
-        $script:DefaultContextMenu = $null
+        $script:ActiveAuxiliaryPopup = $null
         $script:Popup = New-PopupForm -TargetScale $scale -ScaleSource 'native-synthetic'
         $form = $script:Popup
         try {
@@ -164,27 +164,49 @@ foreach ($locale in @('en-US','de-DE')) {
             $script:IsManageEntriesMode = $false
             Focus-Lbs205 $script:Action
 
-            # A genuine native ToolStrip owns Escape while its menu is open.
-            $menu = New-Object System.Windows.Forms.ContextMenuStrip
-            [void]$menu.Items.Add('A target')
-            $script:DefaultContextMenu = $menu
+            # The replacement native owned Form takes local Escape and
+            # preserves the main popup through the activation handoff.
+            $child = New-Object Windows.Forms.Form
+            $child.ShowInTaskbar = $false
+            $child.TopMost = $true
+            $close = New-Object Windows.Forms.Button
+            $close.Text = 'Close'
+            $close.DialogResult = [Windows.Forms.DialogResult]::Cancel
+            $child.Controls.Add($close)
+            $child.CancelButton = $close
+            $script:ActiveAuxiliaryPopup = $child
+            $script:ChildShown = $false
+            $script:ChildOwnerPreserved = $false
+            $script:ChildTimeout = $false
+            $watchdog = New-Object Windows.Forms.Timer
+            $watchdog.Interval = 2000
+            $watchdog.Add_Tick({
+                $script:ChildTimeout = $true
+                $script:ActiveAuxiliaryPopup.DialogResult = [Windows.Forms.DialogResult]::Cancel
+            })
+            $child.Add_Shown({
+                param($sender,$eventArgs)
+                $script:ChildShown = $sender.Visible
+                $owner = $script:Popup
+                $deactivate = $owner.GetType().GetMethod('OnDeactivate',([Reflection.BindingFlags]::Instance -bor [Reflection.BindingFlags]::NonPublic))
+                [void]$deactivate.Invoke($owner,[object[]]@([EventArgs]::Empty))
+                $script:ChildOwnerPreserved = $owner.Visible -and $sender.Visible
+                [void]$sender.CancelButton.Focus()
+                Send-Lbs205Key $sender.CancelButton ([Windows.Forms.Keys]::Escape)
+            })
             try {
-                $menu.Show($script:Action,[Drawing.Point]::new(0,$script:Action.Height))
-                [System.Windows.Forms.Application]::DoEvents()
-                Assert-Lbs205 "$case child menu is native and visible" ($menu.Visible)
-                # Regression: native popup Deactivate must not hide its own
-                # still-open default-target menu. The previous handler did.
-                $deactivate = $form.GetType().GetMethod('OnDeactivate',([Reflection.BindingFlags]::Instance -bor [Reflection.BindingFlags]::NonPublic))
-                if (-not $deactivate) { throw 'Native Form.OnDeactivate method unavailable' }
-                [void]$deactivate.Invoke($form,[object[]]@([EventArgs]::Empty))
-                Assert-Lbs205 "$case menu-owned Deactivate preserves popup while menu open" ($form.Visible -and $menu.Visible)
-                Send-Lbs205Key $menu ([System.Windows.Forms.Keys]::Escape)
-                Assert-Lbs205 "$case menu Escape closes menu without popup dismissal" (
-                    -not $menu.Visible -and $form.Visible)
+                $watchdog.Start()
+                $result = $child.ShowDialog($form)
+                Assert-Lbs205 "$case child form is native and visible" ($script:ChildShown)
+                Assert-Lbs205 "$case child-owned Deactivate preserves popup while open" ($script:ChildOwnerPreserved)
+                Assert-Lbs205 "$case child Escape closes child without popup dismissal" (
+                    $result -eq [Windows.Forms.DialogResult]::Cancel -and -not $script:ChildTimeout -and -not $child.Visible -and $form.Visible)
             }
             finally {
-                $script:DefaultContextMenu = $null
-                $menu.Dispose()
+                $watchdog.Stop()
+                $watchdog.Dispose()
+                $script:ActiveAuxiliaryPopup = $null
+                $child.Dispose()
             }
 
             $script:IsManageEntriesMode = $true
@@ -228,7 +250,7 @@ foreach ($locale in @('en-US','de-DE')) {
         finally {
             $form.Dispose()
             $script:Popup = $null
-            $script:DefaultContextMenu = $null
+            $script:ActiveAuxiliaryPopup = $null
         }
     }
 }

@@ -57,7 +57,7 @@ try {
     Assert-Lbs144Checkbox 'Checked checkbox renders a visible contrast tick' ($tickPixels -ge 5)
 } finally { $bitmap.Dispose(); $cb.Dispose() }
 $source=[IO.File]::ReadAllText((Join-Path $root 'src\UI\PopupComposition.ps1'))
-Assert-Lbs144Checkbox 'Autostart click behavior remains unchanged and accessible' ($source.Contains('Set-AutostartFromUi -Enabled:$this.Checked') -and $source.Contains('$autostartText.Add_Click'))
-Assert-Lbs144Checkbox 'Popup 96-DPI checkbox control dimensions remain 26 by 24' ($source.Contains('New-Object Drawing.Size(26, 24)'))
+Assert-Lbs144Checkbox 'Configuration Autostart label and checkbox share existing action routing and accessibility' ($source.Contains('$autostartLabel.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })') -and $source.Contains('$check.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })') -and $source.Contains('$check.AccessibleName = $autostartLabel.Text') -and $source.Contains('$check.AutoCheck = $false') -and $source.Contains('$item.PerformClick()'))
+Assert-Lbs144Checkbox 'Configuration 96-DPI checkbox target measures 34 by 30' ($source.Contains('$check.Size = [Drawing.Size]::new(34,30)'))
 Write-Host ("LBS144 CHECKBOX TOTAL {0}/{0}" -f $script:checks)
 if ($script:checks -ne 18) { throw "Expected 18 native checkbox checks, found $script:checks" }
