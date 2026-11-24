@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.12.0 – UX-05 Manage Entries action feedback (LBS-221)
+
+- Brighten the reorder grip on hover and show its localized dark drag hint using the existing action tooltip. Close the tooltip on grip press and before row snapshot/OLE drag; suppress action hints during active dragging.
+- Brighten the visibility eye on hover while preserving its red visible and gray crossed-out hidden states. Restore original idle ink on leave. Keep the existing pencil, hit areas, row geometry, viewport, instructions, click routes, alias editor and draft Save/Cancel behavior.
+- Add 83 isolated WinForms Windows PowerShell 5.1 hover and tooltip-routing assertions across DE/EN and synthetic 96/240 DPI with no firmware, task, boot-order or settings mutation. Physical owner acceptance remains separate.
+
 ## v1.5.11.1 – Avoid redundant verified BootNext selection (LBS-219 Hotfix)
 
 - Repeated activation of the same allowlisted, firmware-readback-verified one-shot next-boot target is idempotent: preserve the confirmed checkmark, status, restart state and focus without pending UI or another SYSTEM worker.
