@@ -6,6 +6,7 @@ $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 
 . (Join-Path $root 'src\Core\BootNextSelectionState.ps1')
 . (Join-Path $root 'src\UI\BootEntryList.ps1')
+. (Join-Path $root 'src\Core\EntryPreferences.ps1')
 . (Join-Path $root 'src\UI\BootEntryRows.ps1')
 . (Join-Path $root 'src\UI\PopupPosition.ps1')
 
@@ -43,11 +44,11 @@ $script:TestCapabilities = [pscustomobject]@{
 }
 function Get-CurrentSystemFunctionsCapabilities { return $script:TestCapabilities }
 function Update-ManageSaveButtonState { }
-function Set-ManageEntryAliasDraft { param([string]$Guid,[AllowEmptyString()][string]$Alias) }
+function Set-ManageEntryAliasDraft { param([string]$Guid,[AllowEmptyString()][string]$Alias) return $true }
 function Update-PopupRows { }
 function Show-DarkActionTooltip { param($Owner,[string]$Text) }
 function Hide-DarkActionTooltip { }
-function Commit-ActiveManageAliasEditor { }
+function Commit-ActiveManageAliasEditor { return $true }
 function Toggle-ManageEntryVisibility { param([string]$Guid) }
 function Get-EntryByGuid { param([string]$Guid) return $null }
 $script:BootNextCalls = 0

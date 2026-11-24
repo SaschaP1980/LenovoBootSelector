@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.14.0 – Limit custom boot entry aliases (LBS-227)
+
+- Limit native alias typing and clipboard paste to 30 UTF-16 code units; validate changed aliases at the shared draft admission boundary and keep invalid edited input open with localized feedback.
+- Preserve unchanged longer aliases already stored in settings, including on unrelated saves; clearing or replacing is explicit and no firmware names are altered.
+- Add isolated native input and draft/persistence coverage; retain existing contextual cue, clear button, geometry and draft Save/Cancel behavior.
+
 ## v1.5.13.1 – Distinguish alias cue from entered text (LBS-224 Hotfix)
 
 - Render the existing cue in italic Segoe UI at the existing point size, with muted blue-gray #8FA6BF instead of neutral gray. Actual alias text remains regular and unchanged.

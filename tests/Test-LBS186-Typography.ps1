@@ -17,6 +17,7 @@ Add-Type -TypeDefinition ($template.Substring($begin,$end-$begin)) -ReferencedAs
 . (Join-Path $root 'src\Core\BootNextSelectionState.ps1')
 . (Join-Path $root 'src\UI\PopupDpiLayout.ps1')
 . (Join-Path $root 'src\UI\BootEntryList.ps1')
+. (Join-Path $root 'src\Core\EntryPreferences.ps1')
 . (Join-Path $root 'src\UI\BootEntryRows.ps1')
 . (Join-Path $root 'src\UI\PopupComposition.ps1')
 . (Join-Path $root 'src\UI\RefreshPresentation.ps1')

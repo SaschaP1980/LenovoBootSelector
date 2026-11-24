@@ -2,6 +2,17 @@
 # Pure/deterministic functions only. No global script state, WinForms, filesystem, registry,
 # Scheduled Tasks, process starts, or privileged broker access are permitted in this file.
 
+# The native EDIT limit counts UTF-16 code units. Preserve unchanged legacy
+# aliases on edit/save; normalization of loaded settings must stay lossless.
+function Get-EntryAliasMaxLengthCore { return 30 }
+
+function Test-EntryAliasChangeCore {
+    param([AllowEmptyString()][string]$Value,[AllowEmptyString()][string]$Previous)
+    $normalized = ([string]$Value).Trim()
+    return ($normalized.Length -le (Get-EntryAliasMaxLengthCore) -or
+        [string]::Equals($normalized, ([string]$Previous).Trim(), [System.StringComparison]::Ordinal))
+}
+
 function Convert-EntryAliasesToHashtable {
     param($Source)
 
