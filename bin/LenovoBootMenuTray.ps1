@@ -204,6 +204,7 @@ function Get-LocalizationCatalogCore {
             'Manage.ClearAliasHint' = 'Clear display name'
             'Manage.AliasCue' = 'Use original name'
             'Manage.AliasFieldHint' = 'Empty: use original name'
+            'Manage.AliasLimitExceeded' = 'Display name: maximum {Limit} characters'
             'Manage.EditAliasStatus' = 'Edit display name · Enter applies · Esc discards · empty = original name'
             'Maintenance.Dialog.RemoveTitle' = 'Remove system functions'
             'Maintenance.Dialog.RemoveHeading' = 'Remove system functions?'
@@ -503,6 +504,7 @@ function Get-LocalizationCatalogCore {
             'Manage.ClearAliasHint' = 'Anzeigename leeren'
             'Manage.AliasCue' = 'Originalname verwenden'
             'Manage.AliasFieldHint' = 'Leer: Originalname verwenden'
+            'Manage.AliasLimitExceeded' = 'Anzeigename: maximal {Limit} Zeichen'
             'Manage.EditAliasStatus' = 'Anzeigename bearbeiten · Enter übernimmt · Esc verwirft · leer = Originalname'
             'Maintenance.Dialog.RemoveTitle' = 'Systemfunktionen entfernen'
             'Maintenance.Dialog.RemoveHeading' = 'Systemfunktionen wirklich entfernen?'
@@ -725,6 +727,17 @@ function Get-LocalizedStringCore {
 # Lenovo Boot Selector v0.4.1 - Functional Core: entry preferences/settings normalization
 # Pure/deterministic functions only. No global script state, WinForms, filesystem, registry,
 # Scheduled Tasks, process starts, or privileged broker access are permitted in this file.
+
+# The native EDIT limit counts UTF-16 code units. Preserve unchanged legacy
+# aliases on edit/save; normalization of loaded settings must stay lossless.
+function Get-EntryAliasMaxLengthCore { return 30 }
+
+function Test-EntryAliasChangeCore {
+    param([AllowEmptyString()][string]$Value,[AllowEmptyString()][string]$Previous)
+    $normalized = ([string]$Value).Trim()
+    return ($normalized.Length -le (Get-EntryAliasMaxLengthCore) -or
+        [string]::Equals($normalized, ([string]$Previous).Trim(), [System.StringComparison]::Ordinal))
+}
 
 function Convert-EntryAliasesToHashtable {
     param($Source)
@@ -2336,7 +2349,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.13.1'
+$script:AppVersion = '1.5.14.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -5613,27 +5626,30 @@ function Set-ManageEntryAliasDraft {
     )
     $normalized = $Guid.ToLowerInvariant()
     $value = if ($null -eq $Alias) { '' } else { ([string]$Alias).Trim() }
+    $previous = [string]$script:ManageEntryAliases[$normalized]
+    if (-not (Test-EntryAliasChangeCore -Value $value -Previous $previous)) { return $false }
     if ($value) {
         $script:ManageEntryAliases[$normalized] = $value
     }
     else {
         [void]$script:ManageEntryAliases.Remove($normalized)
     }
+    return $true
 }
 
 function Commit-ActiveManageAliasEditor {
-    if (-not $script:ManageAliasEditGuid) { return }
-    try {
-        if ($script:Popup -and -not $script:Popup.IsDisposed) {
-            $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
-            if ($editor -and [string]$editor.Tag) {
-                Set-ManageEntryAliasDraft -Guid ([string]$editor.Tag) -Alias ([string]$editor.Text)
+    if (-not $script:ManageAliasEditGuid) { return $true }
+    if ($script:Popup -and -not $script:Popup.IsDisposed) {
+        $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
+        if ($editor -and [string]$editor.Tag) {
+            if (-not (Set-ManageEntryAliasDraft -Guid ([string]$editor.Tag) -Alias ([string]$editor.Text))) {
+                Show-ManageAliasLimitFeedback -Editor $editor
+                return $false
             }
         }
     }
-    finally {
-        $script:ManageAliasEditGuid = $null
-    }
+    $script:ManageAliasEditGuid = $null
+    return $true
 }
 
 
@@ -5768,7 +5784,7 @@ function Stop-ManageEntriesMode {
     Reset-ManageDragPreview
 
     if ($Save) {
-        Commit-ActiveManageAliasEditor
+        if (-not (Commit-ActiveManageAliasEditor)) { return }
         $script:EntryOrder = @($script:ManageEntryOrder)
         $script:HiddenEntryGuids = @($script:ManageHiddenEntryGuids | Select-Object -Unique)
         $script:EntryAliases = Copy-EntryAliasMap $script:ManageEntryAliases
@@ -10663,7 +10679,7 @@ function New-BootEntryInteractionHandlers {
 
         if ($script:IsManageEntriesMode) {
             if (([datetime]::UtcNow - $script:ManageLastDragUtc).TotalMilliseconds -lt 350) { return }
-            if ($script:ManageAliasEditGuid) { Commit-ActiveManageAliasEditor }
+            if ($script:ManageAliasEditGuid -and -not (Commit-ActiveManageAliasEditor)) { return }
             Toggle-ManageEntryVisibility -Guid $guid
             $script:LastStatusText = if (Test-ManageEntryHidden -Guid $guid) { Get-LocalizedString -Key 'Manage.EntryHiddenStatus' } else { Get-LocalizedString -Key 'Manage.EntryVisibleStatus' }
             Update-PopupRows
@@ -10883,6 +10899,13 @@ function Hide-ManageAliasFieldTooltip {
     }
 }
 
+function Show-ManageAliasLimitFeedback {
+    param([System.Windows.Forms.TextBox]$Editor)
+    $script:LastStatusText = Get-LocalizedString -Key 'Manage.AliasLimitExceeded' -Values @{ Limit = (Get-EntryAliasMaxLengthCore) }
+    [void]$Editor.Focus()
+    try { Show-DarkActionTooltip -Owner $Editor -Text $script:LastStatusText } catch { }
+}
+
 function Add-BootEntryAliasEditor {
     param(
         [Parameter(Mandatory=$true)]$Row,
@@ -10902,6 +10925,9 @@ function Add-BootEntryAliasEditor {
     $aliasEditor = New-Object System.Windows.Forms.TextBox
     $aliasEditor.Name = 'AliasEditor'
     $aliasEditor.Tag = $entry.Guid
+    # Native typing/paste is limited; programmatic initialization preserves
+    # an existing overlength alias until the user explicitly edits it.
+    $aliasEditor.MaxLength = Get-EntryAliasMaxLengthCore
     $aliasEditor.Text = if ($alias) { [string]$alias } else { '' }
     $aliasEditor.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
     $aliasEditor.ForeColor = $script:ColorPrimary
@@ -11020,10 +11046,13 @@ function Add-BootEntryAliasEditor {
         param($sender,$eventArgs)
         Hide-ManageAliasFieldTooltip -Owner $sender
         if ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
-            Set-ManageEntryAliasDraft -Guid ([string]$sender.Tag) -Alias ([string]$sender.Text)
+            $eventArgs.SuppressKeyPress = $true
+            if (-not (Set-ManageEntryAliasDraft -Guid ([string]$sender.Tag) -Alias ([string]$sender.Text))) {
+                Show-ManageAliasLimitFeedback -Editor $sender
+                return
+            }
             $script:ManageAliasEditGuid = $null
             $script:LastStatusText = if ([string]::IsNullOrWhiteSpace([string]$sender.Text)) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
-            $eventArgs.SuppressKeyPress = $true
             Update-PopupRows
         }
         elseif ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Escape) {
@@ -11058,7 +11087,10 @@ function Add-BootEntryAliasEditor {
         param($sender,$eventArgs)
         $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
         if ($editor) {
-            Set-ManageEntryAliasDraft -Guid ([string]$editor.Tag) -Alias ([string]$editor.Text)
+            if (-not (Set-ManageEntryAliasDraft -Guid ([string]$editor.Tag) -Alias ([string]$editor.Text))) {
+                Show-ManageAliasLimitFeedback -Editor $editor
+                return
+            }
             $empty = [string]::IsNullOrWhiteSpace([string]$editor.Text)
             $script:ManageAliasEditGuid = $null
             $script:LastStatusText = if ($empty) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
@@ -11290,7 +11322,7 @@ $editAlias.Add_Click({
     try { Hide-DarkActionTooltip } catch { }
     $guid = ([string]$sender.Tag).ToLowerInvariant()
     if ($script:ManageAliasEditGuid -and $script:ManageAliasEditGuid -ne $guid) {
-        Commit-ActiveManageAliasEditor
+        if (-not (Commit-ActiveManageAliasEditor)) { return }
     }
     $script:ManageAliasEditGuid = $guid
     $script:LastStatusText = Get-LocalizedString -Key 'Manage.EditAliasStatus'

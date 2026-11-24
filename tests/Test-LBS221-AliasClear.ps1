@@ -6,6 +6,7 @@ Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 . (Join-Path $root 'src\Core\Localization.ps1')
 . (Join-Path $root 'src\UI\BootEntryList.ps1')
+. (Join-Path $root 'src\Core\EntryPreferences.ps1')
 . (Join-Path $root 'src\UI\BootEntryRows.ps1')
 . (Join-Path $root 'src\UI\PopupDpiLayout.ps1')
 $script:checks = 0
@@ -18,7 +19,7 @@ function Get-LocalizedString { param([string]$Key,$Values) Get-LocalizedStringCo
 function Show-DarkActionTooltip { param($Owner,[string]$Text) $script:DarkActionTooltipOwner=$Owner; $script:TipText=$Text }
 function Hide-DarkActionTooltip { $script:DarkActionTooltipOwner=$null; $script:TipText='' }
 function Update-ManageSaveButtonState { $script:SaveStateCalls++ }
-function Set-ManageEntryAliasDraft { param([string]$Guid,[string]$Alias) $script:Mutations++ }
+function Set-ManageEntryAliasDraft { param([string]$Guid,[string]$Alias) $script:Mutations++; return $true }
 function Save-AppSettings { $script:Mutations++ }
 function Update-PopupRows { $script:Mutations++ }
 $script:ColorAccent=[Drawing.Color]::FromArgb(225,37,27)

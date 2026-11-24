@@ -35,6 +35,11 @@ $bootRowStateProbe = Join-Path $root 'tests\Test-LBS217-RowState.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $bootRowStateProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-217 native boot row state semantics regression failed' }
 
+# LBS-227: native EDIT length limit and actual draft/settings legacy preservation.
+$aliasLimitProbe = Join-Path $root 'tests\Test-LBS227-AliasLimit.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $aliasLimitProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-227 native alias limit regression failed' }
+
 # LBS-224: actual product cue rendering, input, hit test and lifecycle.
 $aliasCueProbe = Join-Path $root 'tests\Test-LBS224-AliasCue.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $aliasCueProbe

@@ -5,27 +5,30 @@
     )
     $normalized = $Guid.ToLowerInvariant()
     $value = if ($null -eq $Alias) { '' } else { ([string]$Alias).Trim() }
+    $previous = [string]$script:ManageEntryAliases[$normalized]
+    if (-not (Test-EntryAliasChangeCore -Value $value -Previous $previous)) { return $false }
     if ($value) {
         $script:ManageEntryAliases[$normalized] = $value
     }
     else {
         [void]$script:ManageEntryAliases.Remove($normalized)
     }
+    return $true
 }
 
 function Commit-ActiveManageAliasEditor {
-    if (-not $script:ManageAliasEditGuid) { return }
-    try {
-        if ($script:Popup -and -not $script:Popup.IsDisposed) {
-            $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
-            if ($editor -and [string]$editor.Tag) {
-                Set-ManageEntryAliasDraft -Guid ([string]$editor.Tag) -Alias ([string]$editor.Text)
+    if (-not $script:ManageAliasEditGuid) { return $true }
+    if ($script:Popup -and -not $script:Popup.IsDisposed) {
+        $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
+        if ($editor -and [string]$editor.Tag) {
+            if (-not (Set-ManageEntryAliasDraft -Guid ([string]$editor.Tag) -Alias ([string]$editor.Text))) {
+                Show-ManageAliasLimitFeedback -Editor $editor
+                return $false
             }
         }
     }
-    finally {
-        $script:ManageAliasEditGuid = $null
-    }
+    $script:ManageAliasEditGuid = $null
+    return $true
 }
 
 
@@ -160,7 +163,7 @@ function Stop-ManageEntriesMode {
     Reset-ManageDragPreview
 
     if ($Save) {
-        Commit-ActiveManageAliasEditor
+        if (-not (Commit-ActiveManageAliasEditor)) { return }
         $script:EntryOrder = @($script:ManageEntryOrder)
         $script:HiddenEntryGuids = @($script:ManageHiddenEntryGuids | Select-Object -Unique)
         $script:EntryAliases = Copy-EntryAliasMap $script:ManageEntryAliases
