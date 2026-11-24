@@ -215,7 +215,7 @@ def main():
     taskbroker_migration=txt(taskbroker_migration_path) if taskbroker_migration_path.is_file() else ''
     s.has('LBS-3 migration suite keeps fixed total 45',taskbroker_migration,'Write-Host "TASKBROKER MIGRATION TOTAL $checks/45"')
     selection_ui = txt(root/'tests/Test-BootNextSelectionUi.ps1')
-    s.has('LBS-143 hotfix pending and cold-start selection suite keeps fixed total 57',selection_ui,'Write-Host "BOOTNEXT SELECTION UI TOTAL $checks/57"')
+    s.has('LBS-219 confirmed selection and cold-start suite keeps fixed total 72',selection_ui,'Write-Host "BOOTNEXT SELECTION UI TOTAL $checks/72"')
     s.has('LBS-143 patch selection suite runs in native Windows aggregate',windows_wrapper,"& (Join-Path $root 'tests\\Test-BootNextSelectionUi.ps1')")
     boot_writer_priority = txt(root/'tests/Test-BootWriterPriority.ps1')
     s.has('LBS-143 writer native suite keeps fixed total 24',boot_writer_priority,'Write-Host "BOOT WRITER PRIORITY TOTAL $checks/24"')
