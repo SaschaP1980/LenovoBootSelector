@@ -288,6 +288,104 @@ try {
         } finally { if (-not $invalid.IsDisposed) { $invalid.Dispose() } }
     }
     if ($secondFailures.Count) { throw ("LBS229 second correction RED: " + ($secondFailures -join '; ')) }
+    # F09: exercise real native Button rendering, not just FlatAppearance
+    # properties. NotifyDefault models a retained native default-button outline
+    # even when the actual owner is disabled by ShowDialog.
+    function Get-Lbs229RefreshFramePixels([Windows.Forms.Button]$Button) {
+        $bitmap = [Drawing.Bitmap]::new($Button.Width,$Button.Height)
+        try {
+            $Button.DrawToBitmap($bitmap,$Button.ClientRectangle)
+            $background = $Button.BackColor.ToArgb()
+            $count = 0
+            for ($y=0; $y -lt $bitmap.Height; $y++) {
+                for ($x=0; $x -lt $bitmap.Width; $x++) {
+                    if ($x -ge 4 -and $x -lt $bitmap.Width-4 -and $y -ge 4 -and $y -lt $bitmap.Height-4) { continue }
+                    if ($bitmap.GetPixel($x,$y).ToArgb() -ne $background) { $count++ }
+                }
+            }
+            return $count
+        } finally { $bitmap.Dispose() }
+    }
+    # WinForms default/focus pixels depend on the actual foreground window
+    # and keyboard cue state. Do not require an outline when the active
+    # control is not in that state. Directly verify that the modal-only
+    # painter is a no-op once the owner is interactive again.
+    function Test-Lbs229ActiveRefreshNativePaint([Windows.Forms.Form]$Owner,[Windows.Forms.Button]$Button) {
+        if ($script:ActiveAuxiliaryPopup -or -not [Lbs229Native]::IsWindowEnabled($Owner.Handle) -or -not $Button.TabStop -or -not $Button.Enabled -or -not $Button.CanSelect) { return $false }
+        $bitmap = [Drawing.Bitmap]::new($Button.Width,$Button.Height)
+        $graphics = [Drawing.Graphics]::FromImage($bitmap)
+        $args = [Windows.Forms.PaintEventArgs]::new($graphics,$Button.ClientRectangle)
+        try {
+            $graphics.Clear([Drawing.Color]::Magenta)
+            Paint-ModalOwnerRefreshGlyph -Button $Button -EventArgs $args
+            for ($y=0; $y -lt $bitmap.Height; $y++) {
+                for ($x=0; $x -lt $bitmap.Width; $x++) {
+                    if ($bitmap.GetPixel($x,$y).ToArgb() -ne [Drawing.Color]::Magenta.ToArgb()) { return $false }
+                }
+            }
+            return $true
+        } finally { $args.Dispose(); $graphics.Dispose(); $bitmap.Dispose() }
+    }
+    $thirdFailures = [Collections.Generic.List[string]]::new()
+    function Test-Lbs229ThirdCorrection([string]$Name,[scriptblock]$Action) {
+        try { & $Action; Write-Host "PASS LBS229 third correction $Name" }
+        catch { $thirdFailures.Add("$Name : $_"); Write-Host "RED LBS229 third correction $Name : $_" }
+    }
+    $headerRoot = New-Object Windows.Forms.Panel
+    $headerRoot.Size = $owner.ClientSize
+    $owner.Controls.Add($headerRoot)
+    try {
+        Add-PopupHeaderSection -Root $headerRoot
+        $refresh = $script:RefreshButton
+        $refresh.NotifyDefault($true)
+        $activeFrame = Get-Lbs229RefreshFramePixels $refresh
+        Write-Host "F09 active native frame pixels=$activeFrame"
+        if ($activeFrame -lt 8) { throw 'F09 fixture could not reproduce native active default outline' }
+        foreach ($kind in @('configuration','default')) {
+            Test-Lbs229ThirdCorrection "F09 $kind inactive outline and active restoration" {
+                $surface = if ($kind -eq 'configuration') { New-ConfigurationPopup } else { New-DefaultTargetPicker }
+                $script:FocusProbeError = $null
+                $script:FocusProbeSeen = $false
+                $timer = New-Object Windows.Forms.Timer
+                $timer.Interval = 50
+                $timer.Add_Tick({
+                    param($sender,$eventArgs)
+                    $child = $script:ActiveAuxiliaryPopup
+                    if (-not $child -or -not $child.Visible) { return }
+                    $sender.Stop()
+                    try {
+                        $refresh.NotifyDefault($true)
+                        $pixels = Get-Lbs229RefreshFramePixels $refresh
+                        Write-Host "F09 $kind modal native frame pixels=$pixels"
+                        Require-Lbs229Correction ($pixels -eq 0) "Inactive refresh outline remains ($pixels frame pixels)"
+                        Require-Lbs229Correction (-not [Lbs229Native]::IsWindowEnabled($owner.Handle) -and $refresh.TabStop -and $refresh.FlatAppearance.BorderSize -eq 0) 'Native modal admission and keyboard route unchanged'
+                        $script:FocusProbeSeen = $true
+                    } catch { $script:FocusProbeError = $_ }
+                    finally { $child.Tag.Close.PerformClick() }
+                })
+                try {
+                    $timer.Start()
+                    [void](Show-OwnedAuxiliaryPopup -Form $surface -Owner $owner)
+                } finally { $timer.Stop(); $timer.Dispose() }
+                if ($script:FocusProbeError) { throw $script:FocusProbeError }
+                Require-Lbs229Correction (Test-Lbs229ActiveRefreshNativePaint $owner $refresh) 'Active native painting and keyboard route must be restored after close'
+                Require-Lbs229Correction $script:FocusProbeSeen 'Actual modal must have been observed'
+            }
+        }
+        Test-Lbs229ThirdCorrection 'F09 failed modal start restores active rendering' {
+            $invalid = New-ConfigurationPopup
+            $invalid.Enabled = $false
+            $failed = $false
+            try { [void](Show-OwnedAuxiliaryPopup -Form $invalid -Owner $owner) }
+            catch { $failed = $true }
+            Require-Lbs229Correction ($failed -and $invalid.IsDisposed -and (Test-Lbs229ActiveRefreshNativePaint $owner $refresh)) 'Failed modal must restore native active painting and keyboard route'
+        }
+    } finally {
+        $headerRoot.Dispose()
+        $script:RefreshButton = $null
+        $script:HeaderStatusLabel = $null
+    }
+    if ($thirdFailures.Count) { throw ("LBS229 third correction RED: " + ($thirdFailures -join '; ')) }
     if ($CorrectionProbeOnly) { return }
 
     $p=Get-AuxiliaryPopupLocation $area $anchor $size
