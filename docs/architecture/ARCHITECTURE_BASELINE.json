@@ -1,16 +1,16 @@
 {
-  "version": "1.5.11.1",
+  "version": "1.5.12.0",
   "runtime": {
-    "lines": 13359,
+    "lines": 13397,
     "functions": 375,
-    "scriptReferences": 1850,
+    "scriptReferences": 1857,
     "scriptVariables": 199,
-    "catchBlocks": 256,
-    "inlineSilentCatches": 140
+    "catchBlocks": 260,
+    "inlineSilentCatches": 144
   },
   "core": {
     "files": 9,
-    "lines": 1581,
+    "lines": 1583,
     "functions": 34,
     "scriptReferences": 0
   },
@@ -28,9 +28,9 @@
   },
   "ui": {
     "files": 20,
-    "lines": 5610,
+    "lines": 5646,
     "functions": 143,
-    "scriptReferences": 1026
+    "scriptReferences": 1033
   },
   "appTemplate": {
     "lines": 2465,
