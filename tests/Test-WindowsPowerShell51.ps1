@@ -107,6 +107,11 @@ $updateNoticeProbe = Join-Path $root 'tests\Test-LBS202-UpdateNotice.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $updateNoticeProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-202 native update-available dialog regression failed' }
 
+# LBS-242: native shared regular dialog composition and copy feedback.
+$dialogProbe = Join-Path $root 'tests\Test-LBS242-DialogComposition.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $dialogProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-242 native regular dialog composition regression failed' }
+
 # UX01-V8 / LBS-197: real focusable normal rows, scroll and safe keyboard selection.
 $keyboardProbe = Join-Path $root 'tests\Test-LBS197-NormalKeyboard.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $keyboardProbe

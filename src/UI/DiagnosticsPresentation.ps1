@@ -3,7 +3,7 @@
         $path = Export-RuntimeDiagnosticPackage -Reason 'manual-ui'
         $revealPath = $path
         $revealAction = { Show-DiagnosticPackageInExplorer -Path $revealPath }.GetNewClosure()
-        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.SavedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.SavedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.Location' -Values @{ Path=$path }) -Kind Info -SecondaryButtonText (Get-LocalizedString -Key 'Diagnostics.ShowFolder') -SecondaryAction $revealAction
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.SavedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.SavedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.PathHint') -ValueCaption (Get-LocalizedString -Key 'Diagnostics.PathCaption') -ValueText $path -Kind Success -SecondaryButtonText (Get-LocalizedString -Key 'Diagnostics.ShowFolder') -SecondaryAction $revealAction
     }
     catch {
         Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_EXPORT_FAILED' -Stage 'diagnostics' -Success $false -ErrorRecord $_ -Level error
@@ -15,6 +15,7 @@ function Start-DiagnosticsUploadFromUi {
     # A deliberate menu click is the only upload trigger. Never call this
     # during startup, refresh, diagnostics export, or error handling.
     if ($script:DiagnosticsUploadState) { return }
+    $path=$null
     try {
         $installationId = Get-DiagnosticsInstallationId -SettingsDirectory $script:SettingsDir
         $path = Export-RuntimeDiagnosticPackage -Reason 'manual-upload'
@@ -37,7 +38,7 @@ function Start-DiagnosticsUploadFromUi {
         }
         if ($script:DiagnosticsUploadState) { Dispose-DiagnosticsUploadTransport -Context $script:DiagnosticsUploadState; $script:DiagnosticsUploadState = $null }
         if ($script:DiagnosticsUploadMenuItem) { $script:DiagnosticsUploadMenuItem.Enabled = $true }
-        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.UploadFailedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.UploadFailedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.UploadFailedMessage') -Kind Warning
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.UploadFailedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.UploadFailedHeading') -Message (Get-LocalizedString -Key $(if ($path) { 'Diagnostics.UploadFailedMessage' } else { 'Diagnostics.UploadNoLocalPackageMessage' })) -Kind Error
     }
 }
 
@@ -80,14 +81,14 @@ function Complete-DiagnosticsUploadFromUi {
     }
     if ($success) {
         $copyId = [string]$receipt.DiagnosisId
-        $copyAction = { [System.Windows.Forms.Clipboard]::SetText($copyId) }.GetNewClosure()
+        $copyAction = { [System.Windows.Forms.Clipboard]::SetText($copyId); return $true }.GetNewClosure()
         Write-RuntimeDiagnosticEvent -Event 'DIAGNOSTIC_UPLOAD_COMPLETED' -Stage 'diagnostics' -Success $true -Data (New-RuntimeDiagnosticData @{ diagnosisId = $copyId })
-        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.UploadedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.UploadedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.UploadedWithId' -Values @{ DiagnosisId=$copyId }) -Kind Info -SecondaryButtonText (Get-LocalizedString -Key 'Diagnostics.CopyId') -SecondaryAction $copyAction
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.UploadedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.UploadedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.IdHint') -ValueCaption (Get-LocalizedString -Key 'Diagnostics.IdCaption') -ValueText $copyId -Kind Success -SecondaryButtonText (Get-LocalizedString -Key 'Diagnostics.CopyId') -SecondaryAction $copyAction -KeepOpenAfterSecondary
     }
     elseif ($receiptUncertain) {
         Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.ReferenceMissingTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.ReferenceMissingHeading') -Message (Get-LocalizedString -Key 'Diagnostics.ReferenceMissingMessage') -Kind Warning
     }
     else {
-        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.UploadFailedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.UploadFailedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.UploadFailedMessage') -Kind Warning
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Diagnostics.UploadFailedTitle') -Heading (Get-LocalizedString -Key 'Diagnostics.UploadFailedHeading') -Message (Get-LocalizedString -Key 'Diagnostics.UploadFailedMessage') -Kind Error
     }
 }
