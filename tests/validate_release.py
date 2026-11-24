@@ -523,7 +523,7 @@ def main():
         '$script:DefaultInteractionEnabled = $interactive' in default_ui)
     s.c('Default target chevron is hidden while saving/verifying and returns afterward',
         '$script:DefaultArrowLabel.Visible = (-not $checking -and -not $pendingDefault)' in default_ui and
-        "$script:DefaultArrowLabel.Text = '›'" in default_ui and
+        "$script:DefaultArrowLabel.Text = '‹'" in default_ui and
         "$script:DefaultValueLabel.Text = if ($pendingDefault) { Get-LocalizedString -Key $key }" in default_ui)
     s.has('Default target amber pending feedback',default_ui,
           '$script:DefaultValueLabel.ForeColor = if ($pendingDefault) { $script:ColorWarning }')
