@@ -1,7 +1,11 @@
 {
   "schemaVersion": 2,
-  "version": "1.5.17.2",
+  "version": "1.5.17.3",
   "releaseProfile": "patch",
-  "protectedFragmentIntent": [],
+  "protectedFragmentIntent": [
+    "ps:New-PopupForm",
+    "ps:Show-LenovoNoticeDialog",
+    "ps:Show-OrTogglePopup"
+  ],
   "repositoryDeleteIntent": []
 }

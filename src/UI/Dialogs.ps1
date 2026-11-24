@@ -146,6 +146,39 @@ function Prepare-LenovoDialogDpiLayout {
     Register-LenovoDialogDpiWindowDiagnostics -Form $Form -Role $Role -Screen $screen -RequestedScale ([double]$scale.Factor)
 }
 
+# Resolve the deepest visible modal owner at display time, not at worker start.
+# Closing settings during a worker does not reopen it or an abandoned main popup.
+function Get-LenovoDialogOwner {
+    foreach ($candidate in @($script:ActiveOwnedDialog,$script:ActiveAuxiliaryPopup,$script:Popup)) {
+        if ($candidate -and -not $candidate.IsDisposed -and $candidate.Visible) { return $candidate }
+    }
+    return $null
+}
+
+function Show-LenovoOwnedDialog {
+    param([Windows.Forms.Form]$Form,[Windows.Forms.Form]$Owner)
+    $previous = $script:ActiveOwnedDialog
+    $dimmer = $null
+    $script:ActiveOwnedDialog = $Form
+    try {
+        if ($Owner -and -not $Owner.IsDisposed -and $Owner.Visible) {
+            # The main owner's existing scrim remains alive; dim the immediate
+            # modal owner only, without a navigation cutout or connector.
+            if ($script:ActiveAuxiliaryPopup) {
+                Initialize-AuxiliaryOwnerDimmer
+                $dimmer = [LenovoAuxiliaryOwnerDimmer]::new($Owner,$null,$Form,1.0,$script:ColorHover,$script:ColorAccent)
+                $dimmer.Show($Owner)
+            }
+            return $Form.ShowDialog($Owner)
+        }
+        return $Form.ShowDialog()
+    }
+    finally {
+        try { if ($dimmer) { $dimmer.Dispose() } }
+        finally { $script:ActiveOwnedDialog = $previous }
+    }
+}
+
 function Show-LenovoNoticeDialog {
     param(
         [Parameter(Mandatory=$true)][string]$Title,
@@ -254,7 +287,7 @@ function Show-LenovoNoticeDialog {
     $form.AcceptButton = $ok
     $form.CancelButton = $ok
     try {
-        $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
+        $owner = Get-LenovoDialogOwner
         Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner -Role 'notice'
         if ($PromoteSecondaryAction) {
             # Safe dismissal receives initial focus even if the native tab
@@ -266,7 +299,7 @@ function Show-LenovoNoticeDialog {
                 }
             }.GetNewClosure())
         }
-        if ($owner) { [void]$form.ShowDialog($owner) } else { [void]$form.ShowDialog() }
+        [void](Show-LenovoOwnedDialog -Form $form -Owner $owner)
     }
     finally { $form.Dispose() }
 }
@@ -330,9 +363,9 @@ function Show-LocaleMigrationDialog {
     $form.AcceptButton = $english
 
     try {
-        $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
+        $owner = Get-LenovoDialogOwner
         Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner -Role 'language-migration'
-        if ($owner) { [void]$form.ShowDialog($owner) } else { [void]$form.ShowDialog() }
+        [void](Show-LenovoOwnedDialog -Form $form -Owner $owner)
         return [string]$form.Tag
     }
     finally { $form.Dispose() }
@@ -450,10 +483,9 @@ function Show-LenovoSystemFunctionsDialog {
     $form.Add_KeyDown({ param($sender,$eventArgs) if ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Escape) { $sender.DialogResult = [System.Windows.Forms.DialogResult]::No; $sender.Close() } })
 
     try {
-        $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
+        $owner = Get-LenovoDialogOwner
         Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner -Role 'system-functions'
-        if ($owner) { return $form.ShowDialog($owner) }
-        return $form.ShowDialog()
+        return (Show-LenovoOwnedDialog -Form $form -Owner $owner)
     }
     finally { $form.Dispose() }
 }
@@ -542,10 +574,9 @@ function Show-LenovoRestartDialog {
     $form.Add_KeyDown({ param($sender, $eventArgs) if ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Escape) { $sender.DialogResult = [System.Windows.Forms.DialogResult]::No; $sender.Close() } })
 
     try {
-        $owner = if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) { $script:Popup } else { $null }
+        $owner = Get-LenovoDialogOwner
         Prepare-LenovoDialogDpiLayout -Form $form -Owner $owner -Role 'restart-confirmation'
-        if ($owner) { return $form.ShowDialog($owner) }
-        return $form.ShowDialog()
+        return (Show-LenovoOwnedDialog -Form $form -Owner $owner)
     }
     finally {
         $form.Dispose()

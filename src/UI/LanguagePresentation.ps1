@@ -36,25 +36,41 @@ function Update-TrayLocalizedText {
     Update-LanguageMenuState
 }
 
-function Rebuild-PopupForLocale {
-    $wasVisible = ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible)
-    try {
-        if ($script:Popup -and -not $script:Popup.IsDisposed) {
-            $script:Popup.Hide()
-            $script:Popup.Dispose()
+# Retain the native window, DPI, scroll position and modal ownership.
+function Update-PopupLocalePresentation {
+    if (-not $script:Popup -or $script:Popup.IsDisposed) {
+        $script:Popup = New-PopupForm
+    }
+    $textKeys = [ordered]@{
+        SectionLabel='Popup.NextBootSection'
+        ManageEntriesButton='Popup.Customize'
+        ConfigurationSectionLabel='Settings.Title'
+        MoreSettingsButton='Settings.More'
+        DefaultTargetNameLabel='Settings.DefaultTarget'
+        RestartActionButton='Action.RestartWindows'
+        RestartUseDefaultButton='BootNext.UseDefaultOnce'
+        ManageCancelButton='Common.Cancel'
+        ManageSaveButton='Manage.Save'
+    }
+    if ($script:Popup.Controls) {
+        foreach ($name in $textKeys.Keys) {
+            foreach ($control in $script:Popup.Controls.Find($name,$true)) {
+                $control.Text = Get-LocalizedString -Key $textKeys[$name]
+            }
         }
-    } catch { }
-
-    $script:Popup = New-PopupForm
-    try { Update-AutostartUi | Out-Null } catch { }
-    try { Update-MaintenanceUi } catch { }
-    try { Update-ManageEntriesUiState } catch { }
-    try { Update-PopupRows } catch { }
-
-    if ($wasVisible) {
-        Position-Popup
-        $script:Popup.Show()
-        $script:Popup.Activate()
+        foreach ($row in $script:Popup.Controls.Find('SettingsPanel',$true)) {
+            $row.AccessibleName = Get-LocalizedString -Key 'Settings.More'
+        }
+        if ($script:HeaderStatusLabel) { $script:HeaderStatusLabel.AccessibleDescription = Get-LocalizedString -Key 'Popup.HeaderUpdateAccessible' }
+        if ($script:RestartUseDefaultButton) { $script:RestartUseDefaultButton.AccessibleName = $script:RestartUseDefaultButton.Text }
+        if ($script:BootTypeToolTip -and $script:RefreshButton) { $script:BootTypeToolTip.SetToolTip($script:RefreshButton,(Get-LocalizedString -Key 'Action.RefreshBootTargets')) }
+    }
+    Update-AutostartUi | Out-Null
+    Update-MaintenanceUi
+    Update-ManageEntriesUiState
+    Update-PopupRows -Reason 'language-change'
+    if ($script:ActiveAuxiliaryPopup -and -not $script:ActiveAuxiliaryPopup.IsDisposed -and $script:ActiveAuxiliaryPopup.Name -eq 'LenovoConfigurationPopup') {
+        Update-ConfigurationPopupLocale -Form $script:ActiveAuxiliaryPopup
     }
 }
 
@@ -76,7 +92,7 @@ function Set-LanguageFromUi {
 
     if ($after -ne $before) {
         Update-CachedBootEntryLocalization
-        Rebuild-PopupForLocale
+        Update-PopupLocalePresentation
     }
     return $after
 }

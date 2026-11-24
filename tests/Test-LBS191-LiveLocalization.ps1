@@ -3,6 +3,7 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
 . (Join-Path $root 'src\Core\Localization.ps1')
 . (Join-Path $root 'src\Core\BootTargetModel.ps1')
 . (Join-Path $root 'src\Application\LocalizationService.ps1')
@@ -38,9 +39,12 @@ $script:Popup = $null
 $script:PaintedEntries = @()
 function Save-AppSettings { $script:Saved++ }
 function New-PopupForm {
-    $form = [pscustomobject]@{ Visible=$false; IsDisposed=$false }
-    $form | Add-Member ScriptMethod Hide { $this.Visible=$false }
-    $form | Add-Member ScriptMethod Dispose { $this.IsDisposed=$true }
+    $form = New-Object Windows.Forms.Form
+    $form.ShowInTaskbar=$false
+    $label=New-Object Windows.Forms.Label
+    $label.Name='SectionLabel'
+    $label.Text=Get-LocalizedString -Key 'Popup.NextBootSection'
+    $form.Controls.Add($label)
     return $form
 }
 function Update-AutostartUi {}
@@ -137,17 +141,23 @@ function Test-LocalizedEntries {
 
 Assert-Lbs191 'canonical initial German projection contains existing hardware facts' (Test-LocalizedEntries -Entries $script:CurrentEntries -Locale 'de-DE' -Storage $oldStorage)
 $signature = Get-StateSignature
+$script:Popup=New-PopupForm
+$script:Popup.Show()
+$originalPopup=$script:Popup
+$originalHandle=$originalPopup.Handle
+$script:VisibilityChanges=0
+$originalPopup.Add_VisibleChanged({ $script:VisibilityChanges++ })
 # Model a newer storage result without replacing the displayed firmware state.
 # A locale switch must not silently reinterpret the existing hardware evidence.
 $script:StorageContext = $newStorage
 [void](Set-LanguageFromUi -Locale 'en-US')
-Assert-Lbs191 'DE to EN updates cached entry text before first rebuilt popup paint' (Test-LocalizedEntries -Entries $script:PaintedEntries -Locale 'en-US' -Storage $oldStorage)
+Assert-Lbs191 'DE to EN updates existing visible popup and cached entries without hiding' ((Test-LocalizedEntries -Entries $script:PaintedEntries -Locale 'en-US' -Storage $oldStorage) -and [object]::ReferenceEquals($originalPopup,$script:Popup) -and $originalPopup.Visible -and $originalPopup.Handle -eq $originalHandle -and $script:VisibilityChanges -eq 0 -and $originalPopup.Controls['SectionLabel'].Text -eq (Get-LocalizedString -Key 'Popup.NextBootSection'))
 Assert-Lbs191 'English current entries preserve original storage context and raw source' (Test-LocalizedEntries -Entries $script:CurrentEntries -Locale 'en-US' -Storage $oldStorage)
 Assert-Lbs191 'language switch preserves selected pending default order hidden aliases and manage draft' ((Get-StateSignature) -ceq $signature)
 Assert-Lbs191 'language switch performs no firmware snapshot read' ($script:SnapshotReads -eq 1)
 [void](Set-LanguageFromUi -Locale 'de-DE')
 Assert-Lbs191 'EN to DE relocalizes cached entries including empty raw description' (Test-LocalizedEntries -Entries $script:PaintedEntries -Locale 'de-DE' -Storage $oldStorage)
-Assert-Lbs191 'second switch preserves boot and manage state' ((Get-StateSignature) -ceq $signature)
+Assert-Lbs191 'second switch preserves boot and manage state and native window' ((Get-StateSignature) -ceq $signature -and [object]::ReferenceEquals($originalPopup,$script:Popup) -and $originalPopup.Visible -and $script:VisibilityChanges -eq 0)
 $paints = $script:Paints
 [void](Set-LanguageFromUi -Locale 'de-DE')
 Assert-Lbs191 'same locale does not recreate popup' ($script:Paints -eq $paints)
@@ -166,5 +176,6 @@ Assert-Lbs191 'completed refresh replaces facts without reverting locale' (Test-
 $script:CurrentEntries = @()
 [void](Set-LanguageFromUi -Locale 'de-DE')
 Assert-Lbs191 'empty cached entry list remains empty' ($script:CurrentEntries.Count -eq 0 -and $script:PaintedEntries.Count -eq 0)
+$originalPopup.Dispose()
 Write-Host "LBS191 LIVE LOCALIZATION TOTAL $script:checks/12"
 if ($script:checks -ne 12) { throw "Expected 12 LBS191 checks, got $script:checks" }

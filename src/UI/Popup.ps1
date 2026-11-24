@@ -11,7 +11,7 @@ function Invoke-PopupEscapeDismissal {
     if (-not $Form.Visible -or -not $Form.ContainsFocus) { return }
 
     # Owned auxiliary forms and OLE drag have independent Escape/cleanup lifecycles.
-    if ($script:ActiveAuxiliaryPopup) { return }
+    if ($script:ActiveAuxiliaryPopup -or $script:ActiveOwnedDialog) { return }
     if ($script:ManageActiveDragGuid -or $script:ManageDragLayout) { return }
 
     $aliasEditor = $Form.Controls.Find('AliasEditor', $true) | Select-Object -First 1
@@ -81,7 +81,7 @@ function New-PopupForm {
     $form.Add_Deactivate({
         # The owned auxiliary Form is part of this popup's UI. The
         # ownership flag covers Deactivate before the child becomes visible.
-        if ($script:ActiveAuxiliaryPopup) { return }
+        if ($script:ActiveAuxiliaryPopup -or $script:ActiveOwnedDialog) { return }
         $capabilities = Get-CurrentSystemFunctionsCapabilities
         if (-not $script:ExitRequested -and [string]$capabilities.State -ne 'Busy') { $this.Hide() }
     })
@@ -126,6 +126,10 @@ function Position-Popup {
 
 function Show-OrTogglePopup {
     param([switch]$FromTrayClick)
+    if ($script:ActiveOwnedDialog -and -not $script:ActiveOwnedDialog.IsDisposed) {
+        [void]$script:ActiveOwnedDialog.Activate()
+        return
+    }
     if ($script:ActiveAuxiliaryPopup -and -not $script:ActiveAuxiliaryPopup.IsDisposed) {
         [void]$script:ActiveAuxiliaryPopup.Activate()
         return
@@ -186,6 +190,10 @@ function Show-OrTogglePopup {
 # Explicit launcher re-entry is SHOW, never the tray-icon toggle (which hides
 # an already visible popup). This runs on the existing WinForms UI thread.
 function Show-OrActivatePopup {
+    if ($script:ActiveOwnedDialog -and -not $script:ActiveOwnedDialog.IsDisposed) {
+        [void]$script:ActiveOwnedDialog.Activate()
+        return
+    }
     if ($script:ActiveAuxiliaryPopup -and -not $script:ActiveAuxiliaryPopup.IsDisposed) {
         [void]$script:ActiveAuxiliaryPopup.Activate()
         return
