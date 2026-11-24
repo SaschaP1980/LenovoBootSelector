@@ -857,7 +857,7 @@ function Add-BootEntryAliasEditor {
     $editorFrame.Name = 'AliasEditorFrame'
     $editorFrame.Location = New-Object Drawing.Point(58, 32)
     $editorFrame.Size = New-Object Drawing.Size(318, 27)
-    $editorFrame.BackColor = $script:ColorRow
+    $editorFrame.BackColor = [Drawing.Color]::FromArgb(24,24,24)
 
     $aliasEditor = New-Object System.Windows.Forms.TextBox
     $aliasEditor.Name = 'AliasEditor'
@@ -881,20 +881,53 @@ function Add-BootEntryAliasEditor {
     $clearAlias = New-Object System.Windows.Forms.Button
     $clearAlias.Name = 'AliasClearButton'
     $clearAlias.Text = '×'
-    $clearAlias.Font = New-Object Drawing.Font('Segoe UI', 9.5, [Drawing.FontStyle]::Regular)
-    $clearAlias.ForeColor = [Drawing.Color]::FromArgb(145,145,145)
-    $clearAlias.BackColor = [Drawing.Color]::FromArgb(24,24,24)
+    $clearAlias.Font = New-Object Drawing.Font('Segoe UI', 13.0, [Drawing.FontStyle]::Regular)
+    $clearAlias.ForeColor = [Drawing.Color]::FromArgb(180,180,180)
+    $clearAlias.BackColor = $aliasEditor.BackColor
+    $clearAlias.AccessibleName = Get-LocalizedString -Key 'Manage.ClearAliasHint'
+    $clearAlias.AccessibleDescription = $clearAlias.AccessibleName
     $clearAlias.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $clearAlias.FlatAppearance.BorderSize = 0
-    $clearAlias.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(38,38,38)
-    $clearAlias.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(45,30,29)
+    $clearAlias.FlatAppearance.MouseOverBackColor = $aliasEditor.BackColor
+    $clearAlias.FlatAppearance.MouseDownBackColor = $aliasEditor.BackColor
     $clearAlias.Location = New-Object Drawing.Point(292, 0)
     $clearAlias.Size = New-Object Drawing.Size(26, 23)
     $clearAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
     $clearAlias.Visible = -not [string]::IsNullOrEmpty([string]$aliasEditor.Text)
-    $clearAlias.Add_MouseEnter({ $this.ForeColor = $script:ColorAccent })
-    $clearAlias.Add_MouseLeave({ $this.ForeColor = [Drawing.Color]::FromArgb(145,145,145) })
+    $clearAlias.Add_MouseEnter({
+        param($sender,$eventArgs)
+        if (-not $sender.Visible -or $script:ManageActiveDragGuid) { return }
+        $sender.ForeColor = [Drawing.Color]::FromArgb(255,110,102)
+        try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleName) } catch { }
+    })
+    $clearAlias.Add_MouseLeave({
+        param($sender,$eventArgs)
+        $sender.ForeColor = [Drawing.Color]::FromArgb(180,180,180)
+        if ($script:DarkActionTooltipOwner -eq $sender) {
+            try { Hide-DarkActionTooltip } catch { }
+        }
+    })
+    # The button vanishes when the text is cleared or the editor closes.
+    # Only dismiss its own hint; another control may already own the tooltip.
+    $clearAlias.Add_VisibleChanged({
+        param($sender,$eventArgs)
+        if (-not $sender.Visible) {
+            $sender.ForeColor = [Drawing.Color]::FromArgb(180,180,180)
+            if ($script:DarkActionTooltipOwner -eq $sender) {
+                try { Hide-DarkActionTooltip } catch { }
+            }
+        }
+    })
+    $clearAlias.Add_Disposed({
+        param($sender,$eventArgs)
+        if ($script:DarkActionTooltipOwner -eq $sender) {
+            try { Hide-DarkActionTooltip } catch { }
+        }
+    })
     $clearAlias.Add_Click({
+        if ($script:DarkActionTooltipOwner -eq $this) {
+            try { Hide-DarkActionTooltip } catch { }
+        }
         $editor = $this.Parent.Controls.Find('AliasEditor', $false) | Select-Object -First 1
         if ($editor) {
             $editor.Text = ''

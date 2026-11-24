@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.12.1 – UX-05 alias-clear visual polish (LBS-221 Hotfix)
+
+- Enlarge the alias-clear cross to 13pt with neutral #B4B4B4 idle and #FF6E66 hover ink. Match the field background in normal, hover and pressed states while retaining the native 26x23 clear button.
+- Use the existing localized dark action tooltip for clearing the display name. Close only its own tooltip on leave, clear, hide or disposal; preserve native button activation, focus return, and draft Apply/Cancel and Save/Cancel semantics.
+- Add 49 isolated native WinForms acceptance assertions for English/German and synthetic 96/240 DPI. No other row, layout, firmware or settings changes.
+
 ## v1.5.12.0 – UX-05 Manage Entries action feedback (LBS-221)
 
 - Brighten the reorder grip on hover and show its localized dark drag hint using the existing action tooltip. Close the tooltip on grip press and before row snapshot/OLE drag; suppress action hints during active dragging.
