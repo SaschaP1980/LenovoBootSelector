@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "version": "1.5.17.0",
-  "tag": "v1.5.17.0",
-  "file": "LenovoBootMenuTray-v1.5.17.0.zip",
-  "sha256": "75932a6f74516de1733c2caecaa63328ae7a764ea5727db8b2174a8f1374196a",
-  "size": 180698,
-  "publishedUtc": "2026-11-24T12:58:32Z",
+  "version": "1.5.17.1",
+  "tag": "v1.5.17.1",
+  "file": "LenovoBootMenuTray-v1.5.17.1.zip",
+  "sha256": "550511d8231a477f7f14dfe01d0779d914f2dd8924506fe57df484631710c4d9",
+  "size": 180846,
+  "publishedUtc": "2026-11-24T14:34:08Z",
   "packageFiles": [
     "BUILD_INTEGRITY.txt",
     "icon-preview.png",
