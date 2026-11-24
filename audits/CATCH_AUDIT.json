@@ -1,5 +1,5 @@
 {
-  "version": "1.5.15.0",
+  "version": "1.5.15.1",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
@@ -424,7 +424,7 @@
     },
     {
       "source": "src/Application/RefreshController.ps1",
-      "line": 160,
+      "line": 164,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "catch { }"
@@ -480,7 +480,7 @@
     },
     {
       "source": "src/Core/Localization.ps1",
-      "line": 690,
+      "line": 694,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { $text = $text -f @($Arguments) } catch { }"
@@ -1026,7 +1026,7 @@
     },
     {
       "source": "src/UI/RefreshPresentation.ps1",
-      "line": 59,
+      "line": 72,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { $active = (Test-BackgroundRefreshActive -State $script:BackgroundRefreshState) } catch { }"
@@ -1061,14 +1061,14 @@
     },
     {
       "source": "src/UI/UpdatePresentation.ps1",
-      "line": 129,
+      "line": 130,
       "category": "presentation_best_effort",
       "reason": "Non-critical presentation/tooltip/notification failure is tolerated.",
       "code": "try { if ($script:TrayIcon) { $script:TrayIcon.Visible = $false } } catch { }"
     },
     {
       "source": "src/UI/UpdatePresentation.ps1",
-      "line": 130,
+      "line": 131,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { if ($script:Popup -and -not $script:Popup.IsDisposed) { $script:Popup.Hide() } } catch { }"

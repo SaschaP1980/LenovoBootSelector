@@ -30,14 +30,27 @@ function Update-HeaderRefreshStatus {
     try {
         $updateAvailable = ($script:UpdateState -and [string]$script:UpdateState.Status -eq 'UpdateAvailable' -and $null -ne $script:UpdateState.AvailableManifest)
     } catch { }
-    $showStatus = ($active -or $updateAvailable)
+    # Active request provenance affects presentation only, never worker admission.
+    # Initial readiness wins until it ends; a deliberate manual refresh wins
+    # over coexisting read-only popup checks. Popup work can outlive boot work.
+    $origin = if ($active) { [string]$script:BackgroundRefreshState.ActiveRequest.Origin } else { '' }
+    $pendingOrigin = if ($active) { [string]$script:BackgroundRefreshState.PendingRequest.Origin } else { '' }
+    $popupUpdateActive = ($script:UpdateState -and $script:UpdateState.CheckProcess -and [string]$script:UpdateState.CheckMode -eq 'Popup')
+    $refreshKey = if ($active -and $origin -eq 'Startup') { 'Header.InitializingApplication' }
+        elseif ($active -and ($origin -eq 'Manual' -or $pendingOrigin -eq 'Manual')) { 'Header.Refreshing' }
+        elseif (($active -and ($origin -eq 'Popup' -or $pendingOrigin -eq 'Popup')) -or $popupUpdateActive) { 'Header.RefreshingApplication' }
+        elseif ($active) { 'Header.Refreshing' }
+        else { '' }
+    $refreshVisible = -not [string]::IsNullOrEmpty($refreshKey)
+    $showStatus = ($refreshVisible -or $updateAvailable)
 
     # LBS-174: status may appear/disappear, but title geometry belongs only
     # to Add-PopupHeaderSection and must not be mutated by refresh state.
 
     if ($script:HeaderStatusLabel -and -not $script:HeaderStatusLabel.IsDisposed) {
-        $script:HeaderStatusLabel.Text = if ($active) {
-            Get-LocalizedString -Key 'Header.Refreshing'
+        $script:HeaderStatusLabel.Text = if ($refreshVisible) {
+            if ($refreshKey -eq 'Header.Refreshing') { Get-LocalizedString -Key 'Header.Refreshing' }
+            else { Get-LocalizedString -Key $refreshKey }
         }
         elseif ($updateAvailable) {
             Get-LocalizedString -Key 'Update.Available'
@@ -47,7 +60,7 @@ function Update-HeaderRefreshStatus {
         }
         $script:HeaderStatusLabel.Visible = $showStatus
     }
-    Set-HeaderUpdateInteractionState -Enabled (-not $active -and $updateAvailable)
+    Set-HeaderUpdateInteractionState -Enabled (-not $refreshVisible -and $updateAvailable)
 }
 
 function Update-RefreshButtonVisual {

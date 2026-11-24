@@ -527,7 +527,16 @@ def main():
         "$script:DefaultValueLabel.Text = if ($pendingDefault) { Get-LocalizedString -Key $key }" in default_ui)
     s.has('Default target amber pending feedback',default_ui,
           '$script:DefaultValueLabel.ForeColor = if ($pendingDefault) { $script:ColorWarning }')
-    s.has('Popup default target click uses interaction gate',popup_surface,'if ($script:DefaultInteractionEnabled -and $script:DefaultButton)')
+    navigation_gate=fn(popup_composition,'Test-PopupNavigationRowInteractive')
+    navigation_invoke=fn(popup_composition,'Invoke-PopupNavigationRow')
+    navigation_handlers=fn(popup_composition,'Add-PopupNavigationRowHandlers')
+    s.c('Popup default target click and keyboard use shared interaction gate',
+        "if ($Row.Name -eq 'DefaultPanel') { return [bool]$script:DefaultInteractionEnabled }" in navigation_gate and
+        'if (-not (Test-PopupNavigationRowInteractive -Row $row)) { return }' in navigation_invoke and
+        'Show-DefaultTargetMenu -Owner $row' in navigation_invoke and
+        navigation_invoke.index('if (-not (Test-PopupNavigationRowInteractive -Row $row)) { return }') < navigation_invoke.index('Show-DefaultTargetMenu -Owner $row') and
+        'Invoke-PopupNavigationRow -Control $sender' in navigation_handlers and
+        'Add-PopupNavigationRowHandlers -Row $defaultPanel' in popup_composition)
     s.has('Popup stores default target arrow for state updates',popup_surface,'$script:DefaultArrowLabel = $defaultArrow')
     ui=txt(root/'src/UI/UpdatePresentation.ps1'); infra=txt(root/'src/Infrastructure/UpdateClient.ps1'); transport=txt(root/'src/Infrastructure/UpdateTransport.ps1')
     update_controller=txt(root/'src/Application/UpdateController.ps1')
@@ -640,7 +649,11 @@ def main():
     s.has('LBS-14 interactive header uses hand cursor',header_visual,'[System.Windows.Forms.Cursors]::Hand')
     s.has('LBS-14 interactive header participates in tab navigation',header_visual,'$script:HeaderStatusLabel.TabStop = $interactive')
     s.has('LBS-14 keyboard focus uses Lenovo accent',header_visual,'$script:HeaderStatusLabel.Focused')
-    s.has('LBS-14 refresh disables header update interaction',refresh_ui,'Set-HeaderUpdateInteractionState -Enabled (-not $active -and $updateAvailable)')
+    s.c('LBS-14 active boot or popup refresh disables header update interaction',
+        '$refreshVisible = -not [string]::IsNullOrEmpty($refreshKey)' in refresh_ui and
+        '$popupUpdateActive = ($script:UpdateState -and $script:UpdateState.CheckProcess' in refresh_ui and
+        "elseif ($active) { 'Header.Refreshing' }" in refresh_ui and
+        'Set-HeaderUpdateInteractionState -Enabled (-not $refreshVisible -and $updateAvailable)' in refresh_ui)
     s.has('LBS-14 maintenance disables header update interaction',refresh_ui,'Set-HeaderUpdateInteractionState -Enabled $false')
     s.has('LBS-17 LBS-14 shared dialog title uses canonical localization key',available_dialog,"-Title (Get-LocalizedString -Key 'Update.Available')")
     s.has('LBS-14 shared dialog uses already validated manifest',available_dialog,'$script:UpdateState.AvailableManifest')

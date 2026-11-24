@@ -1,12 +1,14 @@
 ﻿function New-BackgroundRefreshRequest {
     param(
         [bool]$RefreshStorage,
-        [bool]$RefreshFirmware
+        [bool]$RefreshFirmware,
+        [ValidateSet('Background','Startup','Popup','Manual')][string]$Origin = 'Background'
     )
 
     [pscustomobject]@{
         RefreshStorage  = [bool]$RefreshStorage
         RefreshFirmware = [bool]$RefreshFirmware
+        Origin          = $Origin
     }
 }
 
@@ -51,6 +53,16 @@ function Test-BackgroundRefreshRequestEscalation {
     return $false
 }
 
+# Coalesced equivalent requests retain the most meaningful presentation
+# origin without adding work. Startup readiness must never be relabeled.
+function Merge-BackgroundRefreshOrigin {
+    param([string]$Current,[string]$Requested)
+    foreach ($origin in @('Startup','Manual','Popup','Background')) {
+        if ($Current -eq $origin -or $Requested -eq $origin) { return $origin }
+    }
+    return 'Background'
+}
+
 function Add-BackgroundRefreshPendingRequest {
     param(
         [Parameter(Mandatory=$true)]$State,
@@ -58,12 +70,13 @@ function Add-BackgroundRefreshPendingRequest {
     )
 
     if (-not $State.PendingRequest) {
-        $State.PendingRequest = New-BackgroundRefreshRequest -RefreshStorage:$Request.RefreshStorage -RefreshFirmware:$Request.RefreshFirmware
+        $State.PendingRequest = New-BackgroundRefreshRequest -RefreshStorage:$Request.RefreshStorage -RefreshFirmware:$Request.RefreshFirmware -Origin $Request.Origin
         return $State.PendingRequest
     }
 
     if ($Request.RefreshStorage) { $State.PendingRequest.RefreshStorage = $true }
     if ($Request.RefreshFirmware) { $State.PendingRequest.RefreshFirmware = $true }
+    $State.PendingRequest.Origin = Merge-BackgroundRefreshOrigin -Current $State.PendingRequest.Origin -Requested $Request.Origin
     return $State.PendingRequest
 }
 

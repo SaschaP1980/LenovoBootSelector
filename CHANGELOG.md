@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.15.1 – Anchor configuration popups and distinguish refresh status (LBS-229 Hotfix)
+
+- Anchor auxiliary popups to their full initiating navigation rows; retain owner-monitor side preference and clamp, and unify Further settings and Default hover and keyboard activation.
+- Harmonize configuration action appearance, including muted genuinely disabled actions, while retaining native admission and existing action owners.
+- Distinguish actual startup, warm popup and manual boot-refresh lifetimes in DE/EN; retain interactive update availability and do not launch an additional update search on manual refresh.
+- Extend native correction and refresh-controller regression coverage. Physical owner acceptance remains separate.
+
 ## v1.5.15.0 – Separate configuration from everyday boot selection (LBS-229)
 
 - Keep persistent Default directly reachable in the fixed main popup; replace the duplicated Autostart row with Further settings, a flat owned WinForms popup with Autostart, direct language buttons, System functions, Updates and Diagnostics.

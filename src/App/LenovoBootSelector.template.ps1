@@ -2377,7 +2377,7 @@ try {
             [void](Load-BootStateFromExistingCache)
             [void](Refresh-SystemDefaultState)
             Complete-LegacyDefaultMigration
-            Start-BackgroundBootRefresh -RefreshStorage
+            Start-BackgroundBootRefresh -RefreshStorage -Origin Startup
         }
     } catch { }
     try { Update-AutostartUi | Out-Null } catch { }

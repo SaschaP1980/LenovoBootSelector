@@ -123,12 +123,12 @@ function Complete-BackgroundBootRefresh {
     if ($pending) {
         if ($pending.RefreshFirmware) { $script:FirmwareCacheUtc = [datetime]::MinValue }
         $pendingStorage = [bool]$pending.RefreshStorage
-        Start-BackgroundBootRefresh -RefreshStorage:$pendingStorage
+        Start-BackgroundBootRefresh -RefreshStorage:$pendingStorage -Origin $pending.Origin
     }
 }
 
 function Start-BackgroundBootRefresh {
-    param([switch]$RefreshStorage)
+    param([switch]$RefreshStorage,[ValidateSet('Background','Startup','Popup','Manual')][string]$Origin = 'Background')
 
     if ($script:DefaultTargetChangePending) {
         Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_SUPPRESSED' -Stage 'default' -Success $true -Data (New-RuntimeDiagnosticData @{ reason='default-target-changing' })
@@ -143,7 +143,7 @@ function Start-BackgroundBootRefresh {
         -RefreshStorage ([bool]$RefreshStorage) `
         -FirmwareCacheText $script:FirmwareCacheText `
         -FirmwareCacheUtc $script:FirmwareCacheUtc
-    $request = New-BackgroundRefreshRequest -RefreshStorage ([bool]$RefreshStorage) -RefreshFirmware ([bool]$refreshFirmware)
+    $request = New-BackgroundRefreshRequest -RefreshStorage ([bool]$RefreshStorage) -RefreshFirmware ([bool]$refreshFirmware) -Origin $Origin
 
     if (Test-BackgroundRefreshActive -State $script:BackgroundRefreshState) {
         try {
@@ -154,6 +154,10 @@ function Start-BackgroundBootRefresh {
                 if (Test-BackgroundRefreshRequestEscalation -ActiveRequest $script:BackgroundRefreshState.ActiveRequest -Requested $request) {
                     [void](Add-BackgroundRefreshPendingRequest -State $script:BackgroundRefreshState -Request $request)
                 }
+                else {
+                    $script:BackgroundRefreshState.ActiveRequest.Origin = Merge-BackgroundRefreshOrigin -Current $script:BackgroundRefreshState.ActiveRequest.Origin -Requested $request.Origin
+                }
+                Update-RefreshButtonVisual
                 return
             }
         }
