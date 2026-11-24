@@ -591,7 +591,7 @@ def main():
     s.has('LBS-17 tray exposes English selector',template,"Set-LanguageFromUi -Locale 'en-US'")
     s.has('LBS-17 tray exposes German selector',template,"Set-LanguageFromUi -Locale 'de-DE'")
     s.has('LBS-17 language selector persists through active locale service',language_ui,'Set-ActiveLocale -Locale $Locale -Persist')
-    s.has('LBS-17 language change rebuilds visible popup',language_ui,'Rebuild-PopupForLocale')
+    s.has('LBS-17 language change updates existing popup in place',language_ui,'Update-PopupLocalePresentation')
     s.has('LBS-17 popup strings consume localization API',popup_surface,"Get-LocalizedString -Key 'Popup.NextBootSection'")
     s.has('LBS-17 English catalog exposes tray maintenance',localization,"'Tray.Maintenance' = 'Maintenance'")
     s.has('LBS-17 German catalog exposes tray maintenance',localization,"'Tray.Maintenance' = 'Wartung'")

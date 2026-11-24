@@ -261,6 +261,7 @@ function Add-PopupSettingsSection {
 
     $configLabel = New-Label -Text (Get-LocalizedString -Key 'Settings.Title') -Font (New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)) `
         -ForeColor ([Drawing.Color]::FromArgb(145,145,145)) -X 16 -Y 2 -Width 220 -Height 17
+    $configLabel.Name = 'ConfigurationSectionLabel'
     $configSection.Controls.Add($configLabel)
     $Root.Controls.Add($configSection)
 
@@ -295,6 +296,7 @@ function Add-PopupSettingsSection {
 
     $defaultName = New-Label -Text (Get-LocalizedString -Key 'Settings.DefaultTarget') -Font (New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)) `
         -ForeColor $script:ColorPrimary -X 16 -Y 8 -Width 144 -Height 22
+    $defaultName.Name = 'DefaultTargetNameLabel'
     $defaultName.Cursor = [System.Windows.Forms.Cursors]::Hand
     $defaultPanel.Controls.Add($defaultName)
 
@@ -336,6 +338,7 @@ function Add-PopupRestartSection {
     $restartPanel.BackColor = $script:ColorSurface
 
     $restartButton = New-Object System.Windows.Forms.Button
+    $restartButton.Name = 'RestartActionButton'
     $restartButton.Text = Get-LocalizedString -Key 'Action.RestartWindows'
     $restartButton.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
     $restartButton.ForeColor = $script:ColorPrimary
@@ -463,6 +466,7 @@ function Add-PopupManageEntriesSection {
     $managePanel.Controls.Add($manageDivider)
 
     $cancelManage = New-Object System.Windows.Forms.Button
+    $cancelManage.Name = 'ManageCancelButton'
     $cancelManage.Text = Get-LocalizedString -Key 'Common.Cancel'
     $cancelManage.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
     $cancelManage.ForeColor = $script:ColorPrimary
@@ -479,6 +483,7 @@ function Add-PopupManageEntriesSection {
     $managePanel.Controls.Add($cancelManage)
 
     $saveManage = New-Object System.Windows.Forms.Button
+    $saveManage.Name = 'ManageSaveButton'
     $saveManage.Text = Get-LocalizedString -Key 'Manage.Save'
     $saveManage.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
     $saveManage.ForeColor = [Drawing.Color]::FromArgb(146,146,146)
@@ -628,7 +633,7 @@ function New-AuxiliaryPopupForm {
         Choice=$null; Scale=0.0; Header=$header; Title=$titleLabel; Subtitle=$subtitleLabel
         Close=$close; Body=$body; Viewport=$viewport; Scroll=$scroll; ContentHeight=$ContentHeight; Tip=$tip
         Regular=$regular; Bold=$bold; Heading=$heading; Symbol=$symbol
-        Fonts=@($regular,$bold,$heading,$large,$symbol); Timer=$null; DefaultSnapshot=$null
+        Fonts=@($regular,$bold,$heading,$large,$symbol); Timer=$null; DefaultSnapshot=$null; ActionInProgress=$false
     }
     $form.Add_Disposed({
         param($sender,$eventArgs)
@@ -701,22 +706,25 @@ function Invoke-ConfigurationPopupAction {
     if (-not (Test-ConfigurationActionAvailable -Action $action)) { return }
     $form = $Control.FindForm()
     $item = Get-ConfigurationActionMenuItem -Action $action
-    if ($action -eq 'autostart') {
-        # The existing tray handler owns the actual toggle and verification.
-        $item.PerformClick()
-        Update-ConfigurationPopupPresentation -Form $form
-        return
-    }
+    if (-not $form -or $form.IsDisposed -or $form.Tag.ActionInProgress) { return }
     if ($action -like 'language-*' -and $item.Checked) { return }
-    # Close the child before the existing action starts a modal dialog,
-    # rebuilds the main popup, or starts an asynchronous operation.
-    $form.Tag.Choice = [pscustomobject]@{ Action=$action }
-    $form.DialogResult = [Windows.Forms.DialogResult]::OK
+    # The existing tray handlers still own all operations and confirmations.
+    # Keep the settings modal alive throughout synchronous dispatch; asynchronous
+    # result dialogs resolve the currently visible owner when they complete.
+    $form.Tag.ActionInProgress = $true
+    try { $item.PerformClick() }
+    finally {
+        if (-not $form.IsDisposed) {
+            $form.Tag.ActionInProgress = $false
+            Update-ConfigurationPopupPresentation -Form $form
+        }
+    }
 }
 
 function Add-ConfigurationHeading {
     param($Form,[string]$Key,[int]$Y)
     $label = New-Label -Text (Get-LocalizedString -Key $Key) -Font $Form.Tag.Heading -ForeColor $script:ColorSecondary -X 16 -Y $Y -Width 350 -Height 22
+    $label.Name = 'ConfigurationLocale-' + $Key
     $Form.Tag.Body.Controls.Add($label)
 }
 
@@ -764,10 +772,27 @@ function Add-ConfigurationActionButton {
     $Form.Tag.Body.Controls.Add($button)
 }
 
+function Update-ConfigurationPopupLocale {
+    param([Windows.Forms.Form]$Form)
+    $title = Get-LocalizedString -Key 'Settings.More'
+    $Form.Text = $title
+    $Form.AccessibleName = $title
+    $Form.Tag.Title.Text = $title
+    $Form.Tag.Close.AccessibleName = Get-LocalizedString -Key 'Common.Close'
+    foreach ($control in $Form.Tag.Body.Controls) {
+        if ($control.Name.StartsWith('ConfigurationLocale-')) {
+            $control.Text = Get-LocalizedString -Key $control.Name.Substring('ConfigurationLocale-'.Length)
+        }
+    }
+    $Form.Tag.Body.Controls['ConfigurationAutostart'].AccessibleName = Get-LocalizedString -Key 'Settings.Autostart'
+    Update-ConfigurationPopupPresentation -Form $Form
+}
+
 function New-ConfigurationPopup {
     $form = New-AuxiliaryPopupForm -Name 'LenovoConfigurationPopup' -Title (Get-LocalizedString -Key 'Settings.More') -Subtitle 'Lenovo Boot Selector' -ContentHeight 450
     Add-ConfigurationHeading -Form $form -Key 'Settings.General' -Y 6
     $autostartLabel = New-Label -Text (Get-LocalizedString -Key 'Settings.Autostart') -Font $form.Tag.Regular -ForeColor $script:ColorPrimary -X 16 -Y 30 -Width 306 -Height 30
+    $autostartLabel.Name = 'ConfigurationLocale-Settings.Autostart'
     $autostartLabel.Tag = 'autostart'
     $autostartLabel.Cursor = [Windows.Forms.Cursors]::Hand
     $autostartLabel.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })
@@ -787,6 +812,7 @@ function New-ConfigurationPopup {
     $check.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })
     $form.Tag.Body.Controls.Add($check)
     $language = New-Label -Text (Get-LocalizedString -Key 'Settings.Language') -Font $form.Tag.Regular -ForeColor $script:ColorPrimary -X 16 -Y 66 -Width 350 -Height 22
+    $language.Name = 'ConfigurationLocale-Settings.Language'
     $form.Tag.Body.Controls.Add($language)
     Add-ConfigurationActionButton -Form $form -Action 'language-de' -Key 'Language.German' -Y 90 -Width 171
     Add-ConfigurationActionButton -Form $form -Action 'language-en' -Key 'Language.English' -Y 90 -X 195 -Width 171
@@ -820,9 +846,5 @@ function Show-ConfigurationPopup {
     [void](Update-AutostartUi)
     Update-UpdateMenuState
     Update-LanguageMenuState
-    $choice = Show-OwnedAuxiliaryPopup -Form (New-ConfigurationPopup) -Owner $Owner
-    if ($choice -and (Test-ConfigurationActionAvailable -Action $choice.Action)) {
-        $item = Get-ConfigurationActionMenuItem -Action $choice.Action
-        $item.PerformClick()
-    }
+    [void](Show-OwnedAuxiliaryPopup -Form (New-ConfigurationPopup) -Owner $Owner)
 }

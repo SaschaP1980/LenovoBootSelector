@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.17.3 – Preserve settings and main popup across actions (LBS-233)
+
+- Keep the Further settings modal visible during language, maintenance, update and diagnostics actions; delegate exactly once to existing handlers.
+- Relocalize the existing main and settings windows without hiding or recreating them; retain modal ownership, bounds and existing boot facts.
+- Resolve result and confirmation dialogs against the deepest visible owner, dim the settings surface while a nested dialog is open, and preserve explicit update-install shutdown.
+
 ## v1.5.17.2 – Match auxiliary scrollbars to the main popup (LBS-233)
 
 - Reuse the existing red-thumb, dark-track scrollbar for overflowing auxiliary popup content instead of the native light Windows scrollbar.

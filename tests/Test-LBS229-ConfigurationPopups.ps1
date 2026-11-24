@@ -31,6 +31,7 @@ Add-Type -TypeDefinition ($template.Substring($begin,$end-$begin)) -ReferencedAs
 . (Join-Path $root 'src\UI\Popup.ps1')
 . (Join-Path $root 'src\UI\DefaultTargetMenu.ps1')
 . (Join-Path $root 'src\UI\DefaultTargetPresentation.ps1')
+. (Join-Path $root 'src\UI\Dialogs.ps1')
 $script:ColorBackground=[Drawing.Color]::FromArgb(31,31,31)
 $script:ColorHeader=[Drawing.Color]::Black
 $script:ColorRow=$script:ColorBackground
@@ -546,12 +547,13 @@ try {
     Invoke-Lbs229Modal 'configuration' {
         param($active)
         $active.Tag.Body.Controls['ConfigurationAction-update-check'].PerformClick()
-        Assert-Lbs229 'advanced choice does not dispatch before child closes' ($script:Actions.Count -eq 1)
+        Assert-Lbs229 'LBS233 update action dispatches while both windows stay open' ($script:Actions.Count -eq 2 -and $active.Visible -and $owner.Visible -and $active.DialogResult -eq [Windows.Forms.DialogResult]::None -and -not [Lbs229Native]::IsWindowEnabled($owner.Handle))
     }
     Assert-Lbs229 'advanced selection delegates to existing menu action exactly once' ($script:Actions.Count -eq 2 -and $script:Actions[1] -eq 'update-check')
     Invoke-Lbs229Modal 'configuration' {
         param($active)
         $active.Tag.Body.Controls['ConfigurationAction-language-en'].PerformClick()
+        Assert-Lbs229 'LBS233 language action retains both visible modal windows' ($script:Actions.Count -eq 3 -and $active.Visible -and $owner.Visible -and $active.DialogResult -eq [Windows.Forms.DialogResult]::None)
     }
     Assert-Lbs229 'direct language choice dispatches existing language action' ($script:Actions.Count -eq 3 -and $script:Actions[2] -eq 'language-en')
     Invoke-Lbs229Modal 'default' {
@@ -702,6 +704,42 @@ try {
         }
     } finally { $nativeOwner.Dispose() }
     Assert-Lbs229 'LBS233 modal visual probes dispatch no action' ($script:Actions.Count -eq 3 -and $script:DefaultCalls.Count -eq 2 -and $script:BootCalls -eq 0)
+    # Exercise every remaining settings action without real privileged/network effects.
+    $script:Busy=$false
+    $script:UpdateInstallMenuItem.Enabled=$true
+    Invoke-Lbs229Modal 'configuration' {
+        param($active)
+        foreach ($action in @('system-setup','system-remove','diagnostics-save','diagnostics-upload','update-install')) {
+            $before=$script:Actions.Count
+            $active.Tag.Body.Controls['ConfigurationAction-'+$action].PerformClick()
+            Assert-Lbs229 "LBS233 $action dispatch once and preserve settings modal" ($script:Actions.Count -eq $before+1 -and $script:Actions[-1] -eq $action -and $active.Visible -and $owner.Visible -and $active.DialogResult -eq [Windows.Forms.DialogResult]::None)
+        }
+        $oldLocale=$script:Locale
+        $script:Locale=if ($oldLocale -eq 'de-DE') {'en-US'} else {'de-DE'}
+        Update-ConfigurationPopupLocale -Form $active
+        Assert-Lbs229 'LBS233 settings headings and accessibility relocalize on same visible handle' ($active.Visible -and $active.Tag.Title.Text -eq (Get-LocalizedString -Key 'Settings.More') -and $active.Tag.Body.Controls['ConfigurationLocale-Settings.Language'].Text -eq (Get-LocalizedString -Key 'Settings.Language'))
+        $script:Locale=$oldLocale
+        $nested=New-Object Windows.Forms.Form
+        $nested.ShowInTaskbar=$false
+        $nested.TopMost=$true
+        $script:NestedObserved=$false
+        $script:NestedError=$null
+        $nested.Add_Shown({
+            param($sender,$eventArgs)
+            try {
+                $parent=$script:ActiveAuxiliaryPopup
+                $scrim=@($parent.OwnedForms | Where-Object Name -eq 'AuxiliaryOwnerDimmer')
+                Require-Lbs229Correction ($parent.Visible -and $sender.Owner -eq $parent -and $scrim.Count -eq 1 -and $scrim[0].Visible -and -not [Lbs229Native]::IsWindowEnabled($parent.Handle) -and (Get-LenovoDialogOwner) -eq $sender) 'Nested dialog owns active settings and dims it without hiding either window'
+                $script:NestedObserved=$true
+            } catch { $script:NestedError=$_ }
+            finally { $sender.DialogResult=[Windows.Forms.DialogResult]::Cancel }
+        })
+        try {
+            $result=Show-LenovoOwnedDialog -Form $nested -Owner (Get-LenovoDialogOwner)
+            if ($script:NestedError) { throw $script:NestedError }
+            Assert-Lbs229 'LBS233 nested cancel restores same modal owner and removes nested scrim' ($script:NestedObserved -and $result -eq [Windows.Forms.DialogResult]::Cancel -and $active.Visible -and [Lbs229Native]::IsWindowEnabled($active.Handle) -and -not $script:ActiveOwnedDialog -and @($active.OwnedForms | Where-Object Name -eq 'AuxiliaryOwnerDimmer').Count -eq 0)
+        } finally { $nested.Dispose() }
+    }
 } finally {
     $owner.Dispose()
     $tray.Dispose()
