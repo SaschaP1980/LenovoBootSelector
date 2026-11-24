@@ -2367,7 +2367,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.17.1'
+$script:AppVersion = '1.5.17.2'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -6088,7 +6088,7 @@ function Add-DefaultPickerRow {
                 elseif ($key -eq [Windows.Forms.Keys]::Up) { [Math]::Max(0,$index-1) }
                 else { [Math]::Min($rows.Count-1,$index+1) }
             [void]$rows[$target].Focus()
-            $sender.Parent.ScrollControlIntoView($rows[$target])
+            Set-AuxiliaryPopupControlVisible -Control $rows[$target]
         }
     })
     $Form.Tag.Body.Controls.Add($row)
@@ -13063,12 +13063,39 @@ function New-AuxiliaryPopupForm {
     $close.DialogResult = [Windows.Forms.DialogResult]::Cancel
     $header.Controls.Add($close)
     $form.Controls.Add($header)
+    # Keep action controls in the body; clip it in a separate fixed viewport.
+    # Reuse the main popup's existing painted scrollbar and pixel-value contract.
+    $viewport = New-Object Windows.Forms.Panel
+    $viewport.Name = 'AuxiliaryViewport'
+    $viewport.TabIndex = 0
+    $viewport.BackColor = $script:ColorBackground
+    $viewport.AutoScroll = $false
+    $viewport.Location = [Drawing.Point]::new(0,64)
+    $viewport.Size = [Drawing.Size]::new(390,$form.ClientSize.Height-64)
     $body = New-Object Windows.Forms.Panel
     $body.Name = 'AuxiliaryBody'
     $body.TabIndex = 0
-    $body.Location = [Drawing.Point]::new(0,64)
-    $body.Size = [Drawing.Size]::new(390,$form.ClientSize.Height-64)
-    $form.Controls.Add($body)
+    $body.BackColor = $script:ColorBackground
+    $body.AutoScroll = $false
+    $body.Location = [Drawing.Point]::Empty
+    $body.Size = [Drawing.Size]::new(390,$ContentHeight)
+    $viewport.Controls.Add($body)
+    $scroll = New-Object LenovoVerticalScrollBar
+    $scroll.Name = 'AuxiliaryScroll'
+    $scroll.Location = [Drawing.Point]::new(382,0)
+    $scroll.Size = [Drawing.Size]::new(8,$viewport.Height)
+    $scroll.TrackColor = [Drawing.Color]::FromArgb(23,23,23)
+    $scroll.ThumbColor = $script:ColorAccent
+    $scroll.ThumbHoverColor = [Drawing.Color]::FromArgb(242,59,49)
+    $scroll.Visible = $false
+    $scroll.Add_ValueChanged({
+        param($sender,$eventArgs)
+        $content = $sender.Parent.Controls['AuxiliaryBody']
+        if ($content) { $content.Top = -$sender.Value }
+    })
+    $viewport.Controls.Add($scroll)
+    $scroll.BringToFront()
+    $form.Controls.Add($viewport)
     $form.CancelButton = $close
     # Keep the accessible close button in the tab order and as CancelButton,
     # but do not give it the initial keyboard focus (native focus outline).
@@ -13078,7 +13105,7 @@ function New-AuxiliaryPopupForm {
     })
     $form.Tag = [pscustomobject]@{
         Choice=$null; Scale=0.0; Header=$header; Title=$titleLabel; Subtitle=$subtitleLabel
-        Close=$close; Body=$body; ContentHeight=$ContentHeight; Tip=$tip
+        Close=$close; Body=$body; Viewport=$viewport; Scroll=$scroll; ContentHeight=$ContentHeight; Tip=$tip
         Regular=$regular; Bold=$bold; Heading=$heading; Symbol=$symbol
         Fonts=@($regular,$bold,$heading,$large,$symbol); Timer=$null; DefaultSnapshot=$null
     }
@@ -13660,6 +13687,36 @@ function Set-AuxiliaryControlBounds {
     finally { $Control.ResumeLayout($false) }
 }
 
+# Scroll position belongs to the custom bar; never let WinForms create a
+# competing native scrollbar. Focus reveal is read-only and does not select.
+function Set-AuxiliaryPopupControlVisible {
+    param([Windows.Forms.Control]$Control)
+    $form = $Control.FindForm()
+    if (-not $form -or -not $form.Tag.Scroll -or $Control.Parent -ne $form.Tag.Body) { return }
+    $state = $form.Tag
+    $bar = $state.Scroll
+    if ($Control.Top -lt $bar.Value) { $bar.Value = $Control.Top }
+    elseif ($Control.Bottom -gt $bar.Value + $state.Viewport.Height) {
+        $bar.Value = $Control.Bottom - $state.Viewport.Height
+    }
+}
+
+function Add-AuxiliaryPopupWheelHandlers {
+    param([Windows.Forms.Control]$Control)
+    $Control.Add_MouseWheel({
+        param($sender,$eventArgs)
+        if ($eventArgs -is [Windows.Forms.HandledMouseEventArgs] -and $eventArgs.Handled) { return }
+        $form = $sender.FindForm()
+        if (-not $form -or -not $form.Tag.Scroll -or $eventArgs.Delta -eq 0) { return }
+        $bar = $form.Tag.Scroll
+        if ($bar.Maximum -le 0) { return }
+        $steps = [Math]::Max(1,[int][Math]::Abs([Math]::Truncate($eventArgs.Delta / 120.0)))
+        $bar.Value = $bar.Value - [Math]::Sign($eventArgs.Delta)*$steps*$bar.SmallChange
+        if ($eventArgs -is [Windows.Forms.HandledMouseEventArgs]) { $eventArgs.Handled = $true }
+    })
+    foreach ($child in $Control.Controls) { Add-AuxiliaryPopupWheelHandlers -Control $child }
+}
+
 function Set-AuxiliaryPopupLayout {
     param([System.Windows.Forms.Form]$Form,[double]$Scale,[Drawing.Rectangle]$WorkingArea,[Drawing.Rectangle]$OwnerBounds,[Drawing.Rectangle]$TriggerBounds = [Drawing.Rectangle]::Empty)
     if ($Form.Tag.Scale -ne 0) { throw 'Auxiliary surface has already been scaled.' }
@@ -13674,9 +13731,22 @@ function Set-AuxiliaryPopupLayout {
     $state.Close.Left = [Math]::Max(0,$width-$state.Close.Width-[int][Math]::Round(12*$Scale))
     $state.Title.Width = [Math]::Max(1,$state.Close.Left-$state.Title.Left)
     $state.Subtitle.Width = [Math]::Max(1,$width-$state.Subtitle.Left-[int][Math]::Round(16*$Scale))
-    $state.Body.Size = [Drawing.Size]::new($width,[Math]::Max(1,$height-$state.Body.Top))
-    $state.Body.AutoScroll = $true
-    $state.Body.AutoScrollMinSize = [Drawing.Size]::new(0,[int][Math]::Round($state.ContentHeight*$Scale))
+    $viewportHeight = [Math]::Max(1,$height-$state.Viewport.Top)
+    $contentHeight = [Math]::Max($viewportHeight,[int][Math]::Round($state.ContentHeight*$Scale))
+    $range = $contentHeight-$viewportHeight
+    $gutter = if ($range -gt 0) { [Math]::Min($width-1,[int][Math]::Round(8*$Scale)) } else { 0 }
+    $state.Viewport.Size = [Drawing.Size]::new($width,$viewportHeight)
+    $state.Body.Bounds = [Drawing.Rectangle]::new(0,0,$width-$gutter,$contentHeight)
+    $state.Scroll.Bounds = [Drawing.Rectangle]::new($width-$gutter,0,$gutter,$viewportHeight)
+    $state.Scroll.LargeChange = $viewportHeight
+    $state.Scroll.SmallChange = [Math]::Max(1,[int][Math]::Round(60*$Scale))
+    $state.Scroll.Maximum = $range
+    $state.Scroll.Value = 0
+    $state.Scroll.Visible = ($range -gt 0 -and $gutter -gt 0)
+    foreach ($control in $state.Body.Controls) {
+        $control.Add_GotFocus({ param($sender,$eventArgs) Set-AuxiliaryPopupControlVisible -Control $sender })
+    }
+    Add-AuxiliaryPopupWheelHandlers -Control $Form
     $Form.Location = Get-AuxiliaryPopupLocation -WorkingArea $WorkingArea -OwnerBounds $OwnerBounds -SurfaceSize $Form.Size -TriggerBounds $TriggerBounds -Scale $Scale
 }
 

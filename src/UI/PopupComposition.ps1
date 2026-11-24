@@ -584,12 +584,39 @@ function New-AuxiliaryPopupForm {
     $close.DialogResult = [Windows.Forms.DialogResult]::Cancel
     $header.Controls.Add($close)
     $form.Controls.Add($header)
+    # Keep action controls in the body; clip it in a separate fixed viewport.
+    # Reuse the main popup's existing painted scrollbar and pixel-value contract.
+    $viewport = New-Object Windows.Forms.Panel
+    $viewport.Name = 'AuxiliaryViewport'
+    $viewport.TabIndex = 0
+    $viewport.BackColor = $script:ColorBackground
+    $viewport.AutoScroll = $false
+    $viewport.Location = [Drawing.Point]::new(0,64)
+    $viewport.Size = [Drawing.Size]::new(390,$form.ClientSize.Height-64)
     $body = New-Object Windows.Forms.Panel
     $body.Name = 'AuxiliaryBody'
     $body.TabIndex = 0
-    $body.Location = [Drawing.Point]::new(0,64)
-    $body.Size = [Drawing.Size]::new(390,$form.ClientSize.Height-64)
-    $form.Controls.Add($body)
+    $body.BackColor = $script:ColorBackground
+    $body.AutoScroll = $false
+    $body.Location = [Drawing.Point]::Empty
+    $body.Size = [Drawing.Size]::new(390,$ContentHeight)
+    $viewport.Controls.Add($body)
+    $scroll = New-Object LenovoVerticalScrollBar
+    $scroll.Name = 'AuxiliaryScroll'
+    $scroll.Location = [Drawing.Point]::new(382,0)
+    $scroll.Size = [Drawing.Size]::new(8,$viewport.Height)
+    $scroll.TrackColor = [Drawing.Color]::FromArgb(23,23,23)
+    $scroll.ThumbColor = $script:ColorAccent
+    $scroll.ThumbHoverColor = [Drawing.Color]::FromArgb(242,59,49)
+    $scroll.Visible = $false
+    $scroll.Add_ValueChanged({
+        param($sender,$eventArgs)
+        $content = $sender.Parent.Controls['AuxiliaryBody']
+        if ($content) { $content.Top = -$sender.Value }
+    })
+    $viewport.Controls.Add($scroll)
+    $scroll.BringToFront()
+    $form.Controls.Add($viewport)
     $form.CancelButton = $close
     # Keep the accessible close button in the tab order and as CancelButton,
     # but do not give it the initial keyboard focus (native focus outline).
@@ -599,7 +626,7 @@ function New-AuxiliaryPopupForm {
     })
     $form.Tag = [pscustomobject]@{
         Choice=$null; Scale=0.0; Header=$header; Title=$titleLabel; Subtitle=$subtitleLabel
-        Close=$close; Body=$body; ContentHeight=$ContentHeight; Tip=$tip
+        Close=$close; Body=$body; Viewport=$viewport; Scroll=$scroll; ContentHeight=$ContentHeight; Tip=$tip
         Regular=$regular; Bold=$bold; Heading=$heading; Symbol=$symbol
         Fonts=@($regular,$bold,$heading,$large,$symbol); Timer=$null; DefaultSnapshot=$null
     }

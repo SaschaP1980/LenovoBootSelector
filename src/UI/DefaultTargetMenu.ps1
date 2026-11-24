@@ -95,7 +95,7 @@ function Add-DefaultPickerRow {
                 elseif ($key -eq [Windows.Forms.Keys]::Up) { [Math]::Max(0,$index-1) }
                 else { [Math]::Min($rows.Count-1,$index+1) }
             [void]$rows[$target].Focus()
-            $sender.Parent.ScrollControlIntoView($rows[$target])
+            Set-AuxiliaryPopupControlVisible -Control $rows[$target]
         }
     })
     $Form.Tag.Body.Controls.Add($row)
