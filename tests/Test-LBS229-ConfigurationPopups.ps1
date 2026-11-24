@@ -254,6 +254,8 @@ try {
                         Require-Lbs229Correction ($dim.Count -eq 1 -and $dim[0].Visible -and $dim[0].BackColor -eq [Drawing.Color]::Black -and $dim[0].Opacity -ge 0.25 -and $dim[0].Opacity -le 0.5) 'Expected one visible black translucent owner dimmer'
                         Require-Lbs229Correction ($dim[0].Bounds -eq $owner.RectangleToScreen($owner.ClientRectangle) -and -not $dim[0].ShowInTaskbar -and $child.Opacity -eq 1.0 -and [Lbs229Native]::IsWindowEnabled($child.Handle) -and -not [Lbs229Native]::IsWindowEnabled($owner.Handle)) 'Dimmer must cover only owner client area; child remains opaque and enabled'
                         Require-Lbs229Correction ((Test-Lbs229Above $dim[0].Handle $owner.Handle) -and (Test-Lbs229Above $child.Handle $dim[0].Handle)) 'Native z-order must keep the scrim above the owner and below the active child'
+                        Require-Lbs229Correction (-not $child.Tag.Close.Focused -and $child.Tag.Body.ContainsFocus) 'LBS233 hotfix initial keyboard focus belongs to content, not close glyph'
+                        Require-Lbs229Correction ([Math]::Abs($dim[0].Opacity-0.45) -lt 0.005) 'LBS233 hotfix owner dimming is 45 percent'
                         $script:DimProbeSeen = $true
                     } catch { $script:DimProbeError = $_ }
                     finally { $child.Tag.Close.PerformClick() }
@@ -601,6 +603,8 @@ try {
             Add-PopupSettingsSection -Root $nativeRoot
             foreach ($kind in @('SettingsPanel','DefaultPanel')) {
                 $script:Lbs233Row = $nativeRoot.Controls[$kind]
+                Set-PopupNavigationRowHover -Control $script:Lbs233Row -Hover $true
+                Require-Lbs229Correction ($script:Lbs233Row.BackColor.ToArgb() -eq [Drawing.Color]::FromArgb(48,48,48).ToArgb()) 'LBS233 hotfix ordinary navigation hover uses brighter color'
                 $script:Lbs233Owner = $nativeOwner
                 $script:Lbs233Observed = $false
                 $script:Lbs233Error = $null
@@ -622,7 +626,7 @@ try {
                         $bounds = $row.RectangleToScreen($row.ClientRectangle)
                         $center = $dim[0].PointToClient([Drawing.Point]::new(($bounds.Left+8),($bounds.Top+8)))
                         Require-Lbs229Correction ($dim[0].HighlightedRowBounds -eq $bounds -and $dim[0].Region -and -not $dim[0].Region.IsVisible($center) -and $dim[0].Region.IsVisible(1,1)) 'Only initiating row is excluded from dimming'
-                        Require-Lbs229Correction ($row.BackColor -eq $script:ColorHover -and -not [Lbs229Native]::IsWindowEnabled($parent.Handle)) 'Highlight must not reactivate the modal owner'
+                        Require-Lbs229Correction ($row.BackColor.ToArgb() -eq [Drawing.Color]::FromArgb(48,48,48).ToArgb() -and -not [Lbs229Native]::IsWindowEnabled($parent.Handle)) 'LBS233 hotfix brighter initiating row must not reactivate modal owner'
                         $bmp = [Drawing.Bitmap]::new($row.Width,$row.Height)
                         try {
                             $row.DrawToBitmap($bmp,$row.ClientRectangle)
@@ -659,7 +663,8 @@ try {
                     }
                 } finally { $timer.Stop(); $timer.Dispose() }
                 if ($script:Lbs233Error) { throw $script:Lbs233Error }
-                Assert-Lbs229 "LBS233 $locale $kind real navigation modal highlight and cleanup" ($script:Lbs233Observed -and $script:Lbs233Dimmer.IsDisposed -and (-not $script:Lbs233Connector -or $script:Lbs233Connector.IsDisposed) -and -not $script:ActiveAuxiliaryPopup -and $script:Lbs233Row.BackColor -ne $script:ColorHover -and [Lbs229Native]::IsWindowEnabled($nativeOwner.Handle))
+                $expectedHover = if ($script:Lbs233Row.RectangleToScreen($script:Lbs233Row.ClientRectangle).Contains([Windows.Forms.Cursor]::Position) -and (Test-PopupNavigationRowInteractive -Row $script:Lbs233Row)) { [Drawing.Color]::FromArgb(48,48,48) } else { $script:ColorSurface }
+                Assert-Lbs229 "LBS233 $locale $kind real navigation modal highlight and cleanup" ($script:Lbs233Observed -and $script:Lbs233Dimmer.IsDisposed -and (-not $script:Lbs233Connector -or $script:Lbs233Connector.IsDisposed) -and -not $script:ActiveAuxiliaryPopup -and $script:Lbs233Row.BackColor.ToArgb() -eq $expectedHover.ToArgb() -and [Lbs229Native]::IsWindowEnabled($nativeOwner.Handle))
             }
             foreach ($control in @($nativeRoot.Controls)) { $control.Dispose() }
         }
