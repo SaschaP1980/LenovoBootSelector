@@ -843,6 +843,85 @@ function New-BootEntryInteractionHandlers {
     }
 }
 
+# LBS-224: a separate, nonselectable cue preserves the native EDIT's Text,
+# caret and keyboard routing. The native cue banner was too dim on the dark
+# field in the hosted WinForms feasibility probe; this sibling is hit-transparent.
+function New-ManageAliasCue {
+    param([System.Windows.Forms.TextBox]$Editor, [string]$CueText)
+    $cue = $null
+    try {
+        if (-not ('LenovoAliasCueLabel' -as [type])) {
+            Add-Type -ReferencedAssemblies @('System.Windows.Forms','System.Drawing') -TypeDefinition @'
+using System;
+using System.Windows.Forms;
+public sealed class LenovoAliasCueLabel : Label {
+    private TextBox editor;
+    public LenovoAliasCueLabel() {
+        SetStyle(ControlStyles.Selectable, false);
+        TabStop = false;
+        AccessibleRole = AccessibleRole.None;
+        UseMnemonic = false;
+        AutoSize = false;
+    }
+    public void Bind(TextBox target) {
+        Detach();
+        editor = target;
+        editor.TextChanged += SyncVisibility;
+        editor.VisibleChanged += SyncVisibility;
+        editor.Disposed += EditorDisposed;
+        SyncVisibility(editor, EventArgs.Empty);
+    }
+    private void SyncVisibility(object sender, EventArgs e) {
+        Visible = editor != null && !editor.IsDisposed && editor.Visible && editor.TextLength == 0;
+    }
+    private void EditorDisposed(object sender, EventArgs e) {
+        Detach();
+        if (!IsDisposed) Visible = false;
+    }
+    private void Detach() {
+        if (editor == null) return;
+        editor.TextChanged -= SyncVisibility;
+        editor.VisibleChanged -= SyncVisibility;
+        editor.Disposed -= EditorDisposed;
+        editor = null;
+    }
+    protected override void Dispose(bool disposing) {
+        if (disposing) Detach();
+        base.Dispose(disposing);
+    }
+    protected override void WndProc(ref Message m) {
+        if (m.Msg == 0x0084) { m.Result = new IntPtr(-1); return; }
+        base.WndProc(ref m);
+    }
+}
+'@ -ErrorAction Stop
+        }
+        $cue = New-Object LenovoAliasCueLabel
+        $cue.Name = 'AliasCueLabel'
+        $cue.Text = $CueText
+        $cue.Font = $Editor.Font
+        $cue.BackColor = $Editor.BackColor
+        $cue.ForeColor = [Drawing.Color]::FromArgb(155,155,155)
+        # Reserve the native caret's left edge; retain design-scaled bounds.
+        $cue.Location = [Drawing.Point]::new($Editor.Left + 4,$Editor.Top)
+        $cue.Size = [Drawing.Size]::new([Math]::Max(1,$Editor.Width - 4),$Editor.Height)
+        $cue.Bind($Editor)
+        return $cue
+    }
+    catch {
+        if ($cue) { $cue.Dispose() }
+        Write-Verbose ('Alias cue unavailable; retaining the original-name hint: ' + $_.Exception.Message)
+        return $null
+    }
+}
+
+function Hide-ManageAliasFieldTooltip {
+    param([System.Windows.Forms.Control]$Owner)
+    if ($script:DarkActionTooltipOwner -eq $Owner) {
+        try { Hide-DarkActionTooltip } catch { }
+    }
+}
+
 function Add-BootEntryAliasEditor {
     param(
         [Parameter(Mandatory=$true)]$Row,
@@ -869,6 +948,9 @@ function Add-BootEntryAliasEditor {
     $aliasEditor.BorderStyle = [System.Windows.Forms.BorderStyle]::None
     $aliasEditor.Location = New-Object Drawing.Point(0, 2)
     $aliasEditor.Size = New-Object Drawing.Size(288, 21)
+    $aliasEditor.AccessibleName = Get-LocalizedString -Key 'Manage.EditAliasAccessible'
+    $aliasEditor.AccessibleDescription = Get-LocalizedString -Key 'Manage.AliasFieldHint'
+    $aliasCue = New-ManageAliasCue -Editor $aliasEditor -CueText (Get-LocalizedString -Key 'Manage.AliasCue')
 
     $aliasUnderline = New-Object System.Windows.Forms.Panel
     $aliasUnderline.Name = 'AliasEditorUnderline'
@@ -936,6 +1018,19 @@ function Add-BootEntryAliasEditor {
     })
     $editorFrame.Controls.Add($clearAlias)
 
+    $aliasEditor.Add_MouseEnter({
+        param($sender,$eventArgs)
+        if (-not $sender.Visible -or $script:ManageActiveDragGuid) { return }
+        try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleDescription) } catch { }
+    })
+    $aliasEditor.Add_MouseLeave({ param($sender,$eventArgs) Hide-ManageAliasFieldTooltip -Owner $sender })
+    $aliasEditor.Add_MouseDown({ param($sender,$eventArgs) Hide-ManageAliasFieldTooltip -Owner $sender })
+    $aliasEditor.Add_VisibleChanged({
+        param($sender,$eventArgs)
+        if (-not $sender.Visible) { Hide-ManageAliasFieldTooltip -Owner $sender }
+    })
+    $aliasEditor.Add_HandleDestroyed({ param($sender,$eventArgs) Hide-ManageAliasFieldTooltip -Owner $sender })
+    $aliasEditor.Add_Disposed({ param($sender,$eventArgs) Hide-ManageAliasFieldTooltip -Owner $sender })
     $aliasEditor.Add_Enter({
         param($sender,$eventArgs)
         try {
@@ -945,6 +1040,7 @@ function Add-BootEntryAliasEditor {
     })
     $aliasEditor.Add_Leave({
         param($sender,$eventArgs)
+        Hide-ManageAliasFieldTooltip -Owner $sender
         try {
             $line = $sender.Parent.Controls.Find('AliasEditorUnderline', $false) | Select-Object -First 1
             if ($line) { $line.BackColor = [Drawing.Color]::FromArgb(72,72,72) }
@@ -952,6 +1048,7 @@ function Add-BootEntryAliasEditor {
     })
     $aliasEditor.Add_TextChanged({
         param($sender,$eventArgs)
+        Hide-ManageAliasFieldTooltip -Owner $sender
         try {
             $clear = $sender.Parent.Controls.Find('AliasClearButton', $false) | Select-Object -First 1
             if ($clear) { $clear.Visible = -not [string]::IsNullOrEmpty([string]$sender.Text) }
@@ -960,6 +1057,7 @@ function Add-BootEntryAliasEditor {
     })
     $aliasEditor.Add_KeyDown({
         param($sender,$eventArgs)
+        Hide-ManageAliasFieldTooltip -Owner $sender
         if ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
             Set-ManageEntryAliasDraft -Guid ([string]$sender.Tag) -Alias ([string]$sender.Text)
             $script:ManageAliasEditGuid = $null
@@ -975,6 +1073,10 @@ function Add-BootEntryAliasEditor {
         }
     })
     $editorFrame.Controls.Add($aliasEditor)
+    if ($aliasCue) {
+        $editorFrame.Controls.Add($aliasCue)
+        $aliasCue.BringToFront()
+    }
     $row.Controls.Add($editorFrame)
 
     $applyAlias = New-Object System.Windows.Forms.Button
@@ -1024,12 +1126,16 @@ function Add-BootEntryAliasEditor {
     })
     $row.Controls.Add($cancelAlias)
 
-    $originalHint = New-Label -Text (Get-LocalizedString -Key 'Manage.OriginalNameHint') -Font (New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Regular)) `
-        -ForeColor ([Drawing.Color]::FromArgb(155,155,155)) -X 238 -Y 60 -Width 138 -Height 30
-    $originalHint.TextAlign = [Drawing.ContentAlignment]::MiddleRight
-    $originalHint.AccessibleDescription = $originalHint.Text
-    if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($originalHint,$originalHint.Text) }
-    $row.Controls.Add($originalHint)
+    # Fail back to the original instruction rather than lose discoverability.
+    if (-not $aliasCue) {
+        $originalHint = New-Label -Text (Get-LocalizedString -Key 'Manage.OriginalNameHint') -Font (New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Regular)) `
+            -ForeColor ([Drawing.Color]::FromArgb(155,155,155)) -X 238 -Y 60 -Width 138 -Height 30
+        $originalHint.Name = 'AliasOriginalNameHint'
+        $originalHint.TextAlign = [Drawing.ContentAlignment]::MiddleRight
+        $originalHint.AccessibleDescription = $originalHint.Text
+        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($originalHint,$originalHint.Text) }
+        $row.Controls.Add($originalHint)
+    }
 }
 
 # LBS-144: calculate visibility-eye paint geometry from the graphics surface

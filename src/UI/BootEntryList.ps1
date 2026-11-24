@@ -103,6 +103,8 @@ function Get-PopupRowsPresentationState {
         (Get-LocalizedString -Key 'Manage.VisibleAccessible'),
         (Get-LocalizedString -Key 'Manage.ReorderHint'),
         (Get-LocalizedString -Key 'Manage.ClearAliasHint'),
+        (Get-LocalizedString -Key 'Manage.AliasCue'),
+        (Get-LocalizedString -Key 'Manage.AliasFieldHint'),
         (Get-LocalizedString -Key 'Boot.MenuManageSubtitle'),
         (Get-LocalizedString -Key 'BootNext.SelectionPending'),
         (Get-LocalizedString -Key 'BootNext.RowPendingHint'),
