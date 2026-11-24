@@ -1,9 +1,9 @@
 {
-  "version": "1.5.11.0",
+  "version": "1.5.11.1",
   "runtime": {
-    "lines": 13349,
+    "lines": 13359,
     "functions": 375,
-    "scriptReferences": 1847,
+    "scriptReferences": 1850,
     "scriptVariables": 199,
     "catchBlocks": 256,
     "inlineSilentCatches": 140
@@ -16,9 +16,9 @@
   },
   "application": {
     "files": 12,
-    "lines": 1640,
+    "lines": 1650,
     "functions": 68,
-    "scriptReferences": 235
+    "scriptReferences": 238
   },
   "infrastructure": {
     "files": 13,
