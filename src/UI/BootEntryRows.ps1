@@ -856,12 +856,17 @@ using System;
 using System.Windows.Forms;
 public sealed class LenovoAliasCueLabel : Label {
     private TextBox editor;
+    private System.Drawing.Font ownedCueFont;
     public LenovoAliasCueLabel() {
         SetStyle(ControlStyles.Selectable, false);
         TabStop = false;
         AccessibleRole = AccessibleRole.None;
         UseMnemonic = false;
         AutoSize = false;
+    }
+    public void SetCueFont(System.Drawing.Font source) {
+        ownedCueFont = new System.Drawing.Font(source, System.Drawing.FontStyle.Italic);
+        Font = ownedCueFont;
     }
     public void Bind(TextBox target) {
         Detach();
@@ -887,7 +892,16 @@ public sealed class LenovoAliasCueLabel : Label {
     }
     protected override void Dispose(bool disposing) {
         if (disposing) Detach();
-        base.Dispose(disposing);
+        try {
+            base.Dispose(disposing);
+        } finally {
+            // Release only the font created by this cue, never the editor's
+            // font or a replacement owned by the existing DPI layout path.
+            if (disposing && ownedCueFont != null) {
+                ownedCueFont.Dispose();
+                ownedCueFont = null;
+            }
+        }
     }
     protected override void WndProc(ref Message m) {
         if (m.Msg == 0x0084) { m.Result = new IntPtr(-1); return; }
@@ -899,9 +913,9 @@ public sealed class LenovoAliasCueLabel : Label {
         $cue = New-Object LenovoAliasCueLabel
         $cue.Name = 'AliasCueLabel'
         $cue.Text = $CueText
-        $cue.Font = $Editor.Font
+        $cue.SetCueFont($Editor.Font)
         $cue.BackColor = $Editor.BackColor
-        $cue.ForeColor = [Drawing.Color]::FromArgb(155,155,155)
+        $cue.ForeColor = [Drawing.Color]::FromArgb(143,166,191)
         # Reserve the native caret's left edge; retain design-scaled bounds.
         $cue.Location = [Drawing.Point]::new($Editor.Left + 4,$Editor.Top)
         $cue.Size = [Drawing.Size]::new([Math]::Max(1,$Editor.Width - 4),$Editor.Height)
