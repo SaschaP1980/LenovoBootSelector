@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.13.0 – Alias editor contextual original-name cue (LBS-224)
+
+- Replace the permanent right-side original-name hint with a localized cue inside the empty alias field and a contextual dark field tooltip. Use a nonselectable hit-transparent label after native EDIT cue contrast proved insufficient on the dark field.
+- Preserve the actual native TextBox, caret, keyboard, clipboard and draft-only alias behavior. The cue is never alias text; retain the previous instruction if the helper is unavailable. Preserve the accepted clear button and all existing geometry, footer and status wording.
+- Add 110 focused native WinForms assertions for English/German and synthetic 96/240 DPI, including actual rendered cue, native hit test, focus, input, tooltip lifecycle and fallback. Physical owner acceptance remains separate.
+
 ## v1.5.12.1 – UX-05 alias-clear visual polish (LBS-221 Hotfix)
 
 - Enlarge the alias-clear cross to 13pt with neutral #B4B4B4 idle and #FF6E66 hover ink. Match the field background in normal, hover and pressed states while retaining the native 26x23 clear button.
