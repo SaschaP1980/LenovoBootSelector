@@ -1,5 +1,5 @@
 #requires -version 5.1
-# LBS-157: native WinForms Manage Entries viewport and mixed-DPI layout regression.
+# LBS-157/LBS-231: native WinForms Manage Entries viewport and mixed-DPI layout regression.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -59,29 +59,33 @@ try {
     $rootPanel.Controls.Add($normalFooter)
     Add-PopupManageEntriesSection -Root $rootPanel
     $manage = $rootPanel.Controls['ManageEntriesPanel']
-    Assert-Lbs157 'Real composition creates Manage Entries panel' ($null -ne $manage)
+    Assert-Lbs157 'Real composition creates Manage Entries panel without instructional controls' ($null -ne $manage -and $manage.Controls.Count -eq 4 -and @($manage.Controls | Where-Object { $_ -is [Windows.Forms.Label] }).Count -eq 0)
     Complete-PopupDpiLayout -Form $form -Scale 1.0
 
     foreach ($factor in @(1.0,1.25,1.5,2.0,2.5,3.0)) {
         [void](Set-PopupDpiLayoutScale -Form $form -Scale $factor)
         $script:IsManageEntriesMode = $true
         Update-ManageEntriesUiState
-        $expanded = [int][Math]::Round(436 * $factor)
+        $expanded = [int][Math]::Round(508 * $factor)
         $normal = [int][Math]::Round(402 * $factor)
-        $manageY = [int][Math]::Round(524 * $factor)
+        $manageY = [int][Math]::Round(596 * $factor)
         $buttons = @($manage.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] })
         $footer = @($manage.Controls | Where-Object { $_ -is [System.Windows.Forms.Panel] -and $_.Height -gt [int][Math]::Round(20*$factor) -and $_.Top -gt 0 } | Select-Object -First 1)
-        Assert-Lbs157 ("{0}% Manage viewport gains 34 design pixels" -f ($factor*100)) ($listPanel.Height -eq $expanded -and $listPanel.Height -gt $normal)
+        Assert-Lbs157 ("{0}% Manage viewport gains 106 design pixels over normal (72 over previous Manage)" -f ($factor*100)) ($listPanel.Height -eq $expanded -and $listPanel.Height -gt $normal)
         Assert-Lbs157 ("{0}% custom scrollbar follows viewport" -f ($factor*100)) ($bar.Height -eq $expanded)
         Assert-Lbs157 ("{0}% list and controls meet without overlap" -f ($factor*100)) ($listPanel.Bottom -eq $manage.Top -and $manage.Top -eq $manageY)
-        Assert-Lbs157 ("{0}% Manage panel stays inside popup" -f ($factor*100)) ($manage.Bottom -eq $rootPanel.Height)
+        $divider = @($manage.Controls | Where-Object { $_ -is [Windows.Forms.Panel] -and $_.Top -eq 0 })
+        Assert-Lbs157 ("{0}% Manage panel stays inside popup and retains separator" -f ($factor*100)) ($manage.Bottom -eq $rootPanel.Height -and $divider.Count -eq 1 -and $divider[0].Height -eq [int][Math]::Round($factor) -and $divider[0].Left -eq [int][Math]::Round(16*$factor) -and $divider[0].Width -eq [int][Math]::Round(358*$factor))
         Assert-Lbs157 ("{0}% cancel/save and footer preserve clearance" -f ($factor*100)) (
             $buttons.Count -eq 2 -and $footer.Count -eq 1 -and
             $buttons[0].Bottom -le $footer[0].Top -and $buttons[1].Bottom -le $footer[0].Top -and
+            $buttons[0].Top -eq [int][Math]::Round(6*$factor) -and $buttons[1].Top -eq [int][Math]::Round(6*$factor) -and
+            $manage.Top + $buttons[0].Top -eq [int][Math]::Round(524*$factor) + [int][Math]::Round(78*$factor) -and
+            $manage.Top + $footer[0].Top -eq [int][Math]::Round(524*$factor) + [int][Math]::Round(116*$factor) -and
             $footer[0].Bottom -eq $manage.Height
         )
         $modelBar = [pscustomobject]@{ LargeChange=0; SmallChange=0; Maximum=0; Visible=$false; Value=0 }
-        $total = [int][Math]::Round(500*$factor)
+        $total = [int][Math]::Round(600*$factor)
         Update-BootEntryScrollLayout -ListPanel $listPanel -ContentPanel $contentPanel -ScrollBar $modelBar -ContentBottom $total -BaseRowHeight ([int][Math]::Round(60*$factor)) -RowGap ([int][Math]::Round(4*$factor))
         Assert-Lbs157 ("{0}% scroll range uses expanded viewport" -f ($factor*100)) (
             $modelBar.Maximum -eq ($total-$expanded) -and $modelBar.LargeChange -eq $expanded
