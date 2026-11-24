@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.18.0 – Consistent compact dialogs and status feedback (LBS-242)
+
+- Align regular notice, migration, maintenance and restart presentation with shared content-measured layout, consistent typography, action bar and semantic success icons.
+- Show full diagnostic values and restart target names, group removal consequences, and keep dialog actions accessible on constrained displays.
+- Keep the verified diagnostic upload notice open when copying its ID, display localized confirmed copy feedback, and allow repeated copying without changing upload behavior.
+- Preserve existing default actions, update safety, modal ownership, privilege boundaries and independent startup and installer fallback paths.
+
 ## v1.5.17.4 – Correct auxiliary close-glyph focus feedback (LBS-233)
 
 - Transfer focus to eligible settings content before disabling an active action, including during asynchronous diagnostic upload.

@@ -45,7 +45,7 @@ function New-Label {
 }
 function Start-ManualAppUpdate { $script:UpdateStarts++; return $true }
 function Get-Lbs202Snapshot([System.Windows.Forms.Form]$Form) {
-    $buttons = @($Form.Controls[0].Controls |
+    $buttons = @($Form.Controls.Find('DialogActions',$true)[0].Controls |
         Where-Object { $_ -is [System.Windows.Forms.Button] } | Sort-Object Left)
     $left = if ($buttons.Count -ge 1) { $buttons[0] } else { $null }
     $right = if ($buttons.Count -ge 2) { $buttons[1] } else { $left }
@@ -81,8 +81,8 @@ function Get-Lbs202Snapshot([System.Windows.Forms.Form]$Form) {
         LeftTabIndex = if ($left) { $left.TabIndex } else { -1 }
         RightTabIndex = if ($right) { $right.TabIndex } else { -1 }
         RightTextFits = $textFit
-        Heading = [string]$Form.Controls[0].Controls[3].Text
-        Message = [string]$Form.Controls[0].Controls[4].Text
+        Heading = [string]$Form.Controls.Find('DialogHeading',$true)[0].Text
+        Message = [string]$Form.Controls.Find('DialogMessage',$true)[0].Text
         AcceptText = if ($accept) { [string]$accept.Text } else { '' }
     }
 }
@@ -100,7 +100,7 @@ function Prepare-LenovoDialogDpiLayout {
         $timer.Stop()
         try {
             $global:Lbs202Captured = Get-Lbs202Snapshot $f
-            $buttons = @($f.Controls[0].Controls |
+            $buttons = @($f.Controls.Find('DialogActions',$true)[0].Controls |
                 Where-Object { $_ -is [System.Windows.Forms.Button] } | Sort-Object Left)
             if ($global:Lbs202CaseMode -eq 'safe') {
                 $f.AcceptButton.PerformClick()
@@ -153,10 +153,10 @@ foreach ($locale in @('en-US','de-DE')) {
         Assert-Lbs202 "$tag CancelButton is noninstalling Later" ($s.CancelIsLeft)
         Assert-Lbs202 "$tag default keyboard focus is safe Later" ($s.LeftFocused -and $s.LeftTabIndex -lt $s.RightTabIndex)
         Assert-Lbs202 "$tag right/left positions are DPI scaled and do not overlap" (
-            $s.LeftBounds.Left -eq [int][Math]::Round(184*$scale) -and
-            $s.LeftBounds.Width -eq [int][Math]::Round(110*$scale) -and
-            $s.RightBounds.Left -eq [int][Math]::Round(306*$scale) -and
-            $s.RightBounds.Width -eq [int][Math]::Round(146*$scale) -and
+            $s.LeftBounds.Width -ge [int][Math]::Round(110*$scale) -and
+            $s.RightBounds.Width -ge [int][Math]::Round(110*$scale) -and
+            $s.LeftBounds.Height -eq [int][Math]::Round(34*$scale) -and
+            $s.RightBounds.Height -eq [int][Math]::Round(34*$scale) -and
             $s.LeftBounds.Right -le $s.RightBounds.Left)
         Assert-Lbs202 "$tag update action label fits at DPI scale" $s.RightTextFits
         Assert-Lbs202 "$tag notice retains version and tray update instructions" (
