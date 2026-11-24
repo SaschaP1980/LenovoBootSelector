@@ -62,8 +62,9 @@ function Add-PopupHeaderSection {
     $refresh.BackColor = $script:ColorHeader
     $refresh.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $refresh.FlatAppearance.BorderSize = 0
-    $refresh.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(30, 30, 30)
-    $refresh.FlatAppearance.MouseDownBackColor = $script:ColorSelectedRow
+    $refresh.FlatAppearance.MouseOverBackColor = $script:ColorHeader
+    $refresh.FlatAppearance.MouseDownBackColor = $script:ColorHeader
+    $refresh.UseVisualStyleBackColor = $false
     $refresh.Location = New-Object Drawing.Point(340, 12)
     $refresh.Size = New-Object Drawing.Size(34, 34)
     $refresh.Cursor = [System.Windows.Forms.Cursors]::Hand
@@ -558,7 +559,11 @@ function New-AuxiliaryPopupForm {
     $close.ForeColor = $script:ColorPrimary
     $close.FlatStyle = [Windows.Forms.FlatStyle]::Flat
     $close.FlatAppearance.BorderSize = 0
-    $close.FlatAppearance.MouseOverBackColor = $script:ColorHover
+    $close.FlatAppearance.MouseOverBackColor = $script:ColorHeader
+    $close.FlatAppearance.MouseDownBackColor = $script:ColorHeader
+    $close.UseVisualStyleBackColor = $false
+    $close.Add_MouseEnter({ param($sender,$eventArgs) $sender.ForeColor = $script:ColorAccent })
+    $close.Add_MouseLeave({ param($sender,$eventArgs) $sender.ForeColor = $script:ColorPrimary })
     $close.Location = [Drawing.Point]::new(350,7)
     $close.Size = [Drawing.Size]::new(28,30)
     $close.DialogResult = [Windows.Forms.DialogResult]::Cancel

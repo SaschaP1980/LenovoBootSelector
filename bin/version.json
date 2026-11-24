@@ -1,11 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "1.5.15.1",
+  "version": "1.5.15.2",
   "releaseProfile": "patch",
-  "protectedFragmentIntent": [
-    "ps:Complete-BackgroundBootRefresh",
-    "ps:Show-OrTogglePopup",
-    "ps:Start-BackgroundBootRefresh"
-  ],
+  "protectedFragmentIntent": [],
   "repositoryDeleteIntent": []
 }
