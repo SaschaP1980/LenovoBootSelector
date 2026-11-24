@@ -1,5 +1,7 @@
 ﻿#requires -version 5.1
-# LBS-206 v1.5.10.2: native owner-painted Standardziel menu edge and true reset tooltip.
+# LBS-206 v1.5.10.2: historical owner-painted menu edge renderer contract and true reset tooltip.
+# LBS-229 replaces the production menu; this synthetic named ToolStrip retains
+# the unchanged C# renderer isolation/contrast test. The new picker has its own native test.
 # This fixture never changes a boot target, firmware, settings or task broker.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -68,8 +70,14 @@ foreach ($locale in @('de-DE','en-US')) {
             $hint -match '(?i)(does not restart|no restart)' -and $hint -notmatch '^Set ')
     }
     foreach ($scale in @(1.0,2.5)) {
-        $menu = New-DefaultTargetMenu
+        $menu = New-Object LenovoContextMenuStrip
         $menu.Name = 'DefaultTargetContextMenu'
+        $menu.BackColor = $background
+        $menu.ForeColor = $script:ColorPrimary
+        $menu.Renderer = $script:MenuRenderer
+        [void]$menu.Items.Add((Get-LocalizedString -Key 'Settings.NoDefaultTarget'))
+        [void]$menu.Items.Add('Windows: Gaming')
+        $menu.AutoSize = $false
         $tag = "$locale/$scale"
         try {
             $menu.Size = [Drawing.Size]::new([int](260*$scale),[int](150*$scale))

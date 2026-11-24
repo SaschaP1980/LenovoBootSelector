@@ -140,3 +140,18 @@ function Get-TrayContextMenuLocation {
         [int][Math]::Min($maxY, [Math]::Max($WorkingArea.Top, $y))
     )
 }
+
+# LBS-229: keep the auxiliary surface on the owner's monitor. Prefer a
+# non-overlapping side; when neither side fits, clamp an overlapping surface.
+function Get-AuxiliaryPopupLocation {
+    param([Drawing.Rectangle]$WorkingArea,[Drawing.Rectangle]$OwnerBounds,[Drawing.Size]$SurfaceSize)
+    $gap = 8
+    $right = $OwnerBounds.Right + $gap
+    $left = $OwnerBounds.Left - $SurfaceSize.Width - $gap
+    $x = if ($right + $SurfaceSize.Width -le $WorkingArea.Right) { $right }
+        elseif ($left -ge $WorkingArea.Left) { $left }
+        else { $OwnerBounds.Left }
+    $x = [int][Math]::Max($WorkingArea.Left,[Math]::Min($WorkingArea.Right-$SurfaceSize.Width,$x))
+    $y = [int][Math]::Max($WorkingArea.Top,[Math]::Min($WorkingArea.Bottom-$SurfaceSize.Height,$OwnerBounds.Top))
+    return [Drawing.Point]::new($x,$y)
+}

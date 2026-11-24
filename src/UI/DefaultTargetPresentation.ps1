@@ -21,6 +21,8 @@ function Update-DefaultUi {
         $script:DefaultInteractionEnabled = $interactive
         if (-not $interactive) { $script:DefaultButton.BackColor = $script:ColorSurface }
         $script:DefaultButton.Enabled = $visualEnabled
+        $script:DefaultButton.TabStop = $interactive
+        $script:DefaultButton.AccessibleName = Get-LocalizedString -Key 'Settings.DefaultTarget'
         $script:DefaultButton.Cursor = if ($interactive) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
 
         if ($script:DefaultValueLabel -and -not $script:DefaultValueLabel.IsDisposed) {
@@ -36,6 +38,7 @@ function Update-DefaultUi {
             } else { [string]$script:DefaultValueLabel.Text }
             $script:DefaultValueLabel.AccessibleName = $description
             $script:DefaultValueLabel.AccessibleDescription = $description
+            $script:DefaultButton.AccessibleDescription = $description
             if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($script:DefaultValueLabel,$description) }
             $script:DefaultValueLabel.ForeColor = if ($pendingDefault) { $script:ColorWarning } elseif ($interactive) { $script:ColorPrimary } else { $mutedInk }
         }
