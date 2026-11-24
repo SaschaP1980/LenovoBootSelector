@@ -138,7 +138,7 @@ $script:BootNextSelectionProcess = $null
 $script:BootNextSelectionTimer = $null
 $script:RestartButton = New-Object System.Windows.Forms.Button
 $script:RestartTargetLabel = New-Object System.Windows.Forms.Button
-function Get-TaskBrokerTarget { param([string]$Guid) return [pscustomobject]@{ Guid=$Guid } }
+function Get-TaskBrokerTarget { param([string]$Guid) if ($script:MockTargetBlocked) { return $null }; return [pscustomobject]@{ Guid=$Guid } }
 function Test-MaintenanceBusy { return $false }
 function Test-BackgroundRefreshActive { param($State) return [bool]$script:MockRefreshActive }
 function Stop-BackgroundBootRefreshForMaintenance { param([string]$Reason) $script:MockRefreshStops++ }
@@ -189,6 +189,90 @@ try {
     $script:BootNextSelectionStartedUtc = [datetime]::UtcNow.AddSeconds(-47)
     Complete-BootNextSelection
     Assert-Selection 'Stalled cold startup expires pending without starting writer' (-not $script:BootNextPendingGuid -and $script:MockWorkerStarts -eq 1 -and $script:MockNotices -ge 2)
+
+    # LBS-219: controller with mocked firmware/task boundary. Both mouse
+    # and Enter/Space use this same controller; neither touches real firmware.
+    $script:MockReadiness = 'Ready'
+    $script:MockRefreshActive = $false
+    $script:SelectedGuid = $b
+    $script:NextBootFirmwareReadVerified = $true
+    $script:LastStatusText = 'confirmed-target-status'
+    $script:RestartButton.Enabled = $true
+    $beforeWorkers = $script:MockWorkerStarts
+    $beforeRows = $script:MockRowsDrawn
+    $beforeStops = $script:MockRefreshStops
+    $beforeNotices = $script:MockNotices
+    Start-BootNextSelection -Guid $b
+    Assert-Selection 'Confirmed same-target activation is a no-op, no pending or worker' (
+        -not $script:BootNextPendingGuid -and $script:MockWorkerStarts -eq $beforeWorkers)
+    Assert-Selection 'Confirmed no-op preserves status text and row presentation' (
+        $script:LastStatusText -eq 'confirmed-target-status' -and $script:MockRowsDrawn -eq $beforeRows)
+    Assert-Selection 'Confirmed no-op preserves restart and existing background worker' (
+        $script:RestartButton.Enabled -and $script:MockRefreshStops -eq $beforeStops)
+    Assert-Selection 'Confirmed no-op raises no error notice' ($script:MockNotices -eq $beforeNotices)
+    Start-BootNextSelection -Guid $b.ToUpperInvariant()
+    Assert-Selection 'Repeated keyboard/pointer activation and case variant stay no-op' (
+        -not $script:BootNextPendingGuid -and $script:MockWorkerStarts -eq $beforeWorkers -and
+        $script:MockRowsDrawn -eq $beforeRows)
+    Assert-Selection 'Confirmed row remains selected without a pending marker' (
+        (Resolve-BootNextRowDisplayCore -EntryGuid $b -ConfirmedGuid $script:SelectedGuid -PendingGuid $script:BootNextPendingGuid) -eq 'selected')
+
+    $script:NextBootFirmwareReadVerified = $false
+    Start-BootNextSelection -Guid $b
+    Assert-Selection 'Unverified cached match follows guarded pending and worker path' (
+        $script:BootNextPendingGuid -eq $b -and $script:MockWorkerStarts -eq ($beforeWorkers + 1))
+    Stop-BootNextSelectionWorker -Reason 'test-unverified'
+    $script:NextBootFirmwareReadVerified = $true
+    $script:SelectedGuid = $c
+    Start-BootNextSelection -Guid $b
+    Assert-Selection 'Verified different target still dispatches exactly one worker' (
+        $script:BootNextPendingGuid -eq $b -and $script:MockWorkerStarts -eq ($beforeWorkers + 2))
+    Stop-BootNextSelectionWorker -Reason 'test-different-target'
+
+    $script:SelectedGuid = $b
+    $script:MockRefreshActive = $true
+    Start-BootNextSelection -Guid $b
+    Assert-Selection 'In-flight refresh invalidates no-op and retains normal cancellation/admission' (
+        $script:BootNextPendingGuid -eq $b -and $script:MockWorkerStarts -eq ($beforeWorkers + 3) -and
+        $script:MockRefreshStops -eq ($beforeStops + 1))
+    Stop-BootNextSelectionWorker -Reason 'test-refresh-active'
+    $script:MockRefreshActive = $false
+
+    $script:MockTargetBlocked = $true
+    Start-BootNextSelection -Guid $b
+    Assert-Selection 'Missing allowlist cannot take confirmed no-op shortcut' (
+        -not $script:BootNextPendingGuid -and $script:MockWorkerStarts -eq ($beforeWorkers + 3))
+    $script:MockTargetBlocked = $false
+
+    $script:DefaultTargetChangePending = $true
+    Start-BootNextSelection -Guid $b
+    Assert-Selection 'Default-change interlock still rejects confirmed target' (
+        -not $script:BootNextPendingGuid -and $script:MockWorkerStarts -eq ($beforeWorkers + 3))
+    $script:DefaultTargetChangePending = $false
+
+    $script:BootNextPendingGuid = $b
+    Start-BootNextSelection -Guid $b
+    Assert-Selection 'Already-pending activation still rejects before no-op evaluation' (
+        $script:BootNextPendingGuid -eq $b -and $script:MockWorkerStarts -eq ($beforeWorkers + 3))
+    $script:BootNextPendingGuid = $null
+
+    $script:IsManageEntriesMode = $true
+    Start-BootNextSelection -Guid $b
+    Assert-Selection 'Manage Entries never enables idempotent normal selection' (
+        -not $script:BootNextPendingGuid -and $script:MockWorkerStarts -eq ($beforeWorkers + 3))
+    $script:IsManageEntriesMode = $false
+
+    $script:MockReadiness = 'RepairRequired'
+    Start-BootNextSelection -Guid $b
+    Assert-Selection 'Unavailable capability rejects even a verified matching target' (
+        -not $script:BootNextPendingGuid -and $script:MockWorkerStarts -eq ($beforeWorkers + 3))
+    $script:MockReadiness = 'Checking'
+    $script:MockRefreshActive = $true
+    Start-BootNextSelection -Guid $b
+    Assert-Selection 'Cold Checking same-target request keeps existing deferred admission' (
+        $script:BootNextPendingGuid -eq $b -and $script:BootNextSelectionDeferred -and
+        $script:MockWorkerStarts -eq ($beforeWorkers + 3))
+    Stop-BootNextSelectionWorker -Reason 'test-checking'
 }
 finally {
     Stop-BootNextSelectionWorker -Reason 'focused-native-cleanup'
@@ -196,5 +280,5 @@ finally {
     $script:RestartTargetLabel.Dispose()
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 }
-Write-Host "BOOTNEXT SELECTION UI TOTAL $checks/57"
-if ($checks -ne 57) { throw "Unexpected pending selection count $checks" }
+Write-Host "BOOTNEXT SELECTION UI TOTAL $checks/72"
+if ($checks -ne 72) { throw "Unexpected pending selection count $checks" }

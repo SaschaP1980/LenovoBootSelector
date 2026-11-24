@@ -116,6 +116,16 @@ function Start-BootNextSelection {
         Update-PopupRows
         return
     }
+    # LBS-219: only a confirmed, allowlisted one-shot target is idempotent.
+    # NextBootFirmwareReadVerified is asserted after forced firmware-manager
+    # readback, never for a cached projection. An in-flight refresh makes
+    # even a previously verified GUID ineligible for this no-op.
+    # Admission and all interlocks are checked before changing any GUI state.
+    if ($admission -eq 'start' -and $script:NextBootFirmwareReadVerified -and
+        $normalized -and $script:SelectedGuid -and
+        $normalized -eq $script:SelectedGuid -and -not $refreshActive) {
+        return
+    }
     $deferred = ($admission -eq 'deferred')
     try {
         $script:BootNextPendingGuid = $normalized

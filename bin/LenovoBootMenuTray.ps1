@@ -2328,7 +2328,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.11.0'
+$script:AppVersion = '1.5.11.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -8924,6 +8924,16 @@ function Start-BootNextSelection {
         Write-RuntimeDiagnosticEvent -Event 'BOOTNEXT_CLICK_REJECTED' -Stage 'bootnext' -Success $false -Data (New-RuntimeDiagnosticData @{ guid=$normalized; state=[string]$capabilities.State; refreshActive=$refreshActive })
         $script:LastStatusText = Get-LocalizedString -Key 'BootNext.SelectionFailed'
         Update-PopupRows
+        return
+    }
+    # LBS-219: only a confirmed, allowlisted one-shot target is idempotent.
+    # NextBootFirmwareReadVerified is asserted after forced firmware-manager
+    # readback, never for a cached projection. An in-flight refresh makes
+    # even a previously verified GUID ineligible for this no-op.
+    # Admission and all interlocks are checked before changing any GUI state.
+    if ($admission -eq 'start' -and $script:NextBootFirmwareReadVerified -and
+        $normalized -and $script:SelectedGuid -and
+        $normalized -eq $script:SelectedGuid -and -not $refreshActive) {
         return
     }
     $deferred = ($admission -eq 'deferred')
