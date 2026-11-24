@@ -1,6 +1,19 @@
 ﻿# Lenovo Boot Selector - popup section composition.
 # Domain-specific WinForms builders extracted from New-PopupForm by LBS-29.
 
+# Keep native Button rendering for every active-owner state. This overlay
+# is presentation-only and exists only for the auxiliary modal lifetime.
+function Paint-ModalOwnerRefreshGlyph {
+    param([Windows.Forms.Button]$Button,[Windows.Forms.PaintEventArgs]$EventArgs)
+    if (-not $script:ActiveAuxiliaryPopup) { return }
+    $brush = [Drawing.SolidBrush]::new($Button.BackColor)
+    try { $EventArgs.Graphics.FillRectangle($brush,$Button.ClientRectangle) }
+    finally { $brush.Dispose() }
+    $flags = [Windows.Forms.TextFormatFlags]::HorizontalCenter -bor [Windows.Forms.TextFormatFlags]::VerticalCenter -bor [Windows.Forms.TextFormatFlags]::SingleLine -bor [Windows.Forms.TextFormatFlags]::NoPrefix
+    $ink = if ($Button.Enabled) { $Button.ForeColor } else { [Drawing.SystemColors]::GrayText }
+    [Windows.Forms.TextRenderer]::DrawText($EventArgs.Graphics,$Button.Text,$Button.Font,$Button.ClientRectangle,$ink,$flags)
+}
+
 function Add-PopupHeaderSection {
     param([Parameter(Mandatory=$true)]$Root)
 
@@ -69,6 +82,10 @@ function Add-PopupHeaderSection {
     $refresh.Size = New-Object Drawing.Size(34, 34)
     $refresh.Cursor = [System.Windows.Forms.Cursors]::Hand
     $script:RefreshButton = $refresh
+    # Native flat buttons can retain their default/focus outline while the
+    # top-level owner is disabled by ShowDialog. Keep the real Button and its
+    # native painting for the active owner; redraw only the inactive glyph.
+    $refresh.Add_Paint({ param($sender,$eventArgs) Paint-ModalOwnerRefreshGlyph -Button $sender -EventArgs $eventArgs })
     $refresh.Add_MouseEnter({
         $script:RefreshButtonHovered = $true
         Update-RefreshButtonVisual

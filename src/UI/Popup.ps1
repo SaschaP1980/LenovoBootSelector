@@ -313,6 +313,7 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
 function Show-OwnedAuxiliaryPopup {
     param([System.Windows.Forms.Form]$Form,[System.Windows.Forms.Control]$Owner)
     $dimmer = $null
+    $ownerRefreshButton = $null
     try {
         if ($script:ActiveAuxiliaryPopup -or -not $Owner -or $Owner.IsDisposed) { return $null }
         $parent = $Owner.FindForm()
@@ -322,6 +323,10 @@ function Show-OwnedAuxiliaryPopup {
         $triggerBounds = $Owner.RectangleToScreen($Owner.ClientRectangle)
         Set-AuxiliaryPopupLayout -Form $Form -Scale ([double]$scale) -WorkingArea $screen.WorkingArea -OwnerBounds $parent.Bounds -TriggerBounds $triggerBounds
         $script:ActiveAuxiliaryPopup = $Form
+        if ($script:RefreshButton -and -not $script:RefreshButton.IsDisposed -and [object]::ReferenceEquals($script:RefreshButton.FindForm(),$parent)) {
+            $ownerRefreshButton = $script:RefreshButton
+            $ownerRefreshButton.Refresh()
+        }
         Initialize-AuxiliaryOwnerDimmer
         $dimmer = [LenovoAuxiliaryOwnerDimmer]::new($parent)
         # Show without activation before the child, which retains its normal
@@ -335,7 +340,8 @@ function Show-OwnedAuxiliaryPopup {
         try { if ($dimmer) { $dimmer.Dispose() } }
         finally {
             if ([object]::ReferenceEquals($script:ActiveAuxiliaryPopup,$Form)) { $script:ActiveAuxiliaryPopup = $null }
-            $Form.Dispose()
+            try { $Form.Dispose() }
+            finally { if ($ownerRefreshButton -and -not $ownerRefreshButton.IsDisposed) { $ownerRefreshButton.Refresh() } }
         }
     }
 }
