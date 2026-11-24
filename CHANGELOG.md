@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.16.0 – Reclaim Manage Entries viewport space (LBS-231)
+
+- Remove the permanent Changes heading and both instructional lines; keep contextual action tooltips and alias cue text.
+- Expand the Manage Entries list from 436 to 508 design pixels within the unchanged 390×672 popup. Keep the separator and Cancel/Save action row and version footer at their established positions.
+- Preserve all editing, scrolling, localization and action semantics; update the native multi-DPI viewport contract.
+
 ## v1.5.15.3 – Suppress inactive Refresh outline during auxiliary modals (LBS-229 Hotfix)
 
 - Suppress the native Refresh focus/default outline only while either owned auxiliary modal is active, preserving the glyph, native Button behavior and normal active-owner focus rendering.
