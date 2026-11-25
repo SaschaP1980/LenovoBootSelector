@@ -63,7 +63,22 @@ function Update-PopupLocalePresentation {
         }
         if ($script:HeaderStatusLabel) { $script:HeaderStatusLabel.AccessibleDescription = Get-LocalizedString -Key 'Popup.HeaderUpdateAccessible' }
         if ($script:RestartUseDefaultButton) { $script:RestartUseDefaultButton.AccessibleName = $script:RestartUseDefaultButton.Text }
-        if ($script:BootTypeToolTip -and $script:RefreshButton) { $script:BootTypeToolTip.SetToolTip($script:RefreshButton,(Get-LocalizedString -Key 'Action.RefreshBootTargets')) }
+        if ($script:BootTypeToolTip) {
+            if ($script:RefreshButton) { $script:BootTypeToolTip.SetToolTip($script:RefreshButton,(Get-LocalizedString -Key 'Action.RefreshBootTargets')) }
+            foreach ($name in @('ManageEntriesButton','RestartActionButton','SettingsPanel','DefaultPanel')) {
+                $key = switch ($name) {
+                    'ManageEntriesButton' { 'Tooltip.Customize' }
+                    'RestartActionButton' { 'Tooltip.Restart' }
+                    'SettingsPanel' { 'Tooltip.Settings' }
+                    'DefaultPanel' { 'Tooltip.DefaultNavigation' }
+                }
+                foreach ($control in $script:Popup.Controls.Find($name,$true)) {
+                    $hint = Get-LocalizedString -Key $key
+                    $script:BootTypeToolTip.SetToolTip($control,$hint)
+                    foreach ($child in $control.Controls) { $script:BootTypeToolTip.SetToolTip($child,$hint) }
+                }
+            }
+        }
     }
     Update-AutostartUi | Out-Null
     Update-MaintenanceUi

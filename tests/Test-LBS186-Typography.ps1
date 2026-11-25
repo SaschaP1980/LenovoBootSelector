@@ -155,7 +155,7 @@ foreach ($locale in @('en-US','de-DE')) {
             $customize=$script:ManageEntriesButton
             Assert-Lbs186 "$tag section and customize roles fit" ((Test-Lbs186TextFit $section $graphics $dpi) -and (Test-Lbs186TextFit $customize $graphics $dpi))
             $value=$script:DefaultValueLabel
-            Assert-Lbs186 "$tag default long value retains full accessible text and tooltip" ($value.AccessibleDescription -eq $value.Text -and $script:BootTypeToolTip.GetToolTip($value) -eq $value.Text -and (Test-Lbs186TextFit $value $graphics $dpi -HeightOnly))
+            Assert-Lbs186 "$tag default long value retains full accessible text and tooltip" ($value.AccessibleDescription -eq $value.Text -and $script:BootTypeToolTip.GetToolTip($value).Contains($value.Text) -and (Test-Lbs186TextFit $value $graphics $dpi -HeightOnly))
             $target=$script:RestartTargetLabel
             Assert-Lbs186 "$tag restart long status keeps complete text and readable interaction" ($target.AccessibleName -eq $target.Text -and $script:BootTypeToolTip.GetToolTip($target) -eq $target.Text -and (Test-Lbs186TextFit $target $graphics $dpi -HeightOnly) -and (Test-Lbs186Contrast $target.ForeColor $script:ColorSelectedRow 'restart-selected'))
             $manage=$rootPanel.Controls['ManageEntriesPanel']
@@ -240,7 +240,7 @@ foreach ($locale in @('en-US','de-DE')) {
             $normal=(New-BootEntryRow -Entry $script:TestEntry -Y 0 -BaseRowHeight 60 -Handlers $handlers).Row
             [void](Set-PopupBootRowDpiLayout -Row $normal -Scale $factor -Y 0)
             $title=$normal.Controls['BootTitleLabel']; $sub=$normal.Controls['BootSubtitleLabel']
-            Assert-Lbs186 "$tag long row text remains accessible and fits vertically" ($title.AccessibleDescription -eq $title.Text -and $sub.AccessibleDescription -eq $sub.Text -and $script:BootTypeToolTip.GetToolTip($title) -eq $title.Text -and $script:BootTypeToolTip.GetToolTip($sub) -eq $sub.Text -and (Test-Lbs186TextFit $title $graphics $dpi -HeightOnly) -and (Test-Lbs186TextFit $sub $graphics $dpi -HeightOnly) -and $title.Bottom -lt $sub.Top)
+            Assert-Lbs186 "$tag long row text remains accessible and fits vertically" ($title.AccessibleDescription -eq $title.Text -and $sub.AccessibleDescription -eq $sub.Text -and $script:BootTypeToolTip.GetToolTip($title).Contains($title.Text) -and $script:BootTypeToolTip.GetToolTip($sub).Contains($sub.Text) -and (Test-Lbs186TextFit $title $graphics $dpi -HeightOnly) -and (Test-Lbs186TextFit $sub $graphics $dpi -HeightOnly) -and $title.Bottom -lt $sub.Top)
             Assert-Lbs186 "$tag selected title and subtitle meet contrast" ((Test-Lbs186Contrast $title.ForeColor $normal.BackColor 'selected-title') -and (Test-Lbs186Contrast $sub.ForeColor $normal.BackColor 'selected-subtitle'))
             $script:BootNextPendingGuid=$script:TestGuid
             $script:SelectedGuid=$null

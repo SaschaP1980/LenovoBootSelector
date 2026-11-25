@@ -83,7 +83,31 @@ function Get-LocalizationCatalogCore {
             'Storage.InternalSsdModel' = 'Internal SSD: {Model}'
             'Popup.HeaderUpdateAccessible' = 'Opens the dialog for the available app version.'
             'Status.BootTargetsRefreshing' = 'Boot targets are being refreshed in the background…'
-            'Action.RefreshBootTargets' = 'Refresh boot targets'
+            'Action.RefreshBootTargets' = 'Refresh the available boot targets and current boot state.'
+            'Tooltip.Customize' = 'Configure boot targets: change their order, visibility and display names.'
+            'Tooltip.Settings' = 'Open settings for autostart, language, maintenance, updates and diagnostics.'
+            'Tooltip.DefaultNavigation' = 'Open the picker to set or clear the persistent default boot target.'
+            'Tooltip.Restart' = 'Check the next boot target and open the Windows restart confirmation.'
+            'Tooltip.ClosePicker' = 'Close the picker without changing the default boot target.'
+            'Tooltip.CloseSettings' = 'Close settings. Actions already applied remain in effect.'
+            'Tooltip.Configuration.autostart' = 'Enable or disable automatic startup of Lenovo Boot Selector with Windows.'
+            'Tooltip.Configuration.language-de' = 'Switch the application language to German.'
+            'Tooltip.Configuration.language-en' = 'Switch the application language to English.'
+            'Tooltip.Configuration.system-setup' = 'Open the confirmation to set up, repair or reinitialize system functions.'
+            'Tooltip.Configuration.system-remove' = 'Open the confirmation to remove system functions.'
+            'Tooltip.Configuration.update-check' = 'Check whether a newer application version is available.'
+            'Tooltip.Configuration.update-install' = 'Start the application update process for the available version.'
+            'Tooltip.Configuration.diagnostics-save' = 'Save a local diagnostic package for troubleshooting.'
+            'Tooltip.Configuration.diagnostics-upload' = 'Open the diagnostic upload workflow to send diagnostic data.'
+            'Tooltip.Unavailable' = 'This action is currently unavailable.'
+            'Tooltip.NextBoot' = 'Request “{Target}” as the one-time target for the next restart, when available. No immediate restart or persistent default change.'
+            'Tooltip.NextBootMenu' = 'Request the Lenovo Boot Menu for the next restart, when available. No immediate restart or persistent default change.'
+            'Tooltip.NextBootPending' = 'Selection is being checked or applied. Wait for confirmation before selecting another target.'
+            'Tooltip.NextBootSelected' = 'This target is confirmed for the next restart. Selecting it does not restart Windows or change the persistent default.'
+            'Tooltip.HiddenType' = 'Hidden — therefore shown in gray.'
+            'Tooltip.SetDefault' = 'Set “{Target}” as the persistent default boot target. No immediate restart.'
+            'Tooltip.ClearDefault' = 'Remove the persistent default boot target. No immediate restart.'
+            'Tooltip.CurrentDefault' = 'Current confirmed persistent default. Selecting it requests the existing default again. No immediate restart.'
             'Popup.NextBootSection' = 'NEXT BOOT'
             'Popup.Customize' = 'CUSTOMIZE'
             'Status.ScrollPositionFailed' = 'The scroll position could not be updated.'
@@ -160,17 +184,17 @@ function Get-LocalizationCatalogCore {
             'Diagnostics.Save' = 'Save diagnostics…'
             'Diagnostics.Upload' = 'Upload diagnostics…'
             'Boot.OtherTarget' = 'Other boot target'
-            'Boot.OtherTargetTooltip' = 'Gray: other boot target'
+            'Boot.OtherTargetTooltip' = 'Boot target type: Other boot target · Type color: Gray'
             'Boot.MenuTitle' = 'Lenovo Boot Menu'
             'Boot.MenuSubtitle' = 'Open the boot menu on the next startup'
-            'Boot.MenuTooltip' = 'Red: Lenovo Boot Menu'
+            'Boot.MenuTooltip' = 'Boot target type: Lenovo Boot Menu · Type color: Red'
             'Boot.Nvme1Title' = 'NVMe SSD 1'
             'Boot.Nvme2Title' = 'NVMe SSD 2'
             'Boot.NoDrive' = 'No drive detected'
             'Boot.InternalSsd' = 'Internal SSD'
             'Boot.SecondInternalSsd' = 'Second internal SSD'
-            'Boot.InternalSsdTooltip' = 'Blue: internal SSD'
-            'Boot.UsbTooltip' = 'Yellow: USB drive'
+            'Boot.InternalSsdTooltip' = 'Boot target type: Internal SSD · Type color: Blue'
+            'Boot.UsbTooltip' = 'Boot target type: USB drive · Type color: Yellow'
             'Boot.UsbChecking' = 'Checking USB drives …'
             'Boot.UsbCheckFailed' = 'USB drives could not be checked'
             'Boot.UsbBootMedium' = 'USB boot medium: {Model}'
@@ -184,15 +208,15 @@ function Get-LocalizationCatalogCore {
             'Boot.UsbCdSubtitle' = 'Boot from an optical USB drive'
             'Boot.PxeTitle' = 'Network boot'
             'Boot.PxeSubtitle' = 'Boot over the local network'
-            'Boot.PxeTooltip' = 'Purple: network boot'
+            'Boot.PxeTooltip' = 'Boot target type: Network boot · Type color: Purple'
             'Boot.LenovoRecoveryTitle' = 'Lenovo recovery'
             'Boot.LenovoRecoverySubtitle' = 'Recovery over the network'
-            'Boot.CyanTooltip' = 'Cyan: Lenovo or corporate network'
+            'Boot.CyanTooltip' = 'Boot target type: Lenovo or corporate network · Type color: Cyan'
             'Boot.CorporateTitle' = 'Corporate network boot'
             'Boot.CorporateSubtitle' = 'Boot over the corporate network'
             'Boot.OtherDriveTitle' = 'Other drive'
             'Boot.OtherDriveSubtitle' = 'Other detected drive'
-            'Boot.OtherDriveTooltip' = 'Gray: other drive'
+            'Boot.OtherDriveTooltip' = 'Boot target type: Other drive · Type color: Gray'
             'Boot.OtherCdTitle' = 'Other CD/DVD drive'
             'Boot.OtherCdSubtitle' = 'Other optical boot drive'
             'Status.NextBootTarget' = 'Next boot: {Title}'
@@ -401,7 +425,31 @@ function Get-LocalizationCatalogCore {
             'Storage.InternalSsdModel' = 'Interne SSD: {Model}'
             'Popup.HeaderUpdateAccessible' = 'Öffnet den Dialog zur verfügbaren App-Version.'
             'Status.BootTargetsRefreshing' = 'Startziele werden im Hintergrund aktualisiert…'
-            'Action.RefreshBootTargets' = 'Startziele aktualisieren'
+            'Action.RefreshBootTargets' = 'Verfügbare Startziele und aktuellen Startzustand erneut ermitteln.'
+            'Tooltip.Customize' = 'Startziele konfigurieren: Reihenfolge, Sichtbarkeit und Anzeigenamen ändern.'
+            'Tooltip.Settings' = 'Einstellungen für Autostart, Sprache, Wartung, Updates und Diagnose öffnen.'
+            'Tooltip.DefaultNavigation' = 'Auswahl öffnen, um das dauerhafte Standard-Startziel festzulegen oder zu entfernen.'
+            'Tooltip.Restart' = 'Nächstes Startziel prüfen und die Bestätigung für den Windows-Neustart öffnen.'
+            'Tooltip.ClosePicker' = 'Auswahl schließen, ohne das Standard-Startziel zu ändern.'
+            'Tooltip.CloseSettings' = 'Einstellungen schließen. Bereits übernommene Änderungen bleiben wirksam.'
+            'Tooltip.Configuration.autostart' = 'Automatischen Start von Lenovo Boot Selector mit Windows ein- oder ausschalten.'
+            'Tooltip.Configuration.language-de' = 'Die Anwendungssprache auf Deutsch umstellen.'
+            'Tooltip.Configuration.language-en' = 'Die Anwendungssprache auf Englisch umstellen.'
+            'Tooltip.Configuration.system-setup' = 'Bestätigung zum Einrichten, Reparieren oder erneuten Initialisieren der Systemfunktionen öffnen.'
+            'Tooltip.Configuration.system-remove' = 'Bestätigung zum Entfernen der Systemfunktionen öffnen.'
+            'Tooltip.Configuration.update-check' = 'Prüfen, ob eine neuere Anwendungsversion verfügbar ist.'
+            'Tooltip.Configuration.update-install' = 'Aktualisierung der Anwendung auf die verfügbare Version starten.'
+            'Tooltip.Configuration.diagnostics-save' = 'Ein lokales Diagnosepaket zur Fehleranalyse speichern.'
+            'Tooltip.Configuration.diagnostics-upload' = 'Diagnose-Upload öffnen, um Diagnosedaten zu übermitteln.'
+            'Tooltip.Unavailable' = 'Diese Aktion ist derzeit nicht verfügbar.'
+            'Tooltip.NextBoot' = '„{Target}“ einmalig für den nächsten Neustart auswählen, sofern verfügbar. Kein sofortiger Neustart und keine Änderung des dauerhaften Standardziels.'
+            'Tooltip.NextBootMenu' = 'Das Lenovo Boot-Menü einmalig für den nächsten Neustart auswählen, sofern verfügbar. Kein sofortiger Neustart und keine Änderung des dauerhaften Standardziels.'
+            'Tooltip.NextBootPending' = 'Auswahl wird geprüft oder übernommen. Vor einer weiteren Auswahl auf die Bestätigung warten.'
+            'Tooltip.NextBootSelected' = 'Dieses Ziel ist für den nächsten Neustart bestätigt. Die Auswahl startet Windows nicht neu und ändert das dauerhafte Standardziel nicht.'
+            'Tooltip.HiddenType' = 'Ausgeblendet – daher grau dargestellt.'
+            'Tooltip.SetDefault' = '„{Target}“ als dauerhaftes Standard-Startziel festlegen. Kein sofortiger Neustart.'
+            'Tooltip.ClearDefault' = 'Dauerhaftes Standard-Startziel entfernen. Kein sofortiger Neustart.'
+            'Tooltip.CurrentDefault' = 'Aktuell bestätigtes dauerhaftes Standard-Startziel. Eine Auswahl fordert das bestehende Standardziel erneut an. Kein sofortiger Neustart.'
             'Popup.NextBootSection' = 'NÄCHSTER START'
             'Popup.Customize' = 'ANPASSEN'
             'Status.ScrollPositionFailed' = 'Scrollposition konnte nicht aktualisiert werden.'
@@ -478,17 +526,17 @@ function Get-LocalizationCatalogCore {
             'Diagnostics.Save' = 'Diagnose speichern…'
             'Diagnostics.Upload' = 'Diagnose hochladen…'
             'Boot.OtherTarget' = 'Weiteres Startziel'
-            'Boot.OtherTargetTooltip' = 'Grau: weiteres Startziel'
+            'Boot.OtherTargetTooltip' = 'Startzieltyp: Weiteres Startziel · Typfarbe: Grau'
             'Boot.MenuTitle' = 'Lenovo Boot-Menü'
             'Boot.MenuSubtitle' = 'Beim nächsten Start das Boot-Menü öffnen'
-            'Boot.MenuTooltip' = 'Rot: Lenovo Boot-Menü'
+            'Boot.MenuTooltip' = 'Startzieltyp: Lenovo Boot-Menü · Typfarbe: Rot'
             'Boot.Nvme1Title' = 'NVMe-SSD 1'
             'Boot.Nvme2Title' = 'NVMe-SSD 2'
             'Boot.NoDrive' = 'Kein Laufwerk erkannt'
             'Boot.InternalSsd' = 'Interne SSD'
             'Boot.SecondInternalSsd' = 'Zweite interne SSD'
-            'Boot.InternalSsdTooltip' = 'Blau: interne SSD'
-            'Boot.UsbTooltip' = 'Gelb: USB-Laufwerk'
+            'Boot.InternalSsdTooltip' = 'Startzieltyp: Interne SSD · Typfarbe: Blau'
+            'Boot.UsbTooltip' = 'Startzieltyp: USB-Laufwerk · Typfarbe: Gelb'
             'Boot.UsbChecking' = 'USB-Laufwerke werden geprüft …'
             'Boot.UsbCheckFailed' = 'USB-Laufwerke konnten nicht geprüft werden'
             'Boot.UsbBootMedium' = 'USB-Startmedium: {Model}'
@@ -502,15 +550,15 @@ function Get-LocalizationCatalogCore {
             'Boot.UsbCdSubtitle' = 'Start von einem optischen USB-Laufwerk'
             'Boot.PxeTitle' = 'Netzwerkstart'
             'Boot.PxeSubtitle' = 'Start über das lokale Netzwerk'
-            'Boot.PxeTooltip' = 'Violett: Netzwerkstart'
+            'Boot.PxeTooltip' = 'Startzieltyp: Netzwerkstart · Typfarbe: Violett'
             'Boot.LenovoRecoveryTitle' = 'Lenovo Wiederherstellung'
             'Boot.LenovoRecoverySubtitle' = 'Wiederherstellung über das Netzwerk'
-            'Boot.CyanTooltip' = 'Cyan: Lenovo- oder Firmen-Netzwerk'
+            'Boot.CyanTooltip' = 'Startzieltyp: Lenovo- oder Firmen-Netzwerk · Typfarbe: Cyan'
             'Boot.CorporateTitle' = 'Firmen-Netzwerkstart'
             'Boot.CorporateSubtitle' = 'Start über das Firmennetzwerk'
             'Boot.OtherDriveTitle' = 'Weiteres Laufwerk'
             'Boot.OtherDriveSubtitle' = 'Weiteres erkanntes Laufwerk'
-            'Boot.OtherDriveTooltip' = 'Grau: weiteres Laufwerk'
+            'Boot.OtherDriveTooltip' = 'Startzieltyp: Weiteres Laufwerk · Typfarbe: Grau'
             'Boot.OtherCdTitle' = 'Weiteres CD/DVD-Laufwerk'
             'Boot.OtherCdSubtitle' = 'Anderes optisches Startlaufwerk'
             'Status.NextBootTarget' = 'Nächster Start: {Title}'
@@ -2385,7 +2433,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.19.0'
+$script:AppVersion = '1.5.19.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -5729,7 +5777,22 @@ function Update-PopupLocalePresentation {
         }
         if ($script:HeaderStatusLabel) { $script:HeaderStatusLabel.AccessibleDescription = Get-LocalizedString -Key 'Popup.HeaderUpdateAccessible' }
         if ($script:RestartUseDefaultButton) { $script:RestartUseDefaultButton.AccessibleName = $script:RestartUseDefaultButton.Text }
-        if ($script:BootTypeToolTip -and $script:RefreshButton) { $script:BootTypeToolTip.SetToolTip($script:RefreshButton,(Get-LocalizedString -Key 'Action.RefreshBootTargets')) }
+        if ($script:BootTypeToolTip) {
+            if ($script:RefreshButton) { $script:BootTypeToolTip.SetToolTip($script:RefreshButton,(Get-LocalizedString -Key 'Action.RefreshBootTargets')) }
+            foreach ($name in @('ManageEntriesButton','RestartActionButton','SettingsPanel','DefaultPanel')) {
+                $key = switch ($name) {
+                    'ManageEntriesButton' { 'Tooltip.Customize' }
+                    'RestartActionButton' { 'Tooltip.Restart' }
+                    'SettingsPanel' { 'Tooltip.Settings' }
+                    'DefaultPanel' { 'Tooltip.DefaultNavigation' }
+                }
+                foreach ($control in $script:Popup.Controls.Find($name,$true)) {
+                    $hint = Get-LocalizedString -Key $key
+                    $script:BootTypeToolTip.SetToolTip($control,$hint)
+                    foreach ($child in $control.Controls) { $script:BootTypeToolTip.SetToolTip($child,$hint) }
+                }
+            }
+        }
     }
     Update-AutostartUi | Out-Null
     Update-MaintenanceUi
@@ -6018,7 +6081,14 @@ function Update-DefaultUi {
             $script:DefaultValueLabel.AccessibleName = $description
             $script:DefaultValueLabel.AccessibleDescription = $description
             $script:DefaultButton.AccessibleDescription = $description
-            if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($script:DefaultValueLabel,$description) }
+            if ($script:BootTypeToolTip) {
+                $hint = Get-LocalizedString -Key 'Tooltip.DefaultNavigation'
+                if (-not $interactive) { $hint = Get-LocalizedString -Key 'Tooltip.Unavailable' }
+                foreach ($control in @($script:DefaultButton) + @($script:DefaultButton.Controls)) {
+                    $controlHint = if ($control -eq $script:DefaultValueLabel) { $hint + [Environment]::NewLine + $description } else { $hint }
+                    if ($script:BootTypeToolTip.GetToolTip($control) -cne $controlHint) { $script:BootTypeToolTip.SetToolTip($control,$controlHint) }
+                }
+            }
             $script:DefaultValueLabel.ForeColor = if ($pendingDefault) { $script:ColorWarning } elseif ($interactive) { $script:ColorPrimary } else { $mutedInk }
         }
         if ($script:DefaultArrowLabel -and -not $script:DefaultArrowLabel.IsDisposed) {
@@ -6189,12 +6259,10 @@ function Add-DefaultPickerRow {
     $title = New-Label -Text $titleText -Font $Form.Tag.Bold -ForeColor $script:ColorPrimary -X 58 -Y 6 -Width 270 -Height 21
     $title.Name = 'DefaultPickerTitle'
     $title.AccessibleDescription = $titleText
-    $Form.Tag.Tip.SetToolTip($title,$titleText)
     $row.Controls.Add($title)
     $subtitle = New-Label -Text $subtitleText -Font $Form.Tag.Regular -ForeColor $script:ColorSecondary -X 58 -Y 28 -Width 270 -Height 26
     $subtitle.Name = 'DefaultPickerSubtitle'
     $subtitle.AccessibleDescription = $subtitleText
-    $Form.Tag.Tip.SetToolTip($subtitle,$subtitleText)
     $row.Controls.Add($subtitle)
     if ($selected) {
         $check = New-Label -Text '✓' -Font $Form.Tag.Symbol -ForeColor ([Drawing.Color]::FromArgb(255,110,102)) -X 334 -Y 7 -Width 30 -Height 44
@@ -6202,7 +6270,15 @@ function Add-DefaultPickerRow {
         $check.AccessibleName = Get-LocalizedString -Key 'Settings.DefaultPickerSelected'
         $row.Controls.Add($check)
     }
+    $hint = if ($selected) { Get-LocalizedString -Key 'Tooltip.CurrentDefault' }
+        elseif ($Entry) { Get-LocalizedString -Key 'Tooltip.SetDefault' -Values @{ Target=$titleText } }
+        else { Get-LocalizedString -Key 'Tooltip.ClearDefault' }
+    $hint += [Environment]::NewLine + $titleText + [Environment]::NewLine + $subtitleText
     foreach ($control in @($row)+@($row.Controls)) {
+        $control.Cursor = [Windows.Forms.Cursors]::Hand
+        $controlHint = $hint
+        if ($control -eq $icon -and $Entry -and $Entry.TypeTooltip) { $controlHint = [string]$Entry.TypeTooltip + [Environment]::NewLine + $hint }
+        $Form.Tag.Tip.SetToolTip($control,$controlHint)
         $control.Add_Click({ param($sender,$eventArgs) Invoke-DefaultPickerRow -Control $sender })
         $control.Add_MouseEnter({ param($sender,$eventArgs) Set-DefaultPickerHover -Control $sender -Hover $true })
         $control.Add_MouseLeave({ param($sender,$eventArgs) Set-DefaultPickerHover -Control $sender -Hover $false })
@@ -7434,7 +7510,7 @@ function Update-RestartTargetUi {
         $action.Text = Get-LocalizedString -Key 'BootNext.UseDefaultOnce'
         $action.AccessibleName = $action.Text
         $action.AccessibleDescription = Get-LocalizedString -Key 'BootNext.UseDefaultHint' -Values @{ Default=$default }
-        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($action,$action.AccessibleDescription) }
+        if ($script:BootTypeToolTip -and $script:BootTypeToolTip.GetToolTip($action) -cne $action.AccessibleDescription) { $script:BootTypeToolTip.SetToolTip($action,$action.AccessibleDescription) }
         $action.Visible = [bool]$canApply
         $action.Enabled = [bool]$canApply
         $action.TabStop = [bool]$canApply
@@ -12038,6 +12114,34 @@ function Get-BootEntryRowText {
     return [pscustomobject]@{ Title = [string]$titleText; Subtitle = [string]$subtitleText }
 }
 
+# Normal mode action help is presentation only. Never probe firmware or
+# invoke a selection from a tooltip. Unknown readiness uses conditional wording.
+function Update-NormalBootEntryTooltips {
+    param($Row,$Entry)
+    if ($script:IsManageEntriesMode -or -not $script:BootTypeToolTip -or -not $Row -or $Row.IsDisposed) { return }
+    $text = Get-BootEntryRowText -Entry $Entry
+    $action = if ($script:BootNextPendingGuid -or $script:DefaultTargetChangePending) {
+        Get-LocalizedString -Key 'Tooltip.NextBootPending'
+    } elseif ($script:NextBootFirmwareReadVerified -and $script:SelectedGuid -eq $Entry.Guid) {
+        Get-LocalizedString -Key 'Tooltip.NextBootSelected'
+    } elseif ([string]$Entry.RawDescription -eq 'Boot Menu') {
+        Get-LocalizedString -Key 'Tooltip.NextBootMenu'
+    } else {
+        Get-LocalizedString -Key 'Tooltip.NextBoot' -Values @{ Target=$text.Title }
+    }
+    $full = $action + [Environment]::NewLine + $text.Title
+    if ($text.Subtitle) { $full += [Environment]::NewLine + $text.Subtitle }
+    foreach ($control in @($Row) + @($Row.Controls)) {
+        $hint = $full
+        if ($control.Name -eq 'BootTypeGlyph' -and $Entry.TypeTooltip) {
+            $hint = [string]$Entry.TypeTooltip + [Environment]::NewLine + $full
+        } elseif ($control.Name -eq 'BootSelectionStatusGlyph' -and $control.AccessibleDescription) {
+            $hint = [string]$control.AccessibleDescription + [Environment]::NewLine + $full
+        }
+        if ($script:BootTypeToolTip.GetToolTip($control) -cne $hint) { $script:BootTypeToolTip.SetToolTip($control,$hint) }
+    }
+}
+
 # The caller must first prove GUID/order/mode/DPI and structural-signature parity.
 # Keep live WinForms controls, handlers and scroll context intact.
 function Update-BootEntryRowText {
@@ -12053,16 +12157,17 @@ function Update-BootEntryRowText {
         $title.Text = [string]$text.Title
         $title.AccessibleDescription = [string]$text.Title
         if (-not $script:IsManageEntriesMode) { $Row.AccessibleName = [string]$text.Title }
-        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($title,[string]$text.Title) }
+        if ($script:IsManageEntriesMode -and $script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($title,[string]$text.Title) }
         $changed = $true
     }
     if ([string]$subtitle.Text -cne [string]$text.Subtitle) {
         $subtitle.Text = [string]$text.Subtitle
         $subtitle.AccessibleDescription = [string]$text.Subtitle
         if (-not $script:IsManageEntriesMode) { $Row.AccessibleDescription = [string]$text.Subtitle }
-        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($subtitle,[string]$text.Subtitle) }
+        if ($script:IsManageEntriesMode -and $script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($subtitle,[string]$text.Subtitle) }
         $changed = $true
     }
+    Update-NormalBootEntryTooltips -Row $Row -Entry $Entry
     return [bool]$changed
 }
 
@@ -12241,19 +12346,22 @@ $subtitleColor = if ($isHidden) { [Drawing.Color]::FromArgb(155,155,155) } else 
 
 $icon = New-Label -Text $entry.Symbol -Font (New-Object Drawing.Font('Segoe UI Symbol', 18, [Drawing.FontStyle]::Regular)) `
     -ForeColor $iconColor -X 22 -Y 7 -Width 28 -Height 44
+$icon.Name = 'BootTypeGlyph'
 $icon.Tag = $entry.Guid
 $icon.Cursor = [System.Windows.Forms.Cursors]::Hand
 $icon.AllowDrop = $script:IsManageEntriesMode
 if ($script:BootTypeToolTip -and $entry.TypeTooltip) {
-    $icon.AccessibleDescription = [string]$entry.TypeTooltip
-    $script:BootTypeToolTip.SetToolTip($icon, [string]$entry.TypeTooltip)
+    $typeHint = [string]$entry.TypeTooltip
+    if ($isHidden) { $typeHint += [Environment]::NewLine + (Get-LocalizedString -Key 'Tooltip.HiddenType') }
+    $icon.AccessibleDescription = $typeHint
+    $script:BootTypeToolTip.SetToolTip($icon, $typeHint)
     # Native SetToolTip proved unreliable on the transparent symbol label
     # on the target PC. MouseHover explicitly shows the same tooltip and
     # MouseLeave closes it, while the semantic text remains on the circle only.
     $icon.Add_MouseHover({
         param($sender, $eventArgs)
         try {
-            $text = [string]$sender.AccessibleDescription
+            $text = [string]$script:BootTypeToolTip.GetToolTip($sender)
             if ($text) { $script:BootTypeToolTip.Show($text, $sender, 18, [Math]::Max(18, $sender.Height - 2), 8000) }
         } catch { }
     })
@@ -12316,6 +12424,7 @@ if (-not $aliasEditActive) {
     }
     else {
         $rowControls = @(Add-NormalBootEntryControls -Row $row -Entry $entry -IsSelected ([bool]$isSelected) -Marker $marker -Icon $icon -Title $title -Subtitle $subtitle)
+        Update-NormalBootEntryTooltips -Row $row -Entry $entry
     }
 
     if ($rowControls.Count -gt 0) {
@@ -12821,6 +12930,16 @@ function Update-PopupRows {
             ([string]$script:PopupRowsIdentity -ceq $snapshot.Identity) -and
             $existingRows.Count -eq $snapshot.EntryCount
     if ($same) {
+        # A verified/pending state can change without altering row geometry or
+        # metadata. Refresh semantic hints in place; unchanged bindings are no-ops.
+        if (-not $script:IsManageEntriesMode -and $script:BootTypeToolTip) {
+            $entryByGuid = @{}
+            foreach ($entry in $snapshot.Entries) { $entryByGuid[[string]$entry.Guid] = $entry }
+            foreach ($row in $existingRows) {
+                $entry = $entryByGuid[[string]$row.Tag]
+                if ($entry) { Update-NormalBootEntryTooltips -Row $row -Entry $entry }
+            }
+        }
         $script:PopupRowsRefreshPending = $false
         $viewportChanged = ($script:PopupRowsViewportHeight -ne $listPanel.ClientSize.Height)
         if ($viewportChanged -and $activeDrag) {
@@ -13075,6 +13194,7 @@ function Add-PopupHeaderSection {
     $script:ManageEntriesButton = $manageButton
     $section.Controls.Add($manageButton)
     $Root.Controls.Add($section)
+    if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($manageButton,(Get-LocalizedString -Key 'Tooltip.Customize')) }
 }
 
 function Add-PopupBootEntryListSection {
@@ -13169,7 +13289,9 @@ function Invoke-PopupNavigationRow {
 
 function Add-PopupNavigationRowHandlers {
     param([Windows.Forms.Control]$Row)
+    $hintKey = if ($Row.Name -eq 'DefaultPanel') { 'Tooltip.DefaultNavigation' } else { 'Tooltip.Settings' }
     foreach ($control in @($Row) + @($Row.Controls)) {
+        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($control,(Get-LocalizedString -Key $hintKey)) }
         $control.Add_MouseEnter({ param($sender,$eventArgs) Set-PopupNavigationRowHover -Control $sender -Hover $true })
         $control.Add_MouseLeave({ param($sender,$eventArgs) Set-PopupNavigationRowHover -Control $sender -Hover $false })
         $control.Add_Click({ param($sender,$eventArgs) Invoke-PopupNavigationRow -Control $sender })
@@ -13312,6 +13434,7 @@ function Add-PopupRestartSection {
     $restartButton.Add_Click({ Restart-Windows })
     $script:RestartButton = $restartButton
     $restartPanel.Controls.Add($restartButton)
+    if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($restartButton,(Get-LocalizedString -Key 'Tooltip.Restart')) }
 
     # LBS-206 Layout C: the firmware-readback state is always passive and
     # precedes the explicit restart action. The one-time default control is
@@ -13507,6 +13630,9 @@ function New-AuxiliaryPopupForm {
     $close.Name = 'AuxiliaryClose'
     $close.Text = '×'
     $close.AccessibleName = Get-LocalizedString -Key 'Common.Close'
+    $close.Cursor = [Windows.Forms.Cursors]::Hand
+    $closeHintKey = if ($Name -eq 'LenovoDefaultTargetPicker') { 'Tooltip.ClosePicker' } else { 'Tooltip.CloseSettings' }
+    $tip.SetToolTip($close,(Get-LocalizedString -Key $closeHintKey))
     $close.Font = $symbol
     $close.BackColor = $script:ColorHeader
     $close.ForeColor = $script:ColorPrimary
@@ -13645,6 +13771,10 @@ function Update-ConfigurationPopupPresentation {
         $item = Get-ConfigurationActionMenuItem -Action $action
         $control.Enabled = Test-ConfigurationActionAvailable -Action $action
         if (-not $item) { continue }
+        $hintKey = if ($action -eq 'autostart') { 'Tooltip.Configuration.autostart' } else { 'Tooltip.Configuration.' + $action }
+        $hint = Get-LocalizedString -Key $hintKey
+        if (-not $control.Enabled) { $hint += [Environment]::NewLine + (Get-LocalizedString -Key 'Tooltip.Unavailable') }
+        if ($Form.Tag.Tip.GetToolTip($control) -cne $hint) { $Form.Tag.Tip.SetToolTip($control,$hint) }
         if ($control -is [Windows.Forms.CheckBox]) {
             $control.Checked = [bool]$item.Checked
         }
@@ -13743,6 +13873,7 @@ function Update-ConfigurationPopupLocale {
     $Form.AccessibleName = $title
     $Form.Tag.Title.Text = $title
     $Form.Tag.Close.AccessibleName = Get-LocalizedString -Key 'Common.Close'
+    $Form.Tag.Tip.SetToolTip($Form.Tag.Close,(Get-LocalizedString -Key 'Tooltip.CloseSettings'))
     foreach ($control in $Form.Tag.Body.Controls) {
         if ($control.Name.StartsWith('ConfigurationLocale-')) {
             $control.Text = Get-LocalizedString -Key $control.Name.Substring('ConfigurationLocale-'.Length)

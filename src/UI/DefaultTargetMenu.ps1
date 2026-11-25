@@ -59,12 +59,10 @@ function Add-DefaultPickerRow {
     $title = New-Label -Text $titleText -Font $Form.Tag.Bold -ForeColor $script:ColorPrimary -X 58 -Y 6 -Width 270 -Height 21
     $title.Name = 'DefaultPickerTitle'
     $title.AccessibleDescription = $titleText
-    $Form.Tag.Tip.SetToolTip($title,$titleText)
     $row.Controls.Add($title)
     $subtitle = New-Label -Text $subtitleText -Font $Form.Tag.Regular -ForeColor $script:ColorSecondary -X 58 -Y 28 -Width 270 -Height 26
     $subtitle.Name = 'DefaultPickerSubtitle'
     $subtitle.AccessibleDescription = $subtitleText
-    $Form.Tag.Tip.SetToolTip($subtitle,$subtitleText)
     $row.Controls.Add($subtitle)
     if ($selected) {
         $check = New-Label -Text '✓' -Font $Form.Tag.Symbol -ForeColor ([Drawing.Color]::FromArgb(255,110,102)) -X 334 -Y 7 -Width 30 -Height 44
@@ -72,7 +70,15 @@ function Add-DefaultPickerRow {
         $check.AccessibleName = Get-LocalizedString -Key 'Settings.DefaultPickerSelected'
         $row.Controls.Add($check)
     }
+    $hint = if ($selected) { Get-LocalizedString -Key 'Tooltip.CurrentDefault' }
+        elseif ($Entry) { Get-LocalizedString -Key 'Tooltip.SetDefault' -Values @{ Target=$titleText } }
+        else { Get-LocalizedString -Key 'Tooltip.ClearDefault' }
+    $hint += [Environment]::NewLine + $titleText + [Environment]::NewLine + $subtitleText
     foreach ($control in @($row)+@($row.Controls)) {
+        $control.Cursor = [Windows.Forms.Cursors]::Hand
+        $controlHint = $hint
+        if ($control -eq $icon -and $Entry -and $Entry.TypeTooltip) { $controlHint = [string]$Entry.TypeTooltip + [Environment]::NewLine + $hint }
+        $Form.Tag.Tip.SetToolTip($control,$controlHint)
         $control.Add_Click({ param($sender,$eventArgs) Invoke-DefaultPickerRow -Control $sender })
         $control.Add_MouseEnter({ param($sender,$eventArgs) Set-DefaultPickerHover -Control $sender -Hover $true })
         $control.Add_MouseLeave({ param($sender,$eventArgs) Set-DefaultPickerHover -Control $sender -Hover $false })

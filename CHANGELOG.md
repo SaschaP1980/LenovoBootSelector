@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.19.1 – Action-oriented tooltip coverage (LBS-244)
+
+- Explain Customize, settings navigation, persistent-default selection and clearing, one-time next-boot selection, restart confirmation and settings actions with localized hints.
+- Identify boot-target type colors and distinguish the gray presentation of hidden entries; retain full target text and selection-state semantics.
+- Add context-specific close hints and hand cursors to auxiliary forms. Preserve the accepted dark renderer and existing action, keyboard and privilege contracts.
+- Avoid resetting an unchanged reset-action tooltip registration. Add focused source and real native hover regression coverage; intermittent refresh/reset display failures were not reproduced on the hosted baseline.
+
 ## v1.5.19.0 – Consistent dark WinForms tooltips (LBS-244)
 
 - Share dark tooltip rendering and text measurement across the main popup, Manage Entries and auxiliary settings, while retaining native context-specific timing and ownership.

@@ -117,6 +117,10 @@ if ($LASTEXITCODE -ne 0) { throw 'LBS-242 native regular dialog composition regr
 $tooltipProbe = Join-Path $root 'tests\Test-LBS244-Tooltips.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $tooltipProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-244 native tooltip regression failed' }
+& (Join-Path $root 'tests\Test-LBS244-TooltipCoverage.ps1')
+$actionTooltipProbe = Join-Path $root 'tests\Test-LBS244-ActionTooltips.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $actionTooltipProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-244 native action tooltip coverage failed' }
 
 # UX01-V8 / LBS-197: real focusable normal rows, scroll and safe keyboard selection.
 $keyboardProbe = Join-Path $root 'tests\Test-LBS197-NormalKeyboard.ps1'

@@ -1494,6 +1494,34 @@ function Get-BootEntryRowText {
     return [pscustomobject]@{ Title = [string]$titleText; Subtitle = [string]$subtitleText }
 }
 
+# Normal mode action help is presentation only. Never probe firmware or
+# invoke a selection from a tooltip. Unknown readiness uses conditional wording.
+function Update-NormalBootEntryTooltips {
+    param($Row,$Entry)
+    if ($script:IsManageEntriesMode -or -not $script:BootTypeToolTip -or -not $Row -or $Row.IsDisposed) { return }
+    $text = Get-BootEntryRowText -Entry $Entry
+    $action = if ($script:BootNextPendingGuid -or $script:DefaultTargetChangePending) {
+        Get-LocalizedString -Key 'Tooltip.NextBootPending'
+    } elseif ($script:NextBootFirmwareReadVerified -and $script:SelectedGuid -eq $Entry.Guid) {
+        Get-LocalizedString -Key 'Tooltip.NextBootSelected'
+    } elseif ([string]$Entry.RawDescription -eq 'Boot Menu') {
+        Get-LocalizedString -Key 'Tooltip.NextBootMenu'
+    } else {
+        Get-LocalizedString -Key 'Tooltip.NextBoot' -Values @{ Target=$text.Title }
+    }
+    $full = $action + [Environment]::NewLine + $text.Title
+    if ($text.Subtitle) { $full += [Environment]::NewLine + $text.Subtitle }
+    foreach ($control in @($Row) + @($Row.Controls)) {
+        $hint = $full
+        if ($control.Name -eq 'BootTypeGlyph' -and $Entry.TypeTooltip) {
+            $hint = [string]$Entry.TypeTooltip + [Environment]::NewLine + $full
+        } elseif ($control.Name -eq 'BootSelectionStatusGlyph' -and $control.AccessibleDescription) {
+            $hint = [string]$control.AccessibleDescription + [Environment]::NewLine + $full
+        }
+        if ($script:BootTypeToolTip.GetToolTip($control) -cne $hint) { $script:BootTypeToolTip.SetToolTip($control,$hint) }
+    }
+}
+
 # The caller must first prove GUID/order/mode/DPI and structural-signature parity.
 # Keep live WinForms controls, handlers and scroll context intact.
 function Update-BootEntryRowText {
@@ -1509,16 +1537,17 @@ function Update-BootEntryRowText {
         $title.Text = [string]$text.Title
         $title.AccessibleDescription = [string]$text.Title
         if (-not $script:IsManageEntriesMode) { $Row.AccessibleName = [string]$text.Title }
-        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($title,[string]$text.Title) }
+        if ($script:IsManageEntriesMode -and $script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($title,[string]$text.Title) }
         $changed = $true
     }
     if ([string]$subtitle.Text -cne [string]$text.Subtitle) {
         $subtitle.Text = [string]$text.Subtitle
         $subtitle.AccessibleDescription = [string]$text.Subtitle
         if (-not $script:IsManageEntriesMode) { $Row.AccessibleDescription = [string]$text.Subtitle }
-        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($subtitle,[string]$text.Subtitle) }
+        if ($script:IsManageEntriesMode -and $script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($subtitle,[string]$text.Subtitle) }
         $changed = $true
     }
+    Update-NormalBootEntryTooltips -Row $Row -Entry $Entry
     return [bool]$changed
 }
 
@@ -1697,19 +1726,22 @@ $subtitleColor = if ($isHidden) { [Drawing.Color]::FromArgb(155,155,155) } else 
 
 $icon = New-Label -Text $entry.Symbol -Font (New-Object Drawing.Font('Segoe UI Symbol', 18, [Drawing.FontStyle]::Regular)) `
     -ForeColor $iconColor -X 22 -Y 7 -Width 28 -Height 44
+$icon.Name = 'BootTypeGlyph'
 $icon.Tag = $entry.Guid
 $icon.Cursor = [System.Windows.Forms.Cursors]::Hand
 $icon.AllowDrop = $script:IsManageEntriesMode
 if ($script:BootTypeToolTip -and $entry.TypeTooltip) {
-    $icon.AccessibleDescription = [string]$entry.TypeTooltip
-    $script:BootTypeToolTip.SetToolTip($icon, [string]$entry.TypeTooltip)
+    $typeHint = [string]$entry.TypeTooltip
+    if ($isHidden) { $typeHint += [Environment]::NewLine + (Get-LocalizedString -Key 'Tooltip.HiddenType') }
+    $icon.AccessibleDescription = $typeHint
+    $script:BootTypeToolTip.SetToolTip($icon, $typeHint)
     # Native SetToolTip proved unreliable on the transparent symbol label
     # on the target PC. MouseHover explicitly shows the same tooltip and
     # MouseLeave closes it, while the semantic text remains on the circle only.
     $icon.Add_MouseHover({
         param($sender, $eventArgs)
         try {
-            $text = [string]$sender.AccessibleDescription
+            $text = [string]$script:BootTypeToolTip.GetToolTip($sender)
             if ($text) { $script:BootTypeToolTip.Show($text, $sender, 18, [Math]::Max(18, $sender.Height - 2), 8000) }
         } catch { }
     })
@@ -1772,6 +1804,7 @@ if (-not $aliasEditActive) {
     }
     else {
         $rowControls = @(Add-NormalBootEntryControls -Row $row -Entry $entry -IsSelected ([bool]$isSelected) -Marker $marker -Icon $icon -Title $title -Subtitle $subtitle)
+        Update-NormalBootEntryTooltips -Row $row -Entry $entry
     }
 
     if ($rowControls.Count -gt 0) {
