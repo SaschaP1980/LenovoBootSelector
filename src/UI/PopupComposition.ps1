@@ -682,6 +682,8 @@ function Get-ConfigurationActionMenuItem {
         'system-remove' { return $script:TaskBrokerRemoveMenuItem }
         'update-check' { return $script:UpdateCheckMenuItem }
         'update-install' { return $script:UpdateInstallMenuItem }
+        'preferences-export' { return $script:PreferencesExportMenuItem }
+        'preferences-import' { return $script:PreferencesImportMenuItem }
         'diagnostics-save' { return $script:RuntimeDiagnosticMenuItem }
         'diagnostics-upload' { return $script:DiagnosticsUploadMenuItem }
     }
@@ -691,6 +693,9 @@ function Get-ConfigurationActionMenuItem {
 function Test-ConfigurationActionAvailable {
     param([string]$Action)
     $item = Get-ConfigurationActionMenuItem -Action $Action
+    if ($Action -like 'preferences-*' -and $item -and -not $item.IsDisposed) {
+        $item.Enabled = [bool](Test-PortablePreferencesAvailable -PresentationOnly)
+    }
     return [bool]($item -and -not $item.IsDisposed -and $item.Available -and $item.Enabled -and -not (Test-MaintenanceBusy))
 }
 
@@ -859,7 +864,7 @@ function Update-ConfigurationPopupLocale {
 }
 
 function New-ConfigurationPopup {
-    $form = New-AuxiliaryPopupForm -Name 'LenovoConfigurationPopup' -Title (Get-LocalizedString -Key 'Settings.More') -Subtitle (Get-LocalizedString -Key 'Settings.MoreSubtitle') -ContentHeight 570
+    $form = New-AuxiliaryPopupForm -Name 'LenovoConfigurationPopup' -Title (Get-LocalizedString -Key 'Settings.More') -Subtitle (Get-LocalizedString -Key 'Settings.MoreSubtitle') -ContentHeight 706
     $groupSurface = [Drawing.Color]::FromArgb(37,37,37)
     Add-ConfigurationHeading -Form $form -Key 'Settings.General' -Y 6
     $autostartLabel = New-Object LenovoSettingsAutostartLabel
@@ -898,15 +903,18 @@ function New-ConfigurationPopup {
     $form.Tag.Body.Controls.Add($language)
     Add-ConfigurationActionButton -Form $form -Action 'language-de' -Key 'Language.German' -Y 116 -Width 175
     Add-ConfigurationActionButton -Form $form -Action 'language-en' -Key 'Language.English' -Y 116 -X 191 -Width 175
-    Add-ConfigurationHeading -Form $form -Key 'Maintenance.Caption' -Y 164
-    Add-ConfigurationActionButton -Form $form -Action 'system-setup' -Key 'Maintenance.Setup' -Y 188 -Separator
-    Add-ConfigurationActionButton -Form $form -Action 'system-remove' -Key 'Maintenance.Remove' -Y 240
-    Add-ConfigurationHeading -Form $form -Key 'Settings.Updates' -Y 300
-    Add-ConfigurationActionButton -Form $form -Action 'update-check' -Key 'Update.Check' -Y 324 -Separator
-    Add-ConfigurationActionButton -Form $form -Action 'update-install' -Key 'Update.Install' -Y 376
-    Add-ConfigurationHeading -Form $form -Key 'Settings.Diagnostics' -Y 436
-    Add-ConfigurationActionButton -Form $form -Action 'diagnostics-save' -Key 'Diagnostics.Save' -Y 460 -Separator
-    Add-ConfigurationActionButton -Form $form -Action 'diagnostics-upload' -Key 'Diagnostics.Upload' -Y 512
+    Add-ConfigurationHeading -Form $form -Key 'Preferences.Heading' -Y 164
+    Add-ConfigurationActionButton -Form $form -Action 'preferences-export' -Key 'Preferences.Export' -Y 188 -Separator
+    Add-ConfigurationActionButton -Form $form -Action 'preferences-import' -Key 'Preferences.Import' -Y 240
+    Add-ConfigurationHeading -Form $form -Key 'Maintenance.Caption' -Y 300
+    Add-ConfigurationActionButton -Form $form -Action 'system-setup' -Key 'Maintenance.Setup' -Y 324 -Separator
+    Add-ConfigurationActionButton -Form $form -Action 'system-remove' -Key 'Maintenance.Remove' -Y 376
+    Add-ConfigurationHeading -Form $form -Key 'Settings.Updates' -Y 436
+    Add-ConfigurationActionButton -Form $form -Action 'update-check' -Key 'Update.Check' -Y 460 -Separator
+    Add-ConfigurationActionButton -Form $form -Action 'update-install' -Key 'Update.Install' -Y 512
+    Add-ConfigurationHeading -Form $form -Key 'Settings.Diagnostics' -Y 572
+    Add-ConfigurationActionButton -Form $form -Action 'diagnostics-save' -Key 'Diagnostics.Save' -Y 596 -Separator
+    Add-ConfigurationActionButton -Form $form -Action 'diagnostics-upload' -Key 'Diagnostics.Upload' -Y 648
     Update-ConfigurationPopupPresentation -Form $form
     # Reflect existing presentation state only; do not poll firmware/network.
     $timer = New-Object Windows.Forms.Timer

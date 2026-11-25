@@ -85,7 +85,7 @@ function Get-LocalizationCatalogCore {
             'Status.BootTargetsRefreshing' = 'Boot targets are being refreshed in the background…'
             'Action.RefreshBootTargets' = 'Refresh the available boot targets and current boot state.'
             'Tooltip.Customize' = 'Configure boot targets: change their order, visibility and display names.'
-            'Tooltip.Settings' = 'Open settings for autostart, language, maintenance, updates and diagnostics.'
+            'Tooltip.Settings' = 'Open settings for autostart, language, user preferences, maintenance, updates and diagnostics.'
             'Tooltip.DefaultNavigation' = 'Open the picker to set or clear the persistent default boot target.'
             'Tooltip.Restart' = 'Check the next boot target and open the Windows restart confirmation.'
             'Tooltip.ClosePicker' = 'Close the picker without changing the default boot target.'
@@ -126,6 +126,52 @@ function Get-LocalizationCatalogCore {
             'Settings.Detail.diagnostics-upload' = 'Send diagnostic data'
             'Settings.Updates' = 'UPDATES'
             'Settings.Diagnostics' = 'DIAGNOSTICS'
+            'Preferences.Menu' = 'User preferences'
+            'Preferences.Heading' = 'USER PREFERENCES'
+            'Preferences.Export' = 'Export preferences'
+            'Preferences.Import' = 'Import preferences'
+            'Settings.Detail.preferences-export' = 'Save personal settings as JSON'
+            'Settings.Detail.preferences-import' = 'Preview and restore preferences'
+            'Tooltip.Configuration.preferences-export' = 'Save language, aliases, visibility and order for currently available boot entries to a local JSON file. No system settings or diagnostics.'
+            'Tooltip.Configuration.preferences-import' = 'Preview an exact-GUID match and explicitly restore personal settings. No firmware or system changes.'
+            'Preferences.FileFilter' = 'Preference JSON files (*.json)|*.json'
+            'Preferences.ChooseExport' = 'Choose export file'
+            'Preferences.ChooseImport' = 'Choose import file'
+            'Preferences.PreviewTitle' = 'Import preview'
+            'Preferences.Apply' = 'Apply preferences'
+            'Preferences.Scope' = 'Included: language, aliases, visibility and order for available entries. Excluded: autostart, default target, BootNext, privileged tasks, system and diagnostic data. GUIDs and aliases may contain identifying information. No automatic upload.'
+            'Preferences.ExportSummary' = 'Entries included: {Count}. Unavailable saved entries are not exported.'
+            'Preferences.ExportConfirm' = 'Choose file…'
+            'Preferences.ReconcileWarning' = 'Only exact GUID matches are restored. Equal GUIDs are not proof of identical hardware. Check the current local targets and changes before applying. Unmatched entries are skipped. Local entries absent from the file are preserved.'
+            'Preferences.PreviewLanguage' = 'Language: {Before} → {After}'
+            'Preferences.PreviewCounts' = 'Matched: {Matched} · Unmatched: {Unmatched} · Local only: {Local}'
+            'Preferences.Matched' = 'MATCHED'
+            'Preferences.Unmatched' = 'SKIPPED — no exact local GUID match'
+            'Preferences.LocalOnly' = 'LOCAL ONLY — unchanged'
+            'Preferences.Unavailable' = 'Unavailable saved metadata (preserved locally, excluded from restore):'
+            'Preferences.AliasChange' = 'Alias: {Before} → {After}'
+            'Preferences.AliasSkipped' = 'Imported alias exceeds the current limit; existing alias preserved.'
+            'Preferences.VisibilityChange' = 'Visibility: {Before} → {After}'
+            'Preferences.OrderChange' = 'Position: {Before} → {After}'
+            'Preferences.Visible' = 'visible'
+            'Preferences.Hidden' = 'hidden'
+            'Preferences.NoAlias' = '(no alias)'
+            'Preferences.None' = '(none)'
+            'Preferences.ErrorTitle' = 'Preferences unavailable'
+            'Preferences.ErrorInvalid' = 'The file is invalid, unreadable, too large or uses an unsupported format. Choose a valid preference JSON file. No settings were changed.'
+            'Preferences.ErrorLocal' = 'Local settings cannot be safely used. Resolve any damaged, changed or unsupported settings file, or confirm the pending language choice, then restart or reload the app. No settings were changed.'
+            'Preferences.ErrorStale' = 'The local settings or boot-entry list changed after the preview. Open the workflow again and review a new preview. No settings were changed.'
+            'Preferences.ErrorBusy' = 'Wait for boot-target refresh or other operations to finish, exit Manage Entries and check system readiness. No settings were changed.'
+            'Preferences.ErrorDestination' = 'Select a JSON file outside the internal settings directory. An existing file must already be a valid preference export; other files will not be overwritten.'
+            'Preferences.ErrorSave' = 'The file could not be saved. Check permissions, free space and open file handles, then try again. No new settings were applied.'
+            'Preferences.ErrorUncertain' = 'The file operation could not be verified. Do not repeat the import until the local settings file has been checked and the app reloaded. Settings persistence is blocked after an uncertain import.'
+            'Preferences.ExportUncertain' = 'The export file could not be verified. Check the chosen file before using it. Local application settings were not changed.'
+            'Preferences.ErrorLayout' = 'The preview does not fit the available work area. Use a larger work area or lower display scaling and try again. No settings were changed.'
+            'Preferences.Exported' = 'Preferences saved'
+            'Preferences.ExportSuccess' = 'The preference JSON file was saved locally. Keep it private if it contains personal aliases or GUIDs.'
+            'Preferences.Imported' = 'Preferences restored'
+            'Preferences.ImportSuccess' = 'The confirmed presentation preferences were saved. System settings and boot targets were not changed.'
+            'Preferences.RefreshWarning' = 'Preferences were saved, but the display could not be refreshed completely. Restart the application to see the saved settings.'
             'Settings.DefaultPickerCurrent' = 'Current default: {Target}'
             'Settings.DefaultPickerNoneHint' = 'Do not configure a persistent default'
             'Settings.DefaultPickerSelected' = 'Current persistent default'
@@ -478,6 +524,52 @@ function Get-LocalizationCatalogCore {
             'Settings.Detail.diagnostics-upload' = 'Diagnosedaten übermitteln'
             'Settings.Updates' = 'UPDATES'
             'Settings.Diagnostics' = 'DIAGNOSE'
+            'Preferences.Menu' = 'Benutzereinstellungen'
+            'Preferences.Heading' = 'BENUTZEREINSTELLUNGEN'
+            'Preferences.Export' = 'Einstellungen exportieren'
+            'Preferences.Import' = 'Einstellungen importieren'
+            'Settings.Detail.preferences-export' = 'Persönliche Einstellungen sichern'
+            'Settings.Detail.preferences-import' = 'Gesicherte Einstellungen wiederherstellen'
+            'Tooltip.Configuration.preferences-export' = 'Sprache, Aliase, Sichtbarkeit und Reihenfolge verfügbarer Startziele lokal als JSON sichern. Keine Systemkonfiguration oder Diagnose.'
+            'Tooltip.Configuration.preferences-import' = 'Exakte GUID-Zuordnung prüfen und persönliche Einstellungen nach Bestätigung wiederherstellen. Keine Firmware- oder Systemänderungen.'
+            'Preferences.FileFilter' = 'Einstellungsdateien (*.json)|*.json'
+            'Preferences.ChooseExport' = 'Exportdatei auswählen'
+            'Preferences.ChooseImport' = 'Importdatei auswählen'
+            'Preferences.PreviewTitle' = 'Importvorschau'
+            'Preferences.Apply' = 'Einstellungen übernehmen'
+            'Preferences.Scope' = 'Enthalten: Sprache, Aliase, Sichtbarkeit und Reihenfolge verfügbarer Einträge. Ausgeschlossen: Autostart, Standard-Startziel, BootNext, privilegierte Aufgaben, System- und Diagnosedaten. GUIDs und Aliase können identifizierende Angaben enthalten. Kein automatischer Upload.'
+            'Preferences.ExportSummary' = 'Enthaltene Einträge: {Count}. Nicht verfügbare gespeicherte Einträge werden nicht exportiert.'
+            'Preferences.ExportConfirm' = 'Datei auswählen…'
+            'Preferences.ReconcileWarning' = 'Nur exakte GUID-Übereinstimmungen werden übernommen. Gleiche GUIDs beweisen keine identische Hardware. Prüfe die aktuellen lokalen Startziele und Änderungen vor dem Übernehmen. Nicht passende Einträge werden übersprungen. Lokale Einträge ohne Dateieintrag bleiben erhalten.'
+            'Preferences.PreviewLanguage' = 'Sprache: {Before} → {After}'
+            'Preferences.PreviewCounts' = 'Übereinstimmend: {Matched} · Ohne Treffer: {Unmatched} · Nur lokal: {Local}'
+            'Preferences.Matched' = 'ÜBEREINSTIMMEND'
+            'Preferences.Unmatched' = 'ÜBERSPRUNGEN — keine exakte lokale GUID'
+            'Preferences.LocalOnly' = 'NUR LOKAL — unverändert'
+            'Preferences.Unavailable' = 'Nicht verfügbare gespeicherte Metadaten (lokal erhalten, vom Import ausgeschlossen):'
+            'Preferences.AliasChange' = 'Alias: {Before} → {After}'
+            'Preferences.AliasSkipped' = 'Importierter Alias überschreitet die aktuelle Längengrenze; bisheriger Alias bleibt erhalten.'
+            'Preferences.VisibilityChange' = 'Sichtbarkeit: {Before} → {After}'
+            'Preferences.OrderChange' = 'Position: {Before} → {After}'
+            'Preferences.Visible' = 'sichtbar'
+            'Preferences.Hidden' = 'ausgeblendet'
+            'Preferences.NoAlias' = '(kein Alias)'
+            'Preferences.None' = '(keine)'
+            'Preferences.ErrorTitle' = 'Einstellungen nicht verfügbar'
+            'Preferences.ErrorInvalid' = 'Die Datei ist ungültig, nicht lesbar, zu groß oder verwendet ein nicht unterstütztes Format. Wähle eine gültige Einstellungsdatei. Keine Einstellungen wurden geändert.'
+            'Preferences.ErrorLocal' = 'Die lokalen Einstellungen können nicht sicher verwendet werden. Behebe beschädigte, geänderte oder nicht unterstützte Einstellungen bzw. bestätige die ausstehende Sprachauswahl. Starte die Anwendung neu oder lade sie erneut. Keine Einstellungen wurden geändert.'
+            'Preferences.ErrorStale' = 'Die lokalen Einstellungen oder Startziele haben sich nach der Vorschau geändert. Öffne den Vorgang erneut und prüfe die neue Vorschau. Keine Einstellungen wurden geändert.'
+            'Preferences.ErrorBusy' = 'Warte auf das Ende der Startzielaktualisierung und anderer Vorgänge, verlasse die Eintragsverwaltung und prüfe die Systembereitschaft. Keine Einstellungen wurden geändert.'
+            'Preferences.ErrorDestination' = 'Wähle eine JSON-Datei außerhalb des internen Einstellungsordners. Eine vorhandene Datei muss bereits ein gültiger Einstellungsexport sein; andere Dateien werden nicht überschrieben.'
+            'Preferences.ErrorSave' = 'Die Datei konnte nicht gespeichert werden. Prüfe Berechtigungen, freien Speicher und geöffnete Dateizugriffe. Es wurden keine neuen Einstellungen übernommen.'
+            'Preferences.ErrorUncertain' = 'Der Dateivorgang konnte nicht verifiziert werden. Wiederhole den Import erst, wenn die lokale Einstellungsdatei geprüft und die Anwendung neu geladen wurde. Nach einem unklaren Import ist die Einstellungsspeicherung gesperrt.'
+            'Preferences.ExportUncertain' = 'Die Exportdatei konnte nicht verifiziert werden. Prüfe die gewählte Datei vor der Verwendung. Die lokalen Anwendungseinstellungen wurden nicht geändert.'
+            'Preferences.ErrorLayout' = 'Die Vorschau passt nicht in den verfügbaren Arbeitsbereich. Nutze einen größeren Arbeitsbereich oder eine geringere Skalierung. Keine Einstellungen wurden geändert.'
+            'Preferences.Exported' = 'Einstellungen gesichert'
+            'Preferences.ExportSuccess' = 'Die Einstellungsdatei wurde lokal gespeichert. Bewahre sie vertraulich auf, wenn sie persönliche Aliase oder GUIDs enthält.'
+            'Preferences.Imported' = 'Einstellungen wiederhergestellt'
+            'Preferences.ImportSuccess' = 'Die bestätigten Darstellungseinstellungen wurden gespeichert. Systemkonfiguration und Startzielauswahl wurden nicht geändert.'
+            'Preferences.RefreshWarning' = 'Die Einstellungen wurden gespeichert, die Anzeige konnte aber nicht vollständig aktualisiert werden. Starte die Anwendung neu, um die gespeicherten Einstellungen zu sehen.'
             'Settings.DefaultPickerCurrent' = 'Aktuelles Standardziel: {Target}'
             'Settings.DefaultPickerNoneHint' = 'Kein dauerhaftes Startziel festlegen'
             'Settings.DefaultPickerSelected' = 'Aktuelles dauerhaftes Standardziel'
@@ -1071,6 +1163,224 @@ function Get-OrderedEntriesCore {
     }
 
     return @($result.ToArray())
+}
+
+# Portable preference format v1. Pure data operations; no IO or action admission.
+function Get-PortablePreferencesLimitCore { return 262144 }
+
+function Read-PortableJsonTokenCore {
+    param($Reader)
+    $match = $Reader.Pattern.Match($Reader.Text,$Reader.Offset)
+    if (-not $match.Success -or $match.Index -ne $Reader.Offset) { throw 'InvalidJson' }
+    $Reader.Offset = $match.Index + $match.Length
+    return $match.Groups['token'].Value
+}
+
+function ConvertFrom-PortableJsonStringCore {
+    param([string]$Token)
+    $value = [regex]::Replace($Token.Substring(1,$Token.Length-2),'\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4})',[System.Text.RegularExpressions.MatchEvaluator]{
+        param($m)
+        switch -CaseSensitive ($m.Value.Substring(1,1)) {
+            '"' { return '"' }
+            '\' { return '\' }
+            '/' { return '/' }
+            'b' { return [string][char]8 }
+            'f' { return [string][char]12 }
+            'n' { return [string][char]10 }
+            'r' { return [string][char]13 }
+            't' { return [string][char]9 }
+            'u' { return [string][char][Convert]::ToInt32($m.Value.Substring(2),16) }
+        }
+    })
+    [void]([System.Text.UTF8Encoding]::new($false,$true).GetByteCount($value))
+    return $value
+}
+
+function Read-PortableJsonValueCore {
+    param($Reader,[string]$Token,[int]$Depth)
+    if ($Depth -gt 5) { throw 'InvalidDepth' }
+    if ($Token -ceq '{') {
+        $map = [System.Collections.Specialized.OrderedDictionary]::new([StringComparer]::OrdinalIgnoreCase)
+        $key = Read-PortableJsonTokenCore $Reader
+        if ($key -ceq '}') { return [pscustomobject]@{Value=$map} }
+        while ($true) {
+            if (-not $key.StartsWith('"')) { throw 'InvalidJson' }
+            $name = ConvertFrom-PortableJsonStringCore $key
+            if ($map.Contains($name)) { throw 'DuplicateKey' }
+            if ((Read-PortableJsonTokenCore $Reader) -cne ':') { throw 'InvalidJson' }
+            $value = Read-PortableJsonValueCore $Reader (Read-PortableJsonTokenCore $Reader) ($Depth+1)
+            $map.Add($name,$value.Value)
+            if ($map.Count -gt 512) { throw 'InvalidShape' }
+            $separator = Read-PortableJsonTokenCore $Reader
+            if ($separator -ceq '}') { break }
+            if ($separator -cne ',') { throw 'InvalidJson' }
+            $key = Read-PortableJsonTokenCore $Reader
+        }
+        return [pscustomobject]@{Value=$map}
+    }
+    if ($Token -ceq '[') {
+        $items = [System.Collections.Generic.List[object]]::new()
+        $next = Read-PortableJsonTokenCore $Reader
+        if ($next -cne ']') {
+            while ($true) {
+                $item = Read-PortableJsonValueCore $Reader $next ($Depth+1)
+                $items.Add($item.Value)
+                if ($items.Count -gt 512) { throw 'TooManyEntries' }
+                $separator = Read-PortableJsonTokenCore $Reader
+                if ($separator -ceq ']') { break }
+                if ($separator -cne ',') { throw 'InvalidJson' }
+                $next = Read-PortableJsonTokenCore $Reader
+            }
+        }
+        return [pscustomobject]@{Value=$items.ToArray()}
+    }
+    if ($Token.StartsWith('"')) {
+        $value = ConvertFrom-PortableJsonStringCore $Token
+        return [pscustomobject]@{Value=$value}
+    }
+    switch -CaseSensitive ($Token) {
+        'true' { return [pscustomobject]@{Value=$true} }
+        'false' { return [pscustomobject]@{Value=$false} }
+        'null' { return [pscustomobject]@{Value=$null} }
+        default {
+            if ($Token -cmatch '^(0|[1-9][0-9]*)$') {
+                $number = 0
+                if ([int]::TryParse($Token,[ref]$number)) { return [pscustomobject]@{Value=$number} }
+            }
+            throw 'InvalidScalar'
+        }
+    }
+}
+
+function Assert-PortableKeysCore {
+    param($Map,[string[]]$Keys)
+    if ($Map -isnot [System.Collections.IDictionary] -or $Map.Count -ne $Keys.Count) { throw 'InvalidShape' }
+    foreach ($key in $Map.Keys) {
+        if ($key -cnotin $Keys) { throw 'UnknownKey' }
+    }
+}
+
+function ConvertTo-PortableGuidCore {
+    param($Value)
+    if ($Value -isnot [string] -or $Value -cnotmatch '^\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}$') { throw 'InvalidIdentity' }
+    return $Value.ToLowerInvariant()
+}
+
+function Read-BoundedPreferencesJsonCore {
+    param([AllowEmptyString()][string]$Text)
+    if ([string]::IsNullOrWhiteSpace($Text) -or $Text.Length -gt (Get-PortablePreferencesLimitCore)) { throw 'InvalidSize' }
+    $encoding = [System.Text.UTF8Encoding]::new($false,$true)
+    if ($encoding.GetByteCount($Text) -gt (Get-PortablePreferencesLimitCore)) { throw 'InvalidSize' }
+    # Narrow grammar for preference documents (integer versions, no floats).
+    # Decode strings without date coercion; detect duplicate decoded keys.
+    $reader = [pscustomobject]@{
+        Text=$Text; Offset=0
+        Pattern=[regex]::new('\G[ \t\r\n]*(?<token>"(?:[^"\\\x00-\x1f]|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))*"|[{}\[\]:,]|true|false|null|0|[1-9][0-9]*)',[System.Text.RegularExpressions.RegexOptions]::None,[TimeSpan]::FromSeconds(2))
+    }
+    $root = (Read-PortableJsonValueCore $reader (Read-PortableJsonTokenCore $reader) 0).Value
+    if ($Text.Substring($reader.Offset) -cnotmatch '^[ \t\r\n]*$') { throw 'TrailingJson' }
+    return [pscustomobject]@{Value=$root}
+}
+
+function ConvertFrom-PortablePreferencesCore {
+    param([AllowEmptyString()][string]$Text)
+    $root = (Read-BoundedPreferencesJsonCore $Text).Value
+    $encoding = [System.Text.UTF8Encoding]::new($false,$true)
+    Assert-PortableKeysCore $root @('format','version','locale','entries')
+    if ($root.format -isnot [string] -or $root.format -cne 'LenovoBootSelector.Preferences' -or $root.version -isnot [int] -or $root.version -ne 1) { throw 'UnsupportedFormat' }
+    if ($root.locale -isnot [string] -or $root.locale -cnotin @('de-DE','en-US')) { throw 'InvalidLocale' }
+    if ($root.entries -isnot [array]) { throw 'InvalidEntries' }
+    $seen = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $entries = [System.Collections.Generic.List[object]]::new()
+    foreach ($row in $root.entries) {
+        Assert-PortableKeysCore $row @('guid','alias','hidden')
+        $guid = ConvertTo-PortableGuidCore $row.guid
+        if (-not $seen.Add($guid)) { throw 'DuplicateIdentity' }
+        if ($row.hidden -isnot [bool] -or $row.alias -isnot [string]) { throw 'InvalidEntry' }
+        if ($row.alias.Length -gt 4096 -or $row.alias -match '[\x00-\x1f\x7f]' -or $row.alias -cne $row.alias.Trim()) { throw 'InvalidAlias' }
+        [void]$encoding.GetByteCount($row.alias)
+        $entries.Add([pscustomobject]@{guid=$guid;alias=$row.alias;hidden=$row.hidden})
+    }
+    return [pscustomobject]@{format=$root.format;version=1;locale=$root.locale;entries=$entries.ToArray()}
+}
+
+function New-PortablePreferencesCore {
+    param($Settings,[object[]]$CurrentEntries)
+    if ($Settings.localePreferenceNeedsConfirmation -or $Settings.localePreferenceSource -eq 'migration-pending') { throw 'LocaleMigrationPending' }
+    $aliases = Convert-EntryAliasesToHashtable $Settings.entryAliases
+    $seen = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($entry in @($CurrentEntries)) {
+        if (-not $seen.Add((ConvertTo-PortableGuidCore $entry.Guid))) { throw 'DuplicateLocalIdentity' }
+    }
+    $rows = @(
+        foreach ($entry in @(Get-OrderedEntriesCore -Source $CurrentEntries -Order $Settings.entryOrder -Hidden $Settings.hiddenEntryGuids -IncludeHidden)) {
+            $guid = ConvertTo-PortableGuidCore $entry.Guid
+            [ordered]@{guid=$guid;alias=[string]$aliases[$guid];hidden=(Test-GuidInList -Guid $guid -List $Settings.hiddenEntryGuids)}
+        }
+    )
+    $payload = [ordered]@{format='LenovoBootSelector.Preferences';version=1;locale=[string]$Settings.locale;entries=$rows}
+    $json = ConvertTo-Json -InputObject $payload -Depth 5
+    # Self-validate before any file write; never emit an unsupported file.
+    [void](ConvertFrom-PortablePreferencesCore $json)
+    return $json
+}
+
+function New-PortablePreferencesPlanCore {
+    param($Imported,$Settings,[object[]]$CurrentEntries)
+    if ($Settings.localePreferenceNeedsConfirmation -or $Settings.localePreferenceSource -eq 'migration-pending') { throw 'LocaleMigrationPending' }
+    $local = @{}
+    foreach ($entry in @($CurrentEntries)) {
+        $guid = ConvertTo-PortableGuidCore $entry.Guid
+        if ($local.ContainsKey($guid)) { throw 'DuplicateLocalIdentity' }
+        $local[$guid]=$entry
+    }
+    $aliases = Convert-EntryAliasesToHashtable $Settings.entryAliases
+    $hidden = @($Settings.hiddenEntryGuids)
+    $ordered = @(Get-OrderedEntriesCore -Source $CurrentEntries -Order $Settings.entryOrder -Hidden $hidden -IncludeHidden | ForEach-Object { [string]$_.Guid })
+    # Preserve unavailable persisted order entries at their existing positions.
+    $order = [System.Collections.Generic.List[string]]::new()
+    $orderSeen = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($guid in @($Settings.entryOrder)+$ordered) {
+        if ($guid -and $orderSeen.Add([string]$guid)) { $order.Add([string]$guid) }
+    }
+    $matched = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $importOrder = [System.Collections.Generic.List[string]]::new()
+    $preview = [System.Collections.Generic.List[object]]::new()
+    foreach ($row in @($Imported.entries)) {
+        $guid = $row.guid
+        if (-not $local.ContainsKey($guid)) {
+            $preview.Add([pscustomobject]@{Guid=$guid;Title='';Status='Unmatched';OldAlias='';NewAlias=$row.alias;OldHidden=$null;NewHidden=$row.hidden;OldPosition=$null;NewPosition=$null;AliasSkipped=$false})
+            continue
+        }
+        $old = [string]$aliases[$guid]
+        $skip = -not (Test-EntryAliasChangeCore -Value $row.alias -Previous $old)
+        $new = if ($skip) {$old} else {$row.alias}
+        $wasHidden = Test-GuidInList -Guid $guid -List $hidden
+        if ($new) { $aliases[$guid]=$new } else { $aliases.Remove($guid) }
+        if ($wasHidden -ne $row.hidden) {
+            $hidden = @($hidden | Where-Object { $_ -ne $guid })
+            if ($row.hidden) { $hidden += $guid }
+        }
+        [void]$matched.Add($guid)
+        $importOrder.Add($guid)
+        $preview.Add([pscustomobject]@{Guid=$guid;Title=[string]$local[$guid].Title;Status='Matched';OldAlias=$old;NewAlias=$new;OldHidden=$wasHidden;NewHidden=$row.hidden;OldPosition=([array]::IndexOf($ordered,$guid)+1);NewPosition=$null;AliasSkipped=$skip})
+    }
+    $index=0
+    for ($i=0;$i -lt $order.Count;$i++) {
+        if ($matched.Contains($order[$i])) { $order[$i]=$importOrder[$index]; $index++ }
+    }
+    $newOrdered = @($order | Where-Object { $local.ContainsKey($_) })
+    foreach ($row in $preview) {
+        if ($row.Status -eq 'Matched') { $row.NewPosition=[array]::IndexOf($newOrdered,$row.Guid)+1 }
+    }
+    foreach ($guid in $ordered) {
+        if (-not $matched.Contains($guid)) {
+            $preview.Add([pscustomobject]@{Guid=$guid;Title=[string]$local[$guid].Title;Status='LocalOnly';OldAlias=[string]$aliases[$guid];NewAlias=[string]$aliases[$guid];OldHidden=(Test-GuidInList -Guid $guid -List $hidden);NewHidden=(Test-GuidInList -Guid $guid -List $hidden);OldPosition=([array]::IndexOf($ordered,$guid)+1);NewPosition=([array]::IndexOf($newOrdered,$guid)+1);AliasSkipped=$false})
+        }
+    }
+    $unavailable = @(@($Settings.entryOrder)+@($Settings.hiddenEntryGuids)+@($aliases.Keys) | Where-Object { $_ -and -not $local.ContainsKey($_) } | Sort-Object -Unique)
+    $resultOrder = if (Test-StringSequenceEqual -Left $ordered -Right $newOrdered) { @($Settings.entryOrder) } else { $order.ToArray() }
+    return [pscustomobject]@{Locale=$Imported.locale;OldLocale=$Settings.locale;EntryOrder=@($resultOrder);HiddenEntryGuids=@($hidden | Select-Object -Unique);EntryAliases=$aliases;Rows=$preview.ToArray();UnavailableLocal=$unavailable}
 }
 
 # LBS-143: pure, fail-closed boot ownership decision core.
@@ -2296,6 +2606,18 @@ public static class LenovoSettingsInk
                         if (up) g.DrawLines(p,new Point[] { new Point(7,8),new Point(12,3),new Point(17,8) });
                         else g.DrawLines(p,new Point[] { new Point(7,11),new Point(12,16),new Point(17,11) });
                         g.DrawLines(p,new Point[] { new Point(4,15),new Point(4,21),new Point(20,21),new Point(20,15) }); break;
+                    case "preferences-export":
+                    case "preferences-import":
+                        g.DrawLines(p,new Point[] { new Point(4,3),new Point(13,3),new Point(18,8),new Point(18,21),new Point(4,21),new Point(4,3) });
+                        g.DrawLines(p,new Point[] { new Point(13,3),new Point(13,8),new Point(18,8) });
+                        if (key == "preferences-export") {
+                            g.DrawLine(p,8,14,22,14);
+                            g.DrawLines(p,new Point[] { new Point(18,10),new Point(22,14),new Point(18,18) });
+                        } else {
+                            g.DrawLine(p,22,14,8,14);
+                            g.DrawLines(p,new Point[] { new Point(12,10),new Point(8,14),new Point(12,18) });
+                        }
+                        break;
                     case "diagnostics-save":
                         g.DrawLines(p,new Point[] { new Point(5,3),new Point(14,3),new Point(19,8),new Point(19,21),new Point(5,21),new Point(5,3) });
                         g.DrawLines(p,new Point[] { new Point(14,3),new Point(14,8),new Point(19,8) });
@@ -2843,7 +3165,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.20.6'
+$script:AppVersion = '1.6.0.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -2919,6 +3241,10 @@ $script:LanguageMenuRoot = $null
 $script:LanguageEnglishMenuItem = $null
 $script:LanguageGermanMenuItem = $null
 $script:MaintenanceRootMenuItem = $null
+$script:PreferencesMenuRoot = $null
+$script:PreferencesExportMenuItem = $null
+$script:PreferencesImportMenuItem = $null
+$script:PreferencesUiActive = $false
 $script:TrayExitMenuItem = $null
 $script:RefreshButton = $null
 $script:RefreshButtonHovered = $false
@@ -5968,6 +6294,92 @@ function Remove-LegacySessionRestoreMarker {
     catch { }
 }
 
+# Local, unelevated, bounded IO only. No firmware, registry, process or broker calls.
+function Read-PreferencesFileSnapshot {
+    param([Parameter(Mandatory=$true)][string]$Path,[switch]$AllowMissing)
+    $stream=$null
+    try {
+        try { $stream=[IO.File]::Open($Path,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read) }
+        catch [IO.FileNotFoundException] { if ($AllowMissing) { return [pscustomobject]@{Exists=$false;Token='missing';Text=''} }; throw }
+        catch [IO.DirectoryNotFoundException] { if ($AllowMissing) { return [pscustomobject]@{Exists=$false;Token='missing';Text=''} }; throw }
+        $length=$stream.Length
+        if ($length -gt (Get-PortablePreferencesLimitCore)) { throw 'InvalidSize' }
+        $bytes=[byte[]]::new([int]$length)
+        $offset=0
+        while ($offset -lt $bytes.Length) {
+            $count=$stream.Read($bytes,$offset,$bytes.Length-$offset)
+            if ($count -le 0) { throw 'ReadChanged' }
+            $offset+=$count
+        }
+        if ($stream.ReadByte() -ne -1) { throw 'ReadChanged' }
+        $sha=[Security.Cryptography.SHA256]::Create()
+        try { $token=[BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-','').ToLowerInvariant() }
+        finally { $sha.Dispose() }
+        $start=0
+        if ($bytes.Length -ge 3 -and $bytes[0] -eq 239 -and $bytes[1] -eq 187 -and $bytes[2] -eq 191) { $start=3 }
+        $encoding=[Text.UTF8Encoding]::new($false,$true)
+        $text=$encoding.GetString($bytes,$start,$bytes.Length-$start)
+        return [pscustomobject]@{Exists=$true;Token=$token;Text=$text}
+    }
+    finally { if ($stream) { $stream.Dispose() } }
+}
+
+function Write-PreferencesFileAtomic {
+    param([Parameter(Mandatory=$true)][string]$Path,[Parameter(Mandatory=$true)][string]$Text,[Parameter(Mandatory=$true)][string]$ExpectedToken)
+    $encoding=[Text.UTF8Encoding]::new($false,$true)
+    $bytes=$encoding.GetBytes($Text)
+    if ($bytes.Length -gt (Get-PortablePreferencesLimitCore)) { throw 'InvalidSize' }
+    $path=[IO.Path]::GetFullPath($Path)
+    $directory=[IO.Path]::GetDirectoryName($path)
+    $original=Read-PreferencesFileSnapshot -Path $path -AllowMissing
+    if ($original.Token -cne $ExpectedToken) { throw 'StalePreview' }
+    # A unique sibling temporary file permits an atomic same-volume rename.
+    # File.Replace retains a rollback copy until the replacement succeeds.
+    [void][IO.Directory]::CreateDirectory($directory)
+    $nonce=[guid]::NewGuid().ToString('N')
+    $temporary=[IO.Path]::Combine($directory,'.lbs-preferences-'+$nonce+'.tmp')
+    $backup=[IO.Path]::Combine($directory,'.lbs-preferences-'+$nonce+'.bak')
+    $committed=$false
+    $replacementAttempted=$false
+    try {
+        $stream=[IO.File]::Open($temporary,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+        try { $stream.Write($bytes,0,$bytes.Length); $stream.Flush($true) }
+        finally { $stream.Dispose() }
+        $new=Read-PreferencesFileSnapshot -Path $temporary
+        $latest=Read-PreferencesFileSnapshot -Path $path -AllowMissing
+        if ($latest.Token -cne $ExpectedToken) { throw 'StalePreview' }
+        $replacementAttempted=$true
+        if ($original.Exists) { [IO.File]::Replace($temporary,$path,$backup) }
+        else { [IO.File]::Move($temporary,$path) }
+        $committed=$true
+    }
+    catch {
+        if ($replacementAttempted) {
+            try {
+                $observed=Read-PreferencesFileSnapshot -Path $path -AllowMissing
+                if ($observed.Token -cne $ExpectedToken) {
+                    # Never overwrite an unrelated external writer's new data.
+                    if ($original.Exists -and [IO.File]::Exists($backup) -and
+                        (-not $observed.Exists -or $observed.Token -ceq $new.Token)) {
+                        if ($observed.Exists) { [IO.File]::Replace($backup,$path,$null) }
+                        else { [IO.File]::Move($backup,$path) }
+                    }
+                    elseif (-not $original.Exists -and $observed.Token -ceq $new.Token) { [IO.File]::Delete($path) }
+                    else { throw 'CommitUncertain' }
+                    if ((Read-PreferencesFileSnapshot -Path $path -AllowMissing).Token -cne $ExpectedToken) { throw 'CommitUncertain' }
+                }
+            }
+            catch { throw 'CommitUncertain' }
+        }
+        throw
+    }
+    finally {
+        try { if ([IO.File]::Exists($temporary)) { [IO.File]::Delete($temporary) } } catch { }
+        # Preserve an available rollback copy on uncertain failure.
+        if ($committed) { try { if ([IO.File]::Exists($backup)) { [IO.File]::Delete($backup) } } catch { } }
+    }
+}
+
 
 function New-AppSettingsLoadResult {
     param(
@@ -6122,6 +6534,153 @@ function Load-AppSettings {
     Remove-LegacySessionRestoreMarker -RegistryPath $script:LegacySessionRestoreRegistryPath -ValueName $script:LegacySessionRestoreValueName
 }
 
+# Application owner for the explicit preference import transaction.
+function Test-PortablePreferencesAvailable {
+    param([switch]$PresentationOnly)
+    if ($script:IsManageEntriesMode -or $script:BootNextPendingGuid -or $script:DefaultTargetChangePending -or
+        $script:LocalePreferenceNeedsConfirmation -or ($script:SettingsLoadState -and $script:SettingsLoadState.PersistenceBlocked) -or
+        (Test-MaintenanceBusy) -or ($script:BackgroundRefreshState -and (Test-BackgroundRefreshActive -State $script:BackgroundRefreshState))) { return $false }
+    if ($PresentationOnly) {
+        # The existing settings timer only reflects cached presentation facts.
+        # The action owner revalidates the complete current capability gate.
+        return [bool]($script:TaskBrokerReadyCached -eq $true -and @($script:CurrentEntries).Count -gt 0 -and -not (Test-BootTargetDriftRuntimeDetected -State $script:BootTargetDriftState))
+    }
+    return [bool](Get-CurrentSystemFunctionsCapabilities).CanManageEntries
+}
+
+function ConvertTo-PreferencesSettingsPayload {
+    param($Settings)
+    $aliases=[ordered]@{}
+    $map=Convert-EntryAliasesToHashtable $Settings.entryAliases
+    foreach ($key in @($map.Keys | Sort-Object)) { $aliases[$key]=$map[$key] }
+    return [ordered]@{
+        schemaVersion=6
+        locale=[string]$Settings.locale
+        localePreferenceSource=[string]$Settings.localePreferenceSource
+        defaultGuid=$Settings.defaultGuid
+        entryOrder=@($Settings.entryOrder)
+        hiddenEntryGuids=@($Settings.hiddenEntryGuids)
+        entryAliases=$aliases
+    }
+}
+
+function Get-PortablePreferencesContext {
+    if (-not (Test-PortablePreferencesAvailable)) { throw 'PreferencesUnavailable' }
+    try { $file=Read-PreferencesFileSnapshot -Path $script:SettingsPath -AllowMissing }
+    catch { throw 'InvalidLocalSettings' }
+    $raw=$null
+    if ($file.Exists) {
+        try { $raw=(Read-BoundedPreferencesJsonCore $file.Text).Value }
+        catch { throw 'InvalidLocalSettings' }
+        if ($raw -isnot [Collections.IDictionary]) { throw 'InvalidLocalSettings' }
+        foreach ($key in $raw.Keys) {
+            if ($key -cnotin @('schemaVersion','locale','localePreferenceSource','defaultGuid','entryOrder','hiddenEntryGuids','entryAliases')) { throw 'UnsupportedLocalSettings' }
+        }
+        if ($raw.Contains('schemaVersion') -and ($raw.schemaVersion -isnot [int] -or $raw.schemaVersion -lt 1 -or $raw.schemaVersion -gt 6)) { throw 'UnsupportedLocalSettings' }
+        try {
+            foreach ($field in @('locale','localePreferenceSource')) {
+                if ($raw.Contains($field) -and $raw[$field] -isnot [string]) { throw 'InvalidLocalSettings' }
+            }
+            if ($raw.Contains('defaultGuid') -and $null -ne $raw.defaultGuid -and $raw.defaultGuid -ne '') { [void](ConvertTo-PortableGuidCore $raw.defaultGuid) }
+            foreach ($field in @('entryOrder','hiddenEntryGuids')) {
+                if (-not $raw.Contains($field)) { continue }
+                if ($raw[$field] -isnot [array]) { throw 'InvalidLocalSettings' }
+                $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+                foreach ($guid in $raw[$field]) {
+                    if (-not $seen.Add((ConvertTo-PortableGuidCore $guid))) { throw 'InvalidLocalSettings' }
+                }
+            }
+            if ($raw.Contains('entryAliases')) {
+                if ($raw.entryAliases -isnot [Collections.IDictionary]) { throw 'InvalidLocalSettings' }
+                foreach ($key in $raw.entryAliases.Keys) {
+                    [void](ConvertTo-PortableGuidCore $key)
+                    if ($raw.entryAliases[$key] -isnot [string]) { throw 'InvalidLocalSettings' }
+                }
+            }
+        } catch { throw 'InvalidLocalSettings' }
+    }
+    $persisted=ConvertTo-NormalizedAppSettingsCore -Source $raw
+    if ($persisted.localePreferenceNeedsConfirmation) { throw 'LocaleMigrationPending' }
+    $runtime=[pscustomobject]@{
+        locale=$script:UiLocale;localePreferenceSource=$script:LocalePreferenceSource
+        localePreferenceNeedsConfirmation=$script:LocalePreferenceNeedsConfirmation
+        defaultGuid=$script:LegacyDefaultGuid
+        entryOrder=@($script:EntryOrder);hiddenEntryGuids=@($script:HiddenEntryGuids)
+        entryAliases=(Copy-EntryAliasMap $script:EntryAliases)
+    }
+    $payload=ConvertTo-PreferencesSettingsPayload $runtime
+    $serialized=ConvertTo-Json -InputObject $payload -Depth 6 -Compress
+    if ($serialized -cne (ConvertTo-Json -InputObject (ConvertTo-PreferencesSettingsPayload $persisted) -Depth 6 -Compress)) { throw 'LocalSettingsChanged' }
+    $entries=@(foreach ($entry in @($script:CurrentEntries)) { [pscustomobject]@{Guid=(ConvertTo-PortableGuidCore $entry.Guid);Title=[string]$entry.Title} })
+    # Include displayed local identity/title/order and exact persisted bytes
+    # so a changed refresh or settings write invalidates the preview.
+    $entrySnapshot=ConvertTo-Json -InputObject $entries -Depth 3 -Compress
+    return [pscustomobject]@{Settings=$runtime;Entries=$entries;Token=$file.Token;Runtime=$serialized;EntrySnapshot=$entrySnapshot}
+}
+
+function Assert-PortablePreferencesContextCurrent {
+    param($Context)
+    $now=Get-PortablePreferencesContext
+    if ($now.Token -cne $Context.Token -or $now.Runtime -cne $Context.Runtime -or $now.EntrySnapshot -cne $Context.EntrySnapshot) { throw 'StalePreview' }
+    return $now
+}
+
+function New-PortablePreferencesImport {
+    param([string]$Path)
+    $inputFile=Read-PreferencesFileSnapshot -Path $Path
+    $document=ConvertFrom-PortablePreferencesCore $inputFile.Text
+    $context=Get-PortablePreferencesContext
+    return [pscustomobject]@{Document=$document;Context=$context;Plan=(New-PortablePreferencesPlanCore $document $context.Settings $context.Entries)}
+}
+
+function Save-PortablePreferencesExport {
+    param([string]$Path,$Context)
+    $current=Assert-PortablePreferencesContextCurrent $Context
+    $full=[IO.Path]::GetFullPath($Path)
+    $settingsRoot=[IO.Path]::GetFullPath($script:SettingsDir).TrimEnd('\','/')+[IO.Path]::DirectorySeparatorChar
+    if ([IO.Path]::GetExtension($full) -ine '.json' -or $full.StartsWith($settingsRoot,[StringComparison]::OrdinalIgnoreCase)) { throw 'InvalidDestination' }
+    $existing=Read-PreferencesFileSnapshot -Path $full -AllowMissing
+    # Never replace another JSON format (especially settings.json or diagnostics).
+    if ($existing.Exists) {
+        try { [void](ConvertFrom-PortablePreferencesCore $existing.Text) }
+        catch { throw 'InvalidDestination' }
+    }
+    $json=New-PortablePreferencesCore $current.Settings $current.Entries
+    Write-PreferencesFileAtomic -Path $full -Text $json -ExpectedToken $existing.Token
+}
+
+function Complete-PortablePreferencesImport {
+    param($Import)
+    $context=Assert-PortablePreferencesContextCurrent $Import.Context
+    # Recompute from the validated document, not mutable preview controls.
+    $plan=New-PortablePreferencesPlanCore $Import.Document $context.Settings $context.Entries
+    $payload=ConvertTo-PreferencesSettingsPayload $context.Settings
+    $payload.locale=$plan.Locale
+    $payload.localePreferenceSource='user'
+    $payload.entryOrder=@($plan.EntryOrder)
+    $payload.hiddenEntryGuids=@($plan.HiddenEntryGuids)
+    $aliases=[ordered]@{}
+    foreach ($key in @($plan.EntryAliases.Keys | Sort-Object)) { $aliases[$key]=$plan.EntryAliases[$key] }
+    $payload.entryAliases=$aliases
+    $json=ConvertTo-Json -InputObject $payload -Depth 6
+    try { Write-PreferencesFileAtomic -Path $script:SettingsPath -Text $json -ExpectedToken $context.Token }
+    catch {
+        if ($_.Exception.Message -eq 'CommitUncertain') {
+            Set-AppSettingsLoadState -Outcome (New-AppSettingsLoadResult -Status 'Unreadable' -Settings $null -FailureKind 'ImportCommitUncertain')
+        }
+        throw
+    }
+    # Commit first; no mutable runtime preferences are changed on failed IO.
+    $script:UiLocale=$plan.Locale
+    $script:LocalePreferenceSource='user'
+    $script:LocalePreferenceNeedsConfirmation=$false
+    $script:EntryOrder=@($plan.EntryOrder)
+    $script:HiddenEntryGuids=@($plan.HiddenEntryGuids)
+    $script:EntryAliases=Copy-EntryAliasMap $plan.EntryAliases
+    Set-AppSettingsLoadState -Outcome (New-AppSettingsLoadResult -Status 'Loaded' -Settings $null)
+    return $plan
+}
+
 function Resolve-PendingLocalePreference {
     if (-not $script:LocalePreferenceNeedsConfirmation) { return $false }
 
@@ -6148,6 +6707,9 @@ function Update-LanguageMenuState {
 function Update-TrayLocalizedText {
     if ($script:TrayOpenMenuItem) { $script:TrayOpenMenuItem.Text = Get-LocalizedString -Key 'Tray.Open' }
     if ($script:AutostartMenuItem) { $script:AutostartMenuItem.Text = Get-LocalizedString -Key 'Settings.Autostart' }
+    if ($script:PreferencesMenuRoot) { $script:PreferencesMenuRoot.Text = Get-LocalizedString -Key 'Preferences.Menu' }
+    if ($script:PreferencesExportMenuItem) { $script:PreferencesExportMenuItem.Text = Get-LocalizedString -Key 'Preferences.Export' }
+    if ($script:PreferencesImportMenuItem) { $script:PreferencesImportMenuItem.Text = Get-LocalizedString -Key 'Preferences.Import' }
     if ($script:MaintenanceRootMenuItem) { $script:MaintenanceRootMenuItem.Text = Get-LocalizedString -Key 'Tray.Maintenance' }
     if ($script:TaskBrokerSetupMenuItem) { $script:TaskBrokerSetupMenuItem.Text = Get-LocalizedString -Key 'Maintenance.Setup' }
     if ($script:TaskBrokerRemoveMenuItem) { $script:TaskBrokerRemoveMenuItem.Text = Get-LocalizedString -Key 'Maintenance.Remove' }
@@ -7632,6 +8194,276 @@ function Show-LenovoRestartDialog {
     }
     finally {
         $form.Dispose()
+    }
+}
+
+# Manual preference workflows. Imported text is data, never an action.
+function Update-PortablePreferencesMenuState {
+    $available=[bool](Test-PortablePreferencesAvailable -PresentationOnly)
+    foreach ($item in @($script:PreferencesExportMenuItem,$script:PreferencesImportMenuItem)) {
+        if ($item -and -not $item.IsDisposed) { $item.Enabled=$available }
+    }
+}
+
+function Format-PreferencesPreviewValue {
+    param([AllowEmptyString()][string]$Value)
+    if (-not $Value) { return (Get-LocalizedString -Key 'Preferences.NoAlias') }
+    # Escape invisible control/format characters so they cannot spoof a row.
+    $literal=[regex]::Replace($Value.Replace('\','\\'),'[\p{Cc}\p{Cf}]',[System.Text.RegularExpressions.MatchEvaluator]{
+        param($match) return ('\u{0:x4}' -f [int][char]$match.Value[0])
+    })
+    return ('"'+$literal.Replace('"','\"')+'"')
+}
+
+function Get-PreferencesPreviewText {
+    param($Plan)
+    $lines=[System.Collections.Generic.List[string]]::new()
+    $lines.Add((Get-LocalizedString -Key 'Preferences.ReconcileWarning'))
+    $lines.Add('')
+    $lines.Add((Get-LocalizedString -Key 'Preferences.PreviewLanguage' -Values @{Before=$Plan.OldLocale;After=$Plan.Locale}))
+    $lines.Add((Get-LocalizedString -Key 'Preferences.PreviewCounts' -Values @{
+        Matched=@($Plan.Rows | Where-Object Status -eq 'Matched').Count
+        Unmatched=@($Plan.Rows | Where-Object Status -eq 'Unmatched').Count
+        Local=@($Plan.Rows | Where-Object Status -eq 'LocalOnly').Count
+    }))
+    foreach ($row in @($Plan.Rows)) {
+        $lines.Add('')
+        $lines.Add((Get-LocalizedString -Key ('Preferences.'+$row.Status)))
+        if ($row.Title) { $lines.Add((Format-PreferencesPreviewValue $row.Title)) }
+        $lines.Add([string]$row.Guid)
+        $newVisibility=Get-LocalizedString -Key $(if ($row.NewHidden) {'Preferences.Hidden'} else {'Preferences.Visible'})
+        if ($row.Status -eq 'Unmatched') {
+            $lines.Add((Get-LocalizedString -Key 'Preferences.AliasChange' -Values @{Before='—';After=(Format-PreferencesPreviewValue $row.NewAlias)}))
+            $lines.Add((Get-LocalizedString -Key 'Preferences.VisibilityChange' -Values @{Before='—';After=$newVisibility}))
+            continue
+        }
+        $oldVisibility=Get-LocalizedString -Key $(if ($row.OldHidden) {'Preferences.Hidden'} else {'Preferences.Visible'})
+        $lines.Add((Get-LocalizedString -Key 'Preferences.AliasChange' -Values @{Before=(Format-PreferencesPreviewValue $row.OldAlias);After=(Format-PreferencesPreviewValue $row.NewAlias)}))
+        if ($row.AliasSkipped) { $lines.Add((Get-LocalizedString -Key 'Preferences.AliasSkipped')) }
+        $lines.Add((Get-LocalizedString -Key 'Preferences.VisibilityChange' -Values @{Before=$oldVisibility;After=$newVisibility}))
+        $lines.Add((Get-LocalizedString -Key 'Preferences.OrderChange' -Values @{Before=$row.OldPosition;After=$row.NewPosition}))
+    }
+    $lines.Add('')
+    $lines.Add((Get-LocalizedString -Key 'Preferences.Unavailable'))
+    if (@($Plan.UnavailableLocal).Count -eq 0) { $lines.Add((Get-LocalizedString -Key 'Preferences.None')) }
+    else { foreach ($guid in @($Plan.UnavailableLocal)) { $lines.Add((Format-PreferencesPreviewValue $guid)) } }
+    $lines.Add('')
+    $lines.Add((Get-LocalizedString -Key 'Preferences.Scope'))
+    return [string]::Join([Environment]::NewLine,$lines.ToArray())
+}
+
+function New-PreferencesConfirmationForm {
+    param([string]$Title,[string]$Text,[string]$ConfirmText)
+    $form=New-Object Windows.Forms.Form
+    $form.Name='LenovoPreferencesConfirmation'
+    $form.Text=$Title
+    $form.AccessibleName=$Title
+    $form.FormBorderStyle=[Windows.Forms.FormBorderStyle]::None
+    $form.AutoScaleMode=[Windows.Forms.AutoScaleMode]::None
+    $form.ShowInTaskbar=$false
+    $form.TopMost=$true
+    $form.StartPosition=[Windows.Forms.FormStartPosition]::Manual
+    $form.BackColor=$script:ColorBackground
+    $heading=New-Object Windows.Forms.Label
+    $heading.Text=$Title
+    $heading.UseMnemonic=$false
+    $heading.ForeColor=$script:ColorPrimary
+    $heading.BackColor=$script:ColorHeader
+    $heading.TextAlign=[Drawing.ContentAlignment]::MiddleLeft
+    $heading.Font=[Drawing.Font]::new('Segoe UI',11,[Drawing.FontStyle]::Bold)
+    $heading.Name='PreferencesTitle'
+    $content=New-Object Windows.Forms.TextBox
+    $content.Name='PreferencesPreviewText'
+    $content.AccessibleName=$Title
+    $content.Multiline=$true
+    $content.MaxLength=0
+    $content.ReadOnly=$true
+    $content.WordWrap=$true
+    $content.ScrollBars=[Windows.Forms.ScrollBars]::Vertical
+    $content.BackColor=$script:ColorSurface
+    $content.ForeColor=$script:ColorPrimary
+    $content.Font=[Drawing.Font]::new('Segoe UI',9.5)
+    $content.BorderStyle=[Windows.Forms.BorderStyle]::FixedSingle
+    $content.Text=$Text
+    $content.SelectionStart=0
+    $content.TabIndex=1
+    $cancel=New-Object Windows.Forms.Button
+    $cancel.Name='PreferencesCancel'
+    $cancel.Text=Get-LocalizedString -Key 'Common.Cancel'
+    $cancel.DialogResult=[Windows.Forms.DialogResult]::Cancel
+    $cancel.TabIndex=0
+    $confirm=New-Object Windows.Forms.Button
+    $confirm.Name='PreferencesConfirm'
+    $confirm.Text=$ConfirmText
+    $confirm.DialogResult=[Windows.Forms.DialogResult]::OK
+    $confirm.TabIndex=2
+    foreach ($button in @($cancel,$confirm)) {
+        $button.Font=[Drawing.Font]::new('Segoe UI',9.5)
+        $button.FlatStyle=[Windows.Forms.FlatStyle]::Flat
+        $button.UseVisualStyleBackColor=$false
+        $button.UseMnemonic=$false
+        $button.Cursor=[Windows.Forms.Cursors]::Hand
+        $button.ForeColor=$script:ColorPrimary
+        $button.BackColor=if ($button -eq $confirm) {$script:ColorAccent} else {$script:ColorSurface}
+        $button.FlatAppearance.BorderColor=[Drawing.Color]::FromArgb(70,70,70)
+    }
+    $form.Controls.Add($heading)
+    $form.Controls.Add($content)
+    $form.Controls.Add($cancel)
+    $form.Controls.Add($confirm)
+    # Enter and Escape before a deliberate choice dismiss without writing.
+    $form.AcceptButton=$cancel
+    $form.CancelButton=$cancel
+    $form.Tag=[pscustomobject]@{Heading=$heading;Content=$content;Cancel=$cancel;Confirm=$confirm;Fonts=@($heading.Font,$content.Font,$cancel.Font,$confirm.Font)}
+    $form.Add_Shown({ if ($this.Tag.Cancel.CanFocus) { [void]$this.Tag.Cancel.Focus() } })
+    $form.Add_Disposed({ foreach ($font in $this.Tag.Fonts) { $font.Dispose() } })
+    return $form
+}
+
+function Set-PreferencesConfirmationLayout {
+    param([Windows.Forms.Form]$Form,[double]$Scale,[Drawing.Rectangle]$WorkingArea)
+    if ($Scale -lt 1.0 -or $Scale -gt 5.0) { throw 'InvalidPreviewLayout' }
+    function Px([double]$value) { return [Math]::Max(1,[int][Math]::Round($value*$Scale)) }
+    $track=[Windows.Forms.SystemInformation]::MaxWindowTrackSize
+    $width=[Math]::Min((Px 560),[Math]::Min($WorkingArea.Width,$track.Width))
+    $height=[Math]::Min((Px 470),[Math]::Min($WorkingArea.Height,$track.Height))
+    $Form.ClientSize=[Drawing.Size]::new($width,$height)
+    $width=$Form.ClientSize.Width
+    $height=$Form.ClientSize.Height
+    $pad=Px 12
+    $buttonHeight=Px 36
+    $headingHeight=Px 46
+    $gap=Px 8
+    $bitmap=[Drawing.Bitmap]::new(8,8)
+    try {
+        $bitmap.SetResolution([single](96*$Scale),[single](96*$Scale))
+        $graphics=[Drawing.Graphics]::FromImage($bitmap)
+        try {
+            $titleHeight=[int][Math]::Ceiling($graphics.MeasureString($Form.Tag.Heading.Text,$Form.Tag.Heading.Font,[Math]::Max(1,$width-2*$pad)).Height)+(Px 10)
+            $headingHeight=[Math]::Max($headingHeight,$titleHeight)
+            $cancelWidth=[Math]::Max((Px 100),[int][Math]::Ceiling($graphics.MeasureString($Form.Tag.Cancel.Text,$Form.Tag.Cancel.Font).Width)+(Px 20))
+            $confirmWidth=[Math]::Max((Px 120),[int][Math]::Ceiling($graphics.MeasureString($Form.Tag.Confirm.Text,$Form.Tag.Confirm.Font).Width)+(Px 20))
+        } finally { $graphics.Dispose() }
+    } finally { $bitmap.Dispose() }
+    $stacked=($cancelWidth+$confirmWidth+$gap -gt $width-2*$pad)
+    $footer=if ($stacked) { 2*$buttonHeight+$gap+2*$pad } else { $buttonHeight+2*$pad }
+    if ($width-2*$pad -lt [Math]::Max($cancelWidth,$confirmWidth) -or $height-$headingHeight-$footer-2*$pad -lt (Px 50)) { throw 'InvalidPreviewLayout' }
+    $Form.Tag.Heading.Bounds=[Drawing.Rectangle]::new($pad,0,($width-2*$pad),$headingHeight)
+    $Form.Tag.Content.Bounds=[Drawing.Rectangle]::new($pad,($headingHeight+$pad),($width-2*$pad),($height-$headingHeight-$footer-2*$pad))
+    if ($stacked) {
+        $Form.Tag.Cancel.Bounds=[Drawing.Rectangle]::new($pad,($height-$footer+$pad),($width-2*$pad),$buttonHeight)
+        $Form.Tag.Confirm.Bounds=[Drawing.Rectangle]::new($pad,($height-$pad-$buttonHeight),($width-2*$pad),$buttonHeight)
+    } else {
+        $Form.Tag.Cancel.Bounds=[Drawing.Rectangle]::new(($width-$pad-$confirmWidth-$gap-$cancelWidth),($height-$pad-$buttonHeight),$cancelWidth,$buttonHeight)
+        $Form.Tag.Confirm.Bounds=[Drawing.Rectangle]::new(($width-$pad-$confirmWidth),($height-$pad-$buttonHeight),$confirmWidth,$buttonHeight)
+    }
+    $Form.Location=Get-LenovoVisibleDialogLocation -WorkingArea $WorkingArea -WindowSize $Form.Size
+}
+
+function Show-PreferencesConfirmation {
+    param([string]$Title,[string]$Text,[string]$ConfirmText)
+    $form=New-PreferencesConfirmationForm $Title $Text $ConfirmText
+    try {
+        $owner=Get-LenovoDialogOwner
+        $screen=if ($owner) {[Windows.Forms.Screen]::FromControl($owner)} else {[Windows.Forms.Screen]::PrimaryScreen}
+        $scale=Get-LenovoUiCoordinateScale -Screen $screen
+        Set-PreferencesConfirmationLayout -Form $form -Scale ([double]$scale.Factor) -WorkingArea $screen.WorkingArea
+        Register-LenovoDialogVisibilityCorrection -Form $form -Screen $screen
+        return ((Show-LenovoOwnedDialog -Form $form -Owner $owner) -eq [Windows.Forms.DialogResult]::OK)
+    } finally { $form.Dispose() }
+}
+
+function New-PreferencesFileDialog {
+    param([ValidateSet('Export','Import')][string]$Mode)
+    if ($Mode -eq 'Export') {
+        $dialog=New-Object Windows.Forms.SaveFileDialog
+        $dialog.Title=Get-LocalizedString -Key 'Preferences.ChooseExport'
+        $dialog.FileName='LenovoBootSelector-Preferences.json'
+        $dialog.OverwritePrompt=$true
+        $dialog.CreatePrompt=$false
+    } else {
+        $dialog=New-Object Windows.Forms.OpenFileDialog
+        $dialog.Title=Get-LocalizedString -Key 'Preferences.ChooseImport'
+        $dialog.CheckFileExists=$true
+        $dialog.Multiselect=$false
+    }
+    $dialog.Filter=Get-LocalizedString -Key 'Preferences.FileFilter'
+    $dialog.DefaultExt='json'
+    $dialog.AddExtension=$true
+    $dialog.CheckPathExists=$true
+    $dialog.ValidateNames=$true
+    $dialog.RestoreDirectory=$true
+    return $dialog
+}
+
+function Select-PreferencesFile {
+    param([ValidateSet('Export','Import')][string]$Mode)
+    $dialog=New-PreferencesFileDialog $Mode
+    try {
+        $owner=Get-LenovoDialogOwner
+        $result=if ($owner) { $dialog.ShowDialog($owner) } else { $dialog.ShowDialog() }
+        if ($result -eq [Windows.Forms.DialogResult]::OK) { return $dialog.FileName }
+        return $null
+    } finally { $dialog.Dispose() }
+}
+
+function Show-PortablePreferencesFromUi {
+    param([ValidateSet('Export','Import')][string]$Mode)
+    if ($script:PreferencesUiActive) { return }
+    $script:PreferencesUiActive=$true
+    $stage='read'
+    try {
+        if ($Mode -eq 'Export') {
+            $context=Get-PortablePreferencesContext
+            $unavailable=@(@($context.Settings.entryOrder)+@($context.Settings.hiddenEntryGuids)+@($context.Settings.entryAliases.Keys) | Where-Object { $_ -and $_ -notin $context.Entries.Guid } | Sort-Object -Unique)
+            $summary=(Get-LocalizedString -Key 'Preferences.Scope')+[Environment]::NewLine+[Environment]::NewLine+(Get-LocalizedString -Key 'Preferences.ExportSummary' -Values @{Count=$context.Entries.Count})
+            if ($unavailable.Count -gt 0) {
+                $summary += [Environment]::NewLine+[Environment]::NewLine+(Get-LocalizedString -Key 'Preferences.Unavailable')+[Environment]::NewLine+($unavailable -join [Environment]::NewLine)
+            }
+            if (-not (Show-PreferencesConfirmation -Title (Get-LocalizedString -Key 'Preferences.Export') -Text $summary -ConfirmText (Get-LocalizedString -Key 'Preferences.ExportConfirm'))) { return }
+            $path=Select-PreferencesFile -Mode Export
+            if (-not $path) { return }
+            $stage='write'
+            Save-PortablePreferencesExport -Path $path -Context $context
+            Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Preferences.Export') -Heading (Get-LocalizedString -Key 'Preferences.Exported') -Message (Get-LocalizedString -Key 'Preferences.ExportSuccess') -Kind Success
+        } else {
+            if (-not (Test-PortablePreferencesAvailable)) { throw 'PreferencesUnavailable' }
+            $path=Select-PreferencesFile -Mode Import
+            if (-not $path) { return }
+            $import=New-PortablePreferencesImport -Path $path
+            if (-not (Show-PreferencesConfirmation -Title (Get-LocalizedString -Key 'Preferences.PreviewTitle') -Text (Get-PreferencesPreviewText $import.Plan) -ConfirmText (Get-LocalizedString -Key 'Preferences.Apply'))) { return }
+            $stage='write'
+            $before=$script:UiLocale
+            [void](Complete-PortablePreferencesImport $import)
+            $stage='committed'
+            try {
+                Update-TrayLocalizedText
+                if ($before -cne $script:UiLocale) {
+                    Update-CachedBootEntryLocalization
+                    Update-PopupLocalePresentation
+                } elseif ($script:Popup -and -not $script:Popup.IsDisposed) { Update-PopupRows -Reason 'preferences-import' }
+                Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Preferences.Import') -Heading (Get-LocalizedString -Key 'Preferences.Imported') -Message (Get-LocalizedString -Key 'Preferences.ImportSuccess') -Kind Success
+            } catch {
+                Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Preferences.Import') -Heading (Get-LocalizedString -Key 'Preferences.Imported') -Message (Get-LocalizedString -Key 'Preferences.RefreshWarning') -Kind Warning
+            }
+        }
+    } catch {
+        $key=switch -CaseSensitive ($_.Exception.Message) {
+            'StalePreview' {'Preferences.ErrorStale'}
+            'PreferencesUnavailable' {'Preferences.ErrorBusy'}
+            'InvalidLocalSettings' {'Preferences.ErrorLocal'}
+            'UnsupportedLocalSettings' {'Preferences.ErrorLocal'}
+            'LocalSettingsChanged' {'Preferences.ErrorLocal'}
+            'LocaleMigrationPending' {'Preferences.ErrorLocal'}
+            'InvalidDestination' {'Preferences.ErrorDestination'}
+            'CommitUncertain' { if ($Mode -eq 'Export') {'Preferences.ExportUncertain'} else {'Preferences.ErrorUncertain'} }
+            'InvalidPreviewLayout' {'Preferences.ErrorLayout'}
+            default { if ($stage -eq 'committed') {'Preferences.RefreshWarning'} elseif ($stage -eq 'write') {'Preferences.ErrorSave'} else {'Preferences.ErrorInvalid'} }
+        }
+        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Preferences.ErrorTitle') -Heading (Get-LocalizedString -Key 'Preferences.ErrorTitle') -Message (Get-LocalizedString -Key $key) -Kind Error
+    } finally {
+        $script:PreferencesUiActive=$false
+        Update-PortablePreferencesMenuState
     }
 }
 
@@ -14147,6 +14979,8 @@ function Get-ConfigurationActionMenuItem {
         'system-remove' { return $script:TaskBrokerRemoveMenuItem }
         'update-check' { return $script:UpdateCheckMenuItem }
         'update-install' { return $script:UpdateInstallMenuItem }
+        'preferences-export' { return $script:PreferencesExportMenuItem }
+        'preferences-import' { return $script:PreferencesImportMenuItem }
         'diagnostics-save' { return $script:RuntimeDiagnosticMenuItem }
         'diagnostics-upload' { return $script:DiagnosticsUploadMenuItem }
     }
@@ -14156,6 +14990,9 @@ function Get-ConfigurationActionMenuItem {
 function Test-ConfigurationActionAvailable {
     param([string]$Action)
     $item = Get-ConfigurationActionMenuItem -Action $Action
+    if ($Action -like 'preferences-*' -and $item -and -not $item.IsDisposed) {
+        $item.Enabled = [bool](Test-PortablePreferencesAvailable -PresentationOnly)
+    }
     return [bool]($item -and -not $item.IsDisposed -and $item.Available -and $item.Enabled -and -not (Test-MaintenanceBusy))
 }
 
@@ -14324,7 +15161,7 @@ function Update-ConfigurationPopupLocale {
 }
 
 function New-ConfigurationPopup {
-    $form = New-AuxiliaryPopupForm -Name 'LenovoConfigurationPopup' -Title (Get-LocalizedString -Key 'Settings.More') -Subtitle (Get-LocalizedString -Key 'Settings.MoreSubtitle') -ContentHeight 570
+    $form = New-AuxiliaryPopupForm -Name 'LenovoConfigurationPopup' -Title (Get-LocalizedString -Key 'Settings.More') -Subtitle (Get-LocalizedString -Key 'Settings.MoreSubtitle') -ContentHeight 706
     $groupSurface = [Drawing.Color]::FromArgb(37,37,37)
     Add-ConfigurationHeading -Form $form -Key 'Settings.General' -Y 6
     $autostartLabel = New-Object LenovoSettingsAutostartLabel
@@ -14363,15 +15200,18 @@ function New-ConfigurationPopup {
     $form.Tag.Body.Controls.Add($language)
     Add-ConfigurationActionButton -Form $form -Action 'language-de' -Key 'Language.German' -Y 116 -Width 175
     Add-ConfigurationActionButton -Form $form -Action 'language-en' -Key 'Language.English' -Y 116 -X 191 -Width 175
-    Add-ConfigurationHeading -Form $form -Key 'Maintenance.Caption' -Y 164
-    Add-ConfigurationActionButton -Form $form -Action 'system-setup' -Key 'Maintenance.Setup' -Y 188 -Separator
-    Add-ConfigurationActionButton -Form $form -Action 'system-remove' -Key 'Maintenance.Remove' -Y 240
-    Add-ConfigurationHeading -Form $form -Key 'Settings.Updates' -Y 300
-    Add-ConfigurationActionButton -Form $form -Action 'update-check' -Key 'Update.Check' -Y 324 -Separator
-    Add-ConfigurationActionButton -Form $form -Action 'update-install' -Key 'Update.Install' -Y 376
-    Add-ConfigurationHeading -Form $form -Key 'Settings.Diagnostics' -Y 436
-    Add-ConfigurationActionButton -Form $form -Action 'diagnostics-save' -Key 'Diagnostics.Save' -Y 460 -Separator
-    Add-ConfigurationActionButton -Form $form -Action 'diagnostics-upload' -Key 'Diagnostics.Upload' -Y 512
+    Add-ConfigurationHeading -Form $form -Key 'Preferences.Heading' -Y 164
+    Add-ConfigurationActionButton -Form $form -Action 'preferences-export' -Key 'Preferences.Export' -Y 188 -Separator
+    Add-ConfigurationActionButton -Form $form -Action 'preferences-import' -Key 'Preferences.Import' -Y 240
+    Add-ConfigurationHeading -Form $form -Key 'Maintenance.Caption' -Y 300
+    Add-ConfigurationActionButton -Form $form -Action 'system-setup' -Key 'Maintenance.Setup' -Y 324 -Separator
+    Add-ConfigurationActionButton -Form $form -Action 'system-remove' -Key 'Maintenance.Remove' -Y 376
+    Add-ConfigurationHeading -Form $form -Key 'Settings.Updates' -Y 436
+    Add-ConfigurationActionButton -Form $form -Action 'update-check' -Key 'Update.Check' -Y 460 -Separator
+    Add-ConfigurationActionButton -Form $form -Action 'update-install' -Key 'Update.Install' -Y 512
+    Add-ConfigurationHeading -Form $form -Key 'Settings.Diagnostics' -Y 572
+    Add-ConfigurationActionButton -Form $form -Action 'diagnostics-save' -Key 'Diagnostics.Save' -Y 596 -Separator
+    Add-ConfigurationActionButton -Form $form -Action 'diagnostics-upload' -Key 'Diagnostics.Upload' -Y 648
     Update-ConfigurationPopupPresentation -Form $form
     # Reflect existing presentation state only; do not poll firmware/network.
     $timer = New-Object Windows.Forms.Timer
@@ -14678,6 +15518,7 @@ function Position-Popup {
 
 function Show-OrTogglePopup {
     param([switch]$FromTrayClick)
+    if ($script:PreferencesUiActive) { return }
     if ($script:ActiveOwnedDialog -and -not $script:ActiveOwnedDialog.IsDisposed) {
         [void]$script:ActiveOwnedDialog.Activate()
         return
@@ -14742,6 +15583,7 @@ function Show-OrTogglePopup {
 # Explicit launcher re-entry is SHOW, never the tray-icon toggle (which hides
 # an already visible popup). This runs on the existing WinForms UI thread.
 function Show-OrActivatePopup {
+    if ($script:PreferencesUiActive) { return }
     if ($script:ActiveOwnedDialog -and -not $script:ActiveOwnedDialog.IsDisposed) {
         [void]$script:ActiveOwnedDialog.Activate()
         return
@@ -15374,6 +16216,28 @@ try {
     Update-LanguageMenuState
     [void]$context.Items.Add($languageRoot)
 
+    $preferencesRoot = New-Object Windows.Forms.ToolStripMenuItem
+    $preferencesRoot.Text = Get-LocalizedString -Key 'Preferences.Menu'
+    $preferencesRoot.DropDown = New-Object LenovoDropDownMenu
+    $preferencesRoot.DropDown.TargetWidth = 260
+    Initialize-LenovoMenuAppearance -Menu $preferencesRoot.DropDown
+    $preferencesRoot.Add_DropDownOpening({
+        Initialize-LenovoMenuAppearance -Menu $this.DropDown
+        Update-PortablePreferencesMenuState
+    })
+    $script:PreferencesMenuRoot = $preferencesRoot
+    $exportItem = New-Object Windows.Forms.ToolStripMenuItem
+    $exportItem.Text = Get-LocalizedString -Key 'Preferences.Export'
+    $exportItem.Add_Click({ Show-PortablePreferencesFromUi -Mode Export })
+    $script:PreferencesExportMenuItem = $exportItem
+    [void]$preferencesRoot.DropDownItems.Add($exportItem)
+    $importItem = New-Object Windows.Forms.ToolStripMenuItem
+    $importItem.Text = Get-LocalizedString -Key 'Preferences.Import'
+    $importItem.Add_Click({ Show-PortablePreferencesFromUi -Mode Import })
+    $script:PreferencesImportMenuItem = $importItem
+    [void]$preferencesRoot.DropDownItems.Add($importItem)
+    [void]$context.Items.Add($preferencesRoot)
+
     $script:DefaultContextRoot = $null
     $script:ManageEntriesMenuItem = $null
 
@@ -15474,6 +16338,7 @@ try {
     $script:TrayPopupClickPoint = [Drawing.Point]::Empty
     $script:TrayIcon.Add_MouseClick({
         param($sender, $eventArgs)
+        if ($script:PreferencesUiActive) { return }
         if ($eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Left -or
             $eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Right) {
             # Capture only genuine tray-icon clicks; never borrow arbitrary cursor state.

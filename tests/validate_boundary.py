@@ -198,6 +198,19 @@ def main():
     s.absent('LBS-3 read-only export does not disclose Windows account name',snapshot,'WindowsIdentity]::GetCurrent().Name')
     for forbidden in ('Start-ScheduledTask','Register-ScheduledTask','/set ', 'bootsequence $guid'):
         s.absent('LBS-3 read-only export excludes privileged mutation: ' + forbidden,snapshot,forbidden)
+    # LBS-180 portable preferences are a presentation-only, unprivileged path.
+    portable_paths = ('src/Application/PortablePreferencesService.ps1',
+                      'src/Infrastructure/PreferencesFileRepository.ps1',
+                      'src/UI/PortablePreferencesPresentation.ps1')
+    for rel in portable_paths:
+        module = txt(root/rel)
+        for forbidden in ('Invoke-AuthorizedTask', 'Set-TaskBrokerBootNextTarget',
+                          'Set-TaskBrokerDefaultTarget', 'Clear-TaskBrokerDefaultTarget',
+                          'Start-BootNextSelection', 'Start-DefaultTargetChange',
+                          'Start-ScheduledTask', 'Set-AutostartEnabled',
+                          'Set-ItemProperty', 'Remove-ItemProperty', 'Invoke-Expression',
+                          'Start-Process', 'Load-AppSettings'):
+            s.absent(f'LBS-180 {rel} excludes {forbidden}', module, forbidden)
     # Deterministic build check.
     cp=subprocess.run([sys.executable,str(root/'tools/build_runtime.py'),'--root',str(root),'--check'],capture_output=True,text=True)
     s.eq('Runtime builder check succeeds',cp.returncode,0)

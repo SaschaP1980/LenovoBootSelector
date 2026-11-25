@@ -85,6 +85,7 @@ function Get-EntryByGuid($Guid) { return ($script:CurrentEntries | Where-Object 
 function Get-EntryDisplayTitle($Entry) { return [string]$Entry.Title }
 function Get-CurrentSystemFunctionsCapabilities { return [pscustomobject]@{ State=$(if ($script:Busy) {'Busy'} elseif ($script:Ready) {'Ready'} else {'Checking'});CanSetDefaultTarget=$script:Ready;CanRefresh=$script:Ready;IsChecking=(-not $script:Ready) } }
 function Test-MaintenanceBusy { return $script:Busy }
+function Test-PortablePreferencesAvailable { return (-not $script:Busy -and $script:Ready) }
 function Test-BootTargetDriftDetected { return $script:Drift }
 function Test-TaskBrokerReady { return $script:Ready }
 function Refresh-SystemDefaultState { return $script:DefaultGuid }
@@ -101,6 +102,7 @@ $map=[ordered]@{
     AutostartMenuItem='autostart'; LanguageGermanMenuItem='language-de'; LanguageEnglishMenuItem='language-en'
     TaskBrokerSetupMenuItem='system-setup'; TaskBrokerRemoveMenuItem='system-remove'
     UpdateCheckMenuItem='update-check'; UpdateInstallMenuItem='update-install'
+    PreferencesExportMenuItem='preferences-export'; PreferencesImportMenuItem='preferences-import'
     RuntimeDiagnosticMenuItem='diagnostics-save'; DiagnosticsUploadMenuItem='diagnostics-upload'
 }
 foreach ($var in $map.Keys) {
@@ -569,7 +571,8 @@ try {
                             }
                         }
                         $rows=@($popup.Tag.Body.Controls | Where-Object { $_ -is [LenovoSettingsActionButton] -and -not $_.LocaleCode })
-                        if ($rows.Count -ne 6 -or -not $ok) { throw 'Operation row chevron zone contains navigation ink' }
+                        if ($rows.Count -ne 8) { throw "Expected eight operation rows, got $($rows.Count)" }
+                        if (-not $ok) { throw 'Operation row chevron zone contains navigation ink' }
                     } finally { $popup.Dispose() }
                 }
             }
@@ -903,6 +906,8 @@ try {
         $script:TaskBrokerRemoveMenuItem.Text=Get-LocalizedString -Key 'Maintenance.Remove'
         $script:UpdateCheckMenuItem.Text=Get-LocalizedString -Key 'Update.Check'
         $script:UpdateInstallMenuItem.Text=Get-LocalizedString -Key 'Update.Install'
+        $script:PreferencesExportMenuItem.Text=Get-LocalizedString -Key 'Preferences.Export'
+        $script:PreferencesImportMenuItem.Text=Get-LocalizedString -Key 'Preferences.Import'
         $script:RuntimeDiagnosticMenuItem.Text=Get-LocalizedString -Key 'Diagnostics.Save'
         $script:DiagnosticsUploadMenuItem.Text=Get-LocalizedString -Key 'Diagnostics.Upload'
         foreach ($scale in @(1.0,2.5)) {
@@ -912,7 +917,7 @@ try {
                 Set-AuxiliaryPopupLayout $config $scale $area $anchor
                 $body=$config.Tag.Body
                 $button=@($body.Controls | Where-Object { $_ -is [Windows.Forms.Button] })
-                Assert-Lbs229 "$case grouped configuration has all eight direct actions" ($button.Count -eq 8 -and $body.Controls['ConfigurationAutostart'] -and $config.CancelButton -eq $config.Tag.Close)
+                Assert-Lbs229 "$case grouped configuration has all ten direct actions" ($button.Count -eq 10 -and $body.Controls['ConfigurationAutostart'] -and $config.CancelButton -eq $config.Tag.Close)
                 Assert-Lbs229 "$case bounds and typography scale once" ($config.Width -eq [int](390*$scale) -and $body.Controls['ConfigurationAction-language-de'].Height -eq [int](38*$scale) -and $body.Controls['ConfigurationAction-system-setup'].Height -eq [int](52*$scale) -and $button[0].Font.Size -eq 9.0)
                 Assert-Lbs229 "$case language selection and disabled install truthful" ($body.Controls["ConfigurationAction-language-$(if ($locale -eq 'de-DE') {'de'} else {'en'})"].LanguageSelected -and -not $body.Controls['ConfigurationAction-update-install'].Enabled)
                 $script:UpdateInstallMenuItem.Enabled=$true
@@ -1303,7 +1308,7 @@ try {
     $script:UpdateInstallMenuItem.Enabled=$true
     Invoke-Lbs229Modal 'configuration' {
         param($active)
-        foreach ($action in @('system-setup','system-remove','diagnostics-save','diagnostics-upload','update-install')) {
+        foreach ($action in @('preferences-export','preferences-import','system-setup','system-remove','diagnostics-save','diagnostics-upload','update-install')) {
             $before=$script:Actions.Count
             $active.Tag.Body.Controls['ConfigurationAction-'+$action].PerformClick()
             Assert-Lbs229 "LBS233 $action dispatch once and preserve settings modal" ($script:Actions.Count -eq $before+1 -and $script:Actions[-1] -eq $action -and $active.Visible -and $owner.Visible -and $active.DialogResult -eq [Windows.Forms.DialogResult]::None)

@@ -24,6 +24,9 @@ function Update-LanguageMenuState {
 function Update-TrayLocalizedText {
     if ($script:TrayOpenMenuItem) { $script:TrayOpenMenuItem.Text = Get-LocalizedString -Key 'Tray.Open' }
     if ($script:AutostartMenuItem) { $script:AutostartMenuItem.Text = Get-LocalizedString -Key 'Settings.Autostart' }
+    if ($script:PreferencesMenuRoot) { $script:PreferencesMenuRoot.Text = Get-LocalizedString -Key 'Preferences.Menu' }
+    if ($script:PreferencesExportMenuItem) { $script:PreferencesExportMenuItem.Text = Get-LocalizedString -Key 'Preferences.Export' }
+    if ($script:PreferencesImportMenuItem) { $script:PreferencesImportMenuItem.Text = Get-LocalizedString -Key 'Preferences.Import' }
     if ($script:MaintenanceRootMenuItem) { $script:MaintenanceRootMenuItem.Text = Get-LocalizedString -Key 'Tray.Maintenance' }
     if ($script:TaskBrokerSetupMenuItem) { $script:TaskBrokerSetupMenuItem.Text = Get-LocalizedString -Key 'Maintenance.Setup' }
     if ($script:TaskBrokerRemoveMenuItem) { $script:TaskBrokerRemoveMenuItem.Text = Get-LocalizedString -Key 'Maintenance.Remove' }

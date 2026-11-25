@@ -11,7 +11,7 @@
 
 It changes the firmware's **one-time `bootsequence`**, not the permanent UEFI `BootOrder`. Boot targets must be supported by the installed TaskBroker configuration; the application cannot address arbitrary devices or independently select individual physical drives behind a generic firmware entry.
 
-**Current development version:** v1.5.20.6  
+**Current development version:** v1.6.0.0  
 **Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`  
 **Releases:** [Downloads and version history](downloads/README.md) · [Latest published version metadata](downloads/latest.json) · [Changelog](CHANGELOG.md)
 
@@ -91,6 +91,12 @@ All product-controlled user-facing UI text uses a central PowerShell-5.1-compati
 Existing pre-localization settings are migrated to German to avoid unexpectedly changing the language of an established German installation. Invalid or unknown stored locales fall back to English. Changing the selected language updates the tray menu and rebuilds the visible popup.
 
 Firmware descriptions, device models, GUIDs, paths, diagnostic event codes, and other externally supplied technical identifiers are not translated. The full contract is documented in [docs/LOCALIZATION.md](docs/LOCALIZATION.md).
+
+## Portable user preferences
+
+Open **Further settings → User preferences** (also available in the tray menu). Export and import a local, inspectable preference JSON file, separate from diagnostics. The export includes the effective language and the alias, visibility and order of currently discovered entries, including hidden entries. It does not include autostart, the persistent default, BootNext, SYSTEM tasks, privileged state, diagnostic identity or storage paths. Aliases and GUIDs may be identifying; handle the file privately.
+
+Import requires ready, currently available boot entries and no conflicting operation or unsaved Customize draft. The preview lists exact GUID matches, unmatched incoming entries, unchanged local entries, alias/visibility/order changes, language and excluded unavailable saved metadata. Equal GUIDs do not prove identical hardware. No name/model matching or manual remapping in v1. Cancel is the initial and safe default action; only explicit Apply persists. Unknown fields, duplicates, invalid data, oversized files and unsupported format versions fail closed. Differing legacy overlength aliases are skipped rather than truncated. The import rechecks the local settings bytes and current entry snapshot; stale previews must be reopened. The transaction uses same-directory replacement, with local settings and runtime updated only after a successful commit. It does not synchronize arbitrary external writers or claim cryptographic authentication of edited JSON. See [docs/PORTABLE_PREFERENCES.md](docs/PORTABLE_PREFERENCES.md) for the exact format and exclusions.
 
 ## Updates
 

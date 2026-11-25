@@ -1,7 +1,10 @@
 {
   "schemaVersion": 2,
-  "version": "1.5.20.6",
+  "version": "1.6.0.0",
   "releaseProfile": "patch",
-  "protectedFragmentIntent": [],
+  "protectedFragmentIntent": [
+    "ps:Load-AppSettings",
+    "ps:Show-OrTogglePopup"
+  ],
   "repositoryDeleteIntent": []
 }
