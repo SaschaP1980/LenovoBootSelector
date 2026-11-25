@@ -1051,6 +1051,42 @@ public sealed class LenovoSettingsToggle : CheckBox
 
 // One hover owner for both native autostart hit areas. Screen coordinates
 // preserve the highlight across sibling transitions and clipped scrolling.
+// Settings input is independent of business actions. Native hit testing
+// distinguishes a visible pointer target from keyboard focus, and the modal
+// enable state rejects hover underneath a nested dialog.
+public static class LenovoSettingsWindowInput
+{
+    [DllImport("user32.dll")]
+    private static extern IntPtr WindowFromPoint(Point point);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr window, uint flags);
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowEnabled(IntPtr window);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr window);
+
+    public static bool IsPointerOnSurface(Form form, Point pointer)
+    {
+        if (form == null || form.IsDisposed || !form.Visible ||
+            !form.IsHandleCreated || !IsWindowEnabled(form.Handle)) return false;
+        IntPtr hit = WindowFromPoint(pointer);
+        return hit != IntPtr.Zero && GetAncestor(hit, 2) == form.Handle;
+    }
+
+    // Called once, at the end of the user-initiated settings Shown event
+    // after the owner dimmer/connector has been shown. Respect OS foreground
+    // restrictions; never use periodic activation or injected input.
+    public static void ActivateInitialSurface(Form form)
+    {
+        if (form == null || form.IsDisposed || !form.Visible ||
+            !form.IsHandleCreated || !IsWindowEnabled(form.Handle)) return;
+        if (GetForegroundWindow() != form.Handle) SetForegroundWindow(form.Handle);
+        if (!form.ContainsFocus) form.Activate();
+    }
+}
+
 public sealed class LenovoSettingsAutostartHover
 {
     private readonly LenovoSettingsAutostartLabel label;
@@ -1094,7 +1130,7 @@ public sealed class LenovoSettingsAutostartHover
     {
         if (label.IsDisposed || toggle.IsDisposed) return;
         Point pointer = Control.MousePosition;
-        SetHovered(label.Enabled && toggle.Enabled && form != null && form.ContainsFocus &&
+        SetHovered(label.Enabled && toggle.Enabled && LenovoSettingsWindowInput.IsPointerOnSurface(form, pointer) &&
             (ContainsVisiblePoint(label, pointer) || ContainsVisiblePoint(toggle, pointer)));
     }
 
