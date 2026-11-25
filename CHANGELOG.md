@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.20.5 – Consistent Customize typography (LBS-252)
+
+- Draw Customize text through one renderer with identical font and bounds in disabled and enabled states; retain subdued disabled ink and native Button action admission.
+- Preserve hover, pressed and keyboard focus feedback. Verify visible normalized glyph geometry and coverage, disabled contrast and native keyboard and hover behavior in both locales.
+
 ## v1.5.20.4 – Legible disabled Customize action (LBS-252)
 
 - Render the disabled Customize label with subdued, legible dark-theme ink while initial readiness is checked.
