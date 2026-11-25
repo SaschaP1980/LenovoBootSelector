@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.6.2.0 – Final portable preferences dialog design (LBS-180 F05/F06)
+
+- Consolidate export into one icon-led summary surface with dynamic entry count, a responsive two-column scope grid and clear local backup and exclusion guidance.
+- Refine import into an icon-led summary, independent reconciliation metrics, grouped language comparison and a continuous expandable target list; hide redundant zero-count notices.
+- Preserve exact GUID-only matching, full preview evidence, view-only filters, safe cancellation, explicit confirmation and existing transaction and modal lifecycle boundaries.
+
 ## v1.6.1.0 – Preference dialog overhaul and modal tray lifecycle (LBS-180 F01–F04)
 
 - Redesign preference export and import preview using shared Lenovo dialog chrome, dark scrollbar, structured scope/counts, comparison cards, read-only filters and full detail pages.

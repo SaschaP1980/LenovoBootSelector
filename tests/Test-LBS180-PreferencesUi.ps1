@@ -72,8 +72,8 @@ foreach ($locale in @('en-US','de-DE')) {
             $fit=($area.Contains($form.Bounds) -and $form.ClientRectangle.Contains($sh.Viewport.Bounds) -and $sh.Footer.ClientRectangle.Contains($t.Cancel.Bounds) -and $sh.Footer.ClientRectangle.Contains($t.Confirm.Bounds) -and $sh.Viewport.Bottom -le $sh.Footer.Top -and -not $t.Cancel.Bounds.IntersectsWith($t.Confirm.Bounds))
             $fit=$fit -and $form.AcceptButton -eq $t.Cancel -and $form.CancelButton -eq $t.Cancel -and $sh.Scroll -is [LenovoVerticalScrollBar]
             Assert-True $fit "$locale/$scale structured preview geometry, dark scrollbar and safe dismissal"
-            $names=@('MetricMatched','MetricChanged','MetricSkipped','MetricLocalOnly','LanguageComparison','ReconcileWarning','SystemUnchanged','FilterAll','FilterChanged','FilterSkipped','FilterLocalOnly','FilterUnavailable','Entry0Title','Entry0Details','ExcludedScope','PrivacyBody')
-            Assert-True (@($names | Where-Object {$form.Controls.Find($_,$true).Count -ne 1}).Count -eq 0 -and $form.Controls.Find('PreferencesPreviewText',$true).Count -eq 0 -and $t.VisibleRows.Count -eq 4) "$locale/$scale distinct structured preview controls"
+            $names=@('MetricMatched','MetricChanged','MetricSkipped','MetricLocalOnly','LanguageStatus','ReconcileWarning','SystemUnchanged','FilterAll','FilterChanged','FilterSkipped','FilterLocalOnly','FilterUnavailable','Entry0Title','Entry0Details','ExcludedScope','PrivacyBody')
+            Assert-True (@($names | Where-Object {$form.Controls.Find($_,$true).Count -ne 1}).Count -eq 0 -and $form.Controls.Find('PreferencesPreviewText',$true).Count -eq 0 -and $t.VisibleRows.Count -eq 4 -and $form.Controls.Find('LanguageComparison',$true).Count -eq 0 -and $form.Controls.Find('LanguageBeforeName',$true)[0].Text -notmatch '\(en-US\)' -and $form.Controls.Find('LanguageAfterName',$true)[0].Text -notmatch '\(de-DE\)' -and $form.Controls.Find('MetricMatchedDriveIcon',$true).Count -eq 1 -and $form.Controls.Find('MetricMatchedJsonIcon',$true).Count -eq 1 -and $form.Controls.Find('UnavailableCount',$true).Count -eq 1 -and $form.Controls.Find('AliasSkippedCount',$true).Count -eq 0 -and @($t.Blocks | Where-Object {$_.Tag.Card}).Count -eq 1) "$locale/$scale distinct structured preview controls"
             $flagBefore=$form.Controls.Find('LanguageBeforeFlag',$true)[0]
             $flagAfter=$form.Controls.Find('LanguageAfterFlag',$true)[0]
             $beforeBitmap=[Drawing.Bitmap]::new($flagBefore.Width,$flagBefore.Height)
@@ -92,6 +92,7 @@ foreach ($locale in @('en-US','de-DE')) {
             $t=$form.Tag;$sh=$t.Shell
             $names=@('ExportCount','IncludedLanguage','IncludedAliases','IncludedVisibility','IncludedOrder','ExcludedScope','PrivacyBody','UnavailableNote')
             $fit=($area.Contains($form.Bounds) -and $sh.Footer.ClientRectangle.Contains($t.Cancel.Bounds) -and $sh.Footer.ClientRectangle.Contains($t.Confirm.Bounds) -and $t.Shell.Scroll -is [LenovoVerticalScrollBar] -and @($names | Where-Object {$form.Controls.Find($_,$true).Count -ne 1}).Count -eq 0)
+            $fit=$fit -and @($t.Blocks | Where-Object {$_.Tag.Card}).Count -eq 1 -and $form.Controls.Find('ExportCountDriveIcon',$true).Count -eq 1 -and $form.Controls.Find('ExportCountJsonIcon',$true).Count -eq 1 -and $form.Controls.Find('IncludedLanguageIcon',$true).Count -eq 1 -and $form.Controls.Find('ExportCount',$true)[0].Text -match '^2 '
             if ($scale -eq 1.0) {$fit=$fit -and $sh.Scroll.Maximum -eq 0 -and $sh.Viewport.Height -eq $sh.Body.Height}
             Assert-True $fit "$locale/$scale compact export with included/excluded/private sections"
         } finally {$form.Dispose()}
