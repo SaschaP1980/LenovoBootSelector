@@ -1,5 +1,5 @@
 {
-  "version": "1.6.1.0",
+  "version": "1.6.2.0",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
@@ -46,266 +46,266 @@
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 1412,
+      "line": 1433,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $mutex.Dispose() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 1418,
+      "line": 1439,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $mutex.Dispose() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 1676,
+      "line": 1697,
       "category": "migration_persistence_best_effort",
       "reason": "Legacy migration persistence failure is non-fatal and retryable.",
       "code": "try { Save-AppSettings } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 1695,
+      "line": 1716,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 1710,
+      "line": 1731,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 1735,
+      "line": 1756,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { [void](Refresh-SystemDefaultState) } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2032,
+      "line": 2053,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $script:TaskBrokerInstallTimer.Stop() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2033,
+      "line": 2054,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $script:TaskBrokerInstallTimer.Dispose() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2121,
+      "line": 2142,
       "category": "migration_autostart_best_effort",
       "reason": "Legacy autostart migration is best-effort and retryable.",
       "code": "if ($legacyAutostart) { try { Set-AutostartEnabled -Enabled:$true } catch { } }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2177,
+      "line": 2198,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $script:TaskBrokerRemoveTimer.Stop() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2178,
+      "line": 2199,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $script:TaskBrokerRemoveTimer.Dispose() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2521,
+      "line": 2542,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "} catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2527,
+      "line": 2548,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "} catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2723,
+      "line": 2744,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $context.Close() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2724,
+      "line": 2745,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { if ($script:Popup -and -not $script:Popup.IsDisposed) { $script:Popup.Hide() } } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2730,
+      "line": 2751,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "} catch { }"
-    },
-    {
-      "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2827,
-      "category": "lifecycle_race_best_effort",
-      "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
-      "code": "} catch { }"
-    },
-    {
-      "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2828,
-      "category": "lifecycle_race_best_effort",
-      "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
-      "code": "try { Update-AutostartUi | Out-Null } catch { }"
-    },
-    {
-      "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2829,
-      "category": "lifecycle_race_best_effort",
-      "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
-      "code": "try { Update-DefaultUi } catch { }"
-    },
-    {
-      "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2840,
-      "category": "cleanup_best_effort",
-      "reason": "Cleanup/dispose failure must not replace the primary operation result.",
-      "code": "try { $script:TaskBrokerInstallTimer.Stop() } catch { }"
-    },
-    {
-      "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2841,
-      "category": "cleanup_best_effort",
-      "reason": "Cleanup/dispose failure must not replace the primary operation result.",
-      "code": "try { $script:TaskBrokerInstallTimer.Dispose() } catch { }"
-    },
-    {
-      "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2844,
-      "category": "cleanup_best_effort",
-      "reason": "Cleanup/dispose failure must not replace the primary operation result.",
-      "code": "try { $script:TaskBrokerRemoveTimer.Stop() } catch { }"
-    },
-    {
-      "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2845,
-      "category": "cleanup_best_effort",
-      "reason": "Cleanup/dispose failure must not replace the primary operation result.",
-      "code": "try { $script:TaskBrokerRemoveTimer.Dispose() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
       "line": 2848,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
-      "code": "try { Stop-UpdateCheckWorkflow -State $script:UpdateState } catch { }"
+      "code": "} catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
       "line": 2849,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
+      "code": "try { Update-AutostartUi | Out-Null } catch { }"
+    },
+    {
+      "source": "src/App/LenovoBootSelector.template.ps1",
+      "line": 2850,
+      "category": "lifecycle_race_best_effort",
+      "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
+      "code": "try { Update-DefaultUi } catch { }"
+    },
+    {
+      "source": "src/App/LenovoBootSelector.template.ps1",
+      "line": 2861,
+      "category": "cleanup_best_effort",
+      "reason": "Cleanup/dispose failure must not replace the primary operation result.",
+      "code": "try { $script:TaskBrokerInstallTimer.Stop() } catch { }"
+    },
+    {
+      "source": "src/App/LenovoBootSelector.template.ps1",
+      "line": 2862,
+      "category": "cleanup_best_effort",
+      "reason": "Cleanup/dispose failure must not replace the primary operation result.",
+      "code": "try { $script:TaskBrokerInstallTimer.Dispose() } catch { }"
+    },
+    {
+      "source": "src/App/LenovoBootSelector.template.ps1",
+      "line": 2865,
+      "category": "cleanup_best_effort",
+      "reason": "Cleanup/dispose failure must not replace the primary operation result.",
+      "code": "try { $script:TaskBrokerRemoveTimer.Stop() } catch { }"
+    },
+    {
+      "source": "src/App/LenovoBootSelector.template.ps1",
+      "line": 2866,
+      "category": "cleanup_best_effort",
+      "reason": "Cleanup/dispose failure must not replace the primary operation result.",
+      "code": "try { $script:TaskBrokerRemoveTimer.Dispose() } catch { }"
+    },
+    {
+      "source": "src/App/LenovoBootSelector.template.ps1",
+      "line": 2869,
+      "category": "lifecycle_race_best_effort",
+      "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
+      "code": "try { Stop-UpdateCheckWorkflow -State $script:UpdateState } catch { }"
+    },
+    {
+      "source": "src/App/LenovoBootSelector.template.ps1",
+      "line": 2870,
+      "category": "lifecycle_race_best_effort",
+      "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { Stop-UpdatePrepareWorkflow -State $script:UpdateState } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2859,
+      "line": 2880,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $backgroundRefreshContext.Timer.Stop() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2860,
+      "line": 2881,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $backgroundRefreshContext.Timer.Dispose() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2863,
+      "line": 2884,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { Hide-DarkActionTooltip } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2864,
+      "line": 2885,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $script:DarkActionTooltip.Dispose() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2867,
+      "line": 2888,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { $backgroundRefreshContext.Process.Refresh() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2868,
+      "line": 2889,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { if (-not $backgroundRefreshContext.Process.HasExited) { $backgroundRefreshContext.Process.Kill() } } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2869,
+      "line": 2890,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $backgroundRefreshContext.Process.Dispose() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2875,
+      "line": 2896,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $script:DiagnosticsUploadTimer.Stop(); $script:DiagnosticsUploadTimer.Dispose() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2879,
+      "line": 2900,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { $script:DiagnosticsUploadState.Client.CancelPendingRequests() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2888,
+      "line": 2909,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { Stop-LbsActivationListener -Listener $activationListener } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2892,
+      "line": 2913,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $activationEvent.Dispose() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2898,
+      "line": 2919,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $mutex.ReleaseMutex() } catch { }"
     },
     {
       "source": "src/App/LenovoBootSelector.template.ps1",
-      "line": 2901,
+      "line": 2922,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $mutex.Dispose() } catch { }"
@@ -473,7 +473,7 @@
     },
     {
       "source": "src/Core/Localization.ps1",
-      "line": 956,
+      "line": 964,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { $text = $text -f @($Arguments) } catch { }"

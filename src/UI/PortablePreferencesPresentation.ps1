@@ -180,7 +180,7 @@ function New-PreferencesBlock {
     $panel=[Windows.Forms.Panel]::new()
     $panel.TabStop=$false
     $panel.BackColor=if ($Card) {[Drawing.Color]::FromArgb(37,37,37)} else {[Drawing.Color]::Transparent}
-    if ($Card) {$panel.BorderStyle='FixedSingle'}
+    # A card is a filled summary surface, not a framed box.
     $panel.Tag=[pscustomobject]@{Kind=$Kind;Card=[bool]$Card;Items=$Controls}
     for ($i=0;$i -lt $Controls.Count;$i++) {
         $Controls[$i].TabIndex=$i
@@ -226,32 +226,75 @@ function Move-PreferencesFocusedControlIntoView {
     }
 }
 
+function New-PreferencesIcon {
+    param([string]$Name,[string]$Key)
+    $icon=[Windows.Forms.Panel]::new()
+    $icon.Name=$Name;$icon.Tag=$Key;$icon.TabStop=$false
+    $icon.BackColor=[Drawing.Color]::Transparent
+    $icon.Add_Paint({
+        param($sender,$eventArgs)
+        [LenovoSettingsInk]::DrawIcon($eventArgs.Graphics,[string]$sender.Tag,$sender.ClientRectangle,[Drawing.Color]::FromArgb(184,184,184))
+    })
+    return $icon
+}
+
+function New-PreferencesSeparator {
+    $line=[Windows.Forms.Panel]::new()
+    $line.Name='PreferencesSeparator';$line.TabStop=$false
+    $line.BackColor=[Drawing.Color]::FromArgb(63,63,63)
+    return $line
+}
+
+function New-PreferencesSummaryHead {
+    param($Form,[string]$Name,[string]$Count,[string]$Caption)
+    return (New-PreferencesBlock -Kind SummaryHead -Controls @(
+        (New-PreferencesIcon ($Name+'DriveIcon') 'preferences-drive'),
+        (New-PreferencesBlock -Controls @(
+            (New-PreferencesTextControl $Form $Name $Count Count),
+            (New-PreferencesTextControl $Form ($Name+'Label') $Caption Caption)
+        )),
+        (New-PreferencesIcon ($Name+'JsonIcon') 'preferences-json')
+    ))
+}
+
+function New-PreferencesIconText {
+    param($Form,[string]$Name,[string]$Key,[Windows.Forms.Control[]]$Controls)
+    return (New-PreferencesBlock -Kind IconText -Controls @(
+        (New-PreferencesIcon ($Name+'Icon') $Key),
+        (New-PreferencesBlock -Controls $Controls)
+    ))
+}
+
 function Add-PreferencesMetrics {
     param($Form,$View)
     $items=@()
-    foreach ($key in @('Matched','Changed','Skipped','LocalOnly')) {
-        $items+=,(New-PreferencesBlock -Card -Controls @(
-            (New-PreferencesTextControl $Form ('Metric'+$key) ([string]$View.$key) Count),
+    foreach ($key in @('Changed','Skipped','LocalOnly')) {
+        $items+=,(New-PreferencesBlock -Controls @(
+            (New-PreferencesTextControl $Form ('Metric'+$key) ([string]$View.$key) Heading),
             (New-PreferencesTextControl $Form ('MetricLabel'+$key) (Get-LocalizedString -Key ('Preferences.Metric'+$key)) Caption)
         ))
     }
-    Add-PreferencesBlock $Form $items Metrics
+    Add-PreferencesBlock $Form @(
+        (New-PreferencesSummaryHead $Form 'MetricMatched' (Get-LocalizedString -Key 'Preferences.TargetCount' -Values @{Count=$View.Matched}) (Get-LocalizedString -Key 'Preferences.MetricMatched')),
+        (New-PreferencesSeparator),
+        (New-PreferencesBlock -Controls $items -Kind CompactMetrics)
+    ) -Card
 }
 
 function New-PreferencesLanguageTile {
     param($Form,[string]$Name,[string]$Locale,[string]$CaptionKey)
     $flag=[Windows.Forms.Panel]::new()
     $flag.Name=$Name+'Flag';$flag.Tag=$Locale;$flag.TabStop=$false
-    $flag.BackColor=[Drawing.Color]::FromArgb(37,37,37)
+    $flag.BackColor=[Drawing.Color]::Transparent
     $flag.Add_Paint({
         param($sender,$eventArgs)
         [LenovoLocaleFlags]::DrawFlag($eventArgs.Graphics,[string]$sender.Tag,$sender.ClientRectangle)
     })
     $nameText=Get-LocalizedString -Key $(if ($Locale -ceq 'de-DE') {'Language.German'} else {'Language.English'})
-    return (New-PreferencesBlock -Card -Kind Language -Controls @(
+    return (New-PreferencesBlock -Kind Language -Controls @(
         (New-PreferencesTextControl $Form ($Name+'Caption') (Get-LocalizedString -Key $CaptionKey) Caption),
         $flag,
-        (New-PreferencesTextControl $Form ($Name+'Name') ($nameText+' ('+$Locale+')') Heading)
+        (New-PreferencesTextControl $Form ($Name+'Name') $nameText Heading)
     ))
 }
 
@@ -294,7 +337,8 @@ function Add-PreferencesEntryCard {
             $items+=,(New-PreferencesBlock -Controls @($previous,$next) -Kind Buttons)
         }
     }
-    Add-PreferencesBlock $Form $items -Card
+    $items+=,(New-PreferencesSeparator)
+    Add-PreferencesBlock $Form $items
 }
 
 function Update-PreferencesConfirmationBody {
@@ -306,41 +350,38 @@ function Update-PreferencesConfirmationBody {
         foreach ($control in @($body.Controls)) {$body.Controls.Remove($control);$control.Dispose()}
         $s.Blocks.Clear()
         if ($s.Mode -eq 'Export') {
-            $intro=New-PreferencesBlock -Controls @(
-                (New-PreferencesTextControl $Form 'ExportIntro' (Get-LocalizedString -Key 'Preferences.ExportIntro') Heading),
-                (New-PreferencesTextControl $Form 'ExportFormat' (Get-LocalizedString -Key 'Preferences.ExportFormat') Caption)
-            )
-            $countLabel=New-PreferencesTextControl $Form 'ExportCount' ([string]$s.ExportCount) Count
-            $countCaption=New-PreferencesTextControl $Form 'ExportCountLabel' (Get-LocalizedString -Key 'Preferences.ExportCountLabel') Caption
-            $countLabel.TextAlign='MiddleRight';$countCaption.TextAlign='MiddleRight'
-            $count=New-PreferencesBlock -Controls @($countLabel,$countCaption)
-            Add-PreferencesBlock $Form @($intro,$count) Metrics -Card
-            $included=@((New-PreferencesTextControl $Form 'IncludedHeading' (Get-LocalizedString -Key 'Preferences.IncludedHeading') Caption))
+            $included=@()
+            $icons=@{Language='preferences-language';Aliases='preferences-alias';Visibility='preferences-visible';Order='preferences-order'}
             foreach ($key in @('Language','Aliases','Visibility','Order')) {
-                $included+=,(New-PreferencesTextControl $Form ('Included'+$key) ('✓  '+(Get-LocalizedString -Key ('Preferences.Included'+$key))) Body)
+                $included+=,(New-PreferencesIconText $Form ('Included'+$key) $icons[$key] @(
+                    (New-PreferencesTextControl $Form ('Included'+$key) (Get-LocalizedString -Key ('Preferences.Included'+$key)) Body)
+                ))
             }
-            Add-PreferencesBlock $Form $included
+            Add-PreferencesBlock $Form @(
+                (New-PreferencesSummaryHead $Form 'ExportCount' (Get-LocalizedString -Key 'Preferences.TargetCount' -Values @{Count=$s.ExportCount}) (Get-LocalizedString -Key 'Preferences.ExportIntro')),
+                (New-PreferencesSeparator),
+                (New-PreferencesBlock -Controls $included -Kind TwoColumns)
+            ) -Card
         } else {
             Add-PreferencesMetrics $Form $s.View
-            $languageTiles=New-PreferencesBlock -Kind Metrics -Controls @(
+            $languageTiles=New-PreferencesBlock -Kind TwoColumns -Controls @(
                 (New-PreferencesLanguageTile $Form 'LanguageBefore' $s.View.OldLocale 'Preferences.LanguageBefore'),
                 (New-PreferencesLanguageTile $Form 'LanguageAfter' $s.View.Locale 'Preferences.LanguageAfter')
             )
             Add-PreferencesBlock $Form @(
                 (New-PreferencesTextControl $Form 'LanguageHeading' (Get-LocalizedString -Key 'Preferences.IncludedLanguage') Heading),
                 $languageTiles,
-                (New-PreferencesTextControl $Form 'LanguageComparison' (Get-LocalizedString -Key 'Preferences.PreviewLanguage' -Values @{Before=$s.View.OldLocale;After=$s.View.Locale}) Caption),
-                (New-PreferencesTextControl $Form 'LanguageStatus' (Get-LocalizedString -Key $(if ($s.View.OldLocale -ceq $s.View.Locale) {'Preferences.NoChange'} else {'Preferences.LanguageChanged'})) $(if ($s.View.OldLocale -cne $s.View.Locale) {'Changed'} else {'Caption'}))
+                (New-PreferencesTextControl $Form 'LanguageStatus' (Get-LocalizedString -Key $(if ($s.View.OldLocale -ceq $s.View.Locale) {'Preferences.NoChange'} else {'Preferences.LanguageChanged'})) $(if ($s.View.OldLocale -cne $s.View.Locale) {'Changed'} else {'Caption'})),
+                (New-PreferencesSeparator)
             )
-            Add-PreferencesBlock $Form @(
-                (New-PreferencesTextControl $Form 'ReconcileHeading' (Get-LocalizedString -Key 'Preferences.ReconcileHeading') Heading),
-                (New-PreferencesTextControl $Form 'ReconcileWarning' (Get-LocalizedString -Key 'Preferences.ReconcileWarning') Body),
-                (New-PreferencesTextControl $Form 'SystemUnchanged' (Get-LocalizedString -Key 'Preferences.SystemUnchanged') Caption)
-            ) -Card
-            Add-PreferencesBlock $Form @(
-                (New-PreferencesTextControl $Form 'EntryHeading' (Get-LocalizedString -Key 'Preferences.EntriesHeading') Heading),
-                (New-PreferencesTextControl $Form 'AdditionalCounts' (Get-LocalizedString -Key 'Preferences.AdditionalCounts' -Values @{Unavailable=$s.View.Unavailable;Aliases=$s.View.AliasSkipped}) Caption)
-            )
+            $entryIntro=@((New-PreferencesTextControl $Form 'EntryHeading' (Get-LocalizedString -Key 'Preferences.EntriesHeading') Heading))
+            if ($s.View.Unavailable -gt 0) {
+                $entryIntro+=,(New-PreferencesTextControl $Form 'UnavailableCount' (Get-LocalizedString -Key 'Preferences.UnavailableCount' -Values @{Count=$s.View.Unavailable}) Caption)
+            }
+            if ($s.View.AliasSkipped -gt 0) {
+                $entryIntro+=,(New-PreferencesTextControl $Form 'AliasSkippedCount' (Get-LocalizedString -Key 'Preferences.AliasSkippedCount' -Values @{Count=$s.View.AliasSkipped}) Warning)
+            }
+            Add-PreferencesBlock $Form $entryIntro
             $filters=@()
             foreach ($key in @('All','Changed','Skipped','LocalOnly','Unavailable')) {
                 $filters+=,(New-PreferencesViewButton $Form ('Filter'+$key) (Get-LocalizedString -Key ('Preferences.Filter'+$key)) Filter $key -Selected:($s.Filter -ceq $key))
@@ -366,20 +407,37 @@ function Update-PreferencesConfirmationBody {
                 }
                 foreach ($entry in $s.VisibleRows) {Add-PreferencesEntryCard $Form $entry}
             } else {
-                Add-PreferencesBlock $Form @((New-PreferencesTextControl $Form 'NoRows' (Get-LocalizedString -Key 'Preferences.NoRows') Caption)) -Card
+                Add-PreferencesBlock $Form @((New-PreferencesTextControl $Form 'NoRows' (Get-LocalizedString -Key 'Preferences.NoRows') Caption))
             }
         }
         if ($s.Mode -eq 'Import') {
-            Add-PreferencesBlock $Form @((New-PreferencesTextControl $Form 'IncludedScope' (Get-LocalizedString -Key 'Preferences.IncludedScope') Caption))
+            Add-PreferencesBlock $Form @(
+                (New-PreferencesIconText $Form 'Reconcile' 'preferences-shield' @(
+                    (New-PreferencesTextControl $Form 'ReconcileHeading' (Get-LocalizedString -Key 'Preferences.ReconcileHeading') Heading),
+                    (New-PreferencesTextControl $Form 'ReconcileWarning' (Get-LocalizedString -Key 'Preferences.ReconcileWarning') Body),
+                    (New-PreferencesTextControl $Form 'IncludedScope' (Get-LocalizedString -Key 'Preferences.IncludedScope') Caption)
+                )),
+                (New-PreferencesSeparator)
+            )
+        }
+        $excludedHeading=if ($s.Mode -eq 'Import') {'Preferences.UnchangedHeading'} else {'Preferences.ExcludedHeading'}
+        $excluded=@(
+            (New-PreferencesTextControl $Form 'ExcludedHeading' (Get-LocalizedString -Key $excludedHeading) Heading),
+            (New-PreferencesTextControl $Form 'ExcludedScope' (Get-LocalizedString -Key 'Preferences.ExcludedScope') Body)
+        )
+        if ($s.Mode -eq 'Import') {
+            $excluded+=,(New-PreferencesTextControl $Form 'SystemUnchanged' (Get-LocalizedString -Key 'Preferences.SystemUnchanged') Caption)
         }
         Add-PreferencesBlock $Form @(
-            (New-PreferencesTextControl $Form 'ExcludedHeading' (Get-LocalizedString -Key 'Preferences.ExcludedHeading') Heading),
-            (New-PreferencesTextControl $Form 'ExcludedScope' (Get-LocalizedString -Key 'Preferences.ExcludedScope') Body)
-        ) -Card
+            (New-PreferencesIconText $Form 'Excluded' 'preferences-shield' $excluded),
+            (New-PreferencesSeparator)
+        )
         Add-PreferencesBlock $Form @(
-            (New-PreferencesTextControl $Form 'PrivacyHeading' (Get-LocalizedString -Key 'Preferences.PrivacyHeading') Heading),
-            (New-PreferencesTextControl $Form 'PrivacyBody' (Get-LocalizedString -Key 'Preferences.PrivacyBody') Caption),
-            (New-PreferencesTextControl $Form 'UnavailableNote' (Get-LocalizedString -Key 'Preferences.UnavailableNote') Caption)
+            (New-PreferencesIconText $Form 'Privacy' 'preferences-lock' @(
+                (New-PreferencesTextControl $Form 'PrivacyHeading' (Get-LocalizedString -Key 'Preferences.PrivacyHeading') Heading),
+                (New-PreferencesTextControl $Form 'PrivacyBody' (Get-LocalizedString -Key 'Preferences.PrivacyBody') Caption),
+                (New-PreferencesTextControl $Form 'UnavailableNote' (Get-LocalizedString -Key 'Preferences.UnavailableNote') Caption)
+            ))
         )
     } finally {$body.ResumeLayout($false)}
     if ($s.Scale -gt 0) {
@@ -450,10 +508,14 @@ function Set-PreferencesBlockLayout {
     function Px([double]$n) {return [Math]::Max(1,[int][Math]::Round($n*$Scale))}
     $pad=if ($Block.Tag.Card) {Px 10} else {0}
     $gap=Px 5
-    $available=[Math]::Max(1,$Width-2*$pad-$(if ($Block.Tag.Card) {2} else {0}))
+    $available=[Math]::Max(1,$Width-2*$pad)
     $y=$pad;$x=$pad;$lineHeight=0
-    if ($Block.Tag.Kind -eq 'Metrics') {
-        $columns=if ($available -ge (Px 620)) {4} elseif ($available -ge (Px 250)) {2} else {1}
+    if ($Block.Tag.Kind -in @('Metrics','TwoColumns','CompactMetrics')) {
+        $columns=switch ($Block.Tag.Kind) {
+            'TwoColumns' {if ($available -ge (Px 250)) {2} else {1}}
+            'CompactMetrics' {if ($available -ge (Px 300)) {3} elseif ($available -ge (Px 200)) {2} else {1}}
+            default {if ($available -ge (Px 620)) {4} elseif ($available -ge (Px 250)) {2} else {1}}
+        }
         $columns=[Math]::Max(1,[Math]::Min($columns,$Block.Tag.Items.Count))
         $cell=[int][Math]::Floor(($available-($columns-1)*$gap)/$columns)
         $index=0
@@ -465,6 +527,20 @@ function Set-PreferencesBlockLayout {
             $lineHeight=[Math]::Max($lineHeight,$h);$index++
         }
         $y+=$lineHeight
+    } elseif ($Block.Tag.Kind -in @('SummaryHead','IconText')) {
+        $icon=$Block.Tag.Items[0];$content=$Block.Tag.Items[1]
+        $summary=$Block.Tag.Kind -eq 'SummaryHead'
+        $side=[Math]::Min((Px $(if ($summary) {38} else {20})),[Math]::Max(1,[int]($available/5)))
+        $right=if ($summary) {$side+$gap} else {0}
+        $cw=[Math]::Max(1,$available-$side-$gap-$right)
+        $ch=Set-PreferencesBlockLayout $content $cw $Graphics $Scale
+        $h=[Math]::Max($side,$ch)
+        $icon.Bounds=[Drawing.Rectangle]::new($pad,($y+[int](($h-$side)/2)),$side,$side)
+        $content.Bounds=[Drawing.Rectangle]::new(($pad+$side+$gap),$y,$cw,$ch)
+        if ($summary) {
+            $Block.Tag.Items[2].Bounds=[Drawing.Rectangle]::new(($pad+$available-$side),($y+[int](($h-$side)/2)),$side,$side)
+        }
+        $y+=$h
     } elseif ($Block.Tag.Kind -eq 'Language') {
         $caption=$Block.Tag.Items[0];$flag=$Block.Tag.Items[1];$name=$Block.Tag.Items[2]
         $h=[Math]::Max((Px 16),[int][Math]::Ceiling($Graphics.MeasureString($caption.Text,$caption.Font,$available).Height)+(Px 4))
@@ -490,7 +566,9 @@ function Set-PreferencesBlockLayout {
     } else {
         foreach ($item in $Block.Tag.Items) {
             $w=$available
-            if ($item -is [Windows.Forms.Panel]) {
+            if ($item.Name -ceq 'PreferencesSeparator') {
+                $h=Px 1
+            } elseif ($item -is [Windows.Forms.Panel]) {
                 $h=Set-PreferencesBlockLayout $item $w $Graphics $Scale
             } elseif ($item -is [Windows.Forms.Button]) {
                 $w=[Math]::Min($available,[Math]::Max((Px 100),[int][Math]::Ceiling($Graphics.MeasureString($item.Text,$item.Font).Width)+(Px 22)))
@@ -503,7 +581,7 @@ function Set-PreferencesBlockLayout {
         }
         $y-=$gap
     }
-    return [int][Math]::Max(1,$y+$pad+$(if ($Block.Tag.Card) {2} else {0}))
+    return [int][Math]::Max(1,$y+$pad)
 }
 
 function Set-PreferencesConfirmationLayout {

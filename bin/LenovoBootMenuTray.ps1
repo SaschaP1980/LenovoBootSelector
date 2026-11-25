@@ -130,18 +130,22 @@ function Get-LocalizationCatalogCore {
             'Preferences.ExportIntro' = 'Save personal preferences'
             'Preferences.ExportFormat' = 'Portable JSON file'
             'Preferences.ExportCountLabel' = 'Boot targets included'
+            'Preferences.TargetCount' = '{Count} boot targets'
+            'Preferences.UnchangedHeading' = 'The following settings remain unchanged'
+            'Preferences.UnavailableCount' = 'Unavailable: {Count}'
+            'Preferences.AliasSkippedCount' = 'Aliases skipped: {Count}'
             'Preferences.IncludedHeading' = 'INCLUDED PREFERENCES'
-            'Preferences.IncludedLanguage' = 'Language'
+            'Preferences.IncludedLanguage' = 'Selected language'
             'Preferences.IncludedAliases' = 'Individual aliases'
             'Preferences.IncludedVisibility' = 'Boot target visibility'
             'Preferences.IncludedOrder' = 'Boot target order'
             'Preferences.IncludedScope' = 'Included: language, aliases, visibility and order of available entries.'
-            'Preferences.ExcludedHeading' = 'NOT INCLUDED'
-            'Preferences.ExcludedScope' = 'Autostart, default target, BootNext, privileged tasks, system and diagnostic data.'
-            'Preferences.PrivacyHeading' = 'Local backup'
+            'Preferences.ExcludedHeading' = 'Not included in the backup'
+            'Preferences.ExcludedScope' = 'Windows autostart, default boot target, one-time boot target for the next restart, system configuration, privileged tasks and diagnostic data.'
+            'Preferences.PrivacyHeading' = 'Local and private backup'
             'Preferences.PrivacyBody' = 'The file may contain personal aliases and GUIDs. No automatic upload takes place.'
             'Preferences.UnavailableNote' = 'Unavailable saved entries are not exported or restored; their local metadata remains unchanged.'
-            'Preferences.MetricMatched' = 'Matched'
+            'Preferences.MetricMatched' = 'Successfully matched'
             'Preferences.MetricChanged' = 'Changed'
             'Preferences.MetricSkipped' = 'No match'
             'Preferences.MetricLocalOnly' = 'Local only'
@@ -149,7 +153,7 @@ function Get-LocalizationCatalogCore {
             'Preferences.LanguageChanged' = 'Language will change'
             'Preferences.LanguageBefore' = 'Current language'
             'Preferences.LanguageAfter' = 'After import'
-            'Preferences.ReconcileHeading' = 'Exact GUID reconciliation'
+            'Preferences.ReconcileHeading' = 'Safe matching'
             'Preferences.SystemUnchanged' = 'System functions, the default boot target, BootNext and autostart remain unchanged.'
             'Preferences.EntriesHeading' = 'BOOT TARGETS'
             'Preferences.AdditionalCounts' = 'Unavailable: {Unavailable} · Alias skipped: {Aliases}'
@@ -570,18 +574,22 @@ function Get-LocalizationCatalogCore {
             'Preferences.ExportIntro' = 'Persönliche Einstellungen sichern'
             'Preferences.ExportFormat' = 'Portables JSON-Dateiformat'
             'Preferences.ExportCountLabel' = 'Enthaltene Startziele'
+            'Preferences.TargetCount' = '{Count} Startziele'
+            'Preferences.UnchangedHeading' = 'Folgende Einstellungen bleiben unverändert'
+            'Preferences.UnavailableCount' = 'Nicht verfügbar: {Count}'
+            'Preferences.AliasSkippedCount' = 'Übersprungene Aliase: {Count}'
             'Preferences.IncludedHeading' = 'ENTHALTENE EINSTELLUNGEN'
-            'Preferences.IncludedLanguage' = 'Sprache'
+            'Preferences.IncludedLanguage' = 'Ausgewählte Sprache'
             'Preferences.IncludedAliases' = 'Individuelle Aliase'
             'Preferences.IncludedVisibility' = 'Sichtbarkeit der Startziele'
             'Preferences.IncludedOrder' = 'Reihenfolge der Startziele'
             'Preferences.IncludedScope' = 'Enthalten: Sprache, Aliase, Sichtbarkeit und Reihenfolge verfügbarer Startziele.'
-            'Preferences.ExcludedHeading' = 'NICHT ENTHALTEN'
-            'Preferences.ExcludedScope' = 'Autostart, Standard-Startziel, BootNext, privilegierte Aufgaben, System- und Diagnosedaten.'
-            'Preferences.PrivacyHeading' = 'Lokale Sicherung'
+            'Preferences.ExcludedHeading' = 'Nicht Bestandteil der Sicherung'
+            'Preferences.ExcludedScope' = 'Windows-Autostart, Standard-Startziel, einmaliges Startziel für den nächsten Neustart, Systemkonfiguration, privilegierte Aufgaben und Diagnosedaten.'
+            'Preferences.PrivacyHeading' = 'Lokale und private Sicherung'
             'Preferences.PrivacyBody' = 'Die Datei kann persönliche Aliase und GUIDs enthalten. Es erfolgt kein automatischer Upload.'
             'Preferences.UnavailableNote' = 'Nicht verfügbare gespeicherte Startziele werden nicht exportiert oder übernommen; ihre lokalen Metadaten bleiben erhalten.'
-            'Preferences.MetricMatched' = 'Übereinstimmend'
+            'Preferences.MetricMatched' = 'Erfolgreich zugeordnet'
             'Preferences.MetricChanged' = 'Geändert'
             'Preferences.MetricSkipped' = 'Ohne Treffer'
             'Preferences.MetricLocalOnly' = 'Nur lokal'
@@ -589,7 +597,7 @@ function Get-LocalizationCatalogCore {
             'Preferences.LanguageChanged' = 'Sprache wird geändert'
             'Preferences.LanguageBefore' = 'Aktuelle Sprache'
             'Preferences.LanguageAfter' = 'Nach dem Import'
-            'Preferences.ReconcileHeading' = 'Exakter GUID-Abgleich'
+            'Preferences.ReconcileHeading' = 'Sichere Zuordnung'
             'Preferences.SystemUnchanged' = 'Systemfunktionen, Standard-Startziel, BootNext und Autostart bleiben unverändert.'
             'Preferences.EntriesHeading' = 'STARTZIELE'
             'Preferences.AdditionalCounts' = 'Nicht verfügbar: {Unavailable} · Alias übersprungen: {Aliases}'
@@ -2690,6 +2698,27 @@ public static class LenovoSettingsInk
                         if (up) g.DrawLines(p,new Point[] { new Point(7,8),new Point(12,3),new Point(17,8) });
                         else g.DrawLines(p,new Point[] { new Point(7,11),new Point(12,16),new Point(17,11) });
                         g.DrawLines(p,new Point[] { new Point(4,15),new Point(4,21),new Point(20,21),new Point(20,15) }); break;
+                    case "preferences-drive":
+                        g.DrawRectangle(p,3,5,18,14); g.DrawLine(p,3,14,21,14); g.DrawEllipse(p,6,16,1,1); g.DrawLine(p,10,17,17,17); break;
+                    case "preferences-json":
+                        g.DrawLines(p,new Point[] {new Point(5,3),new Point(14,3),new Point(19,8),new Point(19,21),new Point(5,21),new Point(5,3)});
+                        g.DrawLines(p,new Point[] {new Point(14,3),new Point(14,8),new Point(19,8)});
+                        g.DrawLines(p,new Point[] {new Point(10,11),new Point(8,11),new Point(8,14),new Point(7,15),new Point(8,16),new Point(8,19),new Point(10,19)});
+                        g.DrawLines(p,new Point[] {new Point(14,11),new Point(16,11),new Point(16,14),new Point(17,15),new Point(16,16),new Point(16,19),new Point(14,19)}); break;
+                    case "preferences-language":
+                        g.DrawEllipse(p,3,3,18,18); g.DrawEllipse(p,8,3,8,18); g.DrawLine(p,3,12,21,12); break;
+                    case "preferences-alias":
+                        g.DrawLines(p,new Point[] {new Point(4,6),new Point(13,6),new Point(21,14),new Point(14,21),new Point(4,11),new Point(4,6)}); g.DrawEllipse(p,7,8,2,2); break;
+                    case "preferences-visible":
+                        g.DrawArc(p,2,5,20,14,180,180); g.DrawArc(p,2,5,20,14,0,180); g.DrawEllipse(p,9,9,6,6); break;
+                    case "preferences-order":
+                        g.DrawLine(p,7,4,7,20); g.DrawLines(p,new Point[] {new Point(3,8),new Point(7,4),new Point(11,8)});
+                        g.DrawLine(p,17,4,17,20); g.DrawLines(p,new Point[] {new Point(13,16),new Point(17,20),new Point(21,16)}); break;
+                    case "preferences-shield":
+                        g.DrawLines(p,new Point[] {new Point(12,3),new Point(21,6),new Point(20,15),new Point(12,22),new Point(4,15),new Point(3,6),new Point(12,3)});
+                        g.DrawLines(p,new Point[] {new Point(8,12),new Point(11,15),new Point(16,9)}); break;
+                    case "preferences-lock":
+                        g.DrawArc(p,7,3,10,12,180,180); g.DrawRectangle(p,5,10,14,11); g.DrawLine(p,12,14,12,17); break;
                     case "preferences-export":
                     case "preferences-import":
                         g.DrawLines(p,new Point[] { new Point(4,3),new Point(13,3),new Point(18,8),new Point(18,21),new Point(4,21),new Point(4,3) });
@@ -3249,7 +3278,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.6.1.0'
+$script:AppVersion = '1.6.2.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -8468,7 +8497,7 @@ function New-PreferencesBlock {
     $panel=[Windows.Forms.Panel]::new()
     $panel.TabStop=$false
     $panel.BackColor=if ($Card) {[Drawing.Color]::FromArgb(37,37,37)} else {[Drawing.Color]::Transparent}
-    if ($Card) {$panel.BorderStyle='FixedSingle'}
+    # A card is a filled summary surface, not a framed box.
     $panel.Tag=[pscustomobject]@{Kind=$Kind;Card=[bool]$Card;Items=$Controls}
     for ($i=0;$i -lt $Controls.Count;$i++) {
         $Controls[$i].TabIndex=$i
@@ -8514,32 +8543,75 @@ function Move-PreferencesFocusedControlIntoView {
     }
 }
 
+function New-PreferencesIcon {
+    param([string]$Name,[string]$Key)
+    $icon=[Windows.Forms.Panel]::new()
+    $icon.Name=$Name;$icon.Tag=$Key;$icon.TabStop=$false
+    $icon.BackColor=[Drawing.Color]::Transparent
+    $icon.Add_Paint({
+        param($sender,$eventArgs)
+        [LenovoSettingsInk]::DrawIcon($eventArgs.Graphics,[string]$sender.Tag,$sender.ClientRectangle,[Drawing.Color]::FromArgb(184,184,184))
+    })
+    return $icon
+}
+
+function New-PreferencesSeparator {
+    $line=[Windows.Forms.Panel]::new()
+    $line.Name='PreferencesSeparator';$line.TabStop=$false
+    $line.BackColor=[Drawing.Color]::FromArgb(63,63,63)
+    return $line
+}
+
+function New-PreferencesSummaryHead {
+    param($Form,[string]$Name,[string]$Count,[string]$Caption)
+    return (New-PreferencesBlock -Kind SummaryHead -Controls @(
+        (New-PreferencesIcon ($Name+'DriveIcon') 'preferences-drive'),
+        (New-PreferencesBlock -Controls @(
+            (New-PreferencesTextControl $Form $Name $Count Count),
+            (New-PreferencesTextControl $Form ($Name+'Label') $Caption Caption)
+        )),
+        (New-PreferencesIcon ($Name+'JsonIcon') 'preferences-json')
+    ))
+}
+
+function New-PreferencesIconText {
+    param($Form,[string]$Name,[string]$Key,[Windows.Forms.Control[]]$Controls)
+    return (New-PreferencesBlock -Kind IconText -Controls @(
+        (New-PreferencesIcon ($Name+'Icon') $Key),
+        (New-PreferencesBlock -Controls $Controls)
+    ))
+}
+
 function Add-PreferencesMetrics {
     param($Form,$View)
     $items=@()
-    foreach ($key in @('Matched','Changed','Skipped','LocalOnly')) {
-        $items+=,(New-PreferencesBlock -Card -Controls @(
-            (New-PreferencesTextControl $Form ('Metric'+$key) ([string]$View.$key) Count),
+    foreach ($key in @('Changed','Skipped','LocalOnly')) {
+        $items+=,(New-PreferencesBlock -Controls @(
+            (New-PreferencesTextControl $Form ('Metric'+$key) ([string]$View.$key) Heading),
             (New-PreferencesTextControl $Form ('MetricLabel'+$key) (Get-LocalizedString -Key ('Preferences.Metric'+$key)) Caption)
         ))
     }
-    Add-PreferencesBlock $Form $items Metrics
+    Add-PreferencesBlock $Form @(
+        (New-PreferencesSummaryHead $Form 'MetricMatched' (Get-LocalizedString -Key 'Preferences.TargetCount' -Values @{Count=$View.Matched}) (Get-LocalizedString -Key 'Preferences.MetricMatched')),
+        (New-PreferencesSeparator),
+        (New-PreferencesBlock -Controls $items -Kind CompactMetrics)
+    ) -Card
 }
 
 function New-PreferencesLanguageTile {
     param($Form,[string]$Name,[string]$Locale,[string]$CaptionKey)
     $flag=[Windows.Forms.Panel]::new()
     $flag.Name=$Name+'Flag';$flag.Tag=$Locale;$flag.TabStop=$false
-    $flag.BackColor=[Drawing.Color]::FromArgb(37,37,37)
+    $flag.BackColor=[Drawing.Color]::Transparent
     $flag.Add_Paint({
         param($sender,$eventArgs)
         [LenovoLocaleFlags]::DrawFlag($eventArgs.Graphics,[string]$sender.Tag,$sender.ClientRectangle)
     })
     $nameText=Get-LocalizedString -Key $(if ($Locale -ceq 'de-DE') {'Language.German'} else {'Language.English'})
-    return (New-PreferencesBlock -Card -Kind Language -Controls @(
+    return (New-PreferencesBlock -Kind Language -Controls @(
         (New-PreferencesTextControl $Form ($Name+'Caption') (Get-LocalizedString -Key $CaptionKey) Caption),
         $flag,
-        (New-PreferencesTextControl $Form ($Name+'Name') ($nameText+' ('+$Locale+')') Heading)
+        (New-PreferencesTextControl $Form ($Name+'Name') $nameText Heading)
     ))
 }
 
@@ -8582,7 +8654,8 @@ function Add-PreferencesEntryCard {
             $items+=,(New-PreferencesBlock -Controls @($previous,$next) -Kind Buttons)
         }
     }
-    Add-PreferencesBlock $Form $items -Card
+    $items+=,(New-PreferencesSeparator)
+    Add-PreferencesBlock $Form $items
 }
 
 function Update-PreferencesConfirmationBody {
@@ -8594,41 +8667,38 @@ function Update-PreferencesConfirmationBody {
         foreach ($control in @($body.Controls)) {$body.Controls.Remove($control);$control.Dispose()}
         $s.Blocks.Clear()
         if ($s.Mode -eq 'Export') {
-            $intro=New-PreferencesBlock -Controls @(
-                (New-PreferencesTextControl $Form 'ExportIntro' (Get-LocalizedString -Key 'Preferences.ExportIntro') Heading),
-                (New-PreferencesTextControl $Form 'ExportFormat' (Get-LocalizedString -Key 'Preferences.ExportFormat') Caption)
-            )
-            $countLabel=New-PreferencesTextControl $Form 'ExportCount' ([string]$s.ExportCount) Count
-            $countCaption=New-PreferencesTextControl $Form 'ExportCountLabel' (Get-LocalizedString -Key 'Preferences.ExportCountLabel') Caption
-            $countLabel.TextAlign='MiddleRight';$countCaption.TextAlign='MiddleRight'
-            $count=New-PreferencesBlock -Controls @($countLabel,$countCaption)
-            Add-PreferencesBlock $Form @($intro,$count) Metrics -Card
-            $included=@((New-PreferencesTextControl $Form 'IncludedHeading' (Get-LocalizedString -Key 'Preferences.IncludedHeading') Caption))
+            $included=@()
+            $icons=@{Language='preferences-language';Aliases='preferences-alias';Visibility='preferences-visible';Order='preferences-order'}
             foreach ($key in @('Language','Aliases','Visibility','Order')) {
-                $included+=,(New-PreferencesTextControl $Form ('Included'+$key) ('✓  '+(Get-LocalizedString -Key ('Preferences.Included'+$key))) Body)
+                $included+=,(New-PreferencesIconText $Form ('Included'+$key) $icons[$key] @(
+                    (New-PreferencesTextControl $Form ('Included'+$key) (Get-LocalizedString -Key ('Preferences.Included'+$key)) Body)
+                ))
             }
-            Add-PreferencesBlock $Form $included
+            Add-PreferencesBlock $Form @(
+                (New-PreferencesSummaryHead $Form 'ExportCount' (Get-LocalizedString -Key 'Preferences.TargetCount' -Values @{Count=$s.ExportCount}) (Get-LocalizedString -Key 'Preferences.ExportIntro')),
+                (New-PreferencesSeparator),
+                (New-PreferencesBlock -Controls $included -Kind TwoColumns)
+            ) -Card
         } else {
             Add-PreferencesMetrics $Form $s.View
-            $languageTiles=New-PreferencesBlock -Kind Metrics -Controls @(
+            $languageTiles=New-PreferencesBlock -Kind TwoColumns -Controls @(
                 (New-PreferencesLanguageTile $Form 'LanguageBefore' $s.View.OldLocale 'Preferences.LanguageBefore'),
                 (New-PreferencesLanguageTile $Form 'LanguageAfter' $s.View.Locale 'Preferences.LanguageAfter')
             )
             Add-PreferencesBlock $Form @(
                 (New-PreferencesTextControl $Form 'LanguageHeading' (Get-LocalizedString -Key 'Preferences.IncludedLanguage') Heading),
                 $languageTiles,
-                (New-PreferencesTextControl $Form 'LanguageComparison' (Get-LocalizedString -Key 'Preferences.PreviewLanguage' -Values @{Before=$s.View.OldLocale;After=$s.View.Locale}) Caption),
-                (New-PreferencesTextControl $Form 'LanguageStatus' (Get-LocalizedString -Key $(if ($s.View.OldLocale -ceq $s.View.Locale) {'Preferences.NoChange'} else {'Preferences.LanguageChanged'})) $(if ($s.View.OldLocale -cne $s.View.Locale) {'Changed'} else {'Caption'}))
+                (New-PreferencesTextControl $Form 'LanguageStatus' (Get-LocalizedString -Key $(if ($s.View.OldLocale -ceq $s.View.Locale) {'Preferences.NoChange'} else {'Preferences.LanguageChanged'})) $(if ($s.View.OldLocale -cne $s.View.Locale) {'Changed'} else {'Caption'})),
+                (New-PreferencesSeparator)
             )
-            Add-PreferencesBlock $Form @(
-                (New-PreferencesTextControl $Form 'ReconcileHeading' (Get-LocalizedString -Key 'Preferences.ReconcileHeading') Heading),
-                (New-PreferencesTextControl $Form 'ReconcileWarning' (Get-LocalizedString -Key 'Preferences.ReconcileWarning') Body),
-                (New-PreferencesTextControl $Form 'SystemUnchanged' (Get-LocalizedString -Key 'Preferences.SystemUnchanged') Caption)
-            ) -Card
-            Add-PreferencesBlock $Form @(
-                (New-PreferencesTextControl $Form 'EntryHeading' (Get-LocalizedString -Key 'Preferences.EntriesHeading') Heading),
-                (New-PreferencesTextControl $Form 'AdditionalCounts' (Get-LocalizedString -Key 'Preferences.AdditionalCounts' -Values @{Unavailable=$s.View.Unavailable;Aliases=$s.View.AliasSkipped}) Caption)
-            )
+            $entryIntro=@((New-PreferencesTextControl $Form 'EntryHeading' (Get-LocalizedString -Key 'Preferences.EntriesHeading') Heading))
+            if ($s.View.Unavailable -gt 0) {
+                $entryIntro+=,(New-PreferencesTextControl $Form 'UnavailableCount' (Get-LocalizedString -Key 'Preferences.UnavailableCount' -Values @{Count=$s.View.Unavailable}) Caption)
+            }
+            if ($s.View.AliasSkipped -gt 0) {
+                $entryIntro+=,(New-PreferencesTextControl $Form 'AliasSkippedCount' (Get-LocalizedString -Key 'Preferences.AliasSkippedCount' -Values @{Count=$s.View.AliasSkipped}) Warning)
+            }
+            Add-PreferencesBlock $Form $entryIntro
             $filters=@()
             foreach ($key in @('All','Changed','Skipped','LocalOnly','Unavailable')) {
                 $filters+=,(New-PreferencesViewButton $Form ('Filter'+$key) (Get-LocalizedString -Key ('Preferences.Filter'+$key)) Filter $key -Selected:($s.Filter -ceq $key))
@@ -8654,20 +8724,37 @@ function Update-PreferencesConfirmationBody {
                 }
                 foreach ($entry in $s.VisibleRows) {Add-PreferencesEntryCard $Form $entry}
             } else {
-                Add-PreferencesBlock $Form @((New-PreferencesTextControl $Form 'NoRows' (Get-LocalizedString -Key 'Preferences.NoRows') Caption)) -Card
+                Add-PreferencesBlock $Form @((New-PreferencesTextControl $Form 'NoRows' (Get-LocalizedString -Key 'Preferences.NoRows') Caption))
             }
         }
         if ($s.Mode -eq 'Import') {
-            Add-PreferencesBlock $Form @((New-PreferencesTextControl $Form 'IncludedScope' (Get-LocalizedString -Key 'Preferences.IncludedScope') Caption))
+            Add-PreferencesBlock $Form @(
+                (New-PreferencesIconText $Form 'Reconcile' 'preferences-shield' @(
+                    (New-PreferencesTextControl $Form 'ReconcileHeading' (Get-LocalizedString -Key 'Preferences.ReconcileHeading') Heading),
+                    (New-PreferencesTextControl $Form 'ReconcileWarning' (Get-LocalizedString -Key 'Preferences.ReconcileWarning') Body),
+                    (New-PreferencesTextControl $Form 'IncludedScope' (Get-LocalizedString -Key 'Preferences.IncludedScope') Caption)
+                )),
+                (New-PreferencesSeparator)
+            )
+        }
+        $excludedHeading=if ($s.Mode -eq 'Import') {'Preferences.UnchangedHeading'} else {'Preferences.ExcludedHeading'}
+        $excluded=@(
+            (New-PreferencesTextControl $Form 'ExcludedHeading' (Get-LocalizedString -Key $excludedHeading) Heading),
+            (New-PreferencesTextControl $Form 'ExcludedScope' (Get-LocalizedString -Key 'Preferences.ExcludedScope') Body)
+        )
+        if ($s.Mode -eq 'Import') {
+            $excluded+=,(New-PreferencesTextControl $Form 'SystemUnchanged' (Get-LocalizedString -Key 'Preferences.SystemUnchanged') Caption)
         }
         Add-PreferencesBlock $Form @(
-            (New-PreferencesTextControl $Form 'ExcludedHeading' (Get-LocalizedString -Key 'Preferences.ExcludedHeading') Heading),
-            (New-PreferencesTextControl $Form 'ExcludedScope' (Get-LocalizedString -Key 'Preferences.ExcludedScope') Body)
-        ) -Card
+            (New-PreferencesIconText $Form 'Excluded' 'preferences-shield' $excluded),
+            (New-PreferencesSeparator)
+        )
         Add-PreferencesBlock $Form @(
-            (New-PreferencesTextControl $Form 'PrivacyHeading' (Get-LocalizedString -Key 'Preferences.PrivacyHeading') Heading),
-            (New-PreferencesTextControl $Form 'PrivacyBody' (Get-LocalizedString -Key 'Preferences.PrivacyBody') Caption),
-            (New-PreferencesTextControl $Form 'UnavailableNote' (Get-LocalizedString -Key 'Preferences.UnavailableNote') Caption)
+            (New-PreferencesIconText $Form 'Privacy' 'preferences-lock' @(
+                (New-PreferencesTextControl $Form 'PrivacyHeading' (Get-LocalizedString -Key 'Preferences.PrivacyHeading') Heading),
+                (New-PreferencesTextControl $Form 'PrivacyBody' (Get-LocalizedString -Key 'Preferences.PrivacyBody') Caption),
+                (New-PreferencesTextControl $Form 'UnavailableNote' (Get-LocalizedString -Key 'Preferences.UnavailableNote') Caption)
+            ))
         )
     } finally {$body.ResumeLayout($false)}
     if ($s.Scale -gt 0) {
@@ -8738,10 +8825,14 @@ function Set-PreferencesBlockLayout {
     function Px([double]$n) {return [Math]::Max(1,[int][Math]::Round($n*$Scale))}
     $pad=if ($Block.Tag.Card) {Px 10} else {0}
     $gap=Px 5
-    $available=[Math]::Max(1,$Width-2*$pad-$(if ($Block.Tag.Card) {2} else {0}))
+    $available=[Math]::Max(1,$Width-2*$pad)
     $y=$pad;$x=$pad;$lineHeight=0
-    if ($Block.Tag.Kind -eq 'Metrics') {
-        $columns=if ($available -ge (Px 620)) {4} elseif ($available -ge (Px 250)) {2} else {1}
+    if ($Block.Tag.Kind -in @('Metrics','TwoColumns','CompactMetrics')) {
+        $columns=switch ($Block.Tag.Kind) {
+            'TwoColumns' {if ($available -ge (Px 250)) {2} else {1}}
+            'CompactMetrics' {if ($available -ge (Px 300)) {3} elseif ($available -ge (Px 200)) {2} else {1}}
+            default {if ($available -ge (Px 620)) {4} elseif ($available -ge (Px 250)) {2} else {1}}
+        }
         $columns=[Math]::Max(1,[Math]::Min($columns,$Block.Tag.Items.Count))
         $cell=[int][Math]::Floor(($available-($columns-1)*$gap)/$columns)
         $index=0
@@ -8753,6 +8844,20 @@ function Set-PreferencesBlockLayout {
             $lineHeight=[Math]::Max($lineHeight,$h);$index++
         }
         $y+=$lineHeight
+    } elseif ($Block.Tag.Kind -in @('SummaryHead','IconText')) {
+        $icon=$Block.Tag.Items[0];$content=$Block.Tag.Items[1]
+        $summary=$Block.Tag.Kind -eq 'SummaryHead'
+        $side=[Math]::Min((Px $(if ($summary) {38} else {20})),[Math]::Max(1,[int]($available/5)))
+        $right=if ($summary) {$side+$gap} else {0}
+        $cw=[Math]::Max(1,$available-$side-$gap-$right)
+        $ch=Set-PreferencesBlockLayout $content $cw $Graphics $Scale
+        $h=[Math]::Max($side,$ch)
+        $icon.Bounds=[Drawing.Rectangle]::new($pad,($y+[int](($h-$side)/2)),$side,$side)
+        $content.Bounds=[Drawing.Rectangle]::new(($pad+$side+$gap),$y,$cw,$ch)
+        if ($summary) {
+            $Block.Tag.Items[2].Bounds=[Drawing.Rectangle]::new(($pad+$available-$side),($y+[int](($h-$side)/2)),$side,$side)
+        }
+        $y+=$h
     } elseif ($Block.Tag.Kind -eq 'Language') {
         $caption=$Block.Tag.Items[0];$flag=$Block.Tag.Items[1];$name=$Block.Tag.Items[2]
         $h=[Math]::Max((Px 16),[int][Math]::Ceiling($Graphics.MeasureString($caption.Text,$caption.Font,$available).Height)+(Px 4))
@@ -8778,7 +8883,9 @@ function Set-PreferencesBlockLayout {
     } else {
         foreach ($item in $Block.Tag.Items) {
             $w=$available
-            if ($item -is [Windows.Forms.Panel]) {
+            if ($item.Name -ceq 'PreferencesSeparator') {
+                $h=Px 1
+            } elseif ($item -is [Windows.Forms.Panel]) {
                 $h=Set-PreferencesBlockLayout $item $w $Graphics $Scale
             } elseif ($item -is [Windows.Forms.Button]) {
                 $w=[Math]::Min($available,[Math]::Max((Px 100),[int][Math]::Ceiling($Graphics.MeasureString($item.Text,$item.Font).Width)+(Px 22)))
@@ -8791,7 +8898,7 @@ function Set-PreferencesBlockLayout {
         }
         $y-=$gap
     }
-    return [int][Math]::Max(1,$y+$pad+$(if ($Block.Tag.Card) {2} else {0}))
+    return [int][Math]::Max(1,$y+$pad)
 }
 
 function Set-PreferencesConfirmationLayout {
