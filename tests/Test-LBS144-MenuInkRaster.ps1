@@ -72,7 +72,7 @@ public static class Lbs144MenuInkProbe
     }
 }
 '@
-Add-Type -TypeDefinition ($renderer + [Environment]::NewLine + $probe) -ReferencedAssemblies System.Windows.Forms,System.Drawing -ErrorAction Stop
+Add-Type -TypeDefinition ($renderer + [Environment]::NewLine + $probe) -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility -ErrorAction Stop
 $gdi96 = [Lbs144MenuInkProbe]::RasterHeight([single]96,$false)
 $gdi240 = [Lbs144MenuInkProbe]::RasterHeight([single]240,$false)
 $plus96 = [Lbs144MenuInkProbe]::RasterHeight([single]96,$true)

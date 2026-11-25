@@ -284,6 +284,7 @@ function Set-AuxiliaryPopupLayout {
     $state.Scroll.Bounds = [Drawing.Rectangle]::new($width-$gutter,0,$gutter,$viewportHeight)
     $state.Scroll.LargeChange = $viewportHeight
     $state.Scroll.SmallChange = [Math]::Max(1,[int][Math]::Round(60*$Scale))
+    if ($Form.Name -eq 'LenovoConfigurationPopup') { Set-ConfigurationPopupWidth -Form $Form -Scale $Scale }
     $state.Scroll.Maximum = $range
     $state.Scroll.Value = 0
     $state.Scroll.Visible = ($range -gt 0 -and $gutter -gt 0)

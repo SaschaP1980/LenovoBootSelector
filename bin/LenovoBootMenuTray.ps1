@@ -114,6 +114,16 @@ function Get-LocalizationCatalogCore {
             'Settings.Title' = 'SETTINGS'
             'Settings.More' = 'Further settings'
             'Settings.General' = 'GENERAL'
+            'Settings.MoreSubtitle' = 'Manage application and system functions'
+            'Settings.LanguageSelected' = 'Selected language'
+            'Settings.LanguageNotSelected' = 'Not selected'
+            'Settings.Detail.autostart' = 'Start the application automatically'
+            'Settings.Detail.system-setup' = 'Set up or restore system functions'
+            'Settings.Detail.system-remove' = 'Uninstall system functions'
+            'Settings.Detail.update-check' = 'Check for an available update'
+            'Settings.Detail.update-install' = 'Install the available update'
+            'Settings.Detail.diagnostics-save' = 'Create a local diagnostic package'
+            'Settings.Detail.diagnostics-upload' = 'Send diagnostic data'
             'Settings.Updates' = 'UPDATES'
             'Settings.Diagnostics' = 'DIAGNOSTICS'
             'Settings.DefaultPickerCurrent' = 'Current default: {Target}'
@@ -456,6 +466,16 @@ function Get-LocalizationCatalogCore {
             'Settings.Title' = 'EINSTELLUNGEN'
             'Settings.More' = 'Weitere Einstellungen'
             'Settings.General' = 'ALLGEMEIN'
+            'Settings.MoreSubtitle' = 'Anwendung und Systemfunktionen verwalten'
+            'Settings.LanguageSelected' = 'Ausgewählte Sprache'
+            'Settings.LanguageNotSelected' = 'Nicht ausgewählt'
+            'Settings.Detail.autostart' = 'Anwendung automatisch starten'
+            'Settings.Detail.system-setup' = 'Systemfunktionen einrichten oder reparieren'
+            'Settings.Detail.system-remove' = 'Systemfunktionen deinstallieren'
+            'Settings.Detail.update-check' = 'Verfügbarkeit eines Updates prüfen'
+            'Settings.Detail.update-install' = 'Verfügbares Update installieren'
+            'Settings.Detail.diagnostics-save' = 'Lokales Diagnosepaket erstellen'
+            'Settings.Detail.diagnostics-upload' = 'Diagnosedaten übermitteln'
             'Settings.Updates' = 'UPDATES'
             'Settings.Diagnostics' = 'DIAGNOSE'
             'Settings.DefaultPickerCurrent' = 'Aktuelles Standardziel: {Target}'
@@ -1508,7 +1528,7 @@ public sealed class LenovoMenuColorTable : ProfessionalColorTable
     public override Color ToolStripGradientEnd { get { return bg; } }
 }
 
-// Small, deterministic country flags for the Language submenu only.
+// Small, deterministic country flags shared by the Language submenu and settings.
 // Drawn locally at the active DPI; no emoji fonts, native image gutters or assets.
 public static class LenovoLocaleFlags
 {
@@ -1561,7 +1581,13 @@ public static class LenovoLocaleFlags
     {
         string locale = GetLocale(item);
         if (locale == null || g == null) return;
-        Rectangle flag = GetBounds(item, row, g.DpiX);
+        DrawFlag(g, locale, GetBounds(item, row, g.DpiX));
+    }
+
+    public static void DrawFlag(Graphics g, string locale, Rectangle flag)
+    {
+        if (g == null || flag.Width <= 0 || flag.Height <= 0 ||
+            (locale != "de-DE" && locale != "en-US")) return;
         GraphicsState saved = g.Save();
         try
         {
@@ -2227,6 +2253,238 @@ public sealed class LenovoCheckBox : CheckBox
 }
 
 
+// Configuration-only drawing. Native Button and CheckBox retain input,
+// enabled state, tab order and click semantics; painting does not dispatch.
+public static class LenovoSettingsInk
+{
+    public static int Px(float dpi, int value)
+    { return Math.Max(1, (int)Math.Round(value * Math.Max(96f, dpi) / 96f)); }
+
+    public static Color Muted(bool enabled)
+    { return SystemInformation.HighContrast ? (enabled ? SystemColors.ControlText : SystemColors.GrayText)
+        : (enabled ? Color.FromArgb(184,184,184) : Color.FromArgb(146,146,146)); }
+
+    public static void DrawIcon(Graphics g, string key, Rectangle bounds, Color ink)
+    {
+        if (bounds.Width <= 0 || bounds.Height <= 0) return;
+        GraphicsState state = g.Save();
+        try {
+            g.TranslateTransform(bounds.X, bounds.Y);
+            g.ScaleTransform(bounds.Width / 24f, bounds.Height / 24f);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using (Pen p = new Pen(ink, 1.6f)) {
+                p.StartCap = p.EndCap = LineCap.Round;
+                p.LineJoin = LineJoin.Round;
+                switch (key) {
+                    case "autostart":
+                        g.DrawArc(p, 4, 4, 16, 16, -55, 290);
+                        g.DrawLine(p, 12, 2, 12, 11); break;
+                    case "system-setup":
+                        g.DrawLines(p, new Point[] { new Point(20,3), new Point(15,3), new Point(12,6), new Point(13,10), new Point(4,19), new Point(7,22), new Point(16,13), new Point(20,14), new Point(23,10), new Point(23,6), new Point(19,10), new Point(16,7), new Point(20,3) }); break;
+                    case "system-remove":
+                        g.DrawLine(p, 4, 6, 20, 6);
+                        g.DrawLines(p,new Point[] { new Point(8,6),new Point(8,3),new Point(16,3),new Point(16,6) });
+                        g.DrawLines(p,new Point[] { new Point(6,7),new Point(7,21),new Point(17,21),new Point(18,7) });
+                        g.DrawLine(p,10,10,10,17); g.DrawLine(p,14,10,14,17); break;
+                    case "update-check":
+                        g.DrawArc(p,4,4,16,16,-75,310);
+                        g.DrawLines(p,new Point[] { new Point(20,3),new Point(20,10),new Point(13,10) }); break;
+                    case "update-install":
+                    case "diagnostics-upload":
+                        bool up = key == "diagnostics-upload";
+                        g.DrawLine(p,12,3,12,16);
+                        if (up) g.DrawLines(p,new Point[] { new Point(7,8),new Point(12,3),new Point(17,8) });
+                        else g.DrawLines(p,new Point[] { new Point(7,11),new Point(12,16),new Point(17,11) });
+                        g.DrawLines(p,new Point[] { new Point(4,15),new Point(4,21),new Point(20,21),new Point(20,15) }); break;
+                    case "diagnostics-save":
+                        g.DrawLines(p,new Point[] { new Point(5,3),new Point(14,3),new Point(19,8),new Point(19,21),new Point(5,21),new Point(5,3) });
+                        g.DrawLines(p,new Point[] { new Point(14,3),new Point(14,8),new Point(19,8) });
+                        g.DrawLine(p,8,12,16,12); g.DrawLine(p,8,16,16,16); break;
+                }
+            }
+        } finally { g.Restore(state); }
+    }
+
+    public static Rectangle TextBounds(Rectangle bounds, float dpi, bool language)
+    {
+        int left = Px(dpi, language ? 42 : 44), right = Px(dpi, language ? 9 : 27);
+        return new Rectangle(left, 0, Math.Max(0, bounds.Width-left-right), bounds.Height);
+    }
+
+    public static void DrawTextPair(Graphics g, Rectangle bounds, Font titleFont, Font subtitleFont,
+        string title, string subtitle, Color titleInk, Color secondaryInk)
+    {
+        int top = Px(g.DpiX,5);
+        int h = Math.Max(1,(bounds.Height-top*2)/2);
+        TextFormatFlags flags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
+            TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix |
+            TextFormatFlags.PreserveGraphicsClipping;
+        TextRenderer.DrawText(g,title ?? "",titleFont,new Rectangle(bounds.X,top,bounds.Width,h),titleInk,flags);
+        TextRenderer.DrawText(g,subtitle ?? "",subtitleFont,new Rectangle(bounds.X,top+h,bounds.Width,h),secondaryInk,flags);
+    }
+
+    public static void DrawFocus(Graphics g, Rectangle bounds, Color fg, Color bg)
+    {
+        bounds.Inflate(-Px(g.DpiX,3),-Px(g.DpiX,3));
+        if (bounds.Width > 0 && bounds.Height > 0) ControlPaint.DrawFocusRectangle(g,bounds,fg,bg);
+    }
+}
+
+public sealed class LenovoSettingsActionButton : Button
+{
+    public string ActionIcon { get; set; }
+    public string LocaleCode { get; set; }
+    public string Subtitle { get; set; }
+    public Font TitleFont { get; set; }
+    public Font SubtitleFont { get; set; }
+    public Color HoverSurface { get; set; }
+    public Color SelectedSurface { get; set; }
+    public Color AccentColor { get; set; }
+    public bool LanguageSelected { get; set; }
+    public bool Destructive { get; set; }
+    public bool Separator { get; set; }
+    private bool hovering, pressed;
+
+    public LenovoSettingsActionButton()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        HoverSurface = Color.FromArgb(41,41,41);
+        SelectedSurface = Color.FromArgb(44,25,24);
+        AccentColor = Color.FromArgb(225,37,27);
+    }
+    protected override void OnMouseEnter(EventArgs e) { hovering = true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { hovering = false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnMouseDown(MouseEventArgs e) { pressed = e.Button == MouseButtons.Left; Invalidate(); base.OnMouseDown(e); }
+    protected override void OnMouseUp(MouseEventArgs e) { pressed = false; Invalidate(); base.OnMouseUp(e); }
+    protected override void OnMouseCaptureChanged(EventArgs e) { pressed = false; Invalidate(); base.OnMouseCaptureChanged(e); }
+    protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+    protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
+
+    protected override AccessibleObject CreateAccessibilityInstance()
+    {
+        if (String.IsNullOrEmpty(LocaleCode)) return base.CreateAccessibilityInstance();
+        return new LanguageAccessible(this);
+    }
+    private sealed class LanguageAccessible : Control.ControlAccessibleObject
+    {
+        private readonly LenovoSettingsActionButton button;
+        public LanguageAccessible(LenovoSettingsActionButton owner) : base(owner) { button = owner; }
+        public override AccessibleRole Role { get { return AccessibleRole.RadioButton; } }
+        public override AccessibleStates State {
+            get { return base.State | AccessibleStates.Selectable |
+                (button.LanguageSelected ? AccessibleStates.Selected | AccessibleStates.Checked : AccessibleStates.None); }
+        }
+        public override void DoDefaultAction() { if (button.Enabled) button.PerformClick(); }
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        bool language = !String.IsNullOrEmpty(LocaleCode);
+        bool hc = SystemInformation.HighContrast;
+        Color bg = hc ? (LanguageSelected ? SystemColors.Highlight : SystemColors.Control) :
+            (Enabled && (LanguageSelected || pressed) ? SelectedSurface : Enabled && hovering ? HoverSurface : BackColor);
+        Color fg = hc ? (Enabled ? (LanguageSelected ? SystemColors.HighlightText : SystemColors.ControlText) : SystemColors.GrayText) :
+            (!Enabled ? LenovoSettingsInk.Muted(false) : Destructive ? Color.FromArgb(239,86,78) : ForeColor);
+        g.Clear(bg);
+        float dpi = g.DpiX;
+        int px = LenovoSettingsInk.Px(dpi,1);
+        Rectangle text = LenovoSettingsInk.TextBounds(ClientRectangle,dpi,language);
+        if (language) {
+            int fw = LenovoSettingsInk.Px(dpi,16), fh = LenovoSettingsInk.Px(dpi,12);
+            LenovoLocaleFlags.DrawFlag(g,LocaleCode,new Rectangle(LenovoSettingsInk.Px(dpi,12),(Height-fh)/2,fw,fh));
+            TextRenderer.DrawText(g,Text,Font,text,fg,TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
+                TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+            using (Pen border = new Pen(hc ? SystemColors.ControlText : LanguageSelected ? AccentColor : Color.FromArgb(68,68,68),px))
+                g.DrawRectangle(border,px/2,px/2,Math.Max(0,Width-px-1),Math.Max(0,Height-px-1));
+        } else {
+            int side = LenovoSettingsInk.Px(dpi,22);
+            LenovoSettingsInk.DrawIcon(g,ActionIcon,new Rectangle(LenovoSettingsInk.Px(dpi,11),(Height-side)/2,side,side),
+                Destructive && Enabled ? fg : LenovoSettingsInk.Muted(Enabled));
+            LenovoSettingsInk.DrawTextPair(g,text,TitleFont ?? Font,SubtitleFont ?? Font,Text,Subtitle,fg,LenovoSettingsInk.Muted(Enabled));
+            int x = Width-LenovoSettingsInk.Px(dpi,16), y = Height/2, d = LenovoSettingsInk.Px(dpi,4);
+            using (Pen p = new Pen(LenovoSettingsInk.Muted(Enabled),Math.Max(1f,1.4f*dpi/96f))) {
+                p.StartCap = p.EndCap = LineCap.Round;
+                g.DrawLines(p,new Point[] { new Point(x-d,y-d),new Point(x,y),new Point(x-d,y+d) });
+            }
+            if (Separator) using (Pen p = new Pen(hc ? SystemColors.ControlDark : Color.FromArgb(57,57,57),px))
+                g.DrawLine(p,LenovoSettingsInk.Px(dpi,44),Height-px,Math.Max(0,Width-LenovoSettingsInk.Px(dpi,12)),Height-px);
+        }
+        if (Focused && ShowFocusCues) LenovoSettingsInk.DrawFocus(g,ClientRectangle,fg,bg);
+    }
+}
+
+public sealed class LenovoSettingsAutostartLabel : Label
+{
+    public string Subtitle { get; set; }
+    public Font TitleFont { get; set; }
+    public Font SubtitleFont { get; set; }
+    public Color HoverSurface { get; set; }
+    private bool hovering;
+    public LenovoSettingsAutostartLabel()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+    }
+    protected override void OnMouseEnter(EventArgs e) { hovering=true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { hovering=false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g=e.Graphics;
+        bool hc=SystemInformation.HighContrast;
+        g.Clear(hc ? SystemColors.Control : Enabled && hovering ? HoverSurface : BackColor);
+        int side=LenovoSettingsInk.Px(g.DpiX,22), left=LenovoSettingsInk.Px(g.DpiX,44);
+        Color fg=hc ? (Enabled ? SystemColors.ControlText : SystemColors.GrayText) :
+            (Enabled ? ForeColor : LenovoSettingsInk.Muted(false));
+        LenovoSettingsInk.DrawIcon(g,"autostart",new Rectangle(LenovoSettingsInk.Px(g.DpiX,11),(Height-side)/2,side,side),LenovoSettingsInk.Muted(Enabled));
+        LenovoSettingsInk.DrawTextPair(g,new Rectangle(left,0,Math.Max(0,Width-left-LenovoSettingsInk.Px(g.DpiX,3)),Height),
+            TitleFont ?? Font,SubtitleFont ?? Font,Text,Subtitle,fg,LenovoSettingsInk.Muted(Enabled));
+    }
+}
+
+public sealed class LenovoSettingsToggle : CheckBox
+{
+    public Color AccentColor { get; set; }
+    public Color HoverSurface { get; set; }
+    private bool hovering;
+    public LenovoSettingsToggle()
+    {
+        AutoCheck=false; AutoSize=false;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw,true);
+    }
+    protected override void OnMouseEnter(EventArgs e) { hovering=true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { hovering=false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+    protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g=e.Graphics;
+        bool hc=SystemInformation.HighContrast;
+        Color bg=hc ? SystemColors.Control : Enabled && hovering ? HoverSurface : BackColor;
+        g.Clear(bg);
+        int w=Math.Min(Math.Max(0,Width-4),LenovoSettingsInk.Px(g.DpiX,38));
+        int h=Math.Min(Math.Max(0,Height-4),LenovoSettingsInk.Px(g.DpiX,22));
+        if (w >= h && h >= 4) {
+            Rectangle r=new Rectangle((Width-w)/2,(Height-h)/2,w,h);
+            Color fill=hc ? (Checked ? SystemColors.Highlight : SystemColors.ControlDark) :
+                (Checked && Enabled ? AccentColor : Color.FromArgb(85,85,85));
+            g.SmoothingMode=SmoothingMode.AntiAlias;
+            using (GraphicsPath path=new GraphicsPath()) {
+                path.AddArc(r.Left,r.Top,h,h,90,180);
+                path.AddArc(r.Right-h,r.Top,h,h,270,180);
+                path.CloseFigure();
+                using (Brush brush=new SolidBrush(fill)) g.FillPath(brush,path);
+            }
+            int pad=LenovoSettingsInk.Px(g.DpiX,3), d=Math.Max(1,h-2*pad);
+            using (Brush brush=new SolidBrush(hc ? SystemColors.ControlText : Enabled ? Color.White : Color.FromArgb(155,155,155)))
+                g.FillEllipse(brush,Checked ? r.Right-pad-d : r.Left+pad,r.Top+pad,d,d);
+        }
+        if (Focused && ShowFocusCues) LenovoSettingsInk.DrawFocus(g,ClientRectangle,SystemColors.ControlText,bg);
+    }
+}
+
 public sealed class LenovoVerticalScrollBar : Control
 {
     private int minimum = 0;
@@ -2356,7 +2614,7 @@ public sealed class LenovoVerticalScrollBar : Control
         if (!dragging) { hoverThumb = false; Invalidate(); }
     }
 }
-"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing
+"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility
 
 if ($HideConsole) {
     Add-Type @"
@@ -2433,7 +2691,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.19.1'
+$script:AppVersion = '1.5.20.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -13608,7 +13866,8 @@ function New-AuxiliaryPopupForm {
     $form.KeyPreview = $true
     $form.StartPosition = [Windows.Forms.FormStartPosition]::Manual
     $form.BackColor = $script:ColorBackground
-    $form.ClientSize = [Drawing.Size]::new(390,[Math]::Min(540,64+$ContentHeight))
+    $heightLimit = if ($Name -eq 'LenovoConfigurationPopup') { 672 } else { 540 }
+    $form.ClientSize = [Drawing.Size]::new(390,[Math]::Min($heightLimit,64+$ContentHeight))
     $regular = [Drawing.Font]::new('Segoe UI',[single]9.0)
     $bold = [Drawing.Font]::new('Segoe UI',[single]10.0,[Drawing.FontStyle]::Bold)
     $heading = [Drawing.Font]::new('Segoe UI',[single]8.5,[Drawing.FontStyle]::Bold)
@@ -13775,21 +14034,36 @@ function Update-ConfigurationPopupPresentation {
         $hint = Get-LocalizedString -Key $hintKey
         if (-not $control.Enabled) { $hint += [Environment]::NewLine + (Get-LocalizedString -Key 'Tooltip.Unavailable') }
         if ($Form.Tag.Tip.GetToolTip($control) -cne $hint) { $Form.Tag.Tip.SetToolTip($control,$hint) }
+        $control.Cursor = if ($control.Enabled) { [Windows.Forms.Cursors]::Hand } else { [Windows.Forms.Cursors]::Default }
         if ($control -is [Windows.Forms.CheckBox]) {
-            $control.Checked = [bool]$item.Checked
+            if ($control.Checked -ne [bool]$item.Checked) { $control.Checked = [bool]$item.Checked; $control.Invalidate() }
+            $control.AccessibleDescription = $hint
         }
-        elseif ($control -is [Windows.Forms.Button]) {
+        elseif ($control -is [LenovoSettingsAutostartLabel]) {
+            $control.AccessibleDescription = $hint
+        }
+        elseif ($control -is [LenovoSettingsActionButton]) {
             $language = $action -like 'language-*'
-            $selected = $language -and $item.Checked
-            $control.Text = if ($selected) { ('✓ ' + $item.Text) } else { [string]$item.Text }
-            $control.AccessibleName = [string]$control.Text
+            $selected = [bool]($language -and $item.Checked)
+            $name = if ($language) {
+                if ($action -eq 'language-de') { Get-LocalizedString -Key 'Language.German' }
+                else { Get-LocalizedString -Key 'Language.English' }
+            } else { ([string]$item.Text).TrimEnd('.') }
+            $subtitle = if ($language) { '' } elseif ($action -eq 'update-install' -and -not $control.Enabled) { Get-LocalizedString -Key 'Tooltip.Unavailable' } else { Get-LocalizedString -Key ('Settings.Detail.' + $action) }
+            $description = $hint
+            if ($language) {
+                $description += [Environment]::NewLine + (Get-LocalizedString -Key $(if ($selected) { 'Settings.LanguageSelected' } else { 'Settings.LanguageNotSelected' }))
+            }
+            $changed = $control.Text -cne $name -or $control.Subtitle -cne $subtitle -or $control.LanguageSelected -ne $selected
+            $control.Text = $name
+            $control.Subtitle = $subtitle
+            $control.LanguageSelected = $selected
+            $control.AccessibleName = $name
+            $control.AccessibleDescription = $description
             $control.ForeColor = if ($control.Enabled) { $script:ColorPrimary } else { [Drawing.Color]::FromArgb(146,146,146) }
-            $control.BackColor = if (-not $control.Enabled) { [Drawing.Color]::FromArgb(35,35,35) } elseif ($selected) { $script:ColorSelectedRow } else { [Drawing.Color]::FromArgb(34,34,34) }
+            $control.BackColor = if ($language) { $script:ColorSurface } else { [Drawing.Color]::FromArgb(37,37,37) }
             $control.FlatAppearance.BorderColor = if (-not $control.Enabled) { [Drawing.Color]::FromArgb(58,58,58) } elseif ($selected) { $script:ColorAccent } else { [Drawing.Color]::FromArgb(68,68,68) }
-            $control.FlatAppearance.MouseOverBackColor = if ($control.Enabled) { $script:ColorHover } else { $control.BackColor }
-            $control.FlatAppearance.MouseDownBackColor = if ($control.Enabled) { $script:ColorSelectedRow } else { $control.BackColor }
-            $control.Cursor = if ($control.Enabled) { [Windows.Forms.Cursors]::Hand } else { [Windows.Forms.Cursors]::Default }
-            $control.Invalidate()
+            if ($changed) { $control.Invalidate() }
         }
     }
 }
@@ -13823,47 +14097,55 @@ function Add-ConfigurationHeading {
 }
 
 function Add-ConfigurationActionButton {
-    param($Form,[string]$Action,[string]$Key,[int]$Y,[int]$X=16,[int]$Width=350)
-    $button = New-Object Windows.Forms.Button
+    param($Form,[string]$Action,[string]$Key,[int]$Y,[int]$X=16,[int]$Width=350,[switch]$Separator)
+    $button = New-Object LenovoSettingsActionButton
     $button.Name = 'ConfigurationAction-' + $Action
     $button.Tag = $Action
+    $button.ActionIcon = $Action
+    $button.LocaleCode = if ($Action -eq 'language-de') { 'de-DE' } elseif ($Action -eq 'language-en') { 'en-US' } else { '' }
+    $button.Destructive = ($Action -eq 'system-remove')
+    $button.Separator = [bool]$Separator
     $button.Text = Get-LocalizedString -Key $Key
     $button.AccessibleName = $button.Text
     $button.Font = $Form.Tag.Regular
+    $button.TitleFont = $Form.Tag.Bold
+    $button.SubtitleFont = $Form.Tag.Regular
     $button.ForeColor = $script:ColorPrimary
-    $button.BackColor = $script:ColorSurface
+    $button.BackColor = [Drawing.Color]::FromArgb(37,37,37)
+    $button.HoverSurface = $script:ColorHover
+    $button.SelectedSurface = $script:ColorSelectedRow
+    $button.AccentColor = $script:ColorAccent
     $button.FlatStyle = [Windows.Forms.FlatStyle]::Flat
-    $button.FlatAppearance.BorderSize = 1
-    $button.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(68,68,68)
-    $button.FlatAppearance.MouseOverBackColor = $script:ColorHover
-    $button.FlatAppearance.MouseDownBackColor = $script:ColorSelectedRow
-    # WinForms native flat buttons dim disabled ink against dark surfaces.
-    # Paint only the disabled interior; native Enabled and High Contrast remain authoritative.
-    $button.Add_Paint({
-        param($sender,$eventArgs)
-        if ($sender.Enabled -or [Windows.Forms.SystemInformation]::HighContrast) { return }
-        $inner = $sender.ClientRectangle
-        $border = $sender.FlatAppearance.BorderSize
-        $inner.Inflate(-$border,-$border)
-        if ($inner.Width -le 0 -or $inner.Height -le 0) { return }
-        $background = New-Object Drawing.SolidBrush($sender.BackColor)
-        try { $eventArgs.Graphics.FillRectangle($background,$inner) }
-        finally { $background.Dispose() }
-        $scale = [Math]::Max(1.0,[double]$sender.FindForm().Tag.Scale)
-        $pad = [int][Math]::Round(5*$scale)
-        $inner.X += $pad
-        $inner.Width -= 2*$pad
-        if ($inner.Width -le 0) { return }
-        $flags = [Windows.Forms.TextFormatFlags]::Left -bor [Windows.Forms.TextFormatFlags]::VerticalCenter -bor [Windows.Forms.TextFormatFlags]::SingleLine -bor [Windows.Forms.TextFormatFlags]::EndEllipsis -bor [Windows.Forms.TextFormatFlags]::NoPrefix -bor [Windows.Forms.TextFormatFlags]::PreserveGraphicsClipping
-        [Windows.Forms.TextRenderer]::DrawText($eventArgs.Graphics,$sender.Text,$sender.Font,$inner,$sender.ForeColor,$flags)
-    })
-    $button.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
+    $button.FlatAppearance.BorderSize = 0
     $button.UseMnemonic = $false
     $button.Cursor = [Windows.Forms.Cursors]::Hand
     $button.Location = [Drawing.Point]::new($X,$Y)
-    $button.Size = [Drawing.Size]::new($Width,34)
+    $height = if ($button.LocaleCode) { 38 } else { 52 }
+    $button.Size = [Drawing.Size]::new($Width,$height)
     $button.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })
     $Form.Tag.Body.Controls.Add($button)
+}
+
+# Width adaptation is configuration-local; the default picker retains its
+# original geometry. Bounds are already scaled once by the auxiliary shell.
+function Set-ConfigurationPopupWidth {
+    param($Form,[double]$Scale)
+    $body = $Form.Tag.Body
+    $margin = [int][Math]::Round(16*$Scale)
+    $width = [Math]::Max(2,$body.Width-2*$margin)
+    $toggle = [Math]::Min([int][Math]::Round(64*$Scale),[int][Math]::Floor($width/3))
+    $leftWidth = [Math]::Max(1,$width-$toggle)
+    $half = [int][Math]::Floor($width/2)
+    foreach ($control in $body.Controls) {
+        $control.Left = $margin
+        switch ($control.Name) {
+            'ConfigurationLocale-Settings.Autostart' { $control.Width = $leftWidth }
+            'ConfigurationAutostart' { $control.Left += $leftWidth; $control.Width = $toggle }
+            'ConfigurationAction-language-de' { $control.Width = $half }
+            'ConfigurationAction-language-en' { $control.Left += $half; $control.Width = $width-$half }
+            default { $control.Width = $width }
+        }
+    }
 }
 
 function Update-ConfigurationPopupLocale {
@@ -13872,11 +14154,17 @@ function Update-ConfigurationPopupLocale {
     $Form.Text = $title
     $Form.AccessibleName = $title
     $Form.Tag.Title.Text = $title
+    $subtitle = Get-LocalizedString -Key 'Settings.MoreSubtitle'
+    $Form.Tag.Subtitle.Text = $subtitle
+    $Form.Tag.Subtitle.AccessibleDescription = $subtitle
+    $Form.Tag.Tip.SetToolTip($Form.Tag.Subtitle,$subtitle)
+    $Form.Tag.Body.Controls['ConfigurationLocale-Settings.Autostart'].Subtitle = Get-LocalizedString -Key 'Settings.Detail.autostart'
     $Form.Tag.Close.AccessibleName = Get-LocalizedString -Key 'Common.Close'
     $Form.Tag.Tip.SetToolTip($Form.Tag.Close,(Get-LocalizedString -Key 'Tooltip.CloseSettings'))
     foreach ($control in $Form.Tag.Body.Controls) {
         if ($control.Name.StartsWith('ConfigurationLocale-')) {
             $control.Text = Get-LocalizedString -Key $control.Name.Substring('ConfigurationLocale-'.Length)
+            $control.AccessibleName = $control.Text
         }
     }
     $Form.Tag.Body.Controls['ConfigurationAutostart'].AccessibleName = Get-LocalizedString -Key 'Settings.Autostart'
@@ -13884,42 +14172,53 @@ function Update-ConfigurationPopupLocale {
 }
 
 function New-ConfigurationPopup {
-    $form = New-AuxiliaryPopupForm -Name 'LenovoConfigurationPopup' -Title (Get-LocalizedString -Key 'Settings.More') -Subtitle 'Lenovo Boot Selector' -ContentHeight 450
+    $form = New-AuxiliaryPopupForm -Name 'LenovoConfigurationPopup' -Title (Get-LocalizedString -Key 'Settings.More') -Subtitle (Get-LocalizedString -Key 'Settings.MoreSubtitle') -ContentHeight 570
+    $groupSurface = [Drawing.Color]::FromArgb(37,37,37)
     Add-ConfigurationHeading -Form $form -Key 'Settings.General' -Y 6
-    $autostartLabel = New-Label -Text (Get-LocalizedString -Key 'Settings.Autostart') -Font $form.Tag.Regular -ForeColor $script:ColorPrimary -X 16 -Y 30 -Width 306 -Height 30
+    $autostartLabel = New-Object LenovoSettingsAutostartLabel
     $autostartLabel.Name = 'ConfigurationLocale-Settings.Autostart'
     $autostartLabel.Tag = 'autostart'
+    $autostartLabel.Text = Get-LocalizedString -Key 'Settings.Autostart'
+    $autostartLabel.AccessibleName = $autostartLabel.Text
+    $autostartLabel.Subtitle = Get-LocalizedString -Key 'Settings.Detail.autostart'
+    $autostartLabel.Font = $form.Tag.Regular
+    $autostartLabel.TitleFont = $form.Tag.Bold
+    $autostartLabel.SubtitleFont = $form.Tag.Regular
+    $autostartLabel.ForeColor = $script:ColorPrimary
+    $autostartLabel.BackColor = $groupSurface
+    $autostartLabel.HoverSurface = $script:ColorHover
+    $autostartLabel.Location = [Drawing.Point]::new(16,32)
+    $autostartLabel.Size = [Drawing.Size]::new(286,52)
     $autostartLabel.Cursor = [Windows.Forms.Cursors]::Hand
     $autostartLabel.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })
     $form.Tag.Body.Controls.Add($autostartLabel)
-    $check = New-Object LenovoCheckBox
+    $check = New-Object LenovoSettingsToggle
     $check.Name = 'ConfigurationAutostart'
     $check.Tag = 'autostart'
     $check.AutoCheck = $false
     $check.AccessibleName = $autostartLabel.Text
     $check.Font = $form.Tag.Regular
-    $check.BackColor = $script:ColorBackground
+    $check.BackColor = $groupSurface
+    $check.HoverSurface = $script:ColorHover
     $check.AccentColor = $script:ColorAccent
-    $check.Location = [Drawing.Point]::new(332,30)
-    $check.Size = [Drawing.Size]::new(34,30)
-    $check.Add_GotFocus({ $this.BackColor = $script:ColorHover })
-    $check.Add_LostFocus({ $this.BackColor = $script:ColorBackground })
+    $check.Location = [Drawing.Point]::new(302,32)
+    $check.Size = [Drawing.Size]::new(64,52)
     $check.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })
     $form.Tag.Body.Controls.Add($check)
-    $language = New-Label -Text (Get-LocalizedString -Key 'Settings.Language') -Font $form.Tag.Regular -ForeColor $script:ColorPrimary -X 16 -Y 66 -Width 350 -Height 22
+    $language = New-Label -Text (Get-LocalizedString -Key 'Settings.Language') -Font $form.Tag.Bold -ForeColor $script:ColorPrimary -X 16 -Y 90 -Width 350 -Height 24
     $language.Name = 'ConfigurationLocale-Settings.Language'
     $form.Tag.Body.Controls.Add($language)
-    Add-ConfigurationActionButton -Form $form -Action 'language-de' -Key 'Language.German' -Y 90 -Width 171
-    Add-ConfigurationActionButton -Form $form -Action 'language-en' -Key 'Language.English' -Y 90 -X 195 -Width 171
-    Add-ConfigurationHeading -Form $form -Key 'Maintenance.Caption' -Y 132
-    Add-ConfigurationActionButton -Form $form -Action 'system-setup' -Key 'Maintenance.Setup' -Y 156
-    Add-ConfigurationActionButton -Form $form -Action 'system-remove' -Key 'Maintenance.Remove' -Y 194
-    Add-ConfigurationHeading -Form $form -Key 'Settings.Updates' -Y 236
-    Add-ConfigurationActionButton -Form $form -Action 'update-check' -Key 'Update.Check' -Y 260
-    Add-ConfigurationActionButton -Form $form -Action 'update-install' -Key 'Update.Install' -Y 298
-    Add-ConfigurationHeading -Form $form -Key 'Settings.Diagnostics' -Y 340
-    Add-ConfigurationActionButton -Form $form -Action 'diagnostics-save' -Key 'Diagnostics.Save' -Y 364
-    Add-ConfigurationActionButton -Form $form -Action 'diagnostics-upload' -Key 'Diagnostics.Upload' -Y 402
+    Add-ConfigurationActionButton -Form $form -Action 'language-de' -Key 'Language.German' -Y 116 -Width 175
+    Add-ConfigurationActionButton -Form $form -Action 'language-en' -Key 'Language.English' -Y 116 -X 191 -Width 175
+    Add-ConfigurationHeading -Form $form -Key 'Maintenance.Caption' -Y 164
+    Add-ConfigurationActionButton -Form $form -Action 'system-setup' -Key 'Maintenance.Setup' -Y 188 -Separator
+    Add-ConfigurationActionButton -Form $form -Action 'system-remove' -Key 'Maintenance.Remove' -Y 240
+    Add-ConfigurationHeading -Form $form -Key 'Settings.Updates' -Y 300
+    Add-ConfigurationActionButton -Form $form -Action 'update-check' -Key 'Update.Check' -Y 324 -Separator
+    Add-ConfigurationActionButton -Form $form -Action 'update-install' -Key 'Update.Install' -Y 376
+    Add-ConfigurationHeading -Form $form -Key 'Settings.Diagnostics' -Y 436
+    Add-ConfigurationActionButton -Form $form -Action 'diagnostics-save' -Key 'Diagnostics.Save' -Y 460 -Separator
+    Add-ConfigurationActionButton -Form $form -Action 'diagnostics-upload' -Key 'Diagnostics.Upload' -Y 512
     Update-ConfigurationPopupPresentation -Form $form
     # Reflect existing presentation state only; do not poll firmware/network.
     $timer = New-Object Windows.Forms.Timer
@@ -14385,6 +14684,7 @@ function Set-AuxiliaryPopupLayout {
     $state.Scroll.Bounds = [Drawing.Rectangle]::new($width-$gutter,0,$gutter,$viewportHeight)
     $state.Scroll.LargeChange = $viewportHeight
     $state.Scroll.SmallChange = [Math]::Max(1,[int][Math]::Round(60*$Scale))
+    if ($Form.Name -eq 'LenovoConfigurationPopup') { Set-ConfigurationPopupWidth -Form $Form -Scale $Scale }
     $state.Scroll.Maximum = $range
     $state.Scroll.Value = 0
     $state.Scroll.Visible = ($range -gt 0 -and $gutter -gt 0)

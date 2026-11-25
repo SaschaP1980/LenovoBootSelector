@@ -175,6 +175,7 @@ jobs:
               tooltipNative = Get-TestTotal $logText '^LBS244 TOOLTIP TOTAL\s+(\d+)/(\d+)\s*$'
               tooltipCoverage = Get-TestTotal $logText '^LBS244 COVERAGE TOTAL\s+(\d+)/(\d+)\s*$'
               tooltipAction = Get-TestTotal $logText '^LBS244 ACTION TOTAL\s+(\d+)/(\d+)\s*$'
+              settingsPolish = Get-TestTotal $logText '^LBS247 SETTINGS TOTAL\s+(\d+)/(\d+)\s*$'
               typography = Get-TestTotal $logText '^LBS186 TYPOGRAPHY TOTAL\s+(\d+)/(\d+)\s*$'
               manageGrip = Get-TestTotal $logText '^LBS166 GRIP TOTAL\s+(\d+)/(\d+)\s*$'
               manageViewport = Get-TestTotal $logText '^LBS157 VIEWPORT TOTAL\s+(\d+)/(\d+)\s*$'
@@ -211,6 +212,7 @@ jobs:
               'tooltipNative',
               'tooltipCoverage',
               'tooltipAction',
+              'settingsPolish',
               'typography',
               'manageGrip',
               'manageViewport',
@@ -253,6 +255,7 @@ jobs:
               $totals.tooltipNative.passed +
               $totals.tooltipCoverage.passed +
               $totals.tooltipAction.passed +
+              $totals.settingsPolish.passed +
               $totals.typography.passed +
               $totals.manageGrip.passed +
               $totals.manageViewport.passed +
@@ -286,6 +289,7 @@ jobs:
               $totals.tooltipNative.expected +
               $totals.tooltipCoverage.expected +
               $totals.tooltipAction.expected +
+              $totals.settingsPolish.expected +
               $totals.typography.expected +
               $totals.manageGrip.expected +
               $totals.manageViewport.expected +

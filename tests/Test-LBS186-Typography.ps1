@@ -12,7 +12,7 @@ if ($begin -lt 0) { throw 'Missing canonical WinForms C# source' }
 $begin += $prefix.Length
 $end = $template.IndexOf('"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing',$begin,[StringComparison]::Ordinal)
 if ($end -lt 0) { throw 'Missing canonical WinForms C# source end' }
-Add-Type -TypeDefinition ($template.Substring($begin,$end-$begin)) -ReferencedAssemblies System.Windows.Forms,System.Drawing
+Add-Type -TypeDefinition ($template.Substring($begin,$end-$begin)) -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility
 . (Join-Path $root 'src\Core\Localization.ps1')
 . (Join-Path $root 'src\Core\BootNextSelectionState.ps1')
 . (Join-Path $root 'src\UI\PopupDpiLayout.ps1')

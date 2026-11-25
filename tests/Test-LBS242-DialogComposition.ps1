@@ -39,7 +39,7 @@ for ($i=$start;$i -lt $src.Length;$i++) {
     elseif ($src[$i] -eq '}') { $depth--; if ($opened -and $depth -eq 0) { $end=$i; break } }
 }
 if ($end -lt 0) { throw 'Scrollbar source incomplete' }
-Add-Type -TypeDefinition ("using System; using System.Drawing; using System.Windows.Forms;"+$src.Substring($start,$end-$start+1)) -ReferencedAssemblies System.Windows.Forms,System.Drawing
+Add-Type -TypeDefinition ("using System; using System.Drawing; using System.Windows.Forms;"+$src.Substring($start,$end-$start+1)) -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility
 function Prepare-LenovoDialogDpiLayout {
     param([Windows.Forms.Form]$Form,$Owner,[string]$Role)
     Set-LenovoDialogDpiLayout -Form $Form -Scale $script:Scale -WorkingArea $script:Area

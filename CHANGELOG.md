@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.20.0 – Polished Further Settings and language recovery (LBS-247)
+
+- Group settings into coherent dark action rows with icons, secondary descriptions, a native autostart toggle and clear state feedback.
+- Use the existing German and US flag drawing in the language selector; keep native language names and a red selected state without a visible checkmark.
+- Preserve native action dispatch, readiness, modal ownership, keyboard and dark tooltip behavior. Keep the tray context menu unchanged.
+- Extend native settings checks for both locales and synthetic 100%/250% DPI, including flag raster parity and selected-state accessibility.
+
 ## v1.5.19.1 – Action-oriented tooltip coverage (LBS-244)
 
 - Explain Customize, settings navigation, persistent-default selection and clearing, one-time next-boot selection, restart confirmation and settings actions with localized hints.
