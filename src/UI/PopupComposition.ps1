@@ -892,6 +892,7 @@ function New-ConfigurationPopup {
     $check.Size = [Drawing.Size]::new(64,52)
     $check.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })
     $form.Tag.Body.Controls.Add($check)
+    [void][LenovoSettingsAutostartHover]::new($autostartLabel,$check)
     $language = New-Label -Text (Get-LocalizedString -Key 'Settings.Language') -Font $form.Tag.Bold -ForeColor $script:ColorPrimary -X 16 -Y 90 -Width 350 -Height 24
     $language.Name = 'ConfigurationLocale-Settings.Language'
     $form.Tag.Body.Controls.Add($language)

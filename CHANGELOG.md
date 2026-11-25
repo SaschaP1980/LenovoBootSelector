@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.20.1 – Further Settings hover and action-row refinement (LBS-247)
+
+- Highlight the entire autostart tile when either its label or switch is hovered, preserving the existing native action and disabled state.
+- Remove misleading navigation chevrons from the six operation rows and restore the available text width.
+- Verify real pointer transitions and operation-row raster rendering at both supported test densities and locales.
+
 ## v1.5.20.0 – Polished Further Settings and language recovery (LBS-247)
 
 - Group settings into coherent dark action rows with icons, secondary descriptions, a native autostart toggle and clear state feedback.
