@@ -101,7 +101,7 @@ public sealed class LenovoMenuColorTable : ProfessionalColorTable
     public override Color ToolStripGradientEnd { get { return bg; } }
 }
 
-// Small, deterministic country flags for the Language submenu only.
+// Small, deterministic country flags shared by the Language submenu and settings.
 // Drawn locally at the active DPI; no emoji fonts, native image gutters or assets.
 public static class LenovoLocaleFlags
 {
@@ -154,7 +154,13 @@ public static class LenovoLocaleFlags
     {
         string locale = GetLocale(item);
         if (locale == null || g == null) return;
-        Rectangle flag = GetBounds(item, row, g.DpiX);
+        DrawFlag(g, locale, GetBounds(item, row, g.DpiX));
+    }
+
+    public static void DrawFlag(Graphics g, string locale, Rectangle flag)
+    {
+        if (g == null || flag.Width <= 0 || flag.Height <= 0 ||
+            (locale != "de-DE" && locale != "en-US")) return;
         GraphicsState saved = g.Save();
         try
         {
@@ -820,6 +826,238 @@ public sealed class LenovoCheckBox : CheckBox
 }
 
 
+// Configuration-only drawing. Native Button and CheckBox retain input,
+// enabled state, tab order and click semantics; painting does not dispatch.
+public static class LenovoSettingsInk
+{
+    public static int Px(float dpi, int value)
+    { return Math.Max(1, (int)Math.Round(value * Math.Max(96f, dpi) / 96f)); }
+
+    public static Color Muted(bool enabled)
+    { return SystemInformation.HighContrast ? (enabled ? SystemColors.ControlText : SystemColors.GrayText)
+        : (enabled ? Color.FromArgb(184,184,184) : Color.FromArgb(146,146,146)); }
+
+    public static void DrawIcon(Graphics g, string key, Rectangle bounds, Color ink)
+    {
+        if (bounds.Width <= 0 || bounds.Height <= 0) return;
+        GraphicsState state = g.Save();
+        try {
+            g.TranslateTransform(bounds.X, bounds.Y);
+            g.ScaleTransform(bounds.Width / 24f, bounds.Height / 24f);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using (Pen p = new Pen(ink, 1.6f)) {
+                p.StartCap = p.EndCap = LineCap.Round;
+                p.LineJoin = LineJoin.Round;
+                switch (key) {
+                    case "autostart":
+                        g.DrawArc(p, 4, 4, 16, 16, -55, 290);
+                        g.DrawLine(p, 12, 2, 12, 11); break;
+                    case "system-setup":
+                        g.DrawLines(p, new Point[] { new Point(20,3), new Point(15,3), new Point(12,6), new Point(13,10), new Point(4,19), new Point(7,22), new Point(16,13), new Point(20,14), new Point(23,10), new Point(23,6), new Point(19,10), new Point(16,7), new Point(20,3) }); break;
+                    case "system-remove":
+                        g.DrawLine(p, 4, 6, 20, 6);
+                        g.DrawLines(p,new Point[] { new Point(8,6),new Point(8,3),new Point(16,3),new Point(16,6) });
+                        g.DrawLines(p,new Point[] { new Point(6,7),new Point(7,21),new Point(17,21),new Point(18,7) });
+                        g.DrawLine(p,10,10,10,17); g.DrawLine(p,14,10,14,17); break;
+                    case "update-check":
+                        g.DrawArc(p,4,4,16,16,-75,310);
+                        g.DrawLines(p,new Point[] { new Point(20,3),new Point(20,10),new Point(13,10) }); break;
+                    case "update-install":
+                    case "diagnostics-upload":
+                        bool up = key == "diagnostics-upload";
+                        g.DrawLine(p,12,3,12,16);
+                        if (up) g.DrawLines(p,new Point[] { new Point(7,8),new Point(12,3),new Point(17,8) });
+                        else g.DrawLines(p,new Point[] { new Point(7,11),new Point(12,16),new Point(17,11) });
+                        g.DrawLines(p,new Point[] { new Point(4,15),new Point(4,21),new Point(20,21),new Point(20,15) }); break;
+                    case "diagnostics-save":
+                        g.DrawLines(p,new Point[] { new Point(5,3),new Point(14,3),new Point(19,8),new Point(19,21),new Point(5,21),new Point(5,3) });
+                        g.DrawLines(p,new Point[] { new Point(14,3),new Point(14,8),new Point(19,8) });
+                        g.DrawLine(p,8,12,16,12); g.DrawLine(p,8,16,16,16); break;
+                }
+            }
+        } finally { g.Restore(state); }
+    }
+
+    public static Rectangle TextBounds(Rectangle bounds, float dpi, bool language)
+    {
+        int left = Px(dpi, language ? 42 : 44), right = Px(dpi, language ? 9 : 27);
+        return new Rectangle(left, 0, Math.Max(0, bounds.Width-left-right), bounds.Height);
+    }
+
+    public static void DrawTextPair(Graphics g, Rectangle bounds, Font titleFont, Font subtitleFont,
+        string title, string subtitle, Color titleInk, Color secondaryInk)
+    {
+        int top = Px(g.DpiX,5);
+        int h = Math.Max(1,(bounds.Height-top*2)/2);
+        TextFormatFlags flags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
+            TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix |
+            TextFormatFlags.PreserveGraphicsClipping;
+        TextRenderer.DrawText(g,title ?? "",titleFont,new Rectangle(bounds.X,top,bounds.Width,h),titleInk,flags);
+        TextRenderer.DrawText(g,subtitle ?? "",subtitleFont,new Rectangle(bounds.X,top+h,bounds.Width,h),secondaryInk,flags);
+    }
+
+    public static void DrawFocus(Graphics g, Rectangle bounds, Color fg, Color bg)
+    {
+        bounds.Inflate(-Px(g.DpiX,3),-Px(g.DpiX,3));
+        if (bounds.Width > 0 && bounds.Height > 0) ControlPaint.DrawFocusRectangle(g,bounds,fg,bg);
+    }
+}
+
+public sealed class LenovoSettingsActionButton : Button
+{
+    public string ActionIcon { get; set; }
+    public string LocaleCode { get; set; }
+    public string Subtitle { get; set; }
+    public Font TitleFont { get; set; }
+    public Font SubtitleFont { get; set; }
+    public Color HoverSurface { get; set; }
+    public Color SelectedSurface { get; set; }
+    public Color AccentColor { get; set; }
+    public bool LanguageSelected { get; set; }
+    public bool Destructive { get; set; }
+    public bool Separator { get; set; }
+    private bool hovering, pressed;
+
+    public LenovoSettingsActionButton()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        HoverSurface = Color.FromArgb(41,41,41);
+        SelectedSurface = Color.FromArgb(44,25,24);
+        AccentColor = Color.FromArgb(225,37,27);
+    }
+    protected override void OnMouseEnter(EventArgs e) { hovering = true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { hovering = false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnMouseDown(MouseEventArgs e) { pressed = e.Button == MouseButtons.Left; Invalidate(); base.OnMouseDown(e); }
+    protected override void OnMouseUp(MouseEventArgs e) { pressed = false; Invalidate(); base.OnMouseUp(e); }
+    protected override void OnMouseCaptureChanged(EventArgs e) { pressed = false; Invalidate(); base.OnMouseCaptureChanged(e); }
+    protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+    protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
+
+    protected override AccessibleObject CreateAccessibilityInstance()
+    {
+        if (String.IsNullOrEmpty(LocaleCode)) return base.CreateAccessibilityInstance();
+        return new LanguageAccessible(this);
+    }
+    private sealed class LanguageAccessible : Control.ControlAccessibleObject
+    {
+        private readonly LenovoSettingsActionButton button;
+        public LanguageAccessible(LenovoSettingsActionButton owner) : base(owner) { button = owner; }
+        public override AccessibleRole Role { get { return AccessibleRole.RadioButton; } }
+        public override AccessibleStates State {
+            get { return base.State | AccessibleStates.Selectable |
+                (button.LanguageSelected ? AccessibleStates.Selected | AccessibleStates.Checked : AccessibleStates.None); }
+        }
+        public override void DoDefaultAction() { if (button.Enabled) button.PerformClick(); }
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        bool language = !String.IsNullOrEmpty(LocaleCode);
+        bool hc = SystemInformation.HighContrast;
+        Color bg = hc ? (LanguageSelected ? SystemColors.Highlight : SystemColors.Control) :
+            (Enabled && (LanguageSelected || pressed) ? SelectedSurface : Enabled && hovering ? HoverSurface : BackColor);
+        Color fg = hc ? (Enabled ? (LanguageSelected ? SystemColors.HighlightText : SystemColors.ControlText) : SystemColors.GrayText) :
+            (!Enabled ? LenovoSettingsInk.Muted(false) : Destructive ? Color.FromArgb(239,86,78) : ForeColor);
+        g.Clear(bg);
+        float dpi = g.DpiX;
+        int px = LenovoSettingsInk.Px(dpi,1);
+        Rectangle text = LenovoSettingsInk.TextBounds(ClientRectangle,dpi,language);
+        if (language) {
+            int fw = LenovoSettingsInk.Px(dpi,16), fh = LenovoSettingsInk.Px(dpi,12);
+            LenovoLocaleFlags.DrawFlag(g,LocaleCode,new Rectangle(LenovoSettingsInk.Px(dpi,12),(Height-fh)/2,fw,fh));
+            TextRenderer.DrawText(g,Text,Font,text,fg,TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
+                TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+            using (Pen border = new Pen(hc ? SystemColors.ControlText : LanguageSelected ? AccentColor : Color.FromArgb(68,68,68),px))
+                g.DrawRectangle(border,px/2,px/2,Math.Max(0,Width-px-1),Math.Max(0,Height-px-1));
+        } else {
+            int side = LenovoSettingsInk.Px(dpi,22);
+            LenovoSettingsInk.DrawIcon(g,ActionIcon,new Rectangle(LenovoSettingsInk.Px(dpi,11),(Height-side)/2,side,side),
+                Destructive && Enabled ? fg : LenovoSettingsInk.Muted(Enabled));
+            LenovoSettingsInk.DrawTextPair(g,text,TitleFont ?? Font,SubtitleFont ?? Font,Text,Subtitle,fg,LenovoSettingsInk.Muted(Enabled));
+            int x = Width-LenovoSettingsInk.Px(dpi,16), y = Height/2, d = LenovoSettingsInk.Px(dpi,4);
+            using (Pen p = new Pen(LenovoSettingsInk.Muted(Enabled),Math.Max(1f,1.4f*dpi/96f))) {
+                p.StartCap = p.EndCap = LineCap.Round;
+                g.DrawLines(p,new Point[] { new Point(x-d,y-d),new Point(x,y),new Point(x-d,y+d) });
+            }
+            if (Separator) using (Pen p = new Pen(hc ? SystemColors.ControlDark : Color.FromArgb(57,57,57),px))
+                g.DrawLine(p,LenovoSettingsInk.Px(dpi,44),Height-px,Math.Max(0,Width-LenovoSettingsInk.Px(dpi,12)),Height-px);
+        }
+        if (Focused && ShowFocusCues) LenovoSettingsInk.DrawFocus(g,ClientRectangle,fg,bg);
+    }
+}
+
+public sealed class LenovoSettingsAutostartLabel : Label
+{
+    public string Subtitle { get; set; }
+    public Font TitleFont { get; set; }
+    public Font SubtitleFont { get; set; }
+    public Color HoverSurface { get; set; }
+    private bool hovering;
+    public LenovoSettingsAutostartLabel()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+    }
+    protected override void OnMouseEnter(EventArgs e) { hovering=true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { hovering=false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g=e.Graphics;
+        bool hc=SystemInformation.HighContrast;
+        g.Clear(hc ? SystemColors.Control : Enabled && hovering ? HoverSurface : BackColor);
+        int side=LenovoSettingsInk.Px(g.DpiX,22), left=LenovoSettingsInk.Px(g.DpiX,44);
+        Color fg=hc ? (Enabled ? SystemColors.ControlText : SystemColors.GrayText) :
+            (Enabled ? ForeColor : LenovoSettingsInk.Muted(false));
+        LenovoSettingsInk.DrawIcon(g,"autostart",new Rectangle(LenovoSettingsInk.Px(g.DpiX,11),(Height-side)/2,side,side),LenovoSettingsInk.Muted(Enabled));
+        LenovoSettingsInk.DrawTextPair(g,new Rectangle(left,0,Math.Max(0,Width-left-LenovoSettingsInk.Px(g.DpiX,3)),Height),
+            TitleFont ?? Font,SubtitleFont ?? Font,Text,Subtitle,fg,LenovoSettingsInk.Muted(Enabled));
+    }
+}
+
+public sealed class LenovoSettingsToggle : CheckBox
+{
+    public Color AccentColor { get; set; }
+    public Color HoverSurface { get; set; }
+    private bool hovering;
+    public LenovoSettingsToggle()
+    {
+        AutoCheck=false; AutoSize=false;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw,true);
+    }
+    protected override void OnMouseEnter(EventArgs e) { hovering=true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { hovering=false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+    protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g=e.Graphics;
+        bool hc=SystemInformation.HighContrast;
+        Color bg=hc ? SystemColors.Control : Enabled && hovering ? HoverSurface : BackColor;
+        g.Clear(bg);
+        int w=Math.Min(Math.Max(0,Width-4),LenovoSettingsInk.Px(g.DpiX,38));
+        int h=Math.Min(Math.Max(0,Height-4),LenovoSettingsInk.Px(g.DpiX,22));
+        if (w >= h && h >= 4) {
+            Rectangle r=new Rectangle((Width-w)/2,(Height-h)/2,w,h);
+            Color fill=hc ? (Checked ? SystemColors.Highlight : SystemColors.ControlDark) :
+                (Checked && Enabled ? AccentColor : Color.FromArgb(85,85,85));
+            g.SmoothingMode=SmoothingMode.AntiAlias;
+            using (GraphicsPath path=new GraphicsPath()) {
+                path.AddArc(r.Left,r.Top,h,h,90,180);
+                path.AddArc(r.Right-h,r.Top,h,h,270,180);
+                path.CloseFigure();
+                using (Brush brush=new SolidBrush(fill)) g.FillPath(brush,path);
+            }
+            int pad=LenovoSettingsInk.Px(g.DpiX,3), d=Math.Max(1,h-2*pad);
+            using (Brush brush=new SolidBrush(hc ? SystemColors.ControlText : Enabled ? Color.White : Color.FromArgb(155,155,155)))
+                g.FillEllipse(brush,Checked ? r.Right-pad-d : r.Left+pad,r.Top+pad,d,d);
+        }
+        if (Focused && ShowFocusCues) LenovoSettingsInk.DrawFocus(g,ClientRectangle,SystemColors.ControlText,bg);
+    }
+}
+
 public sealed class LenovoVerticalScrollBar : Control
 {
     private int minimum = 0;
@@ -949,7 +1187,7 @@ public sealed class LenovoVerticalScrollBar : Control
         if (!dragging) { hoverThumb = false; Invalidate(); }
     }
 }
-"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing
+"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility
 
 if ($HideConsole) {
     Add-Type @"

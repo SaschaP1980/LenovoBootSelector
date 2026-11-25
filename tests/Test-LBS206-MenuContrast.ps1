@@ -19,7 +19,7 @@ $endMarker = '"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing'
 $end = $template.IndexOf($endMarker,$start,[StringComparison]::Ordinal)
 if ($end -le $start) { throw 'Canonical C# menu renderer end not found' }
 $rendererSource = $template.Substring($start,$end-$start)
-Add-Type -TypeDefinition $rendererSource -ReferencedAssemblies System.Windows.Forms,System.Drawing -ErrorAction Stop
+Add-Type -TypeDefinition $rendererSource -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility -ErrorAction Stop
 
 $script:ColorPrimary = [Drawing.Color]::FromArgb(252,252,252)
 $script:MenuRenderer = New-Object LenovoMenuRenderer
