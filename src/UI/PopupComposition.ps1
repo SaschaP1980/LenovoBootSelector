@@ -122,7 +122,7 @@ function Add-PopupHeaderSection {
     $sectionLabel.Name = 'SectionLabel'
     $section.Controls.Add($sectionLabel)
 
-    $manageButton = New-Object System.Windows.Forms.Button
+    $manageButton = New-Object LenovoCustomizeButton
     $manageButton.Name = 'ManageEntriesButton'
     $manageButton.Text = Get-LocalizedString -Key 'Popup.Customize'
     $manageButton.Font = New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)
@@ -135,18 +135,6 @@ function Add-PopupHeaderSection {
     $manageButton.Location = New-Object Drawing.Point(268, 1)
     $manageButton.Size = New-Object Drawing.Size(104, 25)
     $manageButton.Cursor = [System.Windows.Forms.Cursors]::Hand
-    # Native flat disabled text can disappear into the dark surface. Keep
-    # native enabled painting and all interaction semantics; only replace
-    # the disabled raster with deliberately subdued, legible text.
-    $manageButton.Add_Paint({
-        param($sender,$eventArgs)
-        if ($sender.Enabled) { return }
-        $brush = [Drawing.SolidBrush]::new($sender.BackColor)
-        try { $eventArgs.Graphics.FillRectangle($brush,$sender.ClientRectangle) }
-        finally { $brush.Dispose() }
-        $flags = [Windows.Forms.TextFormatFlags]::HorizontalCenter -bor [Windows.Forms.TextFormatFlags]::VerticalCenter -bor [Windows.Forms.TextFormatFlags]::SingleLine -bor [Windows.Forms.TextFormatFlags]::NoPrefix
-        [Windows.Forms.TextRenderer]::DrawText($eventArgs.Graphics,$sender.Text,$sender.Font,$sender.ClientRectangle,[Drawing.Color]::FromArgb(138,138,138),$flags)
-    })
     $manageButton.Add_Click({ Start-ManageEntriesMode })
     $script:ManageEntriesButton = $manageButton
     $section.Controls.Add($manageButton)

@@ -2330,6 +2330,67 @@ public static class LenovoSettingsInk
     }
 }
 
+// LBS-252: the same glyph renderer and layout are used in every state.
+// Button retains native input, accessibility, Enabled and Click semantics.
+public sealed class LenovoCustomizeButton : Button
+{
+    private bool hovering, mousePressed, keyPressed;
+
+    public LenovoCustomizeButton()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+    }
+
+    protected override void OnMouseEnter(EventArgs e)
+    { base.OnMouseEnter(e); hovering = true; Invalidate(); }
+    protected override void OnMouseLeave(EventArgs e)
+    { base.OnMouseLeave(e); hovering = false; Invalidate(); }
+    protected override void OnMouseDown(MouseEventArgs e)
+    { mousePressed = e.Button == MouseButtons.Left; base.OnMouseDown(e); Invalidate(); }
+    protected override void OnMouseUp(MouseEventArgs e)
+    { mousePressed = false; base.OnMouseUp(e); Invalidate(); }
+    protected override void OnMouseCaptureChanged(EventArgs e)
+    { mousePressed = false; base.OnMouseCaptureChanged(e); Invalidate(); }
+    protected override void OnKeyDown(KeyEventArgs e)
+    { if (e.KeyCode == Keys.Space) keyPressed = true; base.OnKeyDown(e); Invalidate(); }
+    protected override void OnKeyUp(KeyEventArgs e)
+    { if (e.KeyCode == Keys.Space) keyPressed = false; base.OnKeyUp(e); Invalidate(); }
+    protected override void OnGotFocus(EventArgs e)
+    { base.OnGotFocus(e); Invalidate(); }
+    protected override void OnLostFocus(EventArgs e)
+    { keyPressed = false; base.OnLostFocus(e); Invalidate(); }
+    protected override void OnEnabledChanged(EventArgs e)
+    {
+        mousePressed = keyPressed = false;
+        hovering = Enabled && IsHandleCreated && Visible &&
+            ClientRectangle.Contains(PointToClient(Cursor.Position));
+        base.OnEnabledChanged(e);
+        Invalidate();
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        bool pressed = Enabled && (keyPressed || (mousePressed && hovering));
+        Color bg = pressed ? FlatAppearance.MouseDownBackColor :
+            Enabled && hovering ? FlatAppearance.MouseOverBackColor : BackColor;
+        if (bg.IsEmpty) bg = BackColor;
+        Color ink = Enabled ? ForeColor : Color.FromArgb(138,138,138);
+        using (SolidBrush brush = new SolidBrush(bg))
+            e.Graphics.FillRectangle(brush, ClientRectangle);
+        TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ink,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+            TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix |
+            TextFormatFlags.PreserveGraphicsClipping);
+        if (Enabled && Focused && ShowFocusCues) {
+            Rectangle focus = ClientRectangle;
+            focus.Inflate(-3,-3);
+            if (focus.Width > 0 && focus.Height > 0)
+                ControlPaint.DrawFocusRectangle(e.Graphics, focus, ink, bg);
+        }
+    }
+}
+
 public sealed class LenovoSettingsActionButton : Button
 {
     public string ActionIcon { get; set; }
@@ -2782,7 +2843,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.20.4'
+$script:AppVersion = '1.5.20.5'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -13526,7 +13587,7 @@ function Add-PopupHeaderSection {
     $sectionLabel.Name = 'SectionLabel'
     $section.Controls.Add($sectionLabel)
 
-    $manageButton = New-Object System.Windows.Forms.Button
+    $manageButton = New-Object LenovoCustomizeButton
     $manageButton.Name = 'ManageEntriesButton'
     $manageButton.Text = Get-LocalizedString -Key 'Popup.Customize'
     $manageButton.Font = New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)
@@ -13539,18 +13600,6 @@ function Add-PopupHeaderSection {
     $manageButton.Location = New-Object Drawing.Point(268, 1)
     $manageButton.Size = New-Object Drawing.Size(104, 25)
     $manageButton.Cursor = [System.Windows.Forms.Cursors]::Hand
-    # Native flat disabled text can disappear into the dark surface. Keep
-    # native enabled painting and all interaction semantics; only replace
-    # the disabled raster with deliberately subdued, legible text.
-    $manageButton.Add_Paint({
-        param($sender,$eventArgs)
-        if ($sender.Enabled) { return }
-        $brush = [Drawing.SolidBrush]::new($sender.BackColor)
-        try { $eventArgs.Graphics.FillRectangle($brush,$sender.ClientRectangle) }
-        finally { $brush.Dispose() }
-        $flags = [Windows.Forms.TextFormatFlags]::HorizontalCenter -bor [Windows.Forms.TextFormatFlags]::VerticalCenter -bor [Windows.Forms.TextFormatFlags]::SingleLine -bor [Windows.Forms.TextFormatFlags]::NoPrefix
-        [Windows.Forms.TextRenderer]::DrawText($eventArgs.Graphics,$sender.Text,$sender.Font,$sender.ClientRectangle,[Drawing.Color]::FromArgb(138,138,138),$flags)
-    })
     $manageButton.Add_Click({ Start-ManageEntriesMode })
     $script:ManageEntriesButton = $manageButton
     $section.Controls.Add($manageButton)

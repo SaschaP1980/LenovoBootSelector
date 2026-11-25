@@ -4,6 +4,14 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$template = [IO.File]::ReadAllText((Join-Path $root 'src\App\LenovoBootSelector.template.ps1'))
+$prefix = 'Add-Type -TypeDefinition @"'
+$begin = $template.IndexOf($prefix,[StringComparison]::Ordinal)
+if ($begin -lt 0) { throw 'Missing canonical WinForms C# source' }
+$begin += $prefix.Length
+$end = $template.IndexOf('"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing',$begin,[StringComparison]::Ordinal)
+if ($end -lt 0) { throw 'Missing canonical WinForms C# source end' }
+Add-Type -TypeDefinition ($template.Substring($begin,$end-$begin)) -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility
 . (Join-Path $root 'src\UI\PopupDpiLayout.ps1')
 . (Join-Path $root 'src\UI\RefreshPresentation.ps1')
 . (Join-Path $root 'src\UI\PopupComposition.ps1')
