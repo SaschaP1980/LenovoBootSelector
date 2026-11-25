@@ -2843,7 +2843,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.20.5'
+$script:AppVersion = '1.5.20.6'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -15192,9 +15192,9 @@ function Show-OwnedAuxiliaryPopup {
         # Show without activation before the child, which retains its normal
         # modal ownership, z-order and focus even on overlapping placement.
         $dimmer.Show($parent)
-        # Configuration receives keyboard focus once as part of deliberate
-        # modal opening, after the dimmer's Shown/connector callback.
-        if ($Form.Name -eq 'LenovoConfigurationPopup') {
+        # Both supported auxiliary surfaces receive keyboard focus once as
+        # part of deliberate modal opening, after the dimmer's connector.
+        if ($Form.Name -in @('LenovoConfigurationPopup','LenovoDefaultTargetPicker')) {
             $Form.Add_Shown({
                 param($sender,$eventArgs)
                 if ($sender.IsDisposed -or -not $sender.Visible -or
