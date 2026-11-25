@@ -414,6 +414,16 @@ function Update-PopupRows {
             ([string]$script:PopupRowsIdentity -ceq $snapshot.Identity) -and
             $existingRows.Count -eq $snapshot.EntryCount
     if ($same) {
+        # A verified/pending state can change without altering row geometry or
+        # metadata. Refresh semantic hints in place; unchanged bindings are no-ops.
+        if (-not $script:IsManageEntriesMode -and $script:BootTypeToolTip) {
+            $entryByGuid = @{}
+            foreach ($entry in $snapshot.Entries) { $entryByGuid[[string]$entry.Guid] = $entry }
+            foreach ($row in $existingRows) {
+                $entry = $entryByGuid[[string]$row.Tag]
+                if ($entry) { Update-NormalBootEntryTooltips -Row $row -Entry $entry }
+            }
+        }
         $script:PopupRowsRefreshPending = $false
         $viewportChanged = ($script:PopupRowsViewportHeight -ne $listPanel.ClientSize.Height)
         if ($viewportChanged -and $activeDrag) {

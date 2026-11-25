@@ -139,6 +139,7 @@ function Add-PopupHeaderSection {
     $script:ManageEntriesButton = $manageButton
     $section.Controls.Add($manageButton)
     $Root.Controls.Add($section)
+    if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($manageButton,(Get-LocalizedString -Key 'Tooltip.Customize')) }
 }
 
 function Add-PopupBootEntryListSection {
@@ -233,7 +234,9 @@ function Invoke-PopupNavigationRow {
 
 function Add-PopupNavigationRowHandlers {
     param([Windows.Forms.Control]$Row)
+    $hintKey = if ($Row.Name -eq 'DefaultPanel') { 'Tooltip.DefaultNavigation' } else { 'Tooltip.Settings' }
     foreach ($control in @($Row) + @($Row.Controls)) {
+        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($control,(Get-LocalizedString -Key $hintKey)) }
         $control.Add_MouseEnter({ param($sender,$eventArgs) Set-PopupNavigationRowHover -Control $sender -Hover $true })
         $control.Add_MouseLeave({ param($sender,$eventArgs) Set-PopupNavigationRowHover -Control $sender -Hover $false })
         $control.Add_Click({ param($sender,$eventArgs) Invoke-PopupNavigationRow -Control $sender })
@@ -376,6 +379,7 @@ function Add-PopupRestartSection {
     $restartButton.Add_Click({ Restart-Windows })
     $script:RestartButton = $restartButton
     $restartPanel.Controls.Add($restartButton)
+    if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($restartButton,(Get-LocalizedString -Key 'Tooltip.Restart')) }
 
     # LBS-206 Layout C: the firmware-readback state is always passive and
     # precedes the explicit restart action. The one-time default control is
@@ -571,6 +575,9 @@ function New-AuxiliaryPopupForm {
     $close.Name = 'AuxiliaryClose'
     $close.Text = '×'
     $close.AccessibleName = Get-LocalizedString -Key 'Common.Close'
+    $close.Cursor = [Windows.Forms.Cursors]::Hand
+    $closeHintKey = if ($Name -eq 'LenovoDefaultTargetPicker') { 'Tooltip.ClosePicker' } else { 'Tooltip.CloseSettings' }
+    $tip.SetToolTip($close,(Get-LocalizedString -Key $closeHintKey))
     $close.Font = $symbol
     $close.BackColor = $script:ColorHeader
     $close.ForeColor = $script:ColorPrimary
@@ -709,6 +716,10 @@ function Update-ConfigurationPopupPresentation {
         $item = Get-ConfigurationActionMenuItem -Action $action
         $control.Enabled = Test-ConfigurationActionAvailable -Action $action
         if (-not $item) { continue }
+        $hintKey = if ($action -eq 'autostart') { 'Tooltip.Configuration.autostart' } else { 'Tooltip.Configuration.' + $action }
+        $hint = Get-LocalizedString -Key $hintKey
+        if (-not $control.Enabled) { $hint += [Environment]::NewLine + (Get-LocalizedString -Key 'Tooltip.Unavailable') }
+        if ($Form.Tag.Tip.GetToolTip($control) -cne $hint) { $Form.Tag.Tip.SetToolTip($control,$hint) }
         if ($control -is [Windows.Forms.CheckBox]) {
             $control.Checked = [bool]$item.Checked
         }
@@ -807,6 +818,7 @@ function Update-ConfigurationPopupLocale {
     $Form.AccessibleName = $title
     $Form.Tag.Title.Text = $title
     $Form.Tag.Close.AccessibleName = Get-LocalizedString -Key 'Common.Close'
+    $Form.Tag.Tip.SetToolTip($Form.Tag.Close,(Get-LocalizedString -Key 'Tooltip.CloseSettings'))
     foreach ($control in $Form.Tag.Body.Controls) {
         if ($control.Name.StartsWith('ConfigurationLocale-')) {
             $control.Text = Get-LocalizedString -Key $control.Name.Substring('ConfigurationLocale-'.Length)

@@ -88,8 +88,10 @@ try {
                         [string]$glyph.AccessibleName -eq $expectedHint -and
                         [string]$glyph.AccessibleDescription -eq $expectedHint -and
                         ($status -eq 'idle' -or $glyph.AccessibleRole -eq [Windows.Forms.AccessibleRole]::StaticText))
-                    Assert-Lbs217 "$prefix state hint is attached to native ToolTip" (
-                        [string]$script:BootTypeToolTip.GetToolTip($glyph) -eq $expectedHint)
+                    $glyphHint = [string]$script:BootTypeToolTip.GetToolTip($glyph)
+                    $actionHint = if ($status -eq 'pending') { Get-LocalizedString -Key 'Tooltip.NextBootPending' } else { Get-LocalizedString -Key 'Tooltip.NextBoot' -Values @{ Target=$entry.Title } }
+                    Assert-Lbs217 "$prefix state hint and action consequence are attached to native ToolTip" (
+                        $glyphHint.Contains($actionHint) -and ($status -eq 'idle' -or $glyphHint.StartsWith($expectedHint)))
                     Assert-Lbs217 "$prefix status glyph and row physical bounds remain stable" (
                         $row.Width -eq [int][Math]::Round(390*$factor) -and
                         $row.Height -eq [int][Math]::Round(60*$factor) -and
