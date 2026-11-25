@@ -1,5 +1,5 @@
 ﻿#requires -version 5.1
-param([switch]$CorrectionProbeOnly,[switch]$SettingsCorrectionProbeOnly)
+param([switch]$CorrectionProbeOnly,[switch]$SettingsCorrectionProbeOnly,[switch]$InitialFocusProbeOnly)
 # LBS-229: actual native owned forms, no live firmware or privileged actions.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -14,6 +14,12 @@ public static class Lbs229Native {
     public static extern IntPtr GetWindow(IntPtr hWnd, uint command);
     [DllImport("user32.dll")]
     public static extern int GetWindowLong(IntPtr hWnd, int index);
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetFocus();
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetFocus(IntPtr hWnd);
 }
 '@
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
@@ -139,6 +145,144 @@ try {
             $Control.DrawToBitmap($bm,$Control.ClientRectangle)
             return $bm.GetPixel(1,1).ToArgb()
         } finally { $bm.Dispose() }
+    }
+    # F03: use the actual owned modal route, including the navigation trigger
+    # and connector. Observe natural initial focus before any input. A second,
+    # explicitly controlled focusless phase isolates the reported hover dependency.
+    if (-not $SettingsCorrectionProbeOnly) {
+        $f03Errors=[Collections.Generic.List[string]]::new()
+        $f03Root=New-Object Windows.Forms.Panel
+        $f03Root.Dock=[Windows.Forms.DockStyle]::Fill
+        $savedDefaultButton=$script:DefaultButton
+        $savedDefaultValueLabel=$script:DefaultValueLabel
+        $savedDefaultArrowLabel=$script:DefaultArrowLabel
+        $savedCursor=[Windows.Forms.Cursor]::Position
+        $savedCheck=$script:AutostartMenuItem.Checked
+        $actionCount=$script:Actions.Count
+        $owner.Controls.Add($f03Root)
+        Add-PopupSettingsSection -Root $f03Root
+        $trigger=$f03Root.Controls['SettingsPanel']
+        try {
+            foreach ($checkedState in @($false,$true)) {
+                $script:AutostartMenuItem.Checked=$checkedState
+                $script:F03State=$checkedState
+                $script:F03Error=$null
+                $script:F03Initial=$false
+                $script:F03Pointer=$false
+                $script:F03Controlled=$false
+                $script:F03Escape=$false
+                # Establish focus only on the invoking OWNER, never on the child.
+                [void]$trigger.Focus()
+                $timer=New-Object Windows.Forms.Timer
+                $timer.Interval=75
+                $timer.Add_Tick({
+                    param($sender,$eventArgs)
+                    $active=$script:ActiveAuxiliaryPopup
+                    if (-not $active -or -not $active.Visible) { return }
+                    $sender.Stop()
+                    try {
+                        $label=$active.Tag.Body.Controls['ConfigurationLocale-Settings.Autostart']
+                        $toggle=$active.Tag.Body.Controls['ConfigurationAutostart']
+                        $hot=$label.HoverSurface.ToArgb()
+                        $normal=$label.BackColor.ToArgb()
+                        $focusBefore=[Lbs229Native]::GetFocus()
+                        $foreground=[Lbs229Native]::GetForegroundWindow()
+                        $initial=$foreground -eq $active.Handle -and $active.ContainsFocus -and $active.Tag.Body.ContainsFocus -and -not $active.Tag.Close.Focused
+                        Write-Host "LBS247 F03 initial checked=$script:F03State foreground=$foreground child=$($active.Handle) focus=$focusBefore body=$($active.Tag.Body.ContainsFocus)"
+                        $pointerOk=$true
+                        foreach ($step in @(@{C=$active.Tag.Title;X=5;Y=5;Hot=$false},@{C=$label;X=10;Y=20;Hot=$true},@{C=$toggle;X=10;Y=20;Hot=$true},@{C=$active.Tag.Title;X=5;Y=5;Hot=$false})) {
+                            Move-Lbs247Pointer $step.C $step.X $step.Y
+                            $expect=if ($step.Hot) { $hot } else { $normal }
+                            if ((Get-Lbs247Background $label) -ne $expect -or (Get-Lbs247Background $toggle) -ne $expect) { $pointerOk=$false }
+                        }
+                        $script:F03Pointer=$pointerOk
+                        if ($initial) {
+                            [Windows.Forms.SendKeys]::SendWait('{TAB}')
+                            [Windows.Forms.Application]::DoEvents()
+                            $next=[Lbs229Native]::GetFocus()
+                            [Windows.Forms.SendKeys]::SendWait('+{TAB}')
+                            [Windows.Forms.Application]::DoEvents()
+                            $back=[Lbs229Native]::GetFocus()
+                            $script:F03Initial=$next -ne [IntPtr]::Zero -and $next -ne $focusBefore -and $back -eq $focusBefore -and $active.ContainsFocus
+                        }
+                        # Explicitly separate a controlled focus loss from the
+                        # natural opening observation. No click or action dispatch.
+                        [void][Lbs229Native]::SetFocus([IntPtr]::Zero)
+                        $focusless=(-not $active.ContainsFocus -and [Lbs229Native]::GetFocus() -eq [IntPtr]::Zero)
+                        Move-Lbs247Pointer $label 10 20
+                        $lp=Get-Lbs247Background $label
+                        $tp=Get-Lbs247Background $toggle
+                        $script:F03Controlled=$focusless -and -not $active.ContainsFocus -and $lp -eq $hot -and $tp -eq $hot
+                        Write-Host "LBS247 F03 controlled checked=$script:F03State focusless=$focusless focusAfter=$([Lbs229Native]::GetFocus()) label=$lp switch=$tp expected=$hot result=$script:F03Controlled"
+                        # Restore deliberately perturbed focus solely for the
+                        # Escape test; this is not used to satisfy initial focus.
+                        if ($initial) {
+                            [void][Lbs229Native]::SetFocus($focusBefore)
+                            [Windows.Forms.SendKeys]::SendWait('{ESC}')
+                            [Windows.Forms.Application]::DoEvents()
+                            $script:F03Escape=($active.DialogResult -eq [Windows.Forms.DialogResult]::Cancel -or -not $active.Visible)
+                        }
+                    } catch { $script:F03Error=$_ }
+                    finally {
+                        if (-not $active.IsDisposed -and $active.DialogResult -eq [Windows.Forms.DialogResult]::None) { $active.DialogResult=[Windows.Forms.DialogResult]::Cancel }
+                    }
+                })
+                try { $timer.Start(); Show-ConfigurationPopup -Owner $trigger }
+                finally { $timer.Stop(); $timer.Dispose() }
+                if ($script:F03Error) { throw $script:F03Error }
+                $restored=$owner.ContainsFocus -and $trigger.Focused -and -not $script:ActiveAuxiliaryPopup
+                Write-Host "LBS247 F03 lifecycle checked=$checkedState initialTab=$script:F03Initial pointer=$script:F03Pointer escape=$script:F03Escape ownerRestored=$restored"
+                if ($script:F03Initial -and $script:F03Pointer -and $script:F03Escape -and $restored) { Assert-Lbs247 "F03 unforced modal opening, Tab/Shift+Tab, hover, Escape and owner restoration ($checkedState)" $true }
+                else { $f03Errors.Add("Natural modal lifecycle ($checkedState)") }
+                if ($script:F03Controlled) { Assert-Lbs247 "F03 actual pointer hover without keyboard focus ($checkedState)" $true }
+                else { $f03Errors.Add("Controlled focusless hover ($checkedState)") }
+                if ($script:Actions.Count -ne $actionCount -or $script:AutostartMenuItem.Checked -ne $checkedState) { throw 'F03 unexpectedly dispatched an action' }
+            }
+            # Controlled loss DURING Shown, before the product's final opening
+            # callback. Distinct from the unperturbed real-opening tests above.
+            $script:F03OpeningLossObserved=$false
+            $script:F03OpeningRecovered=$false
+            $script:F03OpeningError=$null
+            $script:AutostartMenuItem.Checked=$savedCheck
+            [void]$trigger.Focus()
+            $form=New-ConfigurationPopup
+            $form.Add_Shown({
+                [void][Lbs229Native]::SetFocus([IntPtr]::Zero)
+                $script:F03OpeningLossObserved=([Lbs229Native]::GetFocus() -eq [IntPtr]::Zero -and -not $this.ContainsFocus)
+            })
+            $timer=New-Object Windows.Forms.Timer
+            $timer.Interval=75
+            $timer.Add_Tick({
+                param($sender,$eventArgs)
+                $active=$script:ActiveAuxiliaryPopup
+                if (-not $active -or -not $active.Visible) { return }
+                $sender.Stop()
+                try {
+                    $script:F03OpeningRecovered=$script:F03OpeningLossObserved -and [Lbs229Native]::GetForegroundWindow() -eq $active.Handle -and $active.Tag.Body.ContainsFocus -and -not $active.Tag.Close.Focused
+                    Write-Host "LBS247 F03 opening perturbation observed=$script:F03OpeningLossObserved recovered=$script:F03OpeningRecovered focus=$([Lbs229Native]::GetFocus())"
+                } catch { $script:F03OpeningError=$_ }
+                finally { $active.DialogResult=[Windows.Forms.DialogResult]::Cancel }
+            })
+            try { $timer.Start(); [void](Show-OwnedAuxiliaryPopup -Form $form -Owner $trigger) }
+            finally { $timer.Stop(); $timer.Dispose() }
+            if ($script:F03OpeningError) { throw $script:F03OpeningError }
+            if ($script:F03OpeningRecovered -and $owner.ContainsFocus -and $trigger.Focused -and $script:Actions.Count -eq $actionCount) {
+                Assert-Lbs247 'F03 controlled focus loss during modal opening is recovered before first input' $true
+            } else { $f03Errors.Add('Controlled opening focus loss recovery') }
+        } finally {
+            $script:AutostartMenuItem.Checked=$savedCheck
+            $f03Root.Dispose()
+            $script:DefaultButton=$savedDefaultButton
+            $script:DefaultValueLabel=$savedDefaultValueLabel
+            $script:DefaultArrowLabel=$savedDefaultArrowLabel
+            [Windows.Forms.Cursor]::Position=$savedCursor
+        }
+        if ($f03Errors.Count) { throw ('LBS247 F03 RED: '+($f03Errors -join '; ')) }
+        if ($InitialFocusProbeOnly) {
+            if ($script:Lbs247Checks -ne 5) { throw 'Unexpected F03 test count' }
+            Write-Host "LBS247 F03 TOTAL $script:Lbs247Checks/5"
+            return
+        }
     }
     Observe-Lbs247Correction 'F01 actual pointer transitions highlight both autostart surfaces without mutation' {
         $popup=New-ConfigurationPopup
@@ -1027,5 +1171,5 @@ try {
     $tray.Dispose()
 }
 Write-Host "LBS229 CONFIGURATION TOTAL $script:Checks"
-if ($script:Lbs247Checks -ne 28) { throw "Unexpected LBS247 test count: $script:Lbs247Checks" }
-Write-Host "LBS247 SETTINGS TOTAL $script:Lbs247Checks/28"
+if ($script:Lbs247Checks -ne 33) { throw "Unexpected LBS247 test count: $script:Lbs247Checks" }
+Write-Host "LBS247 SETTINGS TOTAL $script:Lbs247Checks/33"

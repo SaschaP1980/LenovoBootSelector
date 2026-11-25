@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.20.2 – Further Settings initial focus and hover (LBS-247)
+
+- Establish settings keyboard activation once during the owned modal opening, after the owner scrim and connector callback.
+- Decouple shared autostart hover from keyboard focus; require actual visible native pointer hit and enabled modal surface instead.
+- Cover both autostart states, unforced modal opening, Tab/Shift+Tab/Escape, owner focus restoration and controlled native focus loss. Hosted baseline reproduced the focus-dependent hover, but not spontaneous first-open focus loss.
+
 ## v1.5.20.1 – Further Settings hover and action-row refinement (LBS-247)
 
 - Highlight the entire autostart tile when either its label or switch is hovered, preserving the existing native action and disabled state.
