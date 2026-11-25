@@ -123,17 +123,22 @@ function Position-Popup {
     $script:Popup.Location = $location
 }
 
+# A deliberate tray click must never hide the owner of a modal surface.
+# Prefer the deepest application-owned dialog; ownership is set before Shown.
+function Test-ActivateTrayModalSurface {
+    foreach ($modal in @($script:ActiveOwnedDialog,$script:ActiveAuxiliaryPopup)) {
+        if ($modal -and -not $modal.IsDisposed) {
+            [LenovoSettingsWindowInput]::ActivateInitialSurface($modal)
+            return $true
+        }
+    }
+    return $false
+}
+
 function Show-OrTogglePopup {
     param([switch]$FromTrayClick)
     if ($script:PreferencesUiActive) { return }
-    if ($script:ActiveOwnedDialog -and -not $script:ActiveOwnedDialog.IsDisposed) {
-        [void]$script:ActiveOwnedDialog.Activate()
-        return
-    }
-    if ($script:ActiveAuxiliaryPopup -and -not $script:ActiveAuxiliaryPopup.IsDisposed) {
-        [void]$script:ActiveAuxiliaryPopup.Activate()
-        return
-    }
+    if (Test-ActivateTrayModalSurface) { return }
     if (-not $script:Popup -or $script:Popup.IsDisposed) {
         $initialScreen = [System.Windows.Forms.Screen]::PrimaryScreen
         $initialScale = Get-LenovoUiCoordinateScale -Screen $initialScreen
@@ -191,14 +196,7 @@ function Show-OrTogglePopup {
 # an already visible popup). This runs on the existing WinForms UI thread.
 function Show-OrActivatePopup {
     if ($script:PreferencesUiActive) { return }
-    if ($script:ActiveOwnedDialog -and -not $script:ActiveOwnedDialog.IsDisposed) {
-        [void]$script:ActiveOwnedDialog.Activate()
-        return
-    }
-    if ($script:ActiveAuxiliaryPopup -and -not $script:ActiveAuxiliaryPopup.IsDisposed) {
-        [void]$script:ActiveAuxiliaryPopup.Activate()
-        return
-    }
+    if (Test-ActivateTrayModalSurface) { return }
     if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) {
         [void]$script:Popup.Activate()
         return
