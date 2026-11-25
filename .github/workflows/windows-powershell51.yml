@@ -173,6 +173,8 @@ jobs:
               popupDpiLayout = Get-TestTotal $logText '^POPUP DPI TOTAL\s+(\d+)/(\d+)\s*$'
               tooltipSource = Get-TestTotal $logText '^LBS244 SOURCE TOTAL\s+(\d+)/(\d+)\s*$'
               tooltipNative = Get-TestTotal $logText '^LBS244 TOOLTIP TOTAL\s+(\d+)/(\d+)\s*$'
+              tooltipCoverage = Get-TestTotal $logText '^LBS244 COVERAGE TOTAL\s+(\d+)/(\d+)\s*$'
+              tooltipAction = Get-TestTotal $logText '^LBS244 ACTION TOTAL\s+(\d+)/(\d+)\s*$'
               typography = Get-TestTotal $logText '^LBS186 TYPOGRAPHY TOTAL\s+(\d+)/(\d+)\s*$'
               manageGrip = Get-TestTotal $logText '^LBS166 GRIP TOTAL\s+(\d+)/(\d+)\s*$'
               manageViewport = Get-TestTotal $logText '^LBS157 VIEWPORT TOTAL\s+(\d+)/(\d+)\s*$'
@@ -207,6 +209,8 @@ jobs:
               'popupDpiLayout',
               'tooltipSource',
               'tooltipNative',
+              'tooltipCoverage',
+              'tooltipAction',
               'typography',
               'manageGrip',
               'manageViewport',
@@ -247,6 +251,8 @@ jobs:
               $totals.popupDpiLayout.passed +
               $totals.tooltipSource.passed +
               $totals.tooltipNative.passed +
+              $totals.tooltipCoverage.passed +
+              $totals.tooltipAction.passed +
               $totals.typography.passed +
               $totals.manageGrip.passed +
               $totals.manageViewport.passed +
@@ -278,6 +284,8 @@ jobs:
               $totals.popupDpiLayout.expected +
               $totals.tooltipSource.expected +
               $totals.tooltipNative.expected +
+              $totals.tooltipCoverage.expected +
+              $totals.tooltipAction.expected +
               $totals.typography.expected +
               $totals.manageGrip.expected +
               $totals.manageViewport.expected +

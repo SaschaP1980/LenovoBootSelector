@@ -1,12 +1,9 @@
 {
   "schemaVersion": 2,
-  "version": "1.5.19.0",
+  "version": "1.5.19.1",
   "releaseProfile": "patch",
   "protectedFragmentIntent": [
-    "ps:Ensure-DarkActionTooltip",
-    "ps:Hide-DarkActionTooltip",
-    "ps:New-PopupForm",
-    "ps:Show-DarkActionTooltip"
+    "ps:Update-PopupRows"
   ],
   "repositoryDeleteIntent": []
 }

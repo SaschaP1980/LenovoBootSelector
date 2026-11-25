@@ -1443,7 +1443,7 @@ function Update-RestartTargetUi {
         $action.Text = Get-LocalizedString -Key 'BootNext.UseDefaultOnce'
         $action.AccessibleName = $action.Text
         $action.AccessibleDescription = Get-LocalizedString -Key 'BootNext.UseDefaultHint' -Values @{ Default=$default }
-        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($action,$action.AccessibleDescription) }
+        if ($script:BootTypeToolTip -and $script:BootTypeToolTip.GetToolTip($action) -cne $action.AccessibleDescription) { $script:BootTypeToolTip.SetToolTip($action,$action.AccessibleDescription) }
         $action.Visible = [bool]$canApply
         $action.Enabled = [bool]$canApply
         $action.TabStop = [bool]$canApply

@@ -39,7 +39,14 @@ function Update-DefaultUi {
             $script:DefaultValueLabel.AccessibleName = $description
             $script:DefaultValueLabel.AccessibleDescription = $description
             $script:DefaultButton.AccessibleDescription = $description
-            if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($script:DefaultValueLabel,$description) }
+            if ($script:BootTypeToolTip) {
+                $hint = Get-LocalizedString -Key 'Tooltip.DefaultNavigation'
+                if (-not $interactive) { $hint = Get-LocalizedString -Key 'Tooltip.Unavailable' }
+                foreach ($control in @($script:DefaultButton) + @($script:DefaultButton.Controls)) {
+                    $controlHint = if ($control -eq $script:DefaultValueLabel) { $hint + [Environment]::NewLine + $description } else { $hint }
+                    if ($script:BootTypeToolTip.GetToolTip($control) -cne $controlHint) { $script:BootTypeToolTip.SetToolTip($control,$controlHint) }
+                }
+            }
             $script:DefaultValueLabel.ForeColor = if ($pendingDefault) { $script:ColorWarning } elseif ($interactive) { $script:ColorPrimary } else { $mutedInk }
         }
         if ($script:DefaultArrowLabel -and -not $script:DefaultArrowLabel.IsDisposed) {
