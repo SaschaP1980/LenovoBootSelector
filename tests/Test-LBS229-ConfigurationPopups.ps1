@@ -1,5 +1,5 @@
 ﻿#requires -version 5.1
-param([switch]$CorrectionProbeOnly,[switch]$SettingsCorrectionProbeOnly,[switch]$InitialFocusProbeOnly,[switch]$FocusOutlineProbeOnly)
+param([switch]$CorrectionProbeOnly,[switch]$SettingsCorrectionProbeOnly,[switch]$InitialFocusProbeOnly,[switch]$FocusOutlineProbeOnly,[switch]$DefaultInitialFocusProbeOnly)
 # LBS-229: actual native owned forms, no live firmware or privileged actions.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -129,6 +129,133 @@ $area=[Drawing.Rectangle]::new(-1000,-100,3000,1700)
 $anchor=[Drawing.Rectangle]::new(0,0,390,672)
 $size=[Drawing.Size]::new(390,514)
 try {
+    # F10: observe actual picker foreground and keyboard focus before any
+    # child input. Controlled loss during Shown tests the opening recovery
+    # contract separately from unperturbed owner-specific reproduction.
+    function Test-Lbs229DefaultOpeningFocus {
+        $rootPanel=New-Object Windows.Forms.Panel
+        $rootPanel.Dock=[Windows.Forms.DockStyle]::Fill
+        $owner.Controls.Add($rootPanel)
+        $savedDefaultButton=$script:DefaultButton
+        $savedDefaultValueLabel=$script:DefaultValueLabel
+        $savedDefaultArrowLabel=$script:DefaultArrowLabel
+        $savedLocale=$script:Locale
+        $savedScale=$script:Scale
+        $savedCalls=$script:DefaultCalls
+        $savedCursor=[Windows.Forms.Cursor]::Position
+        $errors=[Collections.Generic.List[string]]::new()
+        $passed=0
+        Add-PopupSettingsSection -Root $rootPanel
+        $trigger=$rootPanel.Controls['DefaultPanel']
+        try {
+            foreach ($locale in @('de-DE','en-US')) {
+                $script:Locale=$locale
+                $script:Scale=if ($locale -eq 'de-DE') { 1.0 } else { 2.5 }
+                foreach ($mode in @('natural','controlled')) {
+                    $script:F10Error=$null
+                    $script:F10Loss=$false
+                    $script:F10Initial=$false
+                    $script:F10Navigation=$false
+                    $script:F10Escape=$false
+                    $script:F10Raster=$false
+                    [void]$trigger.Focus()
+                    $form=$null
+                    if ($mode -eq 'controlled') {
+                        $form=New-DefaultTargetPicker
+                        $form.Add_Shown({
+                            [void][Lbs229Native]::SetFocus([IntPtr]::Zero)
+                            $script:F10Loss=([Lbs229Native]::GetFocus() -eq [IntPtr]::Zero -and -not $this.ContainsFocus)
+                        })
+                    }
+                    $timer=New-Object Windows.Forms.Timer
+                    $timer.Interval=75
+                    $timer.Add_Tick({
+                        param($sender,$eventArgs)
+                        $active=$script:ActiveAuxiliaryPopup
+                        if (-not $active -or -not $active.Visible) { return }
+                        $sender.Stop()
+                        try {
+                            $rows=@($active.Tag.Body.Controls | Where-Object Name -eq 'DefaultPickerRow' | Sort-Object Top)
+                            $focus=[Lbs229Native]::GetFocus()
+                            $foreground=[Lbs229Native]::GetForegroundWindow()
+                            $script:F10Initial=($foreground -eq $active.Handle -and $active.Tag.Body.ContainsFocus -and $rows[0].Focused -and $focus -eq $rows[0].Handle)
+                            Write-Host "LBS229 F10 initial locale=$script:Locale mode=$mode loss=$script:F10Loss foreground=$foreground child=$($active.Handle) focus=$focus first=$($rows[0].Handle) initial=$script:F10Initial"
+                            if ($script:F10Initial) {
+                                $row=$rows[0]
+                                $row.Refresh()
+                                [Windows.Forms.Application]::DoEvents()
+                                $bm=[Drawing.Bitmap]::new($row.Width,$row.Height)
+                                $g=[Drawing.Graphics]::FromImage($bm)
+                                try {
+                                    $g.CopyFromScreen($row.PointToScreen([Drawing.Point]::Empty),[Drawing.Point]::Empty,$row.ClientSize)
+                                    $ink=0
+                                    for ($x=5;$x -lt $bm.Width-5;$x++) {
+                                        $p=$bm.GetPixel($x,3)
+                                        if ($p.R -ge 140 -and $p.G -ge 155 -and $p.B -ge 170) { $ink++ }
+                                    }
+                                    $script:F10Raster=$ink -ge 8
+                                } finally { $g.Dispose(); $bm.Dispose() }
+                                [Windows.Forms.SendKeys]::SendWait('{TAB}')
+                                [Windows.Forms.Application]::DoEvents()
+                                $tab=$rows[1].Focused
+                                [Windows.Forms.SendKeys]::SendWait('+{TAB}')
+                                [Windows.Forms.Application]::DoEvents()
+                                $back=$rows[0].Focused
+                                [Windows.Forms.SendKeys]::SendWait('{DOWN}')
+                                [Windows.Forms.Application]::DoEvents()
+                                $down=$rows[1].Focused
+                                [Windows.Forms.SendKeys]::SendWait('{UP}')
+                                [Windows.Forms.Application]::DoEvents()
+                                $up=$rows[0].Focused
+                                [Windows.Forms.SendKeys]::SendWait('{END}')
+                                [Windows.Forms.Application]::DoEvents()
+                                $end=$rows[-1].Focused -and $active.Tag.Scroll.Value -eq $active.Tag.Scroll.Maximum
+                                [Windows.Forms.SendKeys]::SendWait('{HOME}')
+                                [Windows.Forms.Application]::DoEvents()
+                                $homeReached=$rows[0].Focused -and $active.Tag.Scroll.Value -eq 0
+                                $script:F10Navigation=$tab -and $back -and $down -and $up -and $end -and $homeReached
+                                [Windows.Forms.SendKeys]::SendWait('{ESC}')
+                                [Windows.Forms.Application]::DoEvents()
+                                $script:F10Escape=($active.DialogResult -eq [Windows.Forms.DialogResult]::Cancel -or -not $active.Visible)
+                                Write-Host "LBS229 F10 keys tab=$tab shiftTab=$back down=$down up=$up end=$end home=$homeReached escape=$script:F10Escape raster=$script:F10Raster"
+                            }
+                        } catch { $script:F10Error=$_ }
+                        finally {
+                            if (-not $active.IsDisposed -and $active.DialogResult -eq [Windows.Forms.DialogResult]::None) { $active.DialogResult=[Windows.Forms.DialogResult]::Cancel }
+                        }
+                    })
+                    try {
+                        $timer.Start()
+                        if ($mode -eq 'natural') { Show-DefaultTargetMenu -Owner $trigger }
+                        else { [void](Show-OwnedAuxiliaryPopup -Form $form -Owner $trigger) }
+                    } finally { $timer.Stop(); $timer.Dispose() }
+                    if ($script:F10Error) { throw $script:F10Error }
+                    if ($mode -eq 'controlled' -and -not $script:F10Loss) { throw 'F10 fixture failed to establish controlled Shown focus loss' }
+                    $restored=$owner.ContainsFocus -and $trigger.Focused -and -not $script:ActiveAuxiliaryPopup
+                    Write-Host "LBS229 F10 lifecycle locale=$locale mode=$mode ownerRestored=$restored"
+                    if ($script:DefaultCalls.Count -ne $savedCalls.Count -or $script:BootCalls -ne 0) { throw 'F10 navigation unexpectedly dispatched a target action' }
+                    if ($script:F10Initial -and $script:F10Navigation -and $script:F10Escape -and $script:F10Raster -and $restored) {
+                        $passed++
+                        Assert-Lbs229 "F10 $locale $mode opening focus and actual keyboard lifecycle" $true
+                    } else { $errors.Add("$locale $mode") }
+                }
+            }
+        } finally {
+            $rootPanel.Dispose()
+            $script:DefaultButton=$savedDefaultButton
+            $script:DefaultValueLabel=$savedDefaultValueLabel
+            $script:DefaultArrowLabel=$savedDefaultArrowLabel
+            $script:Locale=$savedLocale
+            $script:Scale=$savedScale
+            [Windows.Forms.Cursor]::Position=$savedCursor
+        }
+        Write-Host "LBS229 F10 TOTAL $passed/4"
+        if ($errors.Count) { throw ('LBS229 F10 RED: '+($errors -join '; ')) }
+    }
+    if ($DefaultInitialFocusProbeOnly -or (-not $CorrectionProbeOnly -and -not $SettingsCorrectionProbeOnly -and -not $InitialFocusProbeOnly -and -not $FocusOutlineProbeOnly)) {
+        Test-Lbs229DefaultOpeningFocus
+        if ($DefaultInitialFocusProbeOnly) { return }
+    }
     # LBS247 correction: independent defect-specific raster observations, on
     # real production controls. Baseline probe deliberately fails both findings.
     $settingsFailures=[Collections.Generic.List[string]]::new()
@@ -975,16 +1102,24 @@ try {
     Invoke-Lbs229Modal 'default' {
         param($active)
         $row=$active.Tag.Body.Controls | Where-Object {$_.Tag.Guid -eq 'b'} | Select-Object -First 1
-        [void]$row.Focus()
-        Assert-Lbs229 'focus alone does not dispatch default or BootNext' ($script:DefaultCalls.Count -eq 0 -and $script:BootCalls -eq 0)
-        Invoke-DefaultPickerRow $row.Controls['DefaultPickerTitle']
-        Assert-Lbs229 'default choice recorded before controller dispatch' ($script:DefaultCalls.Count -eq 0 -and $active.Tag.Choice.Guid -eq 'b')
+        [Windows.Forms.SendKeys]::SendWait('{HOME}')
+        [Windows.Forms.SendKeys]::SendWait('{DOWN}')
+        [Windows.Forms.SendKeys]::SendWait('{DOWN}')
+        [Windows.Forms.Application]::DoEvents()
+        Assert-Lbs229 'real keyboard navigation focuses chosen row without default or BootNext dispatch' ($row.Focused -and $script:DefaultCalls.Count -eq 0 -and $script:BootCalls -eq 0)
+        [Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        [Windows.Forms.Application]::DoEvents()
+        Assert-Lbs229 'Enter records default choice before controller dispatch' ($script:DefaultCalls.Count -eq 0 -and $active.Tag.Choice.Guid -eq 'b')
     }
     Assert-Lbs229 'picker delegates exactly once to persistent-default controller' ($script:DefaultCalls.Count -eq 1 -and $script:DefaultCalls[0] -eq 'b' -and $script:BootCalls -eq 0)
     Invoke-Lbs229Modal 'default' {
         param($active)
         $none=$active.Tag.Body.Controls | Where-Object {-not $_.Tag.Guid} | Select-Object -First 1
-        Invoke-DefaultPickerRow $none
+        [Windows.Forms.SendKeys]::SendWait('{HOME}')
+        [Windows.Forms.Application]::DoEvents()
+        if (-not $none.Focused) { throw 'F10 clear row lacks keyboard focus' }
+        [Windows.Forms.SendKeys]::SendWait(' ')
+        [Windows.Forms.Application]::DoEvents()
     }
     Assert-Lbs229 'clear option delegates null without BootNext dispatch' ($script:DefaultCalls.Count -eq 2 -and -not $script:DefaultCalls[1] -and $script:BootCalls -eq 0)
     Invoke-Lbs229Modal 'default' {
