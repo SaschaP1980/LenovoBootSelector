@@ -52,6 +52,7 @@ function Update-PopupLocalePresentation {
         DefaultTargetNameLabel='Settings.DefaultTarget'
         RestartActionButton='Action.RestartWindows'
         RestartUseDefaultButton='BootNext.UseDefaultOnce'
+        ManageUndoButton='Manage.Undo'
         ManageCancelButton='Common.Cancel'
         ManageSaveButton='Manage.Save'
     }

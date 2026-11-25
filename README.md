@@ -11,7 +11,7 @@
 
 It changes the firmware's **one-time `bootsequence`**, not the permanent UEFI `BootOrder`. Boot targets must be supported by the installed TaskBroker configuration; the application cannot address arbitrary devices or independently select individual physical drives behind a generic firmware entry.
 
-**Current development version:** v1.6.2.0  
+**Current development version:** v1.7.0.0  
 **Technology:** Windows PowerShell 5.1 · WinForms · Windows Task Scheduler · `bcdedit.exe`  
 **Releases:** [Downloads and version history](downloads/README.md) · [Latest published version metadata](downloads/latest.json) · [Changelog](CHANGELOG.md)
 
@@ -95,6 +95,8 @@ Firmware descriptions, device models, GUIDs, paths, diagnostic event codes, and 
 ## Portable user preferences
 
 Open **Further settings → User preferences** (also available in the tray menu). Export and import a local, inspectable preference JSON file, separate from diagnostics. The export includes the effective language and the alias, visibility and order of currently discovered entries, including hidden entries. It does not include autostart, the persistent default, BootNext, SYSTEM tasks, privileged state, diagnostic identity or storage paths. Aliases and GUIDs may be identifying; handle the file privately.
+
+Customize offers a session-only Undo action for the last completed alias, visibility or reorder change. It retains earlier edits and never saves by itself. Its internal history is cleared on Save, Cancel, mode exit or a changed set of discovered GUIDs. Current edits remain intact on inventory invalidation; the history is not shown or stored. Finish or cancel an active alias edit before using Undo. No global Ctrl+Z shortcut or Redo is added.
 
 Import requires ready, currently available boot entries and no conflicting operation or unsaved Customize draft. The preview lists exact GUID matches, unmatched incoming entries, unchanged local entries, alias/visibility/order changes, language and excluded unavailable saved metadata. The structured preview separates matched from changed counts, offers display-only filters and paged comparison details, and uses the shared dark Lenovo dialog design. Export presents the included/excluded scope and privacy guidance without a prototype text box. Equal GUIDs do not prove identical hardware. No name/model matching or manual remapping in v1. Cancel is the initial and safe default action; only explicit Apply persists. Unknown fields, duplicates, invalid data, oversized files and unsupported format versions fail closed. Differing legacy overlength aliases are skipped rather than truncated. The import rechecks the local settings bytes and current entry snapshot; stale previews must be reopened. The transaction uses same-directory replacement, with local settings and runtime updated only after a successful commit. It does not synchronize arbitrary external writers or claim cryptographic authentication of edited JSON. See [docs/PORTABLE_PREFERENCES.md](docs/PORTABLE_PREFERENCES.md) for the exact format and exclusions.
 

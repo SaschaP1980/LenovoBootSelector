@@ -1,4 +1,80 @@
-﻿function Set-ManageEntryAliasDraft {
+﻿# LBS-179: the undo history is local to one Manage session and contains no UI controls.
+function Update-ManageUndoInventory {
+    if ($null -eq $script:ManageUndoHistory) { return }
+    if (-not $script:IsManageEntriesMode) {
+        $script:ManageUndoHistory = $null
+        $script:ManageUndoInventory = @()
+        return
+    }
+    $current = @($script:CurrentEntries | ForEach-Object { $_.Guid })
+    if (-not (Test-StringSequenceEqual -Left $current -Right $script:ManageUndoInventory -Sort)) {
+        $hadHistory = $script:ManageUndoHistory.Count -gt 0
+        $script:ManageUndoHistory.Clear()
+        $script:ManageUndoInventory = @($current)
+        if ($script:ManageAliasEditGuid -and -not (Test-GuidInList -Guid $script:ManageAliasEditGuid -List $current)) {
+            # The editor's GUID disappeared; never commit its unfinished text.
+            $script:ManageAliasEditGuid = $null
+            $script:LastStatusText = Get-LocalizedString -Key 'Manage.UndoTargetUnavailable'
+        }
+        elseif ($hadHistory) { $script:LastStatusText = Get-LocalizedString -Key 'Manage.UndoInventoryChanged' }
+    }
+}
+
+function Get-ManageDraftSnapshot {
+    return (New-ManageDraftSnapshotCore -Order $script:ManageEntryOrder -Hidden $script:ManageHiddenEntryGuids -Aliases $script:ManageEntryAliases)
+}
+
+function Get-ManageUndoBefore {
+    if ($null -eq $script:ManageUndoHistory -or -not $script:IsManageEntriesMode) { return }
+    Update-ManageUndoInventory
+    return (Get-ManageDraftSnapshot)
+}
+
+function Add-ManageUndoCheckpoint {
+    param($Before)
+    if ($null -eq $Before -or $null -eq $script:ManageUndoHistory) { return }
+    if (-not (Test-ManageDraftSnapshotEqualCore -Left $Before -Right (Get-ManageDraftSnapshot))) {
+        $script:ManageUndoHistory.Add($Before)
+    }
+}
+
+function Update-ManageUndoButtonState {
+    if (-not $script:Popup -or $script:Popup.IsDisposed) { return }
+    $button = $script:Popup.Controls.Find('ManageUndoButton',$true) | Select-Object -First 1
+    if (-not $button) { return }
+    $button.Enabled = ($script:IsManageEntriesMode -and $null -ne $script:ManageUndoHistory -and
+        $script:ManageUndoHistory.Count -gt 0 -and -not $script:ManageAliasEditGuid -and -not $script:ManageActiveDragGuid)
+    $button.AccessibleName = $button.Text
+    $button.ForeColor = if ($button.Enabled) { $script:ColorPrimary } else { [Drawing.Color]::FromArgb(146,146,146) }
+    $button.Cursor = if ($button.Enabled) { [Windows.Forms.Cursors]::Hand } else { [Windows.Forms.Cursors]::Default }
+}
+
+function Undo-ManageEntryDraft {
+    if (-not $script:IsManageEntriesMode -or $script:ManageAliasEditGuid -or $script:ManageActiveDragGuid -or $null -eq $script:ManageUndoHistory) { return }
+    Update-ManageUndoInventory
+    if ($script:ManageUndoHistory.Count -eq 0) {
+        Update-PopupRows -Reason 'manage-undo-empty'
+        return
+    }
+    $index = $script:ManageUndoHistory.Count - 1
+    $previous = $script:ManageUndoHistory[$index]
+    $script:ManageUndoHistory.RemoveAt($index)
+    # Copy again so subsequent edits cannot mutate retained snapshots.
+    $restored = New-ManageDraftSnapshotCore -Order $previous.Order -Hidden $previous.Hidden -Aliases $previous.Aliases
+    $script:ManageEntryOrder = @($restored.Order)
+    $script:ManageHiddenEntryGuids = @($restored.Hidden)
+    $script:ManageEntryAliases = $restored.Aliases
+    $script:LastStatusText = Get-LocalizedString -Key 'Manage.UndoDone'
+    $undo = if ($script:Popup -and -not $script:Popup.IsDisposed) { $script:Popup.Controls.Find('ManageUndoButton',$true) | Select-Object -First 1 }
+    $hadFocus = $undo -and $undo.Focused
+    Update-PopupRows -Reason 'manage-undo'
+    if ($hadFocus -and -not $undo.Enabled) {
+        $cancel = $script:Popup.Controls.Find('ManageCancelButton',$true) | Select-Object -First 1
+        if ($cancel -and $cancel.CanFocus) { [void]$cancel.Focus() }
+    }
+}
+
+function Set-ManageEntryAliasDraft {
     param(
         [Parameter(Mandatory=$true)][string]$Guid,
         [AllowEmptyString()][string]$Alias
@@ -7,12 +83,19 @@
     $value = if ($null -eq $Alias) { '' } else { ([string]$Alias).Trim() }
     $previous = [string]$script:ManageEntryAliases[$normalized]
     if (-not (Test-EntryAliasChangeCore -Value $value -Previous $previous)) { return $false }
+    if ($null -ne $script:ManageUndoHistory) {
+        Update-ManageUndoInventory
+        if (-not (Test-GuidInList -Guid $normalized -List $script:ManageUndoInventory)) { return $false }
+    }
+    if ($value -ceq $previous) { return $true }
+    $before = Get-ManageUndoBefore
     if ($value) {
         $script:ManageEntryAliases[$normalized] = $value
     }
     else {
         [void]$script:ManageEntryAliases.Remove($normalized)
     }
+    Add-ManageUndoCheckpoint -Before $before
     return $true
 }
 
@@ -52,12 +135,18 @@ function Test-ManageEntryHidden {
 function Toggle-ManageEntryVisibility {
     param([Parameter(Mandatory=$true)][string]$Guid)
     $normalized = $Guid.ToLowerInvariant()
+    if ($null -ne $script:ManageUndoHistory) {
+        Update-ManageUndoInventory
+        if (-not (Test-GuidInList -Guid $normalized -List $script:ManageUndoInventory)) { return }
+    }
+    $before = Get-ManageUndoBefore
     if (Test-ManageEntryHidden -Guid $normalized) {
         $script:ManageHiddenEntryGuids = @($script:ManageHiddenEntryGuids | Where-Object { ([string]$_).ToLowerInvariant() -ne $normalized })
     }
     else {
         $script:ManageHiddenEntryGuids = @($script:ManageHiddenEntryGuids) + $normalized
     }
+    Add-ManageUndoCheckpoint -Before $before
 }
 
 function Move-ManageEntry {
@@ -70,6 +159,12 @@ function Move-ManageEntry {
     $moved = $MovedGuid.ToLowerInvariant()
     $target = $TargetGuid.ToLowerInvariant()
     if ($moved -eq $target) { return }
+    if ($null -ne $script:ManageUndoHistory) {
+        Update-ManageUndoInventory
+        if (-not (Test-GuidInList -Guid $moved -List $script:ManageUndoInventory) -or
+            -not (Test-GuidInList -Guid $target -List $script:ManageUndoInventory)) { return }
+    }
+    $before = Get-ManageUndoBefore
 
     $list = New-Object System.Collections.ArrayList
     foreach ($guid in @($script:ManageEntryOrder)) {
@@ -88,9 +183,11 @@ function Move-ManageEntry {
         $list.Insert($insertIndex, $moved)
     }
     $script:ManageEntryOrder = @($list)
+    Add-ManageUndoCheckpoint -Before $before
 }
 
 function Update-ManageEntriesUiState {
+    Update-ManageUndoInventory
     if (-not $script:Popup -or $script:Popup.IsDisposed) { return }
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     $sectionLabel = $script:Popup.Controls.Find('SectionLabel', $true) | Select-Object -First 1
@@ -132,6 +229,7 @@ function Update-ManageEntriesUiState {
     if ($script:ManageEntriesMenuItem) {
         $script:ManageEntriesMenuItem.Enabled = (-not $script:IsManageEntriesMode -and [bool]$capabilities.CanManageEntries)
     }
+    Update-ManageUndoButtonState
 }
 
 function Start-ManageEntriesMode {
@@ -149,6 +247,8 @@ function Start-ManageEntriesMode {
     $script:ManageDropPreview = $null
     $script:ManageActiveDragGuid = $null
     $script:IsManageEntriesMode = $true
+    $script:ManageUndoHistory = [System.Collections.Generic.List[object]]::new()
+    $script:ManageUndoInventory = @($script:CurrentEntries | ForEach-Object { $_.Guid })
     $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusEditing'
     Update-ManageEntriesUiState
     Update-PopupRows -Reason 'manage-enter'
@@ -175,6 +275,8 @@ function Stop-ManageEntriesMode {
     }
 
     $script:IsManageEntriesMode = $false
+    $script:ManageUndoHistory = $null
+    $script:ManageUndoInventory = @()
     $script:ManageEntryOrder = @()
     $script:ManageHiddenEntryGuids = @()
     $script:ManageEntryAliases = @{}

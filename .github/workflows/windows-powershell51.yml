@@ -184,6 +184,7 @@ jobs:
               typography = Get-TestTotal $logText '^LBS186 TYPOGRAPHY TOTAL\s+(\d+)/(\d+)\s*$'
               manageGrip = Get-TestTotal $logText '^LBS166 GRIP TOTAL\s+(\d+)/(\d+)\s*$'
               manageViewport = Get-TestTotal $logText '^LBS157 VIEWPORT TOTAL\s+(\d+)/(\d+)\s*$'
+              manageUndo = Get-TestTotal $logText '^LBS179 UNDO TOTAL\s+(\d+)/(\d+)\s*$'
               localizationRuntime = Get-TestTotal $logText '^LOCALIZATION TOTAL\s+(\d+)/(\d+)\s*$'
               liveLocalization = Get-TestTotal $logText '^LBS191 LIVE LOCALIZATION TOTAL\s+(\d+)/(\d+)\s*$'
               refreshRuntime = Get-TestTotal $logText '^REFRESH TOTAL\s+(\d+)/(\d+)\s*$'
@@ -226,6 +227,7 @@ jobs:
               'typography',
               'manageGrip',
               'manageViewport',
+              'manageUndo',
               'localizationRuntime',
               'liveLocalization',
               'refreshRuntime',
@@ -274,6 +276,7 @@ jobs:
               $totals.typography.passed +
               $totals.manageGrip.passed +
               $totals.manageViewport.passed +
+              $totals.manageUndo.passed +
               $totals.localizationRuntime.passed +
               $totals.liveLocalization.passed +
               $totals.refreshRuntime.passed +
@@ -313,6 +316,7 @@ jobs:
               $totals.typography.expected +
               $totals.manageGrip.expected +
               $totals.manageViewport.expected +
+              $totals.manageUndo.expected +
               $totals.localizationRuntime.expected +
               $totals.liveLocalization.expected +
               $totals.refreshRuntime.expected +

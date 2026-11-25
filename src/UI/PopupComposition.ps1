@@ -469,6 +469,25 @@ function Add-PopupManageEntriesSection {
     $manageDivider.BackColor = [Drawing.Color]::FromArgb(54,54,54)
     $managePanel.Controls.Add($manageDivider)
 
+    # LBS-179: one native Undo control in the existing action row, no history surface.
+    $undoManage = New-Object System.Windows.Forms.Button
+    $undoManage.Name = 'ManageUndoButton'
+    $undoManage.Text = Get-LocalizedString -Key 'Manage.Undo'
+    $undoManage.AccessibleName = $undoManage.Text
+    $undoManage.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
+    $undoManage.ForeColor = [Drawing.Color]::FromArgb(146,146,146)
+    $undoManage.BackColor = [Drawing.Color]::FromArgb(34,34,34)
+    $undoManage.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $undoManage.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(68,68,68)
+    $undoManage.FlatAppearance.BorderSize = 1
+    $undoManage.FlatAppearance.MouseOverBackColor = $script:ColorSelectedRow
+    $undoManage.Location = New-Object Drawing.Point(16, 6)
+    $undoManage.Size = New-Object Drawing.Size(100, 34)
+    $undoManage.Enabled = $false
+    $undoManage.TabIndex = 0
+    $undoManage.Add_Click({ Undo-ManageEntryDraft })
+    $managePanel.Controls.Add($undoManage)
+
     $cancelManage = New-Object System.Windows.Forms.Button
     $cancelManage.Name = 'ManageCancelButton'
     $cancelManage.Text = Get-LocalizedString -Key 'Common.Cancel'
@@ -480,8 +499,9 @@ function Add-PopupManageEntriesSection {
     $cancelManage.FlatAppearance.BorderSize = 1
     $cancelManage.FlatAppearance.MouseOverBackColor = $script:ColorSelectedRow
     $cancelManage.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(58,27,25)
-    $cancelManage.Location = New-Object Drawing.Point(16, 6)
-    $cancelManage.Size = New-Object Drawing.Size(126, 34)
+    $cancelManage.Location = New-Object Drawing.Point(124, 6)
+    $cancelManage.Size = New-Object Drawing.Size(84, 34)
+    $cancelManage.TabIndex = 1
     $cancelManage.Cursor = [System.Windows.Forms.Cursors]::Hand
     $cancelManage.Add_Click({ Stop-ManageEntriesMode })
     $managePanel.Controls.Add($cancelManage)
@@ -497,8 +517,9 @@ function Add-PopupManageEntriesSection {
     $saveManage.FlatAppearance.BorderSize = 1
     $saveManage.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(190,35,28)
     $saveManage.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(185,30,22)
-    $saveManage.Location = New-Object Drawing.Point(150, 6)
-    $saveManage.Size = New-Object Drawing.Size(224, 34)
+    $saveManage.Location = New-Object Drawing.Point(216, 6)
+    $saveManage.Size = New-Object Drawing.Size(158, 34)
+    $saveManage.TabIndex = 2
     # LBS-186: the native Flat button adapter dims disabled text against
     # the dark background. Repaint only the disabled interior using the
     # configured palette; keep the real Button, native border and Enabled gate.

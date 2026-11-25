@@ -59,7 +59,7 @@ try {
     $rootPanel.Controls.Add($normalFooter)
     Add-PopupManageEntriesSection -Root $rootPanel
     $manage = $rootPanel.Controls['ManageEntriesPanel']
-    Assert-Lbs157 'Real composition creates Manage Entries panel without instructional controls' ($null -ne $manage -and $manage.Controls.Count -eq 4 -and @($manage.Controls | Where-Object { $_ -is [Windows.Forms.Label] }).Count -eq 0)
+    Assert-Lbs157 'Real composition creates Manage Entries panel without instructional controls' ($null -ne $manage -and $manage.Controls.Count -eq 5 -and @($manage.Controls | Where-Object { $_ -is [Windows.Forms.Label] }).Count -eq 0)
     Complete-PopupDpiLayout -Form $form -Scale 1.0
 
     foreach ($factor in @(1.0,1.25,1.5,2.0,2.5,3.0)) {
@@ -76,10 +76,12 @@ try {
         Assert-Lbs157 ("{0}% list and controls meet without overlap" -f ($factor*100)) ($listPanel.Bottom -eq $manage.Top -and $manage.Top -eq $manageY)
         $divider = @($manage.Controls | Where-Object { $_ -is [Windows.Forms.Panel] -and $_.Top -eq 0 })
         Assert-Lbs157 ("{0}% Manage panel stays inside popup and retains separator" -f ($factor*100)) ($manage.Bottom -eq $rootPanel.Height -and $divider.Count -eq 1 -and $divider[0].Height -eq [int][Math]::Round($factor) -and $divider[0].Left -eq [int][Math]::Round(16*$factor) -and $divider[0].Width -eq [int][Math]::Round(358*$factor))
-        Assert-Lbs157 ("{0}% cancel/save and footer preserve clearance" -f ($factor*100)) (
-            $buttons.Count -eq 2 -and $footer.Count -eq 1 -and
-            $buttons[0].Bottom -le $footer[0].Top -and $buttons[1].Bottom -le $footer[0].Top -and
-            $buttons[0].Top -eq [int][Math]::Round(6*$factor) -and $buttons[1].Top -eq [int][Math]::Round(6*$factor) -and
+        Assert-Lbs157 ("{0}% undo/cancel/save and footer preserve clearance" -f ($factor*100)) (
+            $buttons.Count -eq 3 -and $footer.Count -eq 1 -and
+            @($buttons | Where-Object { $_.Bottom -gt $footer[0].Top -or $_.Top -ne [int][Math]::Round(6*$factor) }).Count -eq 0 -and
+            -not $buttons[0].Bounds.IntersectsWith($buttons[1].Bounds) -and
+            -not $buttons[1].Bounds.IntersectsWith($buttons[2].Bounds) -and
+            -not $buttons[0].Bounds.IntersectsWith($buttons[2].Bounds) -and
             $manage.Top + $buttons[0].Top -eq [int][Math]::Round(524*$factor) + [int][Math]::Round(78*$factor) -and
             $manage.Top + $footer[0].Top -eq [int][Math]::Round(524*$factor) + [int][Math]::Round(116*$factor) -and
             $footer[0].Bottom -eq $manage.Height
