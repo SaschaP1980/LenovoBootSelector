@@ -46,6 +46,7 @@ function Start-LenovoBootSelectorHidden {
 # and fatal-startup UI can honor the persisted locale safely.
 # @include src/Core/Localization.ps1
 # @include src/Core/EntryPreferences.ps1
+# @include src/Core/PortablePreferences.ps1
 # @include src/Core/BootNextOwnership.ps1
 # @include src/Core/BootNextSelectionState.ps1
 # @include src/UI/StartupRecoveryDialog.ps1
@@ -869,6 +870,18 @@ public static class LenovoSettingsInk
                         if (up) g.DrawLines(p,new Point[] { new Point(7,8),new Point(12,3),new Point(17,8) });
                         else g.DrawLines(p,new Point[] { new Point(7,11),new Point(12,16),new Point(17,11) });
                         g.DrawLines(p,new Point[] { new Point(4,15),new Point(4,21),new Point(20,21),new Point(20,15) }); break;
+                    case "preferences-export":
+                    case "preferences-import":
+                        g.DrawLines(p,new Point[] { new Point(4,3),new Point(13,3),new Point(18,8),new Point(18,21),new Point(4,21),new Point(4,3) });
+                        g.DrawLines(p,new Point[] { new Point(13,3),new Point(13,8),new Point(18,8) });
+                        if (key == "preferences-export") {
+                            g.DrawLine(p,8,14,22,14);
+                            g.DrawLines(p,new Point[] { new Point(18,10),new Point(22,14),new Point(18,18) });
+                        } else {
+                            g.DrawLine(p,22,14,8,14);
+                            g.DrawLines(p,new Point[] { new Point(12,10),new Point(8,14),new Point(12,18) });
+                        }
+                        break;
                     case "diagnostics-save":
                         g.DrawLines(p,new Point[] { new Point(5,3),new Point(14,3),new Point(19,8),new Point(19,21),new Point(5,21),new Point(5,3) });
                         g.DrawLines(p,new Point[] { new Point(14,3),new Point(14,8),new Point(19,8) });
@@ -1492,6 +1505,10 @@ $script:LanguageMenuRoot = $null
 $script:LanguageEnglishMenuItem = $null
 $script:LanguageGermanMenuItem = $null
 $script:MaintenanceRootMenuItem = $null
+$script:PreferencesMenuRoot = $null
+$script:PreferencesExportMenuItem = $null
+$script:PreferencesImportMenuItem = $null
+$script:PreferencesUiActive = $false
 $script:TrayExitMenuItem = $null
 $script:RefreshButton = $null
 $script:RefreshButtonHovered = $false
@@ -1603,8 +1620,10 @@ $script:UpdateState = New-UpdateRuntimeState
 # @include src/UI/ManageEntriesState.ps1
 
 # @include src/Infrastructure/SettingsRepository.ps1
+# @include src/Infrastructure/PreferencesFileRepository.ps1
 
 # @include src/Application/SettingsService.ps1
+# @include src/Application/PortablePreferencesService.ps1
 # @include src/UI/LanguagePresentation.ps1
 
 function Get-EntryAlias {
@@ -1725,6 +1744,7 @@ function Set-DefaultGuid {
 # @include src/UI/DefaultTargetMenu.ps1
 
 # @include src/UI/Dialogs.ps1
+# @include src/UI/PortablePreferencesPresentation.ps1
 
 # @include src/UI/MaintenancePresentation.ps1
 
@@ -2602,6 +2622,28 @@ try {
     Update-LanguageMenuState
     [void]$context.Items.Add($languageRoot)
 
+    $preferencesRoot = New-Object Windows.Forms.ToolStripMenuItem
+    $preferencesRoot.Text = Get-LocalizedString -Key 'Preferences.Menu'
+    $preferencesRoot.DropDown = New-Object LenovoDropDownMenu
+    $preferencesRoot.DropDown.TargetWidth = 260
+    Initialize-LenovoMenuAppearance -Menu $preferencesRoot.DropDown
+    $preferencesRoot.Add_DropDownOpening({
+        Initialize-LenovoMenuAppearance -Menu $this.DropDown
+        Update-PortablePreferencesMenuState
+    })
+    $script:PreferencesMenuRoot = $preferencesRoot
+    $exportItem = New-Object Windows.Forms.ToolStripMenuItem
+    $exportItem.Text = Get-LocalizedString -Key 'Preferences.Export'
+    $exportItem.Add_Click({ Show-PortablePreferencesFromUi -Mode Export })
+    $script:PreferencesExportMenuItem = $exportItem
+    [void]$preferencesRoot.DropDownItems.Add($exportItem)
+    $importItem = New-Object Windows.Forms.ToolStripMenuItem
+    $importItem.Text = Get-LocalizedString -Key 'Preferences.Import'
+    $importItem.Add_Click({ Show-PortablePreferencesFromUi -Mode Import })
+    $script:PreferencesImportMenuItem = $importItem
+    [void]$preferencesRoot.DropDownItems.Add($importItem)
+    [void]$context.Items.Add($preferencesRoot)
+
     $script:DefaultContextRoot = $null
     $script:ManageEntriesMenuItem = $null
 
@@ -2702,6 +2744,7 @@ try {
     $script:TrayPopupClickPoint = [Drawing.Point]::Empty
     $script:TrayIcon.Add_MouseClick({
         param($sender, $eventArgs)
+        if ($script:PreferencesUiActive) { return }
         if ($eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Left -or
             $eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Right) {
             # Capture only genuine tray-icon clicks; never borrow arbitrary cursor state.
