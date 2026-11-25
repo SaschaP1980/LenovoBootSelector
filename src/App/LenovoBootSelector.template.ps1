@@ -880,7 +880,7 @@ public static class LenovoSettingsInk
 
     public static Rectangle TextBounds(Rectangle bounds, float dpi, bool language)
     {
-        int left = Px(dpi, language ? 42 : 44), right = Px(dpi, language ? 9 : 27);
+        int left = Px(dpi, language ? 42 : 44), right = Px(dpi, language ? 9 : 12);
         return new Rectangle(left, 0, Math.Max(0, bounds.Width-left-right), bounds.Height);
     }
 
@@ -976,11 +976,6 @@ public sealed class LenovoSettingsActionButton : Button
             LenovoSettingsInk.DrawIcon(g,ActionIcon,new Rectangle(LenovoSettingsInk.Px(dpi,11),(Height-side)/2,side,side),
                 Destructive && Enabled ? fg : LenovoSettingsInk.Muted(Enabled));
             LenovoSettingsInk.DrawTextPair(g,text,TitleFont ?? Font,SubtitleFont ?? Font,Text,Subtitle,fg,LenovoSettingsInk.Muted(Enabled));
-            int x = Width-LenovoSettingsInk.Px(dpi,16), y = Height/2, d = LenovoSettingsInk.Px(dpi,4);
-            using (Pen p = new Pen(LenovoSettingsInk.Muted(Enabled),Math.Max(1f,1.4f*dpi/96f))) {
-                p.StartCap = p.EndCap = LineCap.Round;
-                g.DrawLines(p,new Point[] { new Point(x-d,y-d),new Point(x,y),new Point(x-d,y+d) });
-            }
             if (Separator) using (Pen p = new Pen(hc ? SystemColors.ControlDark : Color.FromArgb(57,57,57),px))
                 g.DrawLine(p,LenovoSettingsInk.Px(dpi,44),Height-px,Math.Max(0,Width-LenovoSettingsInk.Px(dpi,12)),Height-px);
         }
@@ -994,19 +989,17 @@ public sealed class LenovoSettingsAutostartLabel : Label
     public Font TitleFont { get; set; }
     public Font SubtitleFont { get; set; }
     public Color HoverSurface { get; set; }
-    private bool hovering;
+    internal bool TileHovered { get; set; }
     public LenovoSettingsAutostartLabel()
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
             ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
     }
-    protected override void OnMouseEnter(EventArgs e) { hovering=true; Invalidate(); base.OnMouseEnter(e); }
-    protected override void OnMouseLeave(EventArgs e) { hovering=false; Invalidate(); base.OnMouseLeave(e); }
     protected override void OnPaint(PaintEventArgs e)
     {
         Graphics g=e.Graphics;
         bool hc=SystemInformation.HighContrast;
-        g.Clear(hc ? SystemColors.Control : Enabled && hovering ? HoverSurface : BackColor);
+        g.Clear(hc ? SystemColors.Control : Enabled && TileHovered ? HoverSurface : BackColor);
         int side=LenovoSettingsInk.Px(g.DpiX,22), left=LenovoSettingsInk.Px(g.DpiX,44);
         Color fg=hc ? (Enabled ? SystemColors.ControlText : SystemColors.GrayText) :
             (Enabled ? ForeColor : LenovoSettingsInk.Muted(false));
@@ -1020,22 +1013,20 @@ public sealed class LenovoSettingsToggle : CheckBox
 {
     public Color AccentColor { get; set; }
     public Color HoverSurface { get; set; }
-    private bool hovering;
+    internal bool TileHovered { get; set; }
     public LenovoSettingsToggle()
     {
         AutoCheck=false; AutoSize=false;
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
             ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw,true);
     }
-    protected override void OnMouseEnter(EventArgs e) { hovering=true; Invalidate(); base.OnMouseEnter(e); }
-    protected override void OnMouseLeave(EventArgs e) { hovering=false; Invalidate(); base.OnMouseLeave(e); }
     protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
     protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
     protected override void OnPaint(PaintEventArgs e)
     {
         Graphics g=e.Graphics;
         bool hc=SystemInformation.HighContrast;
-        Color bg=hc ? SystemColors.Control : Enabled && hovering ? HoverSurface : BackColor;
+        Color bg=hc ? SystemColors.Control : Enabled && TileHovered ? HoverSurface : BackColor;
         g.Clear(bg);
         int w=Math.Min(Math.Max(0,Width-4),LenovoSettingsInk.Px(g.DpiX,38));
         int h=Math.Min(Math.Max(0,Height-4),LenovoSettingsInk.Px(g.DpiX,22));
@@ -1055,6 +1046,67 @@ public sealed class LenovoSettingsToggle : CheckBox
                 g.FillEllipse(brush,Checked ? r.Right-pad-d : r.Left+pad,r.Top+pad,d,d);
         }
         if (Focused && ShowFocusCues) LenovoSettingsInk.DrawFocus(g,ClientRectangle,SystemColors.ControlText,bg);
+    }
+}
+
+// One hover owner for both native autostart hit areas. Screen coordinates
+// preserve the highlight across sibling transitions and clipped scrolling.
+public sealed class LenovoSettingsAutostartHover
+{
+    private readonly LenovoSettingsAutostartLabel label;
+    private readonly LenovoSettingsToggle toggle;
+    private readonly Form form;
+
+    public LenovoSettingsAutostartHover(LenovoSettingsAutostartLabel label, LenovoSettingsToggle toggle)
+    {
+        this.label = label;
+        this.toggle = toggle;
+        form = label.FindForm();
+        foreach (Control control in new Control[] { label, toggle }) {
+            control.MouseEnter += Refresh;
+            control.MouseLeave += Refresh;
+            control.MouseMove += Refresh;
+            control.EnabledChanged += Refresh;
+            control.VisibleChanged += Refresh;
+            control.LocationChanged += Refresh;
+            control.SizeChanged += Refresh;
+        }
+        for (Control parent = label.Parent; parent != null; parent = parent.Parent) {
+            parent.LocationChanged += Refresh;
+            parent.SizeChanged += Refresh;
+        }
+        if (form != null) {
+            form.Activated += Refresh;
+            form.Deactivate += Clear;
+        }
+    }
+
+    private static bool ContainsVisiblePoint(Control control, Point screen)
+    {
+        for (Control current = control; current != null; current = current.Parent) {
+            if (!current.Visible || !current.IsHandleCreated ||
+                !current.RectangleToScreen(current.ClientRectangle).Contains(screen)) return false;
+        }
+        return true;
+    }
+
+    private void Refresh(object sender, EventArgs e)
+    {
+        if (label.IsDisposed || toggle.IsDisposed) return;
+        Point pointer = Control.MousePosition;
+        SetHovered(label.Enabled && toggle.Enabled && form != null && form.ContainsFocus &&
+            (ContainsVisiblePoint(label, pointer) || ContainsVisiblePoint(toggle, pointer)));
+    }
+
+    private void Clear(object sender, EventArgs e) { SetHovered(false); }
+
+    private void SetHovered(bool hovered)
+    {
+        if (label.IsDisposed || toggle.IsDisposed) return;
+        if (label.TileHovered == hovered && toggle.TileHovered == hovered) return;
+        label.TileHovered = toggle.TileHovered = hovered;
+        label.Invalidate();
+        toggle.Invalidate();
     }
 }
 
