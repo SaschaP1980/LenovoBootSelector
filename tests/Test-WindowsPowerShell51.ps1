@@ -40,6 +40,11 @@ $configurationProbe = Join-Path $root 'tests\Test-LBS229-ConfigurationPopups.ps1
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $configurationProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-229 native configuration popup regression failed' }
 
+# LBS-252: native disabled Customize text and unchanged capability transition.
+$customizeProbe = Join-Path $root 'tests\Test-LBS252-CustomizeButton.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $customizeProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-252 native Customize raster regression failed' }
+
 # LBS-227: native EDIT length limit and actual draft/settings legacy preservation.
 $aliasLimitProbe = Join-Path $root 'tests\Test-LBS227-AliasLimit.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $aliasLimitProbe
