@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.20.6 – Restore initial keyboard focus in the default picker (LBS-229 F10)
+
+- Apply the established one-time owned-modal focus recovery to the Standard-Startziel picker, without selecting or writing a boot target.
+- Verify natural and controlled focus-loss openings, real keyboard navigation, focus rendering, cancellation and owner restoration.
+
 ## v1.5.20.5 – Consistent Customize typography (LBS-252)
 
 - Draw Customize text through one renderer with identical font and bounds in disabled and enabled states; retain subdued disabled ink and native Button action admission.
