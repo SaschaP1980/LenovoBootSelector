@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.20.4 – Legible disabled Customize action (LBS-252)
+
+- Render the disabled Customize label with subdued, legible dark-theme ink while initial readiness is checked.
+- Preserve native enabled painting and the existing capability, keyboard, tooltip and action dispatch contracts.
+- Cover the actual visible button raster and capability transition in both locales at synthetic 100%/250% layout geometry.
+
 ## v1.5.20.3 – Further Settings initial focus outline (LBS-247)
 
 - Draw the existing autostart switch focus rectangle whenever the enabled switch actually has keyboard focus, including on mouse-open before keyboard cue activation.
