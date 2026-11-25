@@ -1,5 +1,5 @@
 ﻿#requires -version 5.1
-param([switch]$CorrectionProbeOnly)
+param([switch]$CorrectionProbeOnly,[switch]$SettingsCorrectionProbeOnly)
 # LBS-229: actual native owned forms, no live firmware or privileged actions.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -121,6 +121,131 @@ $area=[Drawing.Rectangle]::new(-1000,-100,3000,1700)
 $anchor=[Drawing.Rectangle]::new(0,0,390,672)
 $size=[Drawing.Size]::new(390,514)
 try {
+    # LBS247 correction: independent defect-specific raster observations, on
+    # real production controls. Baseline probe deliberately fails both findings.
+    $settingsFailures=[Collections.Generic.List[string]]::new()
+    function Observe-Lbs247Correction([string]$Name,[scriptblock]$Test) {
+        try { & $Test; Assert-Lbs247 $Name $true }
+        catch { $settingsFailures.Add("$Name : $_"); Write-Host "RED LBS247 $Name : $_" }
+    }
+    function Move-Lbs247Pointer($Control,[int]$X,[int]$Y) {
+        [Windows.Forms.Cursor]::Position=$Control.PointToScreen([Drawing.Point]::new($X,$Y))
+        $sw=[Diagnostics.Stopwatch]::StartNew()
+        while ($sw.ElapsedMilliseconds -lt 120) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 10 }
+    }
+    function Get-Lbs247Background($Control) {
+        $bm=[Drawing.Bitmap]::new($Control.Width,$Control.Height)
+        try {
+            $Control.DrawToBitmap($bm,$Control.ClientRectangle)
+            return $bm.GetPixel(1,1).ToArgb()
+        } finally { $bm.Dispose() }
+    }
+    Observe-Lbs247Correction 'F01 actual pointer transitions highlight both autostart surfaces without mutation' {
+        $popup=New-ConfigurationPopup
+        $cursor=[Windows.Forms.Cursor]::Position
+        $before=$script:Actions.Count
+        $checked=$script:AutostartMenuItem.Checked
+        try {
+            $popup.StartPosition=[Windows.Forms.FormStartPosition]::Manual
+            $popup.Location=[Drawing.Point]::new(30,30)
+            $popup.Show($owner)
+            $popup.Activate()
+            [Windows.Forms.Application]::DoEvents()
+            $label=$popup.Tag.Body.Controls['ConfigurationLocale-Settings.Autostart']
+            $toggle=$popup.Tag.Body.Controls['ConfigurationAutostart']
+            $normal=$label.BackColor.ToArgb()
+            $hot=$label.HoverSurface.ToArgb()
+            $ok=$true
+            foreach ($step in @(
+                @{ Control=$popup.Tag.Title; X=5; Y=5; Hot=$false; Name='outside' },
+                @{ Control=$label; X=10; Y=20; Hot=$true; Name='label' },
+                @{ Control=$toggle; X=10; Y=20; Hot=$true; Name='switch' },
+                @{ Control=$label; X=($label.Width-4); Y=20; Hot=$true; Name='return label' },
+                @{ Control=$popup.Tag.Title; X=5; Y=5; Hot=$false; Name='leave tile' }
+            )) {
+                Move-Lbs247Pointer $step.Control $step.X $step.Y
+                $expect=if ($step.Hot) { $hot } else { $normal }
+                $lp=Get-Lbs247Background $label
+                $tp=Get-Lbs247Background $toggle
+                $match=$lp -eq $expect -and $tp -eq $expect
+                Write-Host "LBS247 TILE HOVER $($step.Name) label=$lp switch=$tp expected=$expect result=$match"
+                if (-not $match) { $ok=$false }
+            }
+            $script:Busy=$true
+            Update-ConfigurationPopupPresentation $popup
+            Move-Lbs247Pointer $label 10 20
+            $disabled=(-not $label.Enabled -and -not $toggle.Enabled -and (Get-Lbs247Background $label) -eq $normal -and (Get-Lbs247Background $toggle) -eq $normal)
+            Write-Host "LBS247 TILE HOVER disabled result=$disabled"
+            if (-not ($ok -and $disabled -and $script:Actions.Count -eq $before -and $script:AutostartMenuItem.Checked -eq $checked)) { throw 'Autostart split hover, disabled paint or mutation mismatch' }
+        } finally {
+            $script:Busy=$false
+            $popup.Dispose()
+            [Windows.Forms.Cursor]::Position=$cursor
+            [Windows.Forms.Application]::DoEvents()
+        }
+    }
+    $probeLocale=$script:Locale
+    $probeInstall=$script:UpdateInstallMenuItem.Enabled
+    $operationKeys=[ordered]@{
+        TaskBrokerSetupMenuItem='Maintenance.Menu.Repair'; TaskBrokerRemoveMenuItem='Maintenance.Remove'
+        UpdateCheckMenuItem='Update.Check'; UpdateInstallMenuItem='Update.Install'
+        RuntimeDiagnosticMenuItem='Diagnostics.Save'; DiagnosticsUploadMenuItem='Diagnostics.Upload'
+    }
+    $oldTexts=@{}
+    foreach ($var in $operationKeys.Keys) { $oldTexts[$var]=(Get-Variable -Scope Script -Name $var -ValueOnly).Text }
+    try {
+        foreach ($probeLanguage in @('en-US','de-DE')) {
+            $script:Locale=$probeLanguage
+            foreach ($var in $operationKeys.Keys) { (Get-Variable -Scope Script -Name $var -ValueOnly).Text=Get-LocalizedString -Key $operationKeys[$var] }
+            foreach ($probeScale in @(1.0,2.5)) {
+                Observe-Lbs247Correction "F02 $probeLanguage/$probeScale operation row raster has no chevron" {
+                    $popup=New-ConfigurationPopup
+                    try {
+                        Set-AuxiliaryPopupLayout $popup $probeScale $area $anchor
+                        $ok=$true
+                        foreach ($available in @($false,$true)) {
+                            $script:UpdateInstallMenuItem.Enabled=$available
+                            Update-ConfigurationPopupPresentation $popup
+                            foreach ($row in @($popup.Tag.Body.Controls | Where-Object { $_ -is [LenovoSettingsActionButton] -and -not $_.LocaleCode })) {
+                                $bm=[Drawing.Bitmap]::new($row.Width,$row.Height)
+                                $bm.SetResolution([single](96*$probeScale),[single](96*$probeScale))
+                                $g=[Drawing.Graphics]::FromImage($bm)
+                                $paint=[Windows.Forms.PaintEventArgs]::new($g,$row.ClientRectangle)
+                                try {
+                                    $method=$row.GetType().GetMethod('OnPaint',[Reflection.BindingFlags]'Instance,NonPublic')
+                                    [void]$method.Invoke($row,@($paint))
+                                    $bg=$bm.GetPixel(1,1).ToArgb()
+                                    $ink=0
+                                    $left=$row.Width-[LenovoSettingsInk]::Px([single](96*$probeScale),22)
+                                    $right=$row.Width-[LenovoSettingsInk]::Px([single](96*$probeScale),10)
+                                    $mid=[int][Math]::Floor($row.Height/2)
+                                    $half=[LenovoSettingsInk]::Px([single](96*$probeScale),6)
+                                    for ($y=$mid-$half;$y -le $mid+$half;$y++) {
+                                        for ($x=$left;$x -le $right;$x++) { if ($bm.GetPixel($x,$y).ToArgb() -ne $bg) { $ink++ } }
+                                    }
+                                    Write-Host "LBS247 ROW RASTER $probeLanguage/$probeScale $($row.Tag) enabled=$($row.Enabled) chevronZoneInk=$ink"
+                                    if ($ink -ne 0) { $ok=$false }
+                                } finally { $paint.Dispose(); $g.Dispose(); $bm.Dispose() }
+                            }
+                        }
+                        $rows=@($popup.Tag.Body.Controls | Where-Object { $_ -is [LenovoSettingsActionButton] -and -not $_.LocaleCode })
+                        if ($rows.Count -ne 6 -or -not $ok) { throw 'Operation row chevron zone contains navigation ink' }
+                    } finally { $popup.Dispose() }
+                }
+            }
+        }
+    } finally {
+        $script:Locale=$probeLocale
+        $script:UpdateInstallMenuItem.Enabled=$probeInstall
+        foreach ($var in $oldTexts.Keys) { (Get-Variable -Scope Script -Name $var -ValueOnly).Text=$oldTexts[$var] }
+    }
+    if ($settingsFailures.Count) { throw ('LBS247 CORRECTION RED: '+($settingsFailures -join '; ')) }
+    if ($SettingsCorrectionProbeOnly) {
+        Write-Host "LBS247 CORRECTION TOTAL $script:Lbs247Checks/5"
+        if ($script:Lbs247Checks -ne 5) { throw 'Unexpected correction count' }
+        return
+    }
+
     # LBS229-F01–F06: focused correction contracts. Keep each check independent
     # so the published basis reports all observed failures rather than stopping at F01.
     $correctionFailures = [Collections.Generic.List[string]]::new()
@@ -902,5 +1027,5 @@ try {
     $tray.Dispose()
 }
 Write-Host "LBS229 CONFIGURATION TOTAL $script:Checks"
-if ($script:Lbs247Checks -ne 23) { throw "Unexpected LBS247 test count: $script:Lbs247Checks" }
-Write-Host "LBS247 SETTINGS TOTAL $script:Lbs247Checks/23"
+if ($script:Lbs247Checks -ne 28) { throw "Unexpected LBS247 test count: $script:Lbs247Checks" }
+Write-Host "LBS247 SETTINGS TOTAL $script:Lbs247Checks/28"
