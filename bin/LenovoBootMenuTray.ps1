@@ -2472,7 +2472,10 @@ public sealed class LenovoSettingsToggle : CheckBox
             using (Brush brush=new SolidBrush(hc ? SystemColors.ControlText : Enabled ? Color.White : Color.FromArgb(155,155,155)))
                 g.FillEllipse(brush,Checked ? r.Right-pad-d : r.Left+pad,r.Top+pad,d,d);
         }
-        if (Focused && ShowFocusCues) LenovoSettingsInk.DrawFocus(g,ClientRectangle,SystemColors.ControlText,bg);
+        // The settings switch is the initial keyboard target even after a
+        // mouse-open. Show its real focus immediately, without changing the
+        // system's cue policy or the focus state of any other control.
+        if (Enabled && Focused) LenovoSettingsInk.DrawFocus(g,ClientRectangle,SystemColors.ControlText,bg);
     }
 }
 
@@ -2779,7 +2782,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.5.20.2'
+$script:AppVersion = '1.5.20.3'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()

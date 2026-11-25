@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.5.20.3 – Further Settings initial focus outline (LBS-247)
+
+- Draw the existing autostart switch focus rectangle whenever the enabled switch actually has keyboard focus, including on mouse-open before keyboard cue activation.
+- Keep focus ownership, traversal, hover, disabled state and action dispatch unchanged; verify the native outline raster in both checked states.
+
 ## v1.5.20.2 – Further Settings initial focus and hover (LBS-247)
 
 - Establish settings keyboard activation once during the owned modal opening, after the owner scrim and connector callback.
