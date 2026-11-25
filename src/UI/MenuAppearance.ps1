@@ -3,6 +3,11 @@
 # fixed 260px menu independently of its 96/240 system DPI. Keep immutable
 # geometry baselines; font point sizes stay at 9pt because GDI/WinForms
 # converts points to pixels at its current DPI without further multiplication.
+# Shared immutable 96-DPI action inset for flat action submenus.
+function New-LenovoSubmenuActionPadding {
+    return [System.Windows.Forms.Padding]::new(18,4,14,4)
+}
+
 function Get-LenovoScaledMenuPadding {
     param(
         [Parameter(Mandatory=$true)][System.Windows.Forms.Padding]$Padding,

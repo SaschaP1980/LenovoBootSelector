@@ -127,6 +127,48 @@ function Get-LocalizationCatalogCore {
             'Settings.Updates' = 'UPDATES'
             'Settings.Diagnostics' = 'DIAGNOSTICS'
             'Preferences.Menu' = 'User preferences'
+            'Preferences.ExportIntro' = 'Save personal preferences'
+            'Preferences.ExportFormat' = 'Portable JSON file'
+            'Preferences.ExportCountLabel' = 'Boot targets included'
+            'Preferences.IncludedHeading' = 'INCLUDED PREFERENCES'
+            'Preferences.IncludedLanguage' = 'Language'
+            'Preferences.IncludedAliases' = 'Individual aliases'
+            'Preferences.IncludedVisibility' = 'Boot target visibility'
+            'Preferences.IncludedOrder' = 'Boot target order'
+            'Preferences.IncludedScope' = 'Included: language, aliases, visibility and order of available entries.'
+            'Preferences.ExcludedHeading' = 'NOT INCLUDED'
+            'Preferences.ExcludedScope' = 'Autostart, default target, BootNext, privileged tasks, system and diagnostic data.'
+            'Preferences.PrivacyHeading' = 'Local backup'
+            'Preferences.PrivacyBody' = 'The file may contain personal aliases and GUIDs. No automatic upload takes place.'
+            'Preferences.UnavailableNote' = 'Unavailable saved entries are not exported or restored; their local metadata remains unchanged.'
+            'Preferences.MetricMatched' = 'Matched'
+            'Preferences.MetricChanged' = 'Changed'
+            'Preferences.MetricSkipped' = 'No match'
+            'Preferences.MetricLocalOnly' = 'Local only'
+            'Preferences.NoChange' = 'No change'
+            'Preferences.LanguageChanged' = 'Language will change'
+            'Preferences.LanguageBefore' = 'Current language'
+            'Preferences.LanguageAfter' = 'After import'
+            'Preferences.ReconcileHeading' = 'Exact GUID reconciliation'
+            'Preferences.SystemUnchanged' = 'System functions, the default boot target, BootNext and autostart remain unchanged.'
+            'Preferences.EntriesHeading' = 'BOOT TARGETS'
+            'Preferences.AdditionalCounts' = 'Unavailable: {Unavailable} · Alias skipped: {Aliases}'
+            'Preferences.FilterAll' = 'All'
+            'Preferences.FilterChanged' = 'Changed'
+            'Preferences.FilterSkipped' = 'Skipped'
+            'Preferences.FilterLocalOnly' = 'Local only'
+            'Preferences.FilterUnavailable' = 'Unavailable'
+            'Preferences.PageInfo' = 'Page {Page} of {Total} · {Count} entries'
+            'Preferences.DetailPage' = 'Details · page {Page} of {Total}'
+            'Preferences.Previous' = 'Previous'
+            'Preferences.Next' = 'Next'
+            'Preferences.NoRows' = 'No entries in this view.'
+            'Preferences.RowChanged' = 'Matched · changed'
+            'Preferences.RowUnchanged' = 'Matched · unchanged'
+            'Preferences.UnavailableTitle' = 'Unavailable locally'
+            'Preferences.UnmatchedTitle' = 'Unmatched incoming boot target'
+            'Preferences.ShowDetails' = 'Show details'
+            'Preferences.HideDetails' = 'Hide details'
             'Preferences.Heading' = 'USER PREFERENCES'
             'Preferences.Export' = 'Export preferences'
             'Preferences.Import' = 'Import preferences'
@@ -525,6 +567,48 @@ function Get-LocalizationCatalogCore {
             'Settings.Updates' = 'UPDATES'
             'Settings.Diagnostics' = 'DIAGNOSE'
             'Preferences.Menu' = 'Benutzereinstellungen'
+            'Preferences.ExportIntro' = 'Persönliche Einstellungen sichern'
+            'Preferences.ExportFormat' = 'Portables JSON-Dateiformat'
+            'Preferences.ExportCountLabel' = 'Enthaltene Startziele'
+            'Preferences.IncludedHeading' = 'ENTHALTENE EINSTELLUNGEN'
+            'Preferences.IncludedLanguage' = 'Sprache'
+            'Preferences.IncludedAliases' = 'Individuelle Aliase'
+            'Preferences.IncludedVisibility' = 'Sichtbarkeit der Startziele'
+            'Preferences.IncludedOrder' = 'Reihenfolge der Startziele'
+            'Preferences.IncludedScope' = 'Enthalten: Sprache, Aliase, Sichtbarkeit und Reihenfolge verfügbarer Startziele.'
+            'Preferences.ExcludedHeading' = 'NICHT ENTHALTEN'
+            'Preferences.ExcludedScope' = 'Autostart, Standard-Startziel, BootNext, privilegierte Aufgaben, System- und Diagnosedaten.'
+            'Preferences.PrivacyHeading' = 'Lokale Sicherung'
+            'Preferences.PrivacyBody' = 'Die Datei kann persönliche Aliase und GUIDs enthalten. Es erfolgt kein automatischer Upload.'
+            'Preferences.UnavailableNote' = 'Nicht verfügbare gespeicherte Startziele werden nicht exportiert oder übernommen; ihre lokalen Metadaten bleiben erhalten.'
+            'Preferences.MetricMatched' = 'Übereinstimmend'
+            'Preferences.MetricChanged' = 'Geändert'
+            'Preferences.MetricSkipped' = 'Ohne Treffer'
+            'Preferences.MetricLocalOnly' = 'Nur lokal'
+            'Preferences.NoChange' = 'Keine Änderung'
+            'Preferences.LanguageChanged' = 'Sprache wird geändert'
+            'Preferences.LanguageBefore' = 'Aktuelle Sprache'
+            'Preferences.LanguageAfter' = 'Nach dem Import'
+            'Preferences.ReconcileHeading' = 'Exakter GUID-Abgleich'
+            'Preferences.SystemUnchanged' = 'Systemfunktionen, Standard-Startziel, BootNext und Autostart bleiben unverändert.'
+            'Preferences.EntriesHeading' = 'STARTZIELE'
+            'Preferences.AdditionalCounts' = 'Nicht verfügbar: {Unavailable} · Alias übersprungen: {Aliases}'
+            'Preferences.FilterAll' = 'Alle'
+            'Preferences.FilterChanged' = 'Geändert'
+            'Preferences.FilterSkipped' = 'Übersprungen'
+            'Preferences.FilterLocalOnly' = 'Nur lokal'
+            'Preferences.FilterUnavailable' = 'Nicht verfügbar'
+            'Preferences.PageInfo' = 'Seite {Page} von {Total} · {Count} Einträge'
+            'Preferences.DetailPage' = 'Details · Seite {Page} von {Total}'
+            'Preferences.Previous' = 'Zurück'
+            'Preferences.Next' = 'Weiter'
+            'Preferences.NoRows' = 'Keine Einträge in dieser Ansicht.'
+            'Preferences.RowChanged' = 'Übereinstimmend · geändert'
+            'Preferences.RowUnchanged' = 'Übereinstimmend · unverändert'
+            'Preferences.UnavailableTitle' = 'Lokal nicht verfügbar'
+            'Preferences.UnmatchedTitle' = 'Nicht zugeordnetes Startziel'
+            'Preferences.ShowDetails' = 'Details anzeigen'
+            'Preferences.HideDetails' = 'Details ausblenden'
             'Preferences.Heading' = 'BENUTZEREINSTELLUNGEN'
             'Preferences.Export' = 'Einstellungen exportieren'
             'Preferences.Import' = 'Einstellungen importieren'
@@ -3165,7 +3249,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.6.0.0'
+$script:AppVersion = '1.6.1.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -3978,6 +4062,11 @@ function Write-LenovoMonitorTopologyEvent {
 # fixed 260px menu independently of its 96/240 system DPI. Keep immutable
 # geometry baselines; font point sizes stay at 9pt because GDI/WinForms
 # converts points to pixels at its current DPI without further multiplication.
+# Shared immutable 96-DPI action inset for flat action submenus.
+function New-LenovoSubmenuActionPadding {
+    return [System.Windows.Forms.Padding]::new(18,4,14,4)
+}
+
 function Get-LenovoScaledMenuPadding {
     param(
         [Parameter(Mandatory=$true)][System.Windows.Forms.Padding]$Padding,
@@ -8215,162 +8304,585 @@ function Format-PreferencesPreviewValue {
     return ('"'+$literal.Replace('"','\"')+'"')
 }
 
-function Get-PreferencesPreviewText {
+# Presentation projections never mutate the validated reconciliation plan.
+function Get-PreferencesChangedFields {
+    param($Row)
+    if ($Row.Status -ne 'Matched') { return }
+    if ($Row.OldAlias -cne $Row.NewAlias) { 'Alias' }
+    if ($Row.OldHidden -ne $Row.NewHidden) { 'Visibility' }
+    if ($Row.OldPosition -ne $Row.NewPosition) { 'Order' }
+}
+
+function New-PreferencesPreviewView {
     param($Plan)
-    $lines=[System.Collections.Generic.List[string]]::new()
-    $lines.Add((Get-LocalizedString -Key 'Preferences.ReconcileWarning'))
-    $lines.Add('')
-    $lines.Add((Get-LocalizedString -Key 'Preferences.PreviewLanguage' -Values @{Before=$Plan.OldLocale;After=$Plan.Locale}))
-    $lines.Add((Get-LocalizedString -Key 'Preferences.PreviewCounts' -Values @{
-        Matched=@($Plan.Rows | Where-Object Status -eq 'Matched').Count
-        Unmatched=@($Plan.Rows | Where-Object Status -eq 'Unmatched').Count
-        Local=@($Plan.Rows | Where-Object Status -eq 'LocalOnly').Count
-    }))
+    $rows=[Collections.Generic.List[object]]::new()
     foreach ($row in @($Plan.Rows)) {
-        $lines.Add('')
-        $lines.Add((Get-LocalizedString -Key ('Preferences.'+$row.Status)))
-        if ($row.Title) { $lines.Add((Format-PreferencesPreviewValue $row.Title)) }
-        $lines.Add([string]$row.Guid)
-        $newVisibility=Get-LocalizedString -Key $(if ($row.NewHidden) {'Preferences.Hidden'} else {'Preferences.Visible'})
-        if ($row.Status -eq 'Unmatched') {
-            $lines.Add((Get-LocalizedString -Key 'Preferences.AliasChange' -Values @{Before='—';After=(Format-PreferencesPreviewValue $row.NewAlias)}))
-            $lines.Add((Get-LocalizedString -Key 'Preferences.VisibilityChange' -Values @{Before='—';After=$newVisibility}))
-            continue
-        }
-        $oldVisibility=Get-LocalizedString -Key $(if ($row.OldHidden) {'Preferences.Hidden'} else {'Preferences.Visible'})
-        $lines.Add((Get-LocalizedString -Key 'Preferences.AliasChange' -Values @{Before=(Format-PreferencesPreviewValue $row.OldAlias);After=(Format-PreferencesPreviewValue $row.NewAlias)}))
-        if ($row.AliasSkipped) { $lines.Add((Get-LocalizedString -Key 'Preferences.AliasSkipped')) }
-        $lines.Add((Get-LocalizedString -Key 'Preferences.VisibilityChange' -Values @{Before=$oldVisibility;After=$newVisibility}))
-        $lines.Add((Get-LocalizedString -Key 'Preferences.OrderChange' -Values @{Before=$row.OldPosition;After=$row.NewPosition}))
+        $fields=@(Get-PreferencesChangedFields $row)
+        $rows.Add([pscustomobject]@{
+            Id='Entry'+$rows.Count; Row=$row; Status=$row.Status
+            Changed=($fields.Count -gt 0); Fields=$fields; AliasSkipped=[bool]$row.AliasSkipped
+            Guid=[string]$row.Guid
+        })
     }
-    $lines.Add('')
-    $lines.Add((Get-LocalizedString -Key 'Preferences.Unavailable'))
-    if (@($Plan.UnavailableLocal).Count -eq 0) { $lines.Add((Get-LocalizedString -Key 'Preferences.None')) }
-    else { foreach ($guid in @($Plan.UnavailableLocal)) { $lines.Add((Format-PreferencesPreviewValue $guid)) } }
-    $lines.Add('')
-    $lines.Add((Get-LocalizedString -Key 'Preferences.Scope'))
-    return [string]::Join([Environment]::NewLine,$lines.ToArray())
+    foreach ($guid in @($Plan.UnavailableLocal)) {
+        $rows.Add([pscustomobject]@{Id='Entry'+$rows.Count;Row=$null;Status='Unavailable';Changed=$false;Fields=@();AliasSkipped=$false;Guid=[string]$guid})
+    }
+    return [pscustomobject]@{
+        Rows=$rows.ToArray(); OldLocale=$Plan.OldLocale; Locale=$Plan.Locale
+        Matched=@($rows | Where-Object Status -eq 'Matched').Count
+        Changed=@($rows | Where-Object Changed).Count
+        Skipped=@($rows | Where-Object Status -eq 'Unmatched').Count
+        LocalOnly=@($rows | Where-Object Status -eq 'LocalOnly').Count
+        Unavailable=@($rows | Where-Object Status -eq 'Unavailable').Count
+        AliasSkipped=@($rows | Where-Object AliasSkipped).Count
+    }
+}
+
+function Get-PreferencesFilteredRows {
+    param($View,[string]$Filter)
+    switch ($Filter) {
+        'Changed' { $View.Rows | Where-Object Changed }
+        'Skipped' { $View.Rows | Where-Object { $_.Status -eq 'Unmatched' -or $_.AliasSkipped } }
+        'LocalOnly' { $View.Rows | Where-Object Status -eq 'LocalOnly' }
+        'Unavailable' { $View.Rows | Where-Object Status -eq 'Unavailable' }
+        default { $View.Rows }
+    }
+}
+
+function Get-PreferencesFieldText {
+    param($Row,[ValidateSet('Alias','Visibility','Order')][string]$Field)
+    $unmatched=$Row.Status -eq 'Unmatched'
+    switch ($Field) {
+        'Alias' {
+            $before=if ($unmatched) {'—'} else {Format-PreferencesPreviewValue $Row.OldAlias}
+            $after=Format-PreferencesPreviewValue $Row.NewAlias
+        }
+        'Visibility' {
+            $before=if ($unmatched) {'—'} else {Get-LocalizedString -Key $(if ($Row.OldHidden) {'Preferences.Hidden'} else {'Preferences.Visible'})}
+            $after=Get-LocalizedString -Key $(if ($Row.NewHidden) {'Preferences.Hidden'} else {'Preferences.Visible'})
+        }
+        'Order' {
+            $before=[string]$Row.OldPosition; $after=[string]$Row.NewPosition
+        }
+    }
+    return (Get-LocalizedString -Key ('Preferences.'+$Field+'Change') -Values @{Before=$before;After=$after})
+}
+
+function Limit-PreferencesSummaryText {
+    param([string]$Text)
+    if ($Text.Length -le 120) {return $Text}
+    $end=120
+    if ([char]::IsHighSurrogate($Text[$end-1])) {$end--}
+    return ($Text.Substring(0,$end)+'…')
+}
+
+function Get-PreferencesDetailSegments {
+    param($Entry)
+    $lines=[Collections.Generic.List[string]]::new()
+    if ($Entry.Row -and $Entry.Row.Title) { $lines.Add((Format-PreferencesPreviewValue $Entry.Row.Title)) }
+    $lines.Add('GUID: '+$Entry.Guid)
+    if ($Entry.Row) {
+        $lines.Add((Get-PreferencesFieldText $Entry.Row Alias))
+        if ($Entry.AliasSkipped) {$lines.Add((Get-LocalizedString -Key 'Preferences.AliasSkipped'))}
+        $lines.Add((Get-PreferencesFieldText $Entry.Row Visibility))
+        if ($Entry.Status -ne 'Unmatched') {$lines.Add((Get-PreferencesFieldText $Entry.Row Order))}
+    } else {$lines.Add((Get-LocalizedString -Key 'Preferences.Unavailable'))}
+    # Bounded detail pages keep the native child geometry safe even with
+    # legacy very long aliases. No content is discarded or silently clipped.
+    foreach ($line in $lines) {
+        for ($offset=0;$offset -lt $line.Length;) {
+            $length=[Math]::Min(600,$line.Length-$offset)
+            if ($offset+$length -lt $line.Length -and [char]::IsHighSurrogate($line[$offset+$length-1])) {$length--}
+            $line.Substring($offset,$length)
+            $offset+=$length
+        }
+    }
+}
+
+function New-PreferencesTextControl {
+    param($Form,[string]$Name,[string]$Text,[string]$Role='Body')
+    $label=[Windows.Forms.Label]::new()
+    $label.Name=$Name
+    $label.Text=$Text
+    $label.AccessibleName=$Text
+    $label.UseMnemonic=$false
+    $label.UseCompatibleTextRendering=$true
+    $label.AutoEllipsis=$false
+    $label.AutoSize=$false
+    $label.BackColor=[Drawing.Color]::Transparent
+    $label.Font=switch ($Role) {
+        'Count' {$Form.Tag.Fonts.Metric}
+        'Heading' {$Form.Tag.Fonts.Heading}
+        'Caption' {$Form.Tag.Fonts.Caption}
+        default {$Form.Tag.Fonts.Body}
+    }
+    $label.ForeColor=switch ($Role) {
+        'Caption' {[Drawing.Color]::FromArgb(184,184,184)}
+        'Positive' {[Drawing.Color]::FromArgb(104,206,141)}
+        'Warning' {[Drawing.Color]::FromArgb(233,182,92)}
+        'Changed' {[Drawing.Color]::FromArgb(255,224,222)}
+        default {$script:ColorPrimary}
+    }
+    return $label
+}
+
+function New-PreferencesViewButton {
+    param($Form,[string]$Name,[string]$Text,[string]$Action,$Value,[switch]$Selected)
+    $button=[Windows.Forms.Button]::new()
+    $button.Name=$Name;$button.Text=$Text;$button.AccessibleName=$Text
+    $button.UseMnemonic=$false;$button.UseVisualStyleBackColor=$false
+    $button.FlatStyle='Flat';$button.Font=$Form.Tag.Fonts.Body
+    $button.ForeColor=$script:ColorPrimary
+    $button.BackColor=if ($Selected) {[Drawing.Color]::FromArgb(62,32,30)} else {[Drawing.Color]::FromArgb(37,37,37)}
+    $button.FlatAppearance.BorderColor=if ($Selected) {$script:ColorAccent} else {[Drawing.Color]::FromArgb(72,72,72)}
+    $button.FlatAppearance.MouseOverBackColor=[Drawing.Color]::FromArgb(55,55,55)
+    $button.Cursor=[Windows.Forms.Cursors]::Hand
+    $button.Tag=[pscustomobject]@{Action=$Action;Value=$Value}
+    $button.Add_Click({
+        param($sender,$eventArgs)
+        $f=$sender.FindForm()
+        if (-not $f -or $f.IsDisposed) {return}
+        $state=$f.Tag;$name=$sender.Name;$keep=$false
+        switch ($sender.Tag.Action) {
+            'Filter' {$state.Filter=[string]$sender.Tag.Value;$state.Page=0;$state.Expanded='';$state.DetailPage=0}
+            'Page' {$state.Page=[int]$sender.Tag.Value;$state.Expanded='';$state.DetailPage=0}
+            'Expand' {
+                $state.Expanded=if ($state.Expanded -ceq $sender.Tag.Value) {''} else {[string]$sender.Tag.Value}
+                $state.DetailPage=0;$keep=$true
+            }
+            'Detail' {$state.DetailPage=[int]$sender.Tag.Value;$keep=$true}
+        }
+        try {Update-PreferencesConfirmationBody -Form $f -FocusName $name -KeepScroll:$keep}
+        catch {$state.LayoutFailed=$true;$f.DialogResult=[Windows.Forms.DialogResult]::Cancel}
+    })
+    $button.Add_Enter({
+        param($sender,$eventArgs)
+        $f=$sender.FindForm()
+        if ($f -and $f.Visible) {Move-PreferencesFocusedControlIntoView -Form $f -Control $sender}
+    })
+    return $button
+}
+
+function New-PreferencesBlock {
+    param([Windows.Forms.Control[]]$Controls,[string]$Kind='Stack',[switch]$Card)
+    $panel=[Windows.Forms.Panel]::new()
+    $panel.TabStop=$false
+    $panel.BackColor=if ($Card) {[Drawing.Color]::FromArgb(37,37,37)} else {[Drawing.Color]::Transparent}
+    if ($Card) {$panel.BorderStyle='FixedSingle'}
+    $panel.Tag=[pscustomobject]@{Kind=$Kind;Card=[bool]$Card;Items=$Controls}
+    for ($i=0;$i -lt $Controls.Count;$i++) {
+        $Controls[$i].TabIndex=$i
+        $panel.Controls.Add($Controls[$i])
+    }
+    return $panel
+}
+
+function Add-PreferencesBlock {
+    param($Form,[Windows.Forms.Control[]]$Controls,[string]$Kind='Stack',[switch]$Card)
+    $block=New-PreferencesBlock -Controls $Controls -Kind $Kind -Card:$Card
+    $block.TabIndex=$Form.Tag.Blocks.Count
+    $Form.Tag.Blocks.Add($block)
+    $Form.Tag.Shell.Body.Controls.Add($block)
+    # The shared regular dialog already owns viewport/body scrolling.
+    # Add its nested labels/buttons to the same single scroll range.
+    function AttachWheel($control) {
+        $control.Add_MouseWheel({
+            param($sender,$eventArgs)
+            $f=$sender.FindForm()
+            if (-not $f -or -not $f.Tag.Shell.Scroll -or -not $eventArgs.Delta) {return}
+            $scroll=$f.Tag.Shell.Scroll
+            if ($scroll.Maximum -le 0) {return}
+            if ($eventArgs -is [Windows.Forms.HandledMouseEventArgs]) {
+                if ($eventArgs.Handled) {return}
+                $eventArgs.Handled=$true
+            }
+            $scroll.Value-=[int]([Math]::Sign($eventArgs.Delta)*$scroll.SmallChange)
+        })
+        foreach ($child in $control.Controls) {AttachWheel $child}
+    }
+    AttachWheel $block
+}
+
+function Move-PreferencesFocusedControlIntoView {
+    param($Form,$Control)
+    $shell=$Form.Tag.Shell;$scroll=$shell.Scroll
+    if (-not $scroll -or $scroll.Maximum -le 0 -or -not $Control.Visible) {return}
+    $top=$shell.Body.PointToClient($Control.PointToScreen([Drawing.Point]::Empty)).Y
+    if ($top -lt $scroll.Value) {$scroll.Value=$top}
+    elseif ($top+$Control.Height -gt $scroll.Value+$shell.Viewport.Height) {
+        $scroll.Value=$top+$Control.Height-$shell.Viewport.Height
+    }
+}
+
+function Add-PreferencesMetrics {
+    param($Form,$View)
+    $items=@()
+    foreach ($key in @('Matched','Changed','Skipped','LocalOnly')) {
+        $items+=,(New-PreferencesBlock -Card -Controls @(
+            (New-PreferencesTextControl $Form ('Metric'+$key) ([string]$View.$key) Count),
+            (New-PreferencesTextControl $Form ('MetricLabel'+$key) (Get-LocalizedString -Key ('Preferences.Metric'+$key)) Caption)
+        ))
+    }
+    Add-PreferencesBlock $Form $items Metrics
+}
+
+function New-PreferencesLanguageTile {
+    param($Form,[string]$Name,[string]$Locale,[string]$CaptionKey)
+    $flag=[Windows.Forms.Panel]::new()
+    $flag.Name=$Name+'Flag';$flag.Tag=$Locale;$flag.TabStop=$false
+    $flag.BackColor=[Drawing.Color]::FromArgb(37,37,37)
+    $flag.Add_Paint({
+        param($sender,$eventArgs)
+        [LenovoLocaleFlags]::DrawFlag($eventArgs.Graphics,[string]$sender.Tag,$sender.ClientRectangle)
+    })
+    $nameText=Get-LocalizedString -Key $(if ($Locale -ceq 'de-DE') {'Language.German'} else {'Language.English'})
+    return (New-PreferencesBlock -Card -Kind Language -Controls @(
+        (New-PreferencesTextControl $Form ($Name+'Caption') (Get-LocalizedString -Key $CaptionKey) Caption),
+        $flag,
+        (New-PreferencesTextControl $Form ($Name+'Name') ($nameText+' ('+$Locale+')') Heading)
+    ))
+}
+
+function Add-PreferencesEntryCard {
+    param($Form,$Entry)
+    $s=$Form.Tag
+    $title=if ($Entry.Row -and $Entry.Row.Title) {Format-PreferencesPreviewValue $Entry.Row.Title} elseif ($Entry.Status -eq 'Unavailable') {Get-LocalizedString -Key 'Preferences.UnavailableTitle'} else {Get-LocalizedString -Key 'Preferences.UnmatchedTitle'}
+    $statusKey=switch ($Entry.Status) {
+        'Matched' {if ($Entry.Changed) {'Preferences.RowChanged'} else {'Preferences.RowUnchanged'}}
+        'LocalOnly' {'Preferences.LocalOnly'}
+        'Unmatched' {'Preferences.Unmatched'}
+        default {'Preferences.UnavailableTitle'}
+    }
+    $role=if ($Entry.Status -in @('Unmatched','Unavailable') -or $Entry.AliasSkipped) {'Warning'} elseif ($Entry.Changed) {'Changed'} elseif ($Entry.Status -eq 'Matched') {'Positive'} else {'Caption'}
+    $items=@(
+        (New-PreferencesTextControl $Form ($Entry.Id+'Title') (Limit-PreferencesSummaryText $title) Heading),
+        (New-PreferencesTextControl $Form ($Entry.Id+'Status') (Get-LocalizedString -Key $statusKey) $role)
+    )
+    foreach ($field in @($Entry.Fields)) {
+        $items+=,(New-PreferencesTextControl $Form ($Entry.Id+$field) (Limit-PreferencesSummaryText (Get-PreferencesFieldText $Entry.Row $field)) Changed)
+    }
+    if ($Entry.AliasSkipped) {$items+=,(New-PreferencesTextControl $Form ($Entry.Id+'AliasSkipped') (Get-LocalizedString -Key 'Preferences.AliasSkipped') Warning)}
+    $expanded=$s.Expanded -ceq $Entry.Id
+    $items+=,(New-PreferencesViewButton $Form ($Entry.Id+'Details') (Get-LocalizedString -Key $(if ($expanded) {'Preferences.HideDetails'} else {'Preferences.ShowDetails'})) Expand $Entry.Id -Selected:$expanded)
+    if ($expanded) {
+        $segments=@(Get-PreferencesDetailSegments $Entry)
+        $pages=[Math]::Max(1,[int][Math]::Ceiling($segments.Count/6.0))
+        $s.DetailPage=[Math]::Max(0,[Math]::Min($pages-1,$s.DetailPage))
+        $items+=,(New-PreferencesTextControl $Form ($Entry.Id+'DetailHeader') (Get-LocalizedString -Key 'Preferences.DetailPage' -Values @{Page=($s.DetailPage+1);Total=$pages}) Caption)
+        $i=0
+        foreach ($segment in @($segments | Select-Object -Skip ($s.DetailPage*6) -First 6)) {
+            $items+=,(New-PreferencesTextControl $Form ($Entry.Id+'Detail'+$i) $segment Body)
+            $i++
+        }
+        if ($pages -gt 1) {
+            $previous=New-PreferencesViewButton $Form ($Entry.Id+'DetailPrevious') (Get-LocalizedString -Key 'Preferences.Previous') Detail ($s.DetailPage-1)
+            $previous.Enabled=$s.DetailPage -gt 0
+            $next=New-PreferencesViewButton $Form ($Entry.Id+'DetailNext') (Get-LocalizedString -Key 'Preferences.Next') Detail ($s.DetailPage+1)
+            $next.Enabled=$s.DetailPage -lt $pages-1
+            $items+=,(New-PreferencesBlock -Controls @($previous,$next) -Kind Buttons)
+        }
+    }
+    Add-PreferencesBlock $Form $items -Card
+}
+
+function Update-PreferencesConfirmationBody {
+    param($Form,[string]$FocusName,[switch]$KeepScroll)
+    $s=$Form.Tag;$body=$s.Shell.Body
+    $oldValue=if ($KeepScroll) {$s.Shell.Scroll.Value} else {0}
+    $body.SuspendLayout()
+    try {
+        foreach ($control in @($body.Controls)) {$body.Controls.Remove($control);$control.Dispose()}
+        $s.Blocks.Clear()
+        if ($s.Mode -eq 'Export') {
+            $intro=New-PreferencesBlock -Controls @(
+                (New-PreferencesTextControl $Form 'ExportIntro' (Get-LocalizedString -Key 'Preferences.ExportIntro') Heading),
+                (New-PreferencesTextControl $Form 'ExportFormat' (Get-LocalizedString -Key 'Preferences.ExportFormat') Caption)
+            )
+            $countLabel=New-PreferencesTextControl $Form 'ExportCount' ([string]$s.ExportCount) Count
+            $countCaption=New-PreferencesTextControl $Form 'ExportCountLabel' (Get-LocalizedString -Key 'Preferences.ExportCountLabel') Caption
+            $countLabel.TextAlign='MiddleRight';$countCaption.TextAlign='MiddleRight'
+            $count=New-PreferencesBlock -Controls @($countLabel,$countCaption)
+            Add-PreferencesBlock $Form @($intro,$count) Metrics -Card
+            $included=@((New-PreferencesTextControl $Form 'IncludedHeading' (Get-LocalizedString -Key 'Preferences.IncludedHeading') Caption))
+            foreach ($key in @('Language','Aliases','Visibility','Order')) {
+                $included+=,(New-PreferencesTextControl $Form ('Included'+$key) ('✓  '+(Get-LocalizedString -Key ('Preferences.Included'+$key))) Body)
+            }
+            Add-PreferencesBlock $Form $included
+        } else {
+            Add-PreferencesMetrics $Form $s.View
+            $languageTiles=New-PreferencesBlock -Kind Metrics -Controls @(
+                (New-PreferencesLanguageTile $Form 'LanguageBefore' $s.View.OldLocale 'Preferences.LanguageBefore'),
+                (New-PreferencesLanguageTile $Form 'LanguageAfter' $s.View.Locale 'Preferences.LanguageAfter')
+            )
+            Add-PreferencesBlock $Form @(
+                (New-PreferencesTextControl $Form 'LanguageHeading' (Get-LocalizedString -Key 'Preferences.IncludedLanguage') Heading),
+                $languageTiles,
+                (New-PreferencesTextControl $Form 'LanguageComparison' (Get-LocalizedString -Key 'Preferences.PreviewLanguage' -Values @{Before=$s.View.OldLocale;After=$s.View.Locale}) Caption),
+                (New-PreferencesTextControl $Form 'LanguageStatus' (Get-LocalizedString -Key $(if ($s.View.OldLocale -ceq $s.View.Locale) {'Preferences.NoChange'} else {'Preferences.LanguageChanged'})) $(if ($s.View.OldLocale -cne $s.View.Locale) {'Changed'} else {'Caption'}))
+            )
+            Add-PreferencesBlock $Form @(
+                (New-PreferencesTextControl $Form 'ReconcileHeading' (Get-LocalizedString -Key 'Preferences.ReconcileHeading') Heading),
+                (New-PreferencesTextControl $Form 'ReconcileWarning' (Get-LocalizedString -Key 'Preferences.ReconcileWarning') Body),
+                (New-PreferencesTextControl $Form 'SystemUnchanged' (Get-LocalizedString -Key 'Preferences.SystemUnchanged') Caption)
+            ) -Card
+            Add-PreferencesBlock $Form @(
+                (New-PreferencesTextControl $Form 'EntryHeading' (Get-LocalizedString -Key 'Preferences.EntriesHeading') Heading),
+                (New-PreferencesTextControl $Form 'AdditionalCounts' (Get-LocalizedString -Key 'Preferences.AdditionalCounts' -Values @{Unavailable=$s.View.Unavailable;Aliases=$s.View.AliasSkipped}) Caption)
+            )
+            $filters=@()
+            foreach ($key in @('All','Changed','Skipped','LocalOnly','Unavailable')) {
+                $filters+=,(New-PreferencesViewButton $Form ('Filter'+$key) (Get-LocalizedString -Key ('Preferences.Filter'+$key)) Filter $key -Selected:($s.Filter -ceq $key))
+            }
+            Add-PreferencesBlock $Form $filters Buttons
+        }
+        if ($s.Mode -eq 'Import' -or $s.View.Unavailable -gt 0) {
+            $rows=@(Get-PreferencesFilteredRows $s.View $s.Filter)
+            $s.PageCount=[Math]::Max(1,[int][Math]::Ceiling($rows.Count/8.0))
+            $s.Page=[Math]::Max(0,[Math]::Min($s.PageCount-1,$s.Page))
+            $s.VisibleRows=@($rows | Select-Object -Skip ($s.Page*8) -First 8)
+            if ($s.Mode -eq 'Export') {
+                Add-PreferencesBlock $Form @((New-PreferencesTextControl $Form 'ExportUnavailable' (Get-LocalizedString -Key 'Preferences.Unavailable') Caption))
+            }
+            if ($rows.Count -gt 0) {
+                Add-PreferencesBlock $Form @((New-PreferencesTextControl $Form 'PageInfo' (Get-LocalizedString -Key 'Preferences.PageInfo' -Values @{Page=($s.Page+1);Total=$s.PageCount;Count=$rows.Count}) Caption))
+                if ($s.PageCount -gt 1) {
+                    $previous=New-PreferencesViewButton $Form 'PagePrevious' (Get-LocalizedString -Key 'Preferences.Previous') Page ($s.Page-1)
+                    $previous.Enabled=$s.Page -gt 0
+                    $next=New-PreferencesViewButton $Form 'PageNext' (Get-LocalizedString -Key 'Preferences.Next') Page ($s.Page+1)
+                    $next.Enabled=$s.Page -lt $s.PageCount-1
+                    Add-PreferencesBlock $Form @($previous,$next) Buttons
+                }
+                foreach ($entry in $s.VisibleRows) {Add-PreferencesEntryCard $Form $entry}
+            } else {
+                Add-PreferencesBlock $Form @((New-PreferencesTextControl $Form 'NoRows' (Get-LocalizedString -Key 'Preferences.NoRows') Caption)) -Card
+            }
+        }
+        if ($s.Mode -eq 'Import') {
+            Add-PreferencesBlock $Form @((New-PreferencesTextControl $Form 'IncludedScope' (Get-LocalizedString -Key 'Preferences.IncludedScope') Caption))
+        }
+        Add-PreferencesBlock $Form @(
+            (New-PreferencesTextControl $Form 'ExcludedHeading' (Get-LocalizedString -Key 'Preferences.ExcludedHeading') Heading),
+            (New-PreferencesTextControl $Form 'ExcludedScope' (Get-LocalizedString -Key 'Preferences.ExcludedScope') Body)
+        ) -Card
+        Add-PreferencesBlock $Form @(
+            (New-PreferencesTextControl $Form 'PrivacyHeading' (Get-LocalizedString -Key 'Preferences.PrivacyHeading') Heading),
+            (New-PreferencesTextControl $Form 'PrivacyBody' (Get-LocalizedString -Key 'Preferences.PrivacyBody') Caption),
+            (New-PreferencesTextControl $Form 'UnavailableNote' (Get-LocalizedString -Key 'Preferences.UnavailableNote') Caption)
+        )
+    } finally {$body.ResumeLayout($false)}
+    if ($s.Scale -gt 0) {
+        Set-PreferencesConfirmationLayout -Form $Form -Scale $s.Scale -WorkingArea $s.WorkingArea
+        $s.Shell.Scroll.Value=$oldValue
+        if ($FocusName) {
+            $target=$Form.Controls.Find($FocusName,$true) | Select-Object -First 1
+            if ($target -and $target.CanFocus -and $target.Enabled) {[void]$target.Focus()}
+            elseif ($s.Cancel.CanFocus) {[void]$s.Cancel.Focus()}
+        }
+    }
 }
 
 function New-PreferencesConfirmationForm {
-    param([string]$Title,[string]$Text,[string]$ConfirmText)
-    $form=New-Object Windows.Forms.Form
-    $form.Name='LenovoPreferencesConfirmation'
-    $form.Text=$Title
-    $form.AccessibleName=$Title
-    $form.FormBorderStyle=[Windows.Forms.FormBorderStyle]::None
-    $form.AutoScaleMode=[Windows.Forms.AutoScaleMode]::None
-    $form.ShowInTaskbar=$false
-    $form.TopMost=$true
-    $form.StartPosition=[Windows.Forms.FormStartPosition]::Manual
-    $form.BackColor=$script:ColorBackground
-    $heading=New-Object Windows.Forms.Label
-    $heading.Text=$Title
-    $heading.UseMnemonic=$false
-    $heading.ForeColor=$script:ColorPrimary
-    $heading.BackColor=$script:ColorHeader
-    $heading.TextAlign=[Drawing.ContentAlignment]::MiddleLeft
-    $heading.Font=[Drawing.Font]::new('Segoe UI',11,[Drawing.FontStyle]::Bold)
-    $heading.Name='PreferencesTitle'
-    $content=New-Object Windows.Forms.TextBox
-    $content.Name='PreferencesPreviewText'
-    $content.AccessibleName=$Title
-    $content.Multiline=$true
-    $content.MaxLength=0
-    $content.ReadOnly=$true
-    $content.WordWrap=$true
-    $content.ScrollBars=[Windows.Forms.ScrollBars]::Vertical
-    $content.BackColor=$script:ColorSurface
-    $content.ForeColor=$script:ColorPrimary
-    $content.Font=[Drawing.Font]::new('Segoe UI',9.5)
-    $content.BorderStyle=[Windows.Forms.BorderStyle]::FixedSingle
-    $content.Text=$Text
-    $content.SelectionStart=0
-    $content.TabIndex=1
-    $cancel=New-Object Windows.Forms.Button
-    $cancel.Name='PreferencesCancel'
-    $cancel.Text=Get-LocalizedString -Key 'Common.Cancel'
-    $cancel.DialogResult=[Windows.Forms.DialogResult]::Cancel
-    $cancel.TabIndex=0
-    $confirm=New-Object Windows.Forms.Button
-    $confirm.Name='PreferencesConfirm'
-    $confirm.Text=$ConfirmText
-    $confirm.DialogResult=[Windows.Forms.DialogResult]::OK
-    $confirm.TabIndex=2
+    param([string]$Title,[string]$ConfirmText,$Plan,$ExportContext)
+    if (($null -ne $Plan) -eq ($null -ne $ExportContext)) {throw 'InvalidPreviewLayout'}
+    $form=[Windows.Forms.Form]::new()
+    $form.Name='LenovoPreferencesConfirmation';$form.Text=$Title;$form.AccessibleName=$Title
+    $form.FormBorderStyle='None';$form.AutoScaleMode='None';$form.ShowInTaskbar=$false;$form.TopMost=$true
+    $form.StartPosition='Manual';$form.KeyPreview=$true;$form.BackColor=$script:ColorBackground
+    $root=[Windows.Forms.Panel]::new();$root.Name='PreferencesRoot';$form.Controls.Add($root)
+    $fonts=@{Title=[Drawing.Font]::new('Segoe UI',11,[Drawing.FontStyle]::Bold);Heading=[Drawing.Font]::new('Segoe UI',10,[Drawing.FontStyle]::Bold);Body=[Drawing.Font]::new('Segoe UI',9.5);Caption=[Drawing.Font]::new('Segoe UI',9);Metric=[Drawing.Font]::new('Segoe UI',19,[Drawing.FontStyle]::Bold)}
+    $heading=[Windows.Forms.Label]::new();$heading.Text=$Title;$heading.Font=$fonts.Title;$heading.ForeColor=$script:ColorPrimary
+    $divider=[Windows.Forms.Panel]::new();$divider.BackColor=$script:ColorAccent
+    $cancel=[Windows.Forms.Button]::new();$cancel.Name='PreferencesCancel';$cancel.Text=Get-LocalizedString -Key 'Common.Cancel';$cancel.DialogResult='Cancel'
+    $confirm=[Windows.Forms.Button]::new();$confirm.Name='PreferencesConfirm';$confirm.Text=$ConfirmText;$confirm.DialogResult='OK'
     foreach ($button in @($cancel,$confirm)) {
-        $button.Font=[Drawing.Font]::new('Segoe UI',9.5)
-        $button.FlatStyle=[Windows.Forms.FlatStyle]::Flat
-        $button.UseVisualStyleBackColor=$false
-        $button.UseMnemonic=$false
-        $button.Cursor=[Windows.Forms.Cursors]::Hand
+        $button.AccessibleName=$button.Text;$button.Font=$fonts.Body;$button.FlatStyle='Flat'
+        $button.UseVisualStyleBackColor=$false;$button.UseMnemonic=$false;$button.Cursor=[Windows.Forms.Cursors]::Hand
         $button.ForeColor=$script:ColorPrimary
         $button.BackColor=if ($button -eq $confirm) {$script:ColorAccent} else {$script:ColorSurface}
-        $button.FlatAppearance.BorderColor=[Drawing.Color]::FromArgb(70,70,70)
+        $button.FlatAppearance.BorderColor=[Drawing.Color]::FromArgb(72,72,72)
+        $button.FlatAppearance.MouseOverBackColor=if ($button -eq $confirm) {[Drawing.Color]::FromArgb(242,59,49)} else {[Drawing.Color]::FromArgb(45,45,45)}
     }
-    $form.Controls.Add($heading)
-    $form.Controls.Add($content)
-    $form.Controls.Add($cancel)
-    $form.Controls.Add($confirm)
-    # Enter and Escape before a deliberate choice dismiss without writing.
-    $form.AcceptButton=$cancel
-    $form.CancelButton=$cancel
-    $form.Tag=[pscustomobject]@{Heading=$heading;Content=$content;Cancel=$cancel;Confirm=$confirm;Fonts=@($heading.Font,$content.Font,$cancel.Font,$confirm.Font)}
-    $form.Add_Shown({ if ($this.Tag.Cancel.CanFocus) { [void]$this.Tag.Cancel.Focus() } })
-    $form.Add_Disposed({ foreach ($font in $this.Tag.Fonts) { $font.Dispose() } })
-    return $form
+    $cancel.TabIndex=0;$confirm.TabIndex=1
+    $form.AcceptButton=$cancel;$form.CancelButton=$cancel
+    Initialize-LenovoRegularDialog -Form $form -Root $root -Title $heading -Divider $divider -Content @() -Buttons @($cancel,$confirm)
+    $icon=[Windows.Forms.Panel]::new();$icon.Name='PreferencesHeaderIcon';$icon.TabStop=$false
+    $icon.Tag=if ($Plan) {'preferences-import'} else {'preferences-export'}
+    $icon.BackColor=$root.Tag.Header.BackColor
+    $icon.Add_Paint({
+        param($sender,$eventArgs)
+        [LenovoSettingsInk]::DrawIcon($eventArgs.Graphics,[string]$sender.Tag,$sender.ClientRectangle,[Drawing.Color]::FromArgb(225,37,27))
+    })
+    $root.Tag.Header.Controls.Add($icon)
+    $root.Tag.Footer.TabIndex=0;$root.Tag.Viewport.TabIndex=1;$root.Tag.Header.TabStop=$false
+    $root.Tag.Body.TabIndex=0
+    $mode=if ($Plan) {'Import'} else {'Export'}
+    $view=if ($Plan) {New-PreferencesPreviewView $Plan} else {
+        $unavailable=@(@($ExportContext.Settings.entryOrder)+@($ExportContext.Settings.hiddenEntryGuids)+@($ExportContext.Settings.entryAliases.Keys) | Where-Object { $_ -and $_ -notin $ExportContext.Entries.Guid } | Sort-Object -Unique)
+        New-PreferencesPreviewView ([pscustomobject]@{Rows=@();UnavailableLocal=$unavailable})
+    }
+    $form.Tag=[pscustomobject]@{
+        Mode=$mode;View=$view;ExportCount=@($ExportContext.Entries).Count
+        Shell=$root.Tag;Root=$root;Cancel=$cancel;Confirm=$confirm;Fonts=$fonts;HeaderIcon=$icon;LayoutFailed=$false
+        Blocks=[Collections.Generic.List[object]]::new();Filter='All';Page=0;PageCount=1;Expanded='';DetailPage=0;VisibleRows=@()
+        Scale=0.0;WorkingArea=[Drawing.Rectangle]::Empty
+    }
+    $form.Add_Shown({if ($this.Tag.Cancel.CanFocus) {[void]$this.Tag.Cancel.Focus()}})
+    $form.Add_Disposed({foreach ($font in $this.Tag.Fonts.Values) {$font.Dispose()}})
+    if (-not $root.Tag.Scroll) {$form.Dispose();throw 'InvalidPreviewLayout'}
+    try {Update-PreferencesConfirmationBody $form;return $form}
+    catch {$form.Dispose();throw}
+}
+
+function Set-PreferencesBlockLayout {
+    param($Block,[int]$Width,$Graphics,[double]$Scale)
+    function Px([double]$n) {return [Math]::Max(1,[int][Math]::Round($n*$Scale))}
+    $pad=if ($Block.Tag.Card) {Px 10} else {0}
+    $gap=Px 5
+    $available=[Math]::Max(1,$Width-2*$pad-$(if ($Block.Tag.Card) {2} else {0}))
+    $y=$pad;$x=$pad;$lineHeight=0
+    if ($Block.Tag.Kind -eq 'Metrics') {
+        $columns=if ($available -ge (Px 620)) {4} elseif ($available -ge (Px 250)) {2} else {1}
+        $columns=[Math]::Max(1,[Math]::Min($columns,$Block.Tag.Items.Count))
+        $cell=[int][Math]::Floor(($available-($columns-1)*$gap)/$columns)
+        $index=0
+        foreach ($item in $Block.Tag.Items) {
+            $col=$index%$columns
+            if ($col -eq 0 -and $index -gt 0) {$y+=$lineHeight+$gap;$lineHeight=0}
+            $h=Set-PreferencesBlockLayout $item $cell $Graphics $Scale
+            $item.Bounds=[Drawing.Rectangle]::new(($pad+$col*($cell+$gap)),$y,$cell,$h)
+            $lineHeight=[Math]::Max($lineHeight,$h);$index++
+        }
+        $y+=$lineHeight
+    } elseif ($Block.Tag.Kind -eq 'Language') {
+        $caption=$Block.Tag.Items[0];$flag=$Block.Tag.Items[1];$name=$Block.Tag.Items[2]
+        $h=[Math]::Max((Px 16),[int][Math]::Ceiling($Graphics.MeasureString($caption.Text,$caption.Font,$available).Height)+(Px 4))
+        $caption.Bounds=[Drawing.Rectangle]::new($pad,$y,$available,$h)
+        $y+=$h+$gap
+        $fw=[Math]::Min((Px 28),[Math]::Max(1,$available-(Px 30)))
+        $fh=[Math]::Max(1,[int][Math]::Round($fw*0.75))
+        $nw=[Math]::Max(1,$available-$fw-$gap)
+        $nh=[Math]::Max($fh,[int][Math]::Ceiling($Graphics.MeasureString($name.Text,$name.Font,$nw).Height)+(Px 4))
+        $flag.Bounds=[Drawing.Rectangle]::new($pad,($y+[int](($nh-$fh)/2)),$fw,$fh)
+        $name.Bounds=[Drawing.Rectangle]::new(($pad+$fw+$gap),$y,$nw,$nh)
+        $y+=$nh
+    } elseif ($Block.Tag.Kind -eq 'Buttons') {
+        foreach ($item in $Block.Tag.Items) {
+            $desired=[int][Math]::Ceiling($Graphics.MeasureString($item.Text,$item.Font).Width)+(Px 22)
+            $w=[Math]::Min($available,[Math]::Max((Px 70),$desired))
+            $h=[Math]::Max((Px 30),[int][Math]::Ceiling($Graphics.MeasureString($item.Text,$item.Font,[Math]::Max(1,$w-(Px 10))).Height)+(Px 8))
+            if ($x -gt $pad -and $x+$w -gt $pad+$available) {$y+=$lineHeight+$gap;$x=$pad;$lineHeight=0}
+            $item.Bounds=[Drawing.Rectangle]::new($x,$y,$w,$h)
+            $x+=$w+$gap;$lineHeight=[Math]::Max($lineHeight,$h)
+        }
+        $y+=$lineHeight
+    } else {
+        foreach ($item in $Block.Tag.Items) {
+            $w=$available
+            if ($item -is [Windows.Forms.Panel]) {
+                $h=Set-PreferencesBlockLayout $item $w $Graphics $Scale
+            } elseif ($item -is [Windows.Forms.Button]) {
+                $w=[Math]::Min($available,[Math]::Max((Px 100),[int][Math]::Ceiling($Graphics.MeasureString($item.Text,$item.Font).Width)+(Px 22)))
+                $h=[Math]::Max((Px 30),[int][Math]::Ceiling($Graphics.MeasureString($item.Text,$item.Font,[Math]::Max(1,$w-(Px 10))).Height)+(Px 8))
+            } else {
+                $h=[Math]::Max((Px 16),[int][Math]::Ceiling($Graphics.MeasureString($item.Text,$item.Font,[Math]::Max(1,$w)).Height)+(Px 4))
+            }
+            $item.Bounds=[Drawing.Rectangle]::new($pad,$y,$w,$h)
+            $y+=$h+$gap
+        }
+        $y-=$gap
+    }
+    return [int][Math]::Max(1,$y+$pad+$(if ($Block.Tag.Card) {2} else {0}))
 }
 
 function Set-PreferencesConfirmationLayout {
     param([Windows.Forms.Form]$Form,[double]$Scale,[Drawing.Rectangle]$WorkingArea)
-    if ($Scale -lt 1.0 -or $Scale -gt 5.0) { throw 'InvalidPreviewLayout' }
-    function Px([double]$value) { return [Math]::Max(1,[int][Math]::Round($value*$Scale)) }
+    if ($Scale -lt 1.0 -or $Scale -gt 5.0) {throw 'InvalidPreviewLayout'}
+    function Px([double]$n) {return [Math]::Max(1,[int][Math]::Round($n*$Scale))}
+    $s=$Form.Tag;$shell=$s.Shell
+    $s.Scale=$Scale;$s.WorkingArea=$WorkingArea
     $track=[Windows.Forms.SystemInformation]::MaxWindowTrackSize
-    $width=[Math]::Min((Px 560),[Math]::Min($WorkingArea.Width,$track.Width))
-    $height=[Math]::Min((Px 470),[Math]::Min($WorkingArea.Height,$track.Height))
-    $Form.ClientSize=[Drawing.Size]::new($width,$height)
-    $width=$Form.ClientSize.Width
-    $height=$Form.ClientSize.Height
-    $pad=Px 12
-    $buttonHeight=Px 36
-    $headingHeight=Px 46
-    $gap=Px 8
+    $width=[Math]::Min((Px $(if ($s.Mode -eq 'Export') {500} else {780})),[Math]::Min($WorkingArea.Width,$track.Width))
+    $maxHeight=[Math]::Min($WorkingArea.Height,$track.Height)
+    if ($s.Mode -eq 'Import') {$maxHeight=[Math]::Min($maxHeight,(Px 650))}
+    $pad=Px 18;$gap=Px 10
     $bitmap=[Drawing.Bitmap]::new(8,8)
     try {
         $bitmap.SetResolution([single](96*$Scale),[single](96*$Scale))
-        $graphics=[Drawing.Graphics]::FromImage($bitmap)
+        $g=[Drawing.Graphics]::FromImage($bitmap)
         try {
-            $titleHeight=[int][Math]::Ceiling($graphics.MeasureString($Form.Tag.Heading.Text,$Form.Tag.Heading.Font,[Math]::Max(1,$width-2*$pad)).Height)+(Px 10)
-            $headingHeight=[Math]::Max($headingHeight,$titleHeight)
-            $cancelWidth=[Math]::Max((Px 100),[int][Math]::Ceiling($graphics.MeasureString($Form.Tag.Cancel.Text,$Form.Tag.Cancel.Font).Width)+(Px 20))
-            $confirmWidth=[Math]::Max((Px 120),[int][Math]::Ceiling($graphics.MeasureString($Form.Tag.Confirm.Text,$Form.Tag.Confirm.Font).Width)+(Px 20))
-        } finally { $graphics.Dispose() }
-    } finally { $bitmap.Dispose() }
-    $stacked=($cancelWidth+$confirmWidth+$gap -gt $width-2*$pad)
-    $footer=if ($stacked) { 2*$buttonHeight+$gap+2*$pad } else { $buttonHeight+2*$pad }
-    if ($width-2*$pad -lt [Math]::Max($cancelWidth,$confirmWidth) -or $height-$headingHeight-$footer-2*$pad -lt (Px 50)) { throw 'InvalidPreviewLayout' }
-    $Form.Tag.Heading.Bounds=[Drawing.Rectangle]::new($pad,0,($width-2*$pad),$headingHeight)
-    $Form.Tag.Content.Bounds=[Drawing.Rectangle]::new($pad,($headingHeight+$pad),($width-2*$pad),($height-$headingHeight-$footer-2*$pad))
-    if ($stacked) {
-        $Form.Tag.Cancel.Bounds=[Drawing.Rectangle]::new($pad,($height-$footer+$pad),($width-2*$pad),$buttonHeight)
-        $Form.Tag.Confirm.Bounds=[Drawing.Rectangle]::new($pad,($height-$pad-$buttonHeight),($width-2*$pad),$buttonHeight)
-    } else {
-        $Form.Tag.Cancel.Bounds=[Drawing.Rectangle]::new(($width-$pad-$confirmWidth-$gap-$cancelWidth),($height-$pad-$buttonHeight),$cancelWidth,$buttonHeight)
-        $Form.Tag.Confirm.Bounds=[Drawing.Rectangle]::new(($width-$pad-$confirmWidth),($height-$pad-$buttonHeight),$confirmWidth,$buttonHeight)
-    }
+            $titleWidth=$width-2*$pad
+            if ($titleWidth -lt (Px 80)) {throw 'InvalidPreviewLayout'}
+            $shell.Title.UseCompatibleTextRendering=$true;$shell.Title.AutoSize=$false;$shell.Title.AutoEllipsis=$false
+            $iconSize=Px 23
+            $headingWidth=$titleWidth-$iconSize-$gap
+            if ($headingWidth -lt (Px 40)) {throw 'InvalidPreviewLayout'}
+            $headerHeight=[Math]::Max((Px 49),[int][Math]::Ceiling($g.MeasureString($shell.Title.Text,$shell.Title.Font,$headingWidth).Height)+(Px 20))
+            $buttonWidths=@();$buttonHeight=Px 36
+            foreach ($button in @($s.Cancel,$s.Confirm)) {
+                $bw=[Math]::Min($titleWidth,[Math]::Max((Px 108),[int][Math]::Ceiling($g.MeasureString($button.Text,$button.Font).Width)+(Px 24)))
+                $buttonWidths+=$bw
+                $buttonHeight=[Math]::Max($buttonHeight,[int][Math]::Ceiling($g.MeasureString($button.Text,$button.Font,[Math]::Max(1,$bw-(Px 12))).Height)+(Px 10))
+            }
+            $total=$buttonWidths[0]+$buttonWidths[1]+$gap
+            $stacked=$total -gt $titleWidth
+            $footerHeight=if ($stacked) {2*$buttonHeight+3*$gap} else {$buttonHeight+2*$gap}
+            $available=$maxHeight-$headerHeight-$footerHeight
+            if ($available -lt (Px 50)) {throw 'InvalidPreviewLayout'}
+            $gutter=0;$height=0
+            for ($pass=0;$pass -lt 2;$pass++) {
+                $bodyWidth=$width-$gutter
+                $blockWidth=$bodyWidth-2*$pad
+                if ($blockWidth -lt (Px 70)) {throw 'InvalidPreviewLayout'}
+                $y=$pad
+                foreach ($block in $s.Blocks) {
+                    $h=Set-PreferencesBlockLayout $block $blockWidth $g $Scale
+                    $block.Bounds=[Drawing.Rectangle]::new($pad,$y,$blockWidth,$h)
+                    $y+=$h+$gap
+                }
+                $height=$y-$gap+$pad
+                if ($height -le $available -or $pass -eq 1) {break}
+                $gutter=Px 12
+            }
+            $viewportHeight=if ($s.Mode -eq 'Import') {$available} else {[Math]::Min($available,$height)}
+            $Form.ClientSize=[Drawing.Size]::new($width,($headerHeight+$viewportHeight+$footerHeight))
+            $shell.Header.Bounds=[Drawing.Rectangle]::new(0,0,$width,$headerHeight)
+            $s.HeaderIcon.Bounds=[Drawing.Rectangle]::new($pad,[int](($headerHeight-$iconSize)/2),$iconSize,$iconSize)
+            $shell.Title.Bounds=[Drawing.Rectangle]::new(($pad+$iconSize+$gap),(Px 8),$headingWidth,($headerHeight-(Px 18)))
+            $shell.Divider.Bounds=[Drawing.Rectangle]::new(0,($headerHeight-(Px 2)),$width,(Px 2))
+            $shell.Viewport.Bounds=[Drawing.Rectangle]::new(0,$headerHeight,$width,$viewportHeight)
+            $shell.Body.Bounds=[Drawing.Rectangle]::new(0,0,$bodyWidth,$height)
+            $shell.Footer.Bounds=[Drawing.Rectangle]::new(0,($headerHeight+$viewportHeight),$width,$footerHeight)
+            $scroll=$shell.Scroll
+            $scroll.Bounds=[Drawing.Rectangle]::new(($width-(Px 10)),0,(Px 10),$viewportHeight)
+            $scroll.Value=0;$scroll.Maximum=[Math]::Max(0,$height-$viewportHeight)
+            $scroll.LargeChange=$viewportHeight;$scroll.SmallChange=Px 60
+            $scroll.Visible=$scroll.Maximum -gt 0;$scroll.BringToFront()
+            $x=if ($stacked) {$pad} else {$width-$pad-$total}
+            $y=$gap
+            for ($i=0;$i -lt 2;$i++) {
+                $button=@($s.Cancel,$s.Confirm)[$i]
+                $bw=if ($stacked) {$titleWidth} else {$buttonWidths[$i]}
+                $button.Bounds=[Drawing.Rectangle]::new($x,$y,$bw,$buttonHeight)
+                if ($stacked) {$y+=$buttonHeight+$gap} else {$x+=$bw+$gap}
+            }
+        } finally {$g.Dispose()}
+    } finally {$bitmap.Dispose()}
     $Form.Location=Get-LenovoVisibleDialogLocation -WorkingArea $WorkingArea -WindowSize $Form.Size
 }
 
 function Show-PreferencesConfirmation {
-    param([string]$Title,[string]$Text,[string]$ConfirmText)
-    $form=New-PreferencesConfirmationForm $Title $Text $ConfirmText
+    param([string]$Title,[string]$ConfirmText,$Plan,$ExportContext)
+    $form=New-PreferencesConfirmationForm -Title $Title -ConfirmText $ConfirmText -Plan $Plan -ExportContext $ExportContext
     try {
         $owner=Get-LenovoDialogOwner
         $screen=if ($owner) {[Windows.Forms.Screen]::FromControl($owner)} else {[Windows.Forms.Screen]::PrimaryScreen}
         $scale=Get-LenovoUiCoordinateScale -Screen $screen
         Set-PreferencesConfirmationLayout -Form $form -Scale ([double]$scale.Factor) -WorkingArea $screen.WorkingArea
         Register-LenovoDialogVisibilityCorrection -Form $form -Screen $screen
-        return ((Show-LenovoOwnedDialog -Form $form -Owner $owner) -eq [Windows.Forms.DialogResult]::OK)
-    } finally { $form.Dispose() }
+        $result=Show-LenovoOwnedDialog -Form $form -Owner $owner
+        if ($form.Tag.LayoutFailed) {throw 'InvalidPreviewLayout'}
+        return ($result -eq [Windows.Forms.DialogResult]::OK)
+    } finally {$form.Dispose()}
 }
 
 function New-PreferencesFileDialog {
@@ -8415,12 +8927,7 @@ function Show-PortablePreferencesFromUi {
     try {
         if ($Mode -eq 'Export') {
             $context=Get-PortablePreferencesContext
-            $unavailable=@(@($context.Settings.entryOrder)+@($context.Settings.hiddenEntryGuids)+@($context.Settings.entryAliases.Keys) | Where-Object { $_ -and $_ -notin $context.Entries.Guid } | Sort-Object -Unique)
-            $summary=(Get-LocalizedString -Key 'Preferences.Scope')+[Environment]::NewLine+[Environment]::NewLine+(Get-LocalizedString -Key 'Preferences.ExportSummary' -Values @{Count=$context.Entries.Count})
-            if ($unavailable.Count -gt 0) {
-                $summary += [Environment]::NewLine+[Environment]::NewLine+(Get-LocalizedString -Key 'Preferences.Unavailable')+[Environment]::NewLine+($unavailable -join [Environment]::NewLine)
-            }
-            if (-not (Show-PreferencesConfirmation -Title (Get-LocalizedString -Key 'Preferences.Export') -Text $summary -ConfirmText (Get-LocalizedString -Key 'Preferences.ExportConfirm'))) { return }
+            if (-not (Show-PreferencesConfirmation -Title (Get-LocalizedString -Key 'Preferences.Export') -ExportContext $context -ConfirmText (Get-LocalizedString -Key 'Preferences.ExportConfirm'))) { return }
             $path=Select-PreferencesFile -Mode Export
             if (-not $path) { return }
             $stage='write'
@@ -8431,7 +8938,7 @@ function Show-PortablePreferencesFromUi {
             $path=Select-PreferencesFile -Mode Import
             if (-not $path) { return }
             $import=New-PortablePreferencesImport -Path $path
-            if (-not (Show-PreferencesConfirmation -Title (Get-LocalizedString -Key 'Preferences.PreviewTitle') -Text (Get-PreferencesPreviewText $import.Plan) -ConfirmText (Get-LocalizedString -Key 'Preferences.Apply'))) { return }
+            if (-not (Show-PreferencesConfirmation -Title (Get-LocalizedString -Key 'Preferences.PreviewTitle') -Plan $import.Plan -ConfirmText (Get-LocalizedString -Key 'Preferences.Apply'))) { return }
             $stage='write'
             $before=$script:UiLocale
             [void](Complete-PortablePreferencesImport $import)
@@ -15516,17 +16023,22 @@ function Position-Popup {
     $script:Popup.Location = $location
 }
 
+# A deliberate tray click must never hide the owner of a modal surface.
+# Prefer the deepest application-owned dialog; ownership is set before Shown.
+function Test-ActivateTrayModalSurface {
+    foreach ($modal in @($script:ActiveOwnedDialog,$script:ActiveAuxiliaryPopup)) {
+        if ($modal -and -not $modal.IsDisposed) {
+            [LenovoSettingsWindowInput]::ActivateInitialSurface($modal)
+            return $true
+        }
+    }
+    return $false
+}
+
 function Show-OrTogglePopup {
     param([switch]$FromTrayClick)
     if ($script:PreferencesUiActive) { return }
-    if ($script:ActiveOwnedDialog -and -not $script:ActiveOwnedDialog.IsDisposed) {
-        [void]$script:ActiveOwnedDialog.Activate()
-        return
-    }
-    if ($script:ActiveAuxiliaryPopup -and -not $script:ActiveAuxiliaryPopup.IsDisposed) {
-        [void]$script:ActiveAuxiliaryPopup.Activate()
-        return
-    }
+    if (Test-ActivateTrayModalSurface) { return }
     if (-not $script:Popup -or $script:Popup.IsDisposed) {
         $initialScreen = [System.Windows.Forms.Screen]::PrimaryScreen
         $initialScale = Get-LenovoUiCoordinateScale -Screen $initialScreen
@@ -15584,14 +16096,7 @@ function Show-OrTogglePopup {
 # an already visible popup). This runs on the existing WinForms UI thread.
 function Show-OrActivatePopup {
     if ($script:PreferencesUiActive) { return }
-    if ($script:ActiveOwnedDialog -and -not $script:ActiveOwnedDialog.IsDisposed) {
-        [void]$script:ActiveOwnedDialog.Activate()
-        return
-    }
-    if ($script:ActiveAuxiliaryPopup -and -not $script:ActiveAuxiliaryPopup.IsDisposed) {
-        [void]$script:ActiveAuxiliaryPopup.Activate()
-        return
-    }
+    if (Test-ActivateTrayModalSurface) { return }
     if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) {
         [void]$script:Popup.Activate()
         return
@@ -16228,11 +16733,13 @@ try {
     $script:PreferencesMenuRoot = $preferencesRoot
     $exportItem = New-Object Windows.Forms.ToolStripMenuItem
     $exportItem.Text = Get-LocalizedString -Key 'Preferences.Export'
+    $exportItem.Padding = New-LenovoSubmenuActionPadding
     $exportItem.Add_Click({ Show-PortablePreferencesFromUi -Mode Export })
     $script:PreferencesExportMenuItem = $exportItem
     [void]$preferencesRoot.DropDownItems.Add($exportItem)
     $importItem = New-Object Windows.Forms.ToolStripMenuItem
     $importItem.Text = Get-LocalizedString -Key 'Preferences.Import'
+    $importItem.Padding = New-LenovoSubmenuActionPadding
     $importItem.Add_Click({ Show-PortablePreferencesFromUi -Mode Import })
     $script:PreferencesImportMenuItem = $importItem
     [void]$preferencesRoot.DropDownItems.Add($importItem)
@@ -16251,14 +16758,14 @@ try {
 
     $setupItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $setupItem.Text = Get-LocalizedString -Key 'Maintenance.Setup'
-    $setupItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $setupItem.Padding = New-LenovoSubmenuActionPadding
     $setupItem.Add_Click({ Prompt-TaskBrokerInstall })
     $script:TaskBrokerSetupMenuItem = $setupItem
     [void]$maintenanceRoot.DropDownItems.Add($setupItem)
 
     $removeTasksItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $removeTasksItem.Text = Get-LocalizedString -Key 'Maintenance.Remove'
-    $removeTasksItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $removeTasksItem.Padding = New-LenovoSubmenuActionPadding
     $removeTasksItem.Add_Click({ Prompt-TaskBrokerRemove })
     $script:TaskBrokerRemoveMenuItem = $removeTasksItem
     [void]$maintenanceRoot.DropDownItems.Add($removeTasksItem)
@@ -16266,14 +16773,14 @@ try {
     [void]$maintenanceRoot.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
     $updateCheckItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $updateCheckItem.Text = Get-LocalizedString -Key 'Update.Check'
-    $updateCheckItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $updateCheckItem.Padding = New-LenovoSubmenuActionPadding
     $updateCheckItem.Add_Click({ Start-ManualUpdateCheck })
     $script:UpdateCheckMenuItem = $updateCheckItem
     [void]$maintenanceRoot.DropDownItems.Add($updateCheckItem)
 
     $updateInstallItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $updateInstallItem.Text = Get-LocalizedString -Key 'Update.Install'
-    $updateInstallItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $updateInstallItem.Padding = New-LenovoSubmenuActionPadding
     $updateInstallItem.Enabled = $false
     $updateInstallItem.Add_Click({ Start-ManualAppUpdate })
     $script:UpdateInstallMenuItem = $updateInstallItem
@@ -16283,14 +16790,14 @@ try {
     [void]$maintenanceRoot.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
     $diagnosticItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $diagnosticItem.Text = Get-LocalizedString -Key 'Diagnostics.Save'
-    $diagnosticItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $diagnosticItem.Padding = New-LenovoSubmenuActionPadding
     $diagnosticItem.Add_Click({ Save-RuntimeDiagnosticsFromUi })
     $script:RuntimeDiagnosticMenuItem = $diagnosticItem
     [void]$maintenanceRoot.DropDownItems.Add($diagnosticItem)
 
     $diagnosticUploadItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $diagnosticUploadItem.Text = Get-LocalizedString -Key 'Diagnostics.Upload'
-    $diagnosticUploadItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $diagnosticUploadItem.Padding = New-LenovoSubmenuActionPadding
     $diagnosticUploadItem.Add_Click({ Start-DiagnosticsUploadFromUi })
     $script:DiagnosticsUploadMenuItem = $diagnosticUploadItem
     [void]$maintenanceRoot.DropDownItems.Add($diagnosticUploadItem)
@@ -16338,7 +16845,15 @@ try {
     $script:TrayPopupClickPoint = [Drawing.Point]::Empty
     $script:TrayIcon.Add_MouseClick({
         param($sender, $eventArgs)
-        if ($script:PreferencesUiActive) { return }
+        if ($script:PreferencesUiActive) {
+            # The native chooser owns focus while no app-owned confirmation is
+            # active. Never activate the disabled window beneath it.
+            if ($eventArgs.Button -eq [Windows.Forms.MouseButtons]::Right -and
+                $script:ActiveOwnedDialog -and -not $script:ActiveOwnedDialog.IsDisposed) {
+                [LenovoSettingsWindowInput]::ActivateInitialSurface($script:ActiveOwnedDialog)
+            }
+            return
+        }
         if ($eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Left -or
             $eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Right) {
             # Capture only genuine tray-icon clicks; never borrow arbitrary cursor state.
@@ -16349,6 +16864,7 @@ try {
             Show-OrTogglePopup -FromTrayClick
         }
         elseif ($eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Right) {
+            if (Test-ActivateTrayModalSurface) { return }
             if ($script:Popup -and $script:Popup.Visible) { $script:Popup.Hide() }
             $point = $script:TrayPopupClickPoint
             $screen = [System.Windows.Forms.Screen]::FromPoint($point)

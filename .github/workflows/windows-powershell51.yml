@@ -179,6 +179,7 @@ jobs:
               portablePreferencesCore = Get-TestTotal $logText '^LBS180 CORE TOTAL\s+(\d+)/(\d+)\s*$'
               portablePreferencesTransaction = Get-TestTotal $logText '^LBS180 TRANSACTION TOTAL\s+(\d+)/(\d+)\s*$'
               portablePreferencesUi = Get-TestTotal $logText '^LBS180 UI TOTAL\s+(\d+)/(\d+)\s*$'
+              portablePreferencesTray = Get-TestTotal $logText '^LBS180 TRAY TOTAL\s+(\d+)/(\d+)\s*$'
               customizeButton = Get-TestTotal $logText '^LBS252 CUSTOMIZE TOTAL\s+(\d+)/(\d+)\s*$'
               typography = Get-TestTotal $logText '^LBS186 TYPOGRAPHY TOTAL\s+(\d+)/(\d+)\s*$'
               manageGrip = Get-TestTotal $logText '^LBS166 GRIP TOTAL\s+(\d+)/(\d+)\s*$'
@@ -220,6 +221,7 @@ jobs:
               'portablePreferencesCore',
               'portablePreferencesTransaction',
               'portablePreferencesUi',
+              'portablePreferencesTray',
               'customizeButton',
               'typography',
               'manageGrip',
@@ -267,6 +269,7 @@ jobs:
               $totals.portablePreferencesCore.passed +
               $totals.portablePreferencesTransaction.passed +
               $totals.portablePreferencesUi.passed +
+              $totals.portablePreferencesTray.passed +
               $totals.customizeButton.passed +
               $totals.typography.passed +
               $totals.manageGrip.passed +
@@ -305,6 +308,7 @@ jobs:
               $totals.portablePreferencesCore.expected +
               $totals.portablePreferencesTransaction.expected +
               $totals.portablePreferencesUi.expected +
+              $totals.portablePreferencesTray.expected +
               $totals.customizeButton.expected +
               $totals.typography.expected +
               $totals.manageGrip.expected +
