@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.6.1.0 – Preference dialog overhaul and modal tray lifecycle (LBS-180 F01–F04)
+
+- Redesign preference export and import preview using shared Lenovo dialog chrome, dark scrollbar, structured scope/counts, comparison cards, read-only filters and full detail pages.
+- Match the established maintenance submenu action inset at every supported coordinate scale.
+- Activate the existing modal surface on tray right-click; preserve its owner, focus and the native file chooser guard. Retain main-only tray behavior.
+- Preserve all accepted preference format, reconciliation, file transaction and privileged boundary behavior; qualify native regression fixtures.
+
 ## v1.6.0.0 – Portable user preferences (LBS-180)
 
 - Export language and currently available boot-entry presentation preferences to a separate, versioned local JSON format.

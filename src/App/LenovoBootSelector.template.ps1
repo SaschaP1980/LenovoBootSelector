@@ -2634,11 +2634,13 @@ try {
     $script:PreferencesMenuRoot = $preferencesRoot
     $exportItem = New-Object Windows.Forms.ToolStripMenuItem
     $exportItem.Text = Get-LocalizedString -Key 'Preferences.Export'
+    $exportItem.Padding = New-LenovoSubmenuActionPadding
     $exportItem.Add_Click({ Show-PortablePreferencesFromUi -Mode Export })
     $script:PreferencesExportMenuItem = $exportItem
     [void]$preferencesRoot.DropDownItems.Add($exportItem)
     $importItem = New-Object Windows.Forms.ToolStripMenuItem
     $importItem.Text = Get-LocalizedString -Key 'Preferences.Import'
+    $importItem.Padding = New-LenovoSubmenuActionPadding
     $importItem.Add_Click({ Show-PortablePreferencesFromUi -Mode Import })
     $script:PreferencesImportMenuItem = $importItem
     [void]$preferencesRoot.DropDownItems.Add($importItem)
@@ -2657,14 +2659,14 @@ try {
 
     $setupItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $setupItem.Text = Get-LocalizedString -Key 'Maintenance.Setup'
-    $setupItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $setupItem.Padding = New-LenovoSubmenuActionPadding
     $setupItem.Add_Click({ Prompt-TaskBrokerInstall })
     $script:TaskBrokerSetupMenuItem = $setupItem
     [void]$maintenanceRoot.DropDownItems.Add($setupItem)
 
     $removeTasksItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $removeTasksItem.Text = Get-LocalizedString -Key 'Maintenance.Remove'
-    $removeTasksItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $removeTasksItem.Padding = New-LenovoSubmenuActionPadding
     $removeTasksItem.Add_Click({ Prompt-TaskBrokerRemove })
     $script:TaskBrokerRemoveMenuItem = $removeTasksItem
     [void]$maintenanceRoot.DropDownItems.Add($removeTasksItem)
@@ -2672,14 +2674,14 @@ try {
     [void]$maintenanceRoot.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
     $updateCheckItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $updateCheckItem.Text = Get-LocalizedString -Key 'Update.Check'
-    $updateCheckItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $updateCheckItem.Padding = New-LenovoSubmenuActionPadding
     $updateCheckItem.Add_Click({ Start-ManualUpdateCheck })
     $script:UpdateCheckMenuItem = $updateCheckItem
     [void]$maintenanceRoot.DropDownItems.Add($updateCheckItem)
 
     $updateInstallItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $updateInstallItem.Text = Get-LocalizedString -Key 'Update.Install'
-    $updateInstallItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $updateInstallItem.Padding = New-LenovoSubmenuActionPadding
     $updateInstallItem.Enabled = $false
     $updateInstallItem.Add_Click({ Start-ManualAppUpdate })
     $script:UpdateInstallMenuItem = $updateInstallItem
@@ -2689,14 +2691,14 @@ try {
     [void]$maintenanceRoot.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
     $diagnosticItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $diagnosticItem.Text = Get-LocalizedString -Key 'Diagnostics.Save'
-    $diagnosticItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $diagnosticItem.Padding = New-LenovoSubmenuActionPadding
     $diagnosticItem.Add_Click({ Save-RuntimeDiagnosticsFromUi })
     $script:RuntimeDiagnosticMenuItem = $diagnosticItem
     [void]$maintenanceRoot.DropDownItems.Add($diagnosticItem)
 
     $diagnosticUploadItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $diagnosticUploadItem.Text = Get-LocalizedString -Key 'Diagnostics.Upload'
-    $diagnosticUploadItem.Padding = New-Object System.Windows.Forms.Padding(18, 4, 14, 4)
+    $diagnosticUploadItem.Padding = New-LenovoSubmenuActionPadding
     $diagnosticUploadItem.Add_Click({ Start-DiagnosticsUploadFromUi })
     $script:DiagnosticsUploadMenuItem = $diagnosticUploadItem
     [void]$maintenanceRoot.DropDownItems.Add($diagnosticUploadItem)
@@ -2744,7 +2746,15 @@ try {
     $script:TrayPopupClickPoint = [Drawing.Point]::Empty
     $script:TrayIcon.Add_MouseClick({
         param($sender, $eventArgs)
-        if ($script:PreferencesUiActive) { return }
+        if ($script:PreferencesUiActive) {
+            # The native chooser owns focus while no app-owned confirmation is
+            # active. Never activate the disabled window beneath it.
+            if ($eventArgs.Button -eq [Windows.Forms.MouseButtons]::Right -and
+                $script:ActiveOwnedDialog -and -not $script:ActiveOwnedDialog.IsDisposed) {
+                [LenovoSettingsWindowInput]::ActivateInitialSurface($script:ActiveOwnedDialog)
+            }
+            return
+        }
         if ($eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Left -or
             $eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Right) {
             # Capture only genuine tray-icon clicks; never borrow arbitrary cursor state.
@@ -2755,6 +2765,7 @@ try {
             Show-OrTogglePopup -FromTrayClick
         }
         elseif ($eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Right) {
+            if (Test-ActivateTrayModalSurface) { return }
             if ($script:Popup -and $script:Popup.Visible) { $script:Popup.Hide() }
             $point = $script:TrayPopupClickPoint
             $screen = [System.Windows.Forms.Screen]::FromPoint($point)

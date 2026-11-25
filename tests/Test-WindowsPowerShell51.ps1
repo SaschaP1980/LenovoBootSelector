@@ -133,7 +133,7 @@ $keyboardProbe = Join-Path $root 'tests\Test-LBS197-NormalKeyboard.ps1'
 if ($LASTEXITCODE -ne 0) { throw 'LBS-197 native normal popup keyboard regression failed' }
 
 # LBS-180: isolate real file transactions and modal/file chooser lifecycles.
-foreach ($preferencesProbe in @('Test-LBS180-PortablePreferences.ps1','Test-LBS180-PreferencesTransaction.ps1','Test-LBS180-PreferencesUi.ps1')) {
+foreach ($preferencesProbe in @('Test-LBS180-PortablePreferences.ps1','Test-LBS180-PreferencesTransaction.ps1','Test-LBS180-PreferencesUi.ps1','Test-LBS180-TrayLifecycle.ps1')) {
     & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File (Join-Path $root ('tests\'+$preferencesProbe))
     if ($LASTEXITCODE -ne 0) { throw "LBS-180 native preference suite failed: $preferencesProbe" }
 }
