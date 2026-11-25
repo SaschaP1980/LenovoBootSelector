@@ -22,7 +22,7 @@ $prefix = 'Add-Type -TypeDefinition @"'
 $begin = $template.IndexOf($prefix,[StringComparison]::Ordinal)+$prefix.Length
 $end = $template.IndexOf('"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing',$begin,[StringComparison]::Ordinal)
 if ($begin -lt $prefix.Length -or $end -le $begin) { throw 'Canonical C# controls missing' }
-Add-Type -TypeDefinition ($template.Substring($begin,$end-$begin)) -ReferencedAssemblies System.Windows.Forms,System.Drawing
+Add-Type -TypeDefinition ($template.Substring($begin,$end-$begin)) -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility
 . (Join-Path $root 'src\Core\Localization.ps1')
 . (Join-Path $root 'src\UI\BootEntryList.ps1')
 . (Join-Path $root 'src\UI\BootEntryRows.ps1')
@@ -55,6 +55,7 @@ $script:Drift=$false
 $script:Ready=$true
 $script:ActiveAuxiliaryPopup=$null
 $script:Checks=0
+$script:Lbs247Checks=0
 $script:Actions=@()
 $script:DefaultCalls=@()
 $script:BootCalls=0
@@ -64,6 +65,11 @@ function Assert-Lbs229([string]$Name,[bool]$Condition) {
     if (-not $Condition) { throw "LBS229 FAIL: $Name" }
     $script:Checks++
     Write-Host "PASS LBS229 $Name"
+}
+function Assert-Lbs247([string]$Name,[bool]$Condition) {
+    if (-not $Condition) { throw "LBS247 FAIL: $Name" }
+    $script:Lbs247Checks++
+    Write-Host "PASS LBS247 $Name"
 }
 function Get-LocalizedString { param([string]$Key,$Values) Get-LocalizedStringCore -Key $Key -Locale $script:Locale -Values $Values }
 function Get-OrderedEntriesForUi { return @($script:CurrentEntries) }
@@ -441,9 +447,9 @@ try {
                 Set-AuxiliaryPopupLayout $config $scale $area $anchor
                 $body=$config.Tag.Body
                 $button=@($body.Controls | Where-Object { $_ -is [Windows.Forms.Button] })
-                Assert-Lbs229 "$case flat configuration has all eight direct actions" ($button.Count -eq 8 -and $body.Controls['ConfigurationAutostart'] -and $config.CancelButton -eq $config.Tag.Close)
-                Assert-Lbs229 "$case bounds and typography scale once" ($config.Width -eq [int](390*$scale) -and $button[0].Height -eq [int](34*$scale) -and $button[0].Font.Size -eq 9.0)
-                Assert-Lbs229 "$case language selection and disabled install truthful" ($body.Controls["ConfigurationAction-language-$(if ($locale -eq 'de-DE') {'de'} else {'en'})"].Text.StartsWith('✓ ') -and -not $body.Controls['ConfigurationAction-update-install'].Enabled)
+                Assert-Lbs229 "$case grouped configuration has all eight direct actions" ($button.Count -eq 8 -and $body.Controls['ConfigurationAutostart'] -and $config.CancelButton -eq $config.Tag.Close)
+                Assert-Lbs229 "$case bounds and typography scale once" ($config.Width -eq [int](390*$scale) -and $body.Controls['ConfigurationAction-language-de'].Height -eq [int](38*$scale) -and $body.Controls['ConfigurationAction-system-setup'].Height -eq [int](52*$scale) -and $button[0].Font.Size -eq 9.0)
+                Assert-Lbs229 "$case language selection and disabled install truthful" ($body.Controls["ConfigurationAction-language-$(if ($locale -eq 'de-DE') {'de'} else {'en'})"].LanguageSelected -and -not $body.Controls['ConfigurationAction-update-install'].Enabled)
                 $script:UpdateInstallMenuItem.Enabled=$true
                 Update-ConfigurationPopupPresentation $config
                 Assert-Lbs229 "$case existing availability changes mirrored" ($body.Controls['ConfigurationAction-update-install'].Enabled)
@@ -459,11 +465,59 @@ try {
                 try {
                     $fit=$true
                     foreach ($b in $button) {
-                        $size=$g.MeasureString($b.Text,$b.Font)
-                        if ($size.Width -gt $b.Width - 8*$scale -or $b.Font.GetHeight([single](96*$scale)) -gt $b.Height) { $fit=$false }
+                        $bounds=[LenovoSettingsInk]::TextBounds($b.ClientRectangle,[single](96*$scale),[bool]$b.LocaleCode)
+                        $font=if ($b.LocaleCode) { $b.Font } else { $b.TitleFont }
+                        $size=$g.MeasureString($b.Text,$font)
+                        if ($size.Width -gt $bounds.Width -or $font.GetHeight([single](96*$scale)) -gt $b.Height) { $fit=$false }
+                        if ($b.Subtitle -and $g.MeasureString($b.Subtitle,$b.SubtitleFont).Width -gt $bounds.Width) { $fit=$false }
                     }
                     Assert-Lbs229 "$case localized action labels fit synthetic design bounds" $fit
                 } finally { $g.Dispose(); $bitmap.Dispose() }
+                $de=$body.Controls['ConfigurationAction-language-de']
+                $en=$body.Controls['ConfigurationAction-language-en']
+                $toggle=$body.Controls['ConfigurationAutostart']
+                $label=$body.Controls['ConfigurationLocale-Settings.Autostart']
+                Assert-Lbs247 "$case native names and contiguous equal segments" ($de.Text -ceq 'Deutsch' -and $en.Text -ceq 'English' -and $de.LocaleCode -eq 'de-DE' -and $en.LocaleCode -eq 'en-US' -and [Math]::Abs($de.Width-$en.Width) -le 1 -and $de.Right -eq $en.Left -and $de.Top -eq $en.Top)
+                $selected=if ($script:Locale -eq 'de-DE') { $de } else { $en }
+                $other=if ($selected -eq $de) { $en } else { $de }
+                Assert-Lbs247 "$case programmatic selected state, no checkmark" ($selected.LanguageSelected -and -not $other.LanguageSelected -and ($selected.AccessibilityObject.State -band [Windows.Forms.AccessibleStates]::Selected) -and -not ($other.AccessibilityObject.State -band [Windows.Forms.AccessibleStates]::Selected) -and $selected.FlatAppearance.BorderColor -eq $script:ColorAccent)
+                $setup=$body.Controls['ConfigurationAction-system-setup']
+                $remove=$body.Controls['ConfigurationAction-system-remove']
+                Assert-Lbs247 "$case grouped action rows and native toggle" ($toggle -is [LenovoSettingsToggle] -and -not $toggle.AutoCheck -and $label.Right -eq $toggle.Left -and $label.Height -eq $toggle.Height -and $setup.Bottom -eq $remove.Top -and $setup.Separator -and $remove.Destructive -and $remove.FlatAppearance.BorderSize -eq 0 -and $setup.Subtitle -and $remove.Subtitle)
+                $flagsMatch=$true
+                foreach ($langButton in @($de,$en)) {
+                    $actual=[Drawing.Bitmap]::new($langButton.Width,$langButton.Height)
+                    $expected=[Drawing.Bitmap]::new($langButton.Width,$langButton.Height)
+                    $actual.SetResolution([single](96*$scale),[single](96*$scale))
+                    $expected.SetResolution([single](96*$scale),[single](96*$scale))
+                    $ag=[Drawing.Graphics]::FromImage($actual)
+                    $eg=[Drawing.Graphics]::FromImage($expected)
+                    $fw=[LenovoSettingsInk]::Px([single](96*$scale),16)
+                    $fh=[LenovoSettingsInk]::Px([single](96*$scale),12)
+                    $fr=[Drawing.Rectangle]::new([LenovoSettingsInk]::Px([single](96*$scale),12),[int][Math]::Floor(($langButton.Height-$fh)/2),$fw,$fh)
+                    $paint=[Windows.Forms.PaintEventArgs]::new($ag,$langButton.ClientRectangle)
+                    try {
+                        $method=$langButton.GetType().GetMethod('OnPaint',[Reflection.BindingFlags]'Instance,NonPublic')
+                        [void]$method.Invoke($langButton,@($paint))
+                        [LenovoLocaleFlags]::DrawFlag($eg,$langButton.LocaleCode,$fr)
+                        for ($y=$fr.Top;$y -lt $fr.Bottom;$y++) {
+                            for ($x=$fr.Left;$x -lt $fr.Right;$x++) {
+                                if ($actual.GetPixel($x,$y).ToArgb() -ne $expected.GetPixel($x,$y).ToArgb()) { $flagsMatch=$false }
+                            }
+                        }
+                    } finally { $paint.Dispose(); $ag.Dispose(); $eg.Dispose(); $actual.Dispose(); $expected.Dispose() }
+                }
+                Assert-Lbs247 "$case actual language button raster matches shared country flag renderer" $flagsMatch
+                $savedLocale=$script:Locale
+                $script:Locale=if ($savedLocale -eq 'de-DE') { 'en-US' } else { 'de-DE' }
+                $script:LanguageEnglishMenuItem.Checked=($script:Locale -eq 'en-US')
+                $script:LanguageGermanMenuItem.Checked=($script:Locale -eq 'de-DE')
+                Update-ConfigurationPopupLocale -Form $config
+                Assert-Lbs247 "$case live locale update preserves language identities and reverses selected state" ($de -eq $body.Controls['ConfigurationAction-language-de'] -and $en -eq $body.Controls['ConfigurationAction-language-en'] -and $de.Text -ceq 'Deutsch' -and $en.Text -ceq 'English' -and $other.LanguageSelected -and -not $selected.LanguageSelected -and $config.Tag.Subtitle.Text -ceq (Get-LocalizedString -Key 'Settings.MoreSubtitle'))
+                $script:Locale=$savedLocale
+                $script:LanguageEnglishMenuItem.Checked=($savedLocale -eq 'en-US')
+                $script:LanguageGermanMenuItem.Checked=($savedLocale -eq 'de-DE')
+                Update-ConfigurationPopupLocale -Form $config
             } finally { $config.Dispose() }
             $picker=New-DefaultTargetPicker
             try {
@@ -806,9 +860,47 @@ try {
             if ($script:NestedError) { throw $script:NestedError }
             Assert-Lbs229 'LBS233 nested cancel restores same modal owner and removes nested scrim' ($script:NestedObserved -and $result -eq [Windows.Forms.DialogResult]::Cancel -and $active.Visible -and [Lbs229Native]::IsWindowEnabled($active.Handle) -and -not $script:ActiveOwnedDialog -and @($active.OwnedForms | Where-Object Name -eq 'AuxiliaryOwnerDimmer').Count -eq 0)
         } finally { $nested.Dispose() }
+        # Real native activation of both language choices while the same modal
+        # stays open. Use the existing tray dispatch and a fixture locale owner.
+        $savedLocale=$script:Locale
+        $savedEn=$script:LanguageEnglishMenuItem.Checked
+        $savedDe=$script:LanguageGermanMenuItem.Checked
+        $handler=[EventHandler]{
+            param($sender,$eventArgs)
+            $script:Locale=if ($sender.Tag -eq 'language-de') { 'de-DE' } else { 'en-US' }
+            $script:LanguageGermanMenuItem.Checked=($script:Locale -eq 'de-DE')
+            $script:LanguageEnglishMenuItem.Checked=($script:Locale -eq 'en-US')
+            Update-ConfigurationPopupLocale -Form $script:ActiveAuxiliaryPopup
+        }
+        $script:LanguageGermanMenuItem.Add_Click($handler)
+        $script:LanguageEnglishMenuItem.Add_Click($handler)
+        try {
+            $script:Locale='en-US'
+            $script:LanguageGermanMenuItem.Checked=$false
+            $script:LanguageEnglishMenuItem.Checked=$true
+            Update-ConfigurationPopupLocale -Form $active
+            $de=$active.Tag.Body.Controls['ConfigurationAction-language-de']
+            $en=$active.Tag.Body.Controls['ConfigurationAction-language-en']
+            $handle=$active.Handle
+            $before=$script:Actions.Count
+            $de.PerformClick()
+            Assert-Lbs247 'real activation from English to German keeps native flag and modal identity' ($script:Actions.Count -eq $before+1 -and $script:Actions[-1] -eq 'language-de' -and $de.LanguageSelected -and -not $en.LanguageSelected -and $de.Text -ceq 'Deutsch' -and $en.Text -ceq 'English' -and $active.Visible -and $active.Handle -eq $handle)
+            $en.PerformClick()
+            Assert-Lbs247 'real activation from German to English restores language without closing modal' ($script:Actions.Count -eq $before+2 -and $script:Actions[-1] -eq 'language-en' -and $en.LanguageSelected -and -not $de.LanguageSelected -and $active.Visible -and $active.Handle -eq $handle)
+            $en.PerformClick()
+            Assert-Lbs247 'selected language activation is a no-op' ($script:Actions.Count -eq $before+2 -and $en.LanguageSelected)
+        } finally {
+            $script:LanguageGermanMenuItem.Remove_Click($handler)
+            $script:LanguageEnglishMenuItem.Remove_Click($handler)
+            $script:Locale=$savedLocale
+            $script:LanguageGermanMenuItem.Checked=$savedDe
+            $script:LanguageEnglishMenuItem.Checked=$savedEn
+        }
     }
 } finally {
     $owner.Dispose()
     $tray.Dispose()
 }
 Write-Host "LBS229 CONFIGURATION TOTAL $script:Checks"
+if ($script:Lbs247Checks -ne 23) { throw "Unexpected LBS247 test count: $script:Lbs247Checks" }
+Write-Host "LBS247 SETTINGS TOTAL $script:Lbs247Checks/23"

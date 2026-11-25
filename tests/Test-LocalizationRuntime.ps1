@@ -182,7 +182,7 @@ try {
     $endIndex = $templateText.IndexOf($endMarker, $startIndex + $beginMarker.Length, [StringComparison]::Ordinal)
     if ($startIndex -lt 0 -or $endIndex -le $startIndex) { throw 'LBS-117 menu C# source block not found' }
     $menuCode = $templateText.Substring($startIndex + $beginMarker.Length, $endIndex - $startIndex - $beginMarker.Length)
-    Add-Type -TypeDefinition $menuCode -ReferencedAssemblies System.Windows.Forms,System.Drawing
+    Add-Type -TypeDefinition $menuCode -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility
 
     Assert-Localization 'LBS-117 real tray wires US and German flag identities' (
         $templateText.Contains('$languageRoot.DropDown.Name = ''LenovoLanguageDropDown''') -and

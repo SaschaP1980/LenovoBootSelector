@@ -24,7 +24,7 @@ public static class Lbs200Win32 {
     public static extern bool AllowSetForegroundWindow(int pid);
 }
 '@
-Add-Type -TypeDefinition ($cs + [Environment]::NewLine + $native) -ReferencedAssemblies System.Windows.Forms,System.Drawing -ErrorAction Stop
+Add-Type -TypeDefinition ($cs + [Environment]::NewLine + $native) -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility -ErrorAction Stop
 
 $script:checks = 0
 $script:failures = New-Object System.Collections.Generic.List[string]

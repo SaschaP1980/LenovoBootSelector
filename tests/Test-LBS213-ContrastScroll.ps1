@@ -49,7 +49,7 @@ if ($start -lt 0) { throw 'Canonical native renderer C# start missing.' }
 $start += $prefix.Length
 $end = $template.IndexOf('"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing',$start,[StringComparison]::Ordinal)
 if ($end -le $start) { throw 'Canonical native renderer C# end missing.' }
-Add-Type -TypeDefinition ($template.Substring($start,$end-$start)) -ReferencedAssemblies System.Windows.Forms,System.Drawing -ErrorAction Stop
+Add-Type -TypeDefinition ($template.Substring($start,$end-$start)) -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility -ErrorAction Stop
 $flags = [Reflection.BindingFlags]'Instance,NonPublic'
 $paint = [Windows.Forms.ToolStripRenderer].GetMethod('OnRenderItemText',$flags)
 if (-not $paint) { throw 'Canonical ToolStrip render entry point unavailable.' }

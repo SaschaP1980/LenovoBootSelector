@@ -12,7 +12,7 @@ $start += $prefix.Length
 $end = $template.IndexOf('"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing',$start,[StringComparison]::Ordinal)
 if ($end -lt 0) { throw 'LBS-144 CHECKBOX RED: missing canonical C# source end' }
 if (-not ('LenovoCheckBox' -as [type])) {
-    Add-Type -TypeDefinition ($template.Substring($start,$end-$start)) -ReferencedAssemblies System.Windows.Forms,System.Drawing -ErrorAction Stop
+    Add-Type -TypeDefinition ($template.Substring($start,$end-$start)) -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility -ErrorAction Stop
 }
 $script:checks = 0
 function Assert-Lbs144Checkbox([string]$Name,[bool]$Good) {
@@ -58,6 +58,47 @@ try {
 } finally { $bitmap.Dispose(); $cb.Dispose() }
 $source=[IO.File]::ReadAllText((Join-Path $root 'src\UI\PopupComposition.ps1'))
 Assert-Lbs144Checkbox 'Configuration Autostart label and checkbox share existing action routing and accessibility' ($source.Contains('$autostartLabel.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })') -and $source.Contains('$check.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })') -and $source.Contains('$check.AccessibleName = $autostartLabel.Text') -and $source.Contains('$check.AutoCheck = $false') -and $source.Contains('$item.PerformClick()'))
-Assert-Lbs144Checkbox 'Configuration 96-DPI checkbox target measures 34 by 30' ($source.Contains('$check.Size = [Drawing.Size]::new(34,30)'))
+# LBS-247 deliberately replaces only the settings checkbox presentation with a
+# larger native CheckBox-derived switch. Retain the legacy checkbox raster
+# contract above and verify both switch states at the same six DPI densities.
+$toggle=New-Object LenovoSettingsToggle
+$toggle.BackColor=[Drawing.Color]::FromArgb(37,37,37)
+$toggle.AccentColor=[Drawing.Color]::FromArgb(225,37,27)
+$toggleOk=$source.Contains('$check = New-Object LenovoSettingsToggle') -and $source.Contains('$check.Size = [Drawing.Size]::new(64,52)') -and -not $toggle.AutoCheck
+try {
+    foreach ($c in $cases) {
+        $factor=$c.Dpi/96.0
+        $toggle.Size=[Drawing.Size]::new([int][Math]::Round(64*$factor),[int][Math]::Round(52*$factor))
+        $w=[LenovoSettingsInk]::Px([single]$c.Dpi,38)
+        $h=[LenovoSettingsInk]::Px([single]$c.Dpi,22)
+        $pad=[LenovoSettingsInk]::Px([single]$c.Dpi,3)
+        $d=$h-2*$pad
+        $x=[int][Math]::Floor(($toggle.Width-$w)/2)
+        $y=[int][Math]::Floor(($toggle.Height-$h)/2)
+        $left=$x+$pad+[int][Math]::Floor($d/2)
+        $right=$x+$w-$pad-$d+[int][Math]::Floor($d/2)
+        $mid=$y+$pad+[int][Math]::Floor($d/2)
+        foreach ($checked in @($false,$true)) {
+            $toggle.Checked=$checked
+            $bm=[Drawing.Bitmap]::new($toggle.Width,$toggle.Height)
+            $bm.SetResolution([single]$c.Dpi,[single]$c.Dpi)
+            $g=[Drawing.Graphics]::FromImage($bm)
+            $paint=[Windows.Forms.PaintEventArgs]::new($g,$toggle.ClientRectangle)
+            try {
+                $method=$toggle.GetType().GetMethod('OnPaint',[Reflection.BindingFlags]'Instance,NonPublic')
+                [void]$method.Invoke($toggle,@($paint))
+                $knob=if ($checked) { $bm.GetPixel($right,$mid) } else { $bm.GetPixel($left,$mid) }
+                $track=if ($checked) { $bm.GetPixel($left,$mid) } else { $bm.GetPixel($right,$mid) }
+                $hc=[Windows.Forms.SystemInformation]::HighContrast
+                $expectedKnob=if ($hc) { [Drawing.SystemColors]::ControlText } else { [Drawing.Color]::White }
+                $expectedTrack=if ($hc) { if ($checked) { [Drawing.SystemColors]::Highlight } else { [Drawing.SystemColors]::ControlDark } } elseif ($checked) { $toggle.AccentColor } else { [Drawing.Color]::FromArgb(85,85,85) }
+                $ok=$knob.ToArgb() -eq $expectedKnob.ToArgb() -and $track.ToArgb() -eq $expectedTrack.ToArgb() -and $x -ge 0 -and $y -ge 0 -and $x+$w -le $toggle.Width -and $y+$h -le $toggle.Height
+                Write-Host "LBS247 TOGGLE RASTER dpi=$($c.Dpi) checked=$checked result=$ok"
+                if (-not $ok) { $toggleOk=$false }
+            } finally { $paint.Dispose(); $g.Dispose(); $bm.Dispose() }
+        }
+    }
+} finally { $toggle.Dispose() }
+Assert-Lbs144Checkbox 'Configuration 64 by 52 native toggle has correct checked and unchecked raster across 96..288 DPI' $toggleOk
 Write-Host ("LBS144 CHECKBOX TOTAL {0}/{0}" -f $script:checks)
 if ($script:checks -ne 18) { throw "Expected 18 native checkbox checks, found $script:checks" }

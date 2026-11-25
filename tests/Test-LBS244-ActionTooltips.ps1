@@ -10,7 +10,7 @@ $prefix = 'Add-Type -TypeDefinition @"'
 $begin = $template.IndexOf($prefix,[StringComparison]::Ordinal)+$prefix.Length
 $end = $template.IndexOf('"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing',$begin,[StringComparison]::Ordinal)
 if ($begin -lt $prefix.Length -or $end -le $begin) { throw 'Canonical C# controls missing' }
-Add-Type -TypeDefinition ($template.Substring($begin,$end-$begin)) -ReferencedAssemblies System.Windows.Forms,System.Drawing
+Add-Type -TypeDefinition ($template.Substring($begin,$end-$begin)) -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility
 . (Join-Path $root 'src\Core\Localization.ps1')
 . (Join-Path $root 'src\UI\BootEntryList.ps1')
 . (Join-Path $root 'src\UI\BootEntryRows.ps1')
