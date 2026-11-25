@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.6.0.0 – Portable user preferences (LBS-180)
+
+- Export language and currently available boot-entry presentation preferences to a separate, versioned local JSON format.
+- Import only after strict bounded validation, an exact-GUID reconciliation preview and deliberate confirmation; preserve local-only/unavailable entries and reject unsupported or ambiguous inputs.
+- Commit unelevated settings transactionally and update the visible UI without applying any system, firmware, autostart, default or BootNext operation.
+- Add localized settings/tray actions and native Core, file-transaction and modal/file-dialog regression coverage.
+
 ## v1.5.20.6 – Restore initial keyboard focus in the default picker (LBS-229 F10)
 
 - Apply the established one-time owned-modal focus recovery to the Standard-Startziel picker, without selecting or writing a boot target.

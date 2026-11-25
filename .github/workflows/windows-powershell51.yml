@@ -176,6 +176,9 @@ jobs:
               tooltipCoverage = Get-TestTotal $logText '^LBS244 COVERAGE TOTAL\s+(\d+)/(\d+)\s*$'
               tooltipAction = Get-TestTotal $logText '^LBS244 ACTION TOTAL\s+(\d+)/(\d+)\s*$'
               settingsPolish = Get-TestTotal $logText '^LBS247 SETTINGS TOTAL\s+(\d+)/(\d+)\s*$'
+              portablePreferencesCore = Get-TestTotal $logText '^LBS180 CORE TOTAL\s+(\d+)/(\d+)\s*$'
+              portablePreferencesTransaction = Get-TestTotal $logText '^LBS180 TRANSACTION TOTAL\s+(\d+)/(\d+)\s*$'
+              portablePreferencesUi = Get-TestTotal $logText '^LBS180 UI TOTAL\s+(\d+)/(\d+)\s*$'
               customizeButton = Get-TestTotal $logText '^LBS252 CUSTOMIZE TOTAL\s+(\d+)/(\d+)\s*$'
               typography = Get-TestTotal $logText '^LBS186 TYPOGRAPHY TOTAL\s+(\d+)/(\d+)\s*$'
               manageGrip = Get-TestTotal $logText '^LBS166 GRIP TOTAL\s+(\d+)/(\d+)\s*$'
@@ -214,6 +217,9 @@ jobs:
               'tooltipCoverage',
               'tooltipAction',
               'settingsPolish',
+              'portablePreferencesCore',
+              'portablePreferencesTransaction',
+              'portablePreferencesUi',
               'customizeButton',
               'typography',
               'manageGrip',
@@ -258,6 +264,9 @@ jobs:
               $totals.tooltipCoverage.passed +
               $totals.tooltipAction.passed +
               $totals.settingsPolish.passed +
+              $totals.portablePreferencesCore.passed +
+              $totals.portablePreferencesTransaction.passed +
+              $totals.portablePreferencesUi.passed +
               $totals.customizeButton.passed +
               $totals.typography.passed +
               $totals.manageGrip.passed +
@@ -293,6 +302,9 @@ jobs:
               $totals.tooltipCoverage.expected +
               $totals.tooltipAction.expected +
               $totals.settingsPolish.expected +
+              $totals.portablePreferencesCore.expected +
+              $totals.portablePreferencesTransaction.expected +
+              $totals.portablePreferencesUi.expected +
               $totals.customizeButton.expected +
               $totals.typography.expected +
               $totals.manageGrip.expected +

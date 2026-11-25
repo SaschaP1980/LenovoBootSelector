@@ -125,6 +125,7 @@ function Position-Popup {
 
 function Show-OrTogglePopup {
     param([switch]$FromTrayClick)
+    if ($script:PreferencesUiActive) { return }
     if ($script:ActiveOwnedDialog -and -not $script:ActiveOwnedDialog.IsDisposed) {
         [void]$script:ActiveOwnedDialog.Activate()
         return
@@ -189,6 +190,7 @@ function Show-OrTogglePopup {
 # Explicit launcher re-entry is SHOW, never the tray-icon toggle (which hides
 # an already visible popup). This runs on the existing WinForms UI thread.
 function Show-OrActivatePopup {
+    if ($script:PreferencesUiActive) { return }
     if ($script:ActiveOwnedDialog -and -not $script:ActiveOwnedDialog.IsDisposed) {
         [void]$script:ActiveOwnedDialog.Activate()
         return

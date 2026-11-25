@@ -7,6 +7,7 @@ ROOT_DEFAULT=Path(__file__).resolve().parents[1]
 CORE_FILES=[
     'src/Core/Localization.ps1',
     'src/Core/EntryPreferences.ps1',
+    'src/Core/PortablePreferences.ps1',
     'src/Core/FirmwareParsing.ps1',
     'src/Core/StorageResolution.ps1',
     'src/Core/BootTargetModel.ps1',

@@ -92,6 +92,12 @@ Existing pre-localization settings are migrated to German to avoid unexpectedly 
 
 Firmware descriptions, device models, GUIDs, paths, diagnostic event codes, and other externally supplied technical identifiers are not translated. The full contract is documented in [docs/LOCALIZATION.md](docs/LOCALIZATION.md).
 
+## Portable user preferences
+
+Open **Further settings → User preferences** (also available in the tray menu). Export and import a local, inspectable preference JSON file, separate from diagnostics. The export includes the effective language and the alias, visibility and order of currently discovered entries, including hidden entries. It does not include autostart, the persistent default, BootNext, SYSTEM tasks, privileged state, diagnostic identity or storage paths. Aliases and GUIDs may be identifying; handle the file privately.
+
+Import requires ready, currently available boot entries and no conflicting operation or unsaved Customize draft. The preview lists exact GUID matches, unmatched incoming entries, unchanged local entries, alias/visibility/order changes, language and excluded unavailable saved metadata. Equal GUIDs do not prove identical hardware. No name/model matching or manual remapping in v1. Cancel is the initial and safe default action; only explicit Apply persists. Unknown fields, duplicates, invalid data, oversized files and unsupported format versions fail closed. Differing legacy overlength aliases are skipped rather than truncated. The import rechecks the local settings bytes and current entry snapshot; stale previews must be reopened. The transaction uses same-directory replacement, with local settings and runtime updated only after a successful commit. It does not synchronize arbitrary external writers or claim cryptographic authentication of edited JSON. See [docs/PORTABLE_PREFERENCES.md](docs/PORTABLE_PREFERENCES.md) for the exact format and exclusions.
+
 ## Updates
 
 Each transition from a hidden popup to a visible popup starts **one read-only version check** unless an update operation is already busy. Launching only the tray process does not trigger this check; closing and reopening the popup may trigger another. There is **no periodic polling**.

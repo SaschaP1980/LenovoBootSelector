@@ -59,6 +59,7 @@ function Get-EntryByGuid($Guid) { return ($script:CurrentEntries | Where-Object 
 function Get-EntryDisplayTitle { param($Entry,[switch]$UseManageDraft) return [string]$Entry.Title }
 function Get-CurrentSystemFunctionsCapabilities { return [pscustomobject]@{ State=$(if ($script:Busy) {'Busy'} elseif ($script:Ready) {'Ready'} else {'Checking'});CanSetDefaultTarget=$script:Ready;CanRefresh=$script:Ready;IsChecking=(-not $script:Ready) } }
 function Test-MaintenanceBusy { return $script:Busy }
+function Test-PortablePreferencesAvailable { return (-not $script:Busy -and $script:Ready) }
 function Test-BootTargetDriftDetected { return $script:Drift }
 function Test-TaskBrokerReady { return $script:Ready }
 function Refresh-SystemDefaultState { return $script:DefaultGuid }
@@ -73,6 +74,7 @@ function Show-LenovoNoticeDialog { throw 'Unexpected error dialog' }
 $tray = New-Object Windows.Forms.ContextMenuStrip
 $map=[ordered]@{
     AutostartMenuItem='autostart'; LanguageGermanMenuItem='language-de'; LanguageEnglishMenuItem='language-en'
+    PreferencesExportMenuItem='preferences-export'; PreferencesImportMenuItem='preferences-import'
     TaskBrokerSetupMenuItem='system-setup'; TaskBrokerRemoveMenuItem='system-remove'
     UpdateCheckMenuItem='update-check'; UpdateInstallMenuItem='update-install'
     RuntimeDiagnosticMenuItem='diagnostics-save'; DiagnosticsUploadMenuItem='diagnostics-upload'
@@ -268,8 +270,8 @@ try {
         } finally { $po.Dispose(); $picker.Dispose() }
     }
     Assert-Lbs244Action 'Hover and close never execute fixture actions' ($script:Actions.Count -eq 0 -and $script:DefaultCalls.Count -eq 0 -and $script:BootCalls -eq 0)
-    if ($script:Checks -ne 95) { throw "Unexpected action tooltip assertion count: $script:Checks" }
-    Write-Host "LBS244 ACTION TOTAL $script:Checks/95"
+    if ($script:Checks -ne 99) { throw "Unexpected action tooltip assertion count: $script:Checks" }
+    Write-Host "LBS244 ACTION TOTAL $script:Checks/99"
 } finally {
     $obs.Dispose()
     $script:BootTypeToolTip.Dispose()
