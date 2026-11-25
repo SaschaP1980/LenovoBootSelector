@@ -1,5 +1,5 @@
 ﻿#requires -version 5.1
-param([switch]$CorrectionProbeOnly,[switch]$SettingsCorrectionProbeOnly,[switch]$InitialFocusProbeOnly)
+param([switch]$CorrectionProbeOnly,[switch]$SettingsCorrectionProbeOnly,[switch]$InitialFocusProbeOnly,[switch]$FocusOutlineProbeOnly)
 # LBS-229: actual native owned forms, no live firmware or privileged actions.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -20,6 +20,8 @@ public static class Lbs229Native {
     public static extern IntPtr GetFocus();
     [DllImport("user32.dll")]
     public static extern IntPtr SetFocus(IntPtr hWnd);
+    [DllImport("user32.dll")]
+    public static extern IntPtr SendMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 }
 '@
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
@@ -146,11 +148,45 @@ try {
             return $bm.GetPixel(1,1).ToArgb()
         } finally { $bm.Dispose() }
     }
+    # F04: sample the real visible control, not WM_PRINT/DrawToBitmap.
+    # The inset perimeter is otherwise flat background, separated from
+    # the switch track. Count contrasting pixels on all four sides.
+    function Test-Lbs247FocusRaster($Control) {
+        $Control.Refresh()
+        [Windows.Forms.Application]::DoEvents()
+        $bm=[Drawing.Bitmap]::new($Control.Width,$Control.Height)
+        $g=[Drawing.Graphics]::FromImage($bm)
+        $cg=$Control.CreateGraphics()
+        try {
+            $origin=$Control.PointToScreen([Drawing.Point]::Empty)
+            $g.CopyFromScreen($origin,[Drawing.Point]::Empty,$Control.ClientSize)
+            $bg=$bm.GetPixel(1,1).ToArgb()
+            $p=[LenovoSettingsInk]::Px($cg.DpiX,3)
+            $x0=$p; $y0=$p; $x1=$bm.Width-$p-1; $y1=$bm.Height-$p-1
+            $top=0;$bottom=0;$left=0;$right=0
+            for ($x=$x0+1;$x -lt $x1;$x++) {
+                if ($bm.GetPixel($x,$y0).ToArgb() -ne $bg) { $top++ }
+                if ($bm.GetPixel($x,$y1).ToArgb() -ne $bg) { $bottom++ }
+            }
+            for ($y=$y0+1;$y -lt $y1;$y++) {
+                if ($bm.GetPixel($x0,$y).ToArgb() -ne $bg) { $left++ }
+                if ($bm.GetPixel($x1,$y).ToArgb() -ne $bg) { $right++ }
+            }
+            $present=$top -ge 4 -and $bottom -ge 4 -and $left -ge 4 -and $right -ge 4
+            Write-Host "LBS247 F04 SCREEN focus=$($Control.Focused) bounds=$($Control.ClientRectangle) dpi=$($cg.DpiX) bg=$bg perimeter=$top,$bottom,$left,$right result=$present"
+            return $present
+        } finally {
+            $cg.Dispose()
+            $g.Dispose()
+            $bm.Dispose()
+        }
+    }
     # F03: use the actual owned modal route, including the navigation trigger
     # and connector. Observe natural initial focus before any input. A second,
     # explicitly controlled focusless phase isolates the reported hover dependency.
     if (-not $SettingsCorrectionProbeOnly) {
         $f03Errors=[Collections.Generic.List[string]]::new()
+        $f04Errors=[Collections.Generic.List[string]]::new()
         $f03Root=New-Object Windows.Forms.Panel
         $f03Root.Dock=[Windows.Forms.DockStyle]::Fill
         $savedDefaultButton=$script:DefaultButton
@@ -171,6 +207,9 @@ try {
                 $script:F03Pointer=$false
                 $script:F03Controlled=$false
                 $script:F03Escape=$false
+                $script:F04Natural=$false
+                $script:F04Controlled=$false
+                $script:F04LossReturn=$false
                 # Establish focus only on the invoking OWNER, never on the child.
                 [void]$trigger.Focus()
                 $timer=New-Object Windows.Forms.Timer
@@ -189,6 +228,19 @@ try {
                         $foreground=[Lbs229Native]::GetForegroundWindow()
                         $initial=$foreground -eq $active.Handle -and $active.ContainsFocus -and $active.Tag.Body.ContainsFocus -and -not $active.Tag.Close.Focused
                         Write-Host "LBS247 F03 initial checked=$script:F03State foreground=$foreground child=$($active.Handle) focus=$focusBefore body=$($active.Tag.Body.ContainsFocus)"
+                        if (-not $InitialFocusProbeOnly) {
+                            # Capture before any pointer move, click or key in the child.
+                            $naturalCue=[Lbs229Native]::SendMessage($toggle.Handle,0x129,[IntPtr]::Zero,[IntPtr]::Zero).ToInt64()
+                            $script:F04Natural=$initial -and $toggle.Focused -and $focusBefore -eq $toggle.Handle -and (Test-Lbs247FocusRaster $toggle)
+                            # Reproduce mouse-mode cue suppression explicitly, without
+                            # moving native keyboard focus or executing an action.
+                            [void][Lbs229Native]::SendMessage($active.Handle,0x127,[IntPtr]0x10001,[IntPtr]::Zero)
+                            [void][Lbs229Native]::SendMessage($toggle.Handle,0x128,[IntPtr]0x10001,[IntPtr]::Zero)
+                            $toggle.Refresh()
+                            $hidden=([Lbs229Native]::SendMessage($toggle.Handle,0x129,[IntPtr]::Zero,[IntPtr]::Zero).ToInt64() -band 1) -ne 0
+                            $script:F04Controlled=$hidden -and $toggle.Focused -and (Test-Lbs247FocusRaster $toggle)
+                            Write-Host "LBS247 F04 INITIAL checked=$script:F03State focus=$($toggle.Focused) naturalCue=$naturalCue naturalRaster=$script:F04Natural forcedHidden=$hidden forcedRaster=$script:F04Controlled"
+                        }
                         $pointerOk=$true
                         foreach ($step in @(@{C=$active.Tag.Title;X=5;Y=5;Hot=$false},@{C=$label;X=10;Y=20;Hot=$true},@{C=$toggle;X=10;Y=20;Hot=$true},@{C=$active.Tag.Title;X=5;Y=5;Hot=$false})) {
                             Move-Lbs247Pointer $step.C $step.X $step.Y
@@ -200,9 +252,14 @@ try {
                             [Windows.Forms.SendKeys]::SendWait('{TAB}')
                             [Windows.Forms.Application]::DoEvents()
                             $next=[Lbs229Native]::GetFocus()
+                            $lostRaster=if (-not $InitialFocusProbeOnly) { -not (Test-Lbs247FocusRaster $toggle) } else { $true }
                             [Windows.Forms.SendKeys]::SendWait('+{TAB}')
                             [Windows.Forms.Application]::DoEvents()
                             $back=[Lbs229Native]::GetFocus()
+                            if (-not $InitialFocusProbeOnly) {
+                                $script:F04LossReturn=$lostRaster -and $next -eq $active.Tag.Body.Controls['ConfigurationAction-language-de'].Handle -and $back -eq $toggle.Handle -and (Test-Lbs247FocusRaster $toggle)
+                                Write-Host "LBS247 F04 TRAVERSAL checked=$script:F03State lostRaster=$lostRaster returned=$script:F04LossReturn"
+                            }
                             $script:F03Initial=$next -ne [IntPtr]::Zero -and $next -ne $focusBefore -and $back -eq $focusBefore -and $active.ContainsFocus
                         }
                         # Explicitly separate a controlled focus loss from the
@@ -237,6 +294,12 @@ try {
                 if ($script:F03Controlled) { Assert-Lbs247 "F03 actual pointer hover without keyboard focus ($checkedState)" $true }
                 else { $f03Errors.Add("Controlled focusless hover ($checkedState)") }
                 if ($script:Actions.Count -ne $actionCount -or $script:AutostartMenuItem.Checked -ne $checkedState) { throw 'F03 unexpectedly dispatched an action' }
+                if (-not $InitialFocusProbeOnly) {
+                    if ($script:F04Natural -and $script:F04LossReturn) { Assert-Lbs247 "F04 initial and traversal focus outline ($checkedState)" $true }
+                    else { $f04Errors.Add("Initial/traversal outline ($checkedState)") }
+                    if ($script:F04Controlled) { Assert-Lbs247 "F04 focused outline under native hidden focus cues ($checkedState)" $true }
+                    else { $f04Errors.Add("Hidden cue suppresses focused outline ($checkedState)") }
+                }
             }
             # Controlled loss DURING Shown, before the product's final opening
             # callback. Distinct from the unperturbed real-opening tests above.
@@ -278,6 +341,12 @@ try {
             [Windows.Forms.Cursor]::Position=$savedCursor
         }
         if ($f03Errors.Count) { throw ('LBS247 F03 RED: '+($f03Errors -join '; ')) }
+        if ($f04Errors.Count) { throw ('LBS247 F04 RED: '+($f04Errors -join '; ')) }
+        if ($FocusOutlineProbeOnly) {
+            if ($script:Lbs247Checks -ne 9) { throw 'Unexpected F04 fixture total' }
+            Write-Host "LBS247 F04 TOTAL 4/4"
+            return
+        }
         if ($InitialFocusProbeOnly) {
             if ($script:Lbs247Checks -ne 5) { throw 'Unexpected F03 test count' }
             Write-Host "LBS247 F03 TOTAL $script:Lbs247Checks/5"
@@ -1171,5 +1240,5 @@ try {
     $tray.Dispose()
 }
 Write-Host "LBS229 CONFIGURATION TOTAL $script:Checks"
-if ($script:Lbs247Checks -ne 33) { throw "Unexpected LBS247 test count: $script:Lbs247Checks" }
-Write-Host "LBS247 SETTINGS TOTAL $script:Lbs247Checks/33"
+if ($script:Lbs247Checks -ne 37) { throw "Unexpected LBS247 test count: $script:Lbs247Checks" }
+Write-Host "LBS247 SETTINGS TOTAL $script:Lbs247Checks/37"
