@@ -198,6 +198,11 @@ $manageViewportProbe = Join-Path $root 'tests\Test-LBS157-ManageViewport.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $manageViewportProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-157 Manage Entries viewport regression failed' }
 
+# LBS-179: isolated native Undo controls and deterministic draft snapshots.
+$manageUndoProbe = Join-Path $root 'tests\Test-LBS179-ManageUndo.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $manageUndoProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-179 Manage Undo regression failed' }
+
 # LBS-167: isolate real WinForms refresh/drag row identity and diagnostics.
 $refreshRowsProbe = Join-Path $root 'tests\Test-LBS167-RefreshRendering.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $refreshRowsProbe

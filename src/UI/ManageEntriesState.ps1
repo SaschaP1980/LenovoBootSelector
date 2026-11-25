@@ -13,7 +13,7 @@
             $current = ([string]$editor.Text).Trim()
             $draft = ''
             if ($script:ManageEntryAliases.ContainsKey($guid)) { $draft = ([string]$script:ManageEntryAliases[$guid]).Trim() }
-            if ($current -ne $draft) { return $true }
+            if ($current -cne $draft) { return $true }
         }
     }
     return $false

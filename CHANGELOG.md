@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.7.0.0 – Undo individual unsaved boot-target edits (LBS-179)
+
+- Add one localized Undo button to Customize without a visible history or counter.
+- Reverse completed alias, visibility and reorder operations in last-in-first-out order without persisting or discarding earlier edits.
+- Invalidate session history on changed firmware GUID inventory; retain current draft and existing Save/Cancel boundaries. Preserve native editor keyboard behavior and layout across DPI scales.
+
 ## v1.6.2.0 – Final portable preferences dialog design (LBS-180 F05/F06)
 
 - Consolidate export into one icon-led summary surface with dynamic entry count, a responsive two-column scope grid and clear local backup and exclusion guidance.

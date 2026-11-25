@@ -764,13 +764,17 @@ function New-BootEntryInteractionHandlers {
         $script:ManageDragGuid = $null
         $script:ManageLastDragUtc = [datetime]::UtcNow
         $script:ManageActiveDragGuid = ([string]$guid).ToLowerInvariant()
+        if ($null -ne $script:ManageUndoHistory) { Update-ManageUndoButtonState }
         # LBS-221: close action help before capturing the row or entering OLE drag.
         try { Hide-DarkActionTooltip } catch { }
         $sourceRow = Get-BootRowFromControl $sender
         if ($sourceRow) { Start-ManageDragReflow -SourceRow $sourceRow }
         try { [void]$sender.DoDragDrop($guid, [System.Windows.Forms.DragDropEffects]::Move) }
         catch { }
-        finally { Reset-ManageDragPreview }
+        finally {
+            Reset-ManageDragPreview
+            if ($null -ne $script:ManageUndoHistory) { Update-ManageUndoButtonState }
+        }
     }
     $dragOverHandler = {
         param($sender,$eventArgs)
