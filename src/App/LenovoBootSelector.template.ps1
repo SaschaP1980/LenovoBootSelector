@@ -870,6 +870,27 @@ public static class LenovoSettingsInk
                         if (up) g.DrawLines(p,new Point[] { new Point(7,8),new Point(12,3),new Point(17,8) });
                         else g.DrawLines(p,new Point[] { new Point(7,11),new Point(12,16),new Point(17,11) });
                         g.DrawLines(p,new Point[] { new Point(4,15),new Point(4,21),new Point(20,21),new Point(20,15) }); break;
+                    case "preferences-drive":
+                        g.DrawRectangle(p,3,5,18,14); g.DrawLine(p,3,14,21,14); g.DrawEllipse(p,6,16,1,1); g.DrawLine(p,10,17,17,17); break;
+                    case "preferences-json":
+                        g.DrawLines(p,new Point[] {new Point(5,3),new Point(14,3),new Point(19,8),new Point(19,21),new Point(5,21),new Point(5,3)});
+                        g.DrawLines(p,new Point[] {new Point(14,3),new Point(14,8),new Point(19,8)});
+                        g.DrawLines(p,new Point[] {new Point(10,11),new Point(8,11),new Point(8,14),new Point(7,15),new Point(8,16),new Point(8,19),new Point(10,19)});
+                        g.DrawLines(p,new Point[] {new Point(14,11),new Point(16,11),new Point(16,14),new Point(17,15),new Point(16,16),new Point(16,19),new Point(14,19)}); break;
+                    case "preferences-language":
+                        g.DrawEllipse(p,3,3,18,18); g.DrawEllipse(p,8,3,8,18); g.DrawLine(p,3,12,21,12); break;
+                    case "preferences-alias":
+                        g.DrawLines(p,new Point[] {new Point(4,6),new Point(13,6),new Point(21,14),new Point(14,21),new Point(4,11),new Point(4,6)}); g.DrawEllipse(p,7,8,2,2); break;
+                    case "preferences-visible":
+                        g.DrawArc(p,2,5,20,14,180,180); g.DrawArc(p,2,5,20,14,0,180); g.DrawEllipse(p,9,9,6,6); break;
+                    case "preferences-order":
+                        g.DrawLine(p,7,4,7,20); g.DrawLines(p,new Point[] {new Point(3,8),new Point(7,4),new Point(11,8)});
+                        g.DrawLine(p,17,4,17,20); g.DrawLines(p,new Point[] {new Point(13,16),new Point(17,20),new Point(21,16)}); break;
+                    case "preferences-shield":
+                        g.DrawLines(p,new Point[] {new Point(12,3),new Point(21,6),new Point(20,15),new Point(12,22),new Point(4,15),new Point(3,6),new Point(12,3)});
+                        g.DrawLines(p,new Point[] {new Point(8,12),new Point(11,15),new Point(16,9)}); break;
+                    case "preferences-lock":
+                        g.DrawArc(p,7,3,10,12,180,180); g.DrawRectangle(p,5,10,14,11); g.DrawLine(p,12,14,12,17); break;
                     case "preferences-export":
                     case "preferences-import":
                         g.DrawLines(p,new Point[] { new Point(4,3),new Point(13,3),new Point(18,8),new Point(18,21),new Point(4,21),new Point(4,3) });
