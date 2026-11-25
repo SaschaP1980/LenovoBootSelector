@@ -639,6 +639,24 @@ function Show-OwnedAuxiliaryPopup {
         # Show without activation before the child, which retains its normal
         # modal ownership, z-order and focus even on overlapping placement.
         $dimmer.Show($parent)
+        # Configuration receives keyboard focus once as part of deliberate
+        # modal opening, after the dimmer's Shown/connector callback.
+        if ($Form.Name -eq 'LenovoConfigurationPopup') {
+            $Form.Add_Shown({
+                param($sender,$eventArgs)
+                if ($sender.IsDisposed -or -not $sender.Visible -or
+                    -not [object]::ReferenceEquals($script:ActiveAuxiliaryPopup,$sender) -or
+                    $script:ActiveOwnedDialog) { return }
+                [LenovoSettingsWindowInput]::ActivateInitialSurface($sender)
+                if (-not $sender.Tag.Body.ContainsFocus) {
+                    $target = $sender.Tag.Body.Controls | Where-Object {
+                        $_.TabStop -and $_.CanFocus -and $_.Enabled -and $_.Visible
+                    } | Sort-Object TabIndex | Select-Object -First 1
+                    if ($target) { [void]$target.Focus() }
+                    elseif ($sender.Tag.Close.CanFocus) { [void]$sender.Tag.Close.Focus() }
+                }
+            })
+        }
         $result = $Form.ShowDialog($parent)
         if ($result -eq [Windows.Forms.DialogResult]::OK) { return $Form.Tag.Choice }
         return $null
