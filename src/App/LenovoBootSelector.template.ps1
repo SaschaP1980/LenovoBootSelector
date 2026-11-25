@@ -1573,6 +1573,8 @@ $script:EntryOrder = @()
 $script:HiddenEntryGuids = @()
 $script:EntryAliases = @{}
 $script:IsManageEntriesMode = $false
+$script:ManageUndoHistory = $null
+$script:ManageUndoInventory = @()
 $script:ManageEntryOrder = @()
 $script:ManageHiddenEntryGuids = @()
 $script:ManageEntryAliases = @{}
@@ -2025,6 +2027,8 @@ function Enter-SystemFunctionsMaintenance {
     param([Parameter(Mandatory=$true)][ValidateSet('Setup','Repair','Migrate','Reinitialize','Remove')][string]$Mode)
     [void](Set-MaintenanceRuntimeActive -State $script:MaintenanceState -Mode $Mode)
     $script:IsManageEntriesMode = $false
+    $script:ManageUndoHistory = $null
+    $script:ManageUndoInventory = @()
     $script:ManageAliasEditGuid = $null
     Stop-BackgroundBootRefreshForMaintenance -Reason $Mode
     $script:LastStatusText = Get-MaintenanceBusyStatusText
@@ -2205,6 +2209,8 @@ function Complete-TaskBrokerRemove {
     $script:FirmwareCacheText = $null
     $script:DefaultGuid = $null
     $script:IsManageEntriesMode = $false
+    $script:ManageUndoHistory = $null
+    $script:ManageUndoInventory = @()
     $script:ManageEntryOrder = @()
     $script:ManageHiddenEntryGuids = @()
     $script:ManageEntryAliases = @{}
@@ -2451,6 +2457,7 @@ function Apply-FirmwareBootState {
 
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     if ($capabilities.CanUseCachedBootState) { [void](Refresh-SystemDefaultState) }
+    if ($null -ne $script:ManageUndoHistory) { Update-ManageUndoInventory }
     Update-PopupRows -Reason 'firmware-state'
 }
 

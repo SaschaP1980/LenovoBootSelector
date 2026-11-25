@@ -66,7 +66,7 @@ function Test-EntryAliasMapsEqual {
     $bKeys = @($b.Keys | Sort-Object)
     if (-not (Test-StringSequenceEqual -Left $aKeys -Right $bKeys)) { return $false }
     foreach ($key in $aKeys) {
-        if (([string]$a[$key]).Trim() -ne ([string]$b[$key]).Trim()) { return $false }
+        if (([string]$a[$key]).Trim() -cne ([string]$b[$key]).Trim()) { return $false }
     }
     return $true
 }
@@ -241,4 +241,21 @@ function Get-OrderedEntriesCore {
     }
 
     return @($result.ToArray())
+}
+
+# LBS-179: detached snapshots contain only the three unprivileged draft fields.
+function New-ManageDraftSnapshotCore {
+    param([object[]]$Order,[object[]]$Hidden,$Aliases)
+    return [pscustomobject]@{
+        Order=@($Order | ForEach-Object { [string]$_ })
+        Hidden=@($Hidden | ForEach-Object { [string]$_ })
+        Aliases=(Copy-EntryAliasMap $Aliases)
+    }
+}
+
+function Test-ManageDraftSnapshotEqualCore {
+    param($Left,$Right)
+    return ((Test-StringSequenceEqual -Left $Left.Order -Right $Right.Order) -and
+        (Test-StringSequenceEqual -Left $Left.Hidden -Right $Right.Hidden -Sort) -and
+        (Test-EntryAliasMapsEqual -Left $Left.Aliases -Right $Right.Aliases))
 }
