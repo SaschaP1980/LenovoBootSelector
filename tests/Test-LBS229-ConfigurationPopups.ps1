@@ -16,6 +16,11 @@ public static class Lbs229Native {
     public static extern int GetWindowLong(IntPtr hWnd, int index);
     [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint { public int X; public int Y; }
+    [DllImport("user32.dll")]
+    private static extern IntPtr WindowFromPoint(NativePoint point);
+    public static IntPtr Hit(int x, int y) { return WindowFromPoint(new NativePoint { X=x, Y=y }); }
     [DllImport("user32.dll")]
     public static extern IntPtr GetFocus();
     [DllImport("user32.dll")]
@@ -277,21 +282,53 @@ try {
             return $bm.GetPixel(1,1).ToArgb()
         } finally { $bm.Dispose() }
     }
-    # F04: sample the real visible control, not WM_PRINT/DrawToBitmap.
-    # The inset perimeter is otherwise flat background, separated from
-    # the switch track. Count contrasting pixels on all four sides.
-    function Test-Lbs247FocusRaster($Control) {
-        $Control.Refresh()
+    # F04 / LBS-260: keep real screen evidence separate from the outline
+    # predicate. Never interpret an invalid frame as a valid absence.
+    function Resolve-Lbs260Raster([scriptblock]$Acquire,[bool]$ExpectedOutline,[scriptblock]$BetweenInvalid={
+        Start-Sleep -Milliseconds 25
         [Windows.Forms.Application]::DoEvents()
-        $bm=[Drawing.Bitmap]::new($Control.Width,$Control.Height)
+    }) {
+        for ($attempt=1; $attempt -le 5; $attempt++) {
+            $frame=& $Acquire $attempt
+            if ($null -eq $frame -or $frame.Valid -isnot [bool] -or $frame.Present -isnot [bool]) { throw 'LBS260 malformed raster evidence' }
+            if ($frame.Valid) {
+                if ($frame.Present -ne $ExpectedOutline) { throw "LBS260 VALID OUTLINE MISMATCH expected=$ExpectedOutline actual=$($frame.Present) attempt=$attempt" }
+                return $true
+            }
+            Write-Host "LBS260 INVALID ACQUISITION attempt=$attempt reason=$($frame.Reason)"
+            if ($attempt -lt 5) { & $BetweenInvalid }
+        }
+        throw 'LBS260 INVALID SCREEN FRAME after 5 acquisitions; no valid outline evidence'
+    }
+    function Get-Lbs260ScreenFrame($Control,[IntPtr]$ExpectedFocus,[IntPtr]$ExpectedForm,[Drawing.Rectangle]$ExpectedBounds,[bool]$ExpectedFocused,[int]$Attempt) {
+        $foregroundBefore=[Lbs229Native]::GetForegroundWindow()
+        $focusBefore=[Lbs229Native]::GetFocus()
+        $bounds=$Control.RectangleToScreen($Control.ClientRectangle)
+        if (-not $Control.Visible -or -not $Control.Enabled -or $foregroundBefore -ne $ExpectedForm -or $focusBefore -ne $ExpectedFocus -or $Control.Focused -ne $ExpectedFocused -or $bounds -ne $ExpectedBounds) {
+            throw "LBS260 NATIVE STATE CHANGED before capture foreground=$foregroundBefore expectedForm=$ExpectedForm focus=$focusBefore expectedFocus=$ExpectedFocus bounds=$bounds expectedBounds=$ExpectedBounds focused=$($Control.Focused)"
+        }
+        $bm=[Drawing.Bitmap]::new($Control.ClientSize.Width,$Control.ClientSize.Height)
         $g=[Drawing.Graphics]::FromImage($bm)
         $cg=$Control.CreateGraphics()
         try {
-            $origin=$Control.PointToScreen([Drawing.Point]::Empty)
-            $g.CopyFromScreen($origin,[Drawing.Point]::Empty,$Control.ClientSize)
-            $bg=$bm.GetPixel(1,1).ToArgb()
             $p=[LenovoSettingsInk]::Px($cg.DpiX,3)
             $x0=$p; $y0=$p; $x1=$bm.Width-$p-1; $y1=$bm.Height-$p-1
+            if ($x1-$x0 -lt 5 -or $y1-$y0 -lt 5) { throw 'LBS260 insufficient screen geometry for unchanged perimeter threshold' }
+            $points=@([Drawing.Point]::new(1,1),[Drawing.Point]::new($bm.Width-2,1),[Drawing.Point]::new(1,$bm.Height-2),[Drawing.Point]::new($bm.Width-2,$bm.Height-2),[Drawing.Point]::new([int]($bm.Width/2),[int]($bm.Height/2)))
+            $hitsBefore=@(foreach ($point in $points) { [Lbs229Native]::Hit(($bounds.X+$point.X),($bounds.Y+$point.Y)) })
+            $g.CopyFromScreen($bounds.Location,[Drawing.Point]::Empty,$Control.ClientSize)
+            $hitsAfter=@(foreach ($point in $points) { [Lbs229Native]::Hit(($bounds.X+$point.X),($bounds.Y+$point.Y)) })
+            $foregroundAfter=[Lbs229Native]::GetForegroundWindow()
+            $focusAfter=[Lbs229Native]::GetFocus()
+            $boundsAfter=$Control.RectangleToScreen($Control.ClientRectangle)
+            if ($foregroundAfter -ne $ExpectedForm -or $focusAfter -ne $ExpectedFocus -or $Control.Focused -ne $ExpectedFocused -or $boundsAfter -ne $ExpectedBounds -or -not $Control.Visible -or -not $Control.Enabled) {
+                throw "LBS260 NATIVE STATE CHANGED during capture foreground=$foregroundBefore/$foregroundAfter focus=$focusBefore/$focusAfter bounds=$bounds/$boundsAfter"
+            }
+            $expectedColors=if ([Windows.Forms.SystemInformation]::HighContrast) { @([Drawing.SystemColors]::Control.ToArgb()) } else { @($Control.BackColor.ToArgb(),$Control.HoverSurface.ToArgb()) }
+            $corners=@(foreach ($point in $points[0..3]) { $bm.GetPixel($point.X,$point.Y).ToArgb() })
+            $bg=$corners[0]
+            $surfaceValid=($bg -in $expectedColors) -and (@($corners | Where-Object { $_ -ne $bg }).Count -eq 0)
+            $hitValid=@(($hitsBefore+$hitsAfter) | Where-Object { $_ -ne $Control.Handle }).Count -eq 0
             $top=0;$bottom=0;$left=0;$right=0
             for ($x=$x0+1;$x -lt $x1;$x++) {
                 if ($bm.GetPixel($x,$y0).ToArgb() -ne $bg) { $top++ }
@@ -302,13 +339,97 @@ try {
                 if ($bm.GetPixel($x1,$y).ToArgb() -ne $bg) { $right++ }
             }
             $present=$top -ge 4 -and $bottom -ge 4 -and $left -ge 4 -and $right -ge 4
-            Write-Host "LBS247 F04 SCREEN focus=$($Control.Focused) bounds=$($Control.ClientRectangle) dpi=$($cg.DpiX) bg=$bg perimeter=$top,$bottom,$left,$right result=$present"
-            return $present
+            $valid=$surfaceValid -and $hitValid
+            Write-Host "LBS247 F04 SCREEN attempt=$Attempt checked=$($Control.Checked) focus=$($Control.Focused) focusHandles=$focusBefore/$focusAfter foreground=$foregroundBefore/$foregroundAfter form=$ExpectedForm target=$($Control.Handle) bounds=$bounds dpi=$($cg.DpiX) expected=$($expectedColors -join ',') bg=$bg corners=$($corners -join ',') hitsBefore=$($hitsBefore -join ',') hitsAfter=$($hitsAfter -join ',') hitValid=$hitValid surfaceValid=$surfaceValid valid=$valid perimeter=$top,$bottom,$left,$right result=$present"
+            return [pscustomobject]@{Valid=$valid;Present=$present;Reason="surface=$surfaceValid hit=$hitValid bg=$bg expected=$($expectedColors -join ',')"}
         } finally {
             $cg.Dispose()
             $g.Dispose()
             $bm.Dispose()
         }
+    }
+    function Test-Lbs247FocusRaster($Control,[bool]$ExpectedOutline=$true) {
+        $form=$Control.FindForm()
+        $expectedFocus=[Lbs229Native]::GetFocus()
+        $bounds=$Control.RectangleToScreen($Control.ClientRectangle)
+        if ($null -eq $form -or $Control.Focused -ne $ExpectedOutline -or $expectedFocus -eq [IntPtr]::Zero -or (($expectedFocus -eq $Control.Handle) -ne $ExpectedOutline) -or -not $form.ContainsFocus) {
+            throw 'LBS260 unexpected native focus before raster assertion'
+        }
+        $expectedForm=$form.Handle
+        $Control.Refresh()
+        [Windows.Forms.Application]::DoEvents()
+        return (Resolve-Lbs260Raster -ExpectedOutline $ExpectedOutline -Acquire {
+            param($attempt)
+            Get-Lbs260ScreenFrame $Control $expectedFocus $expectedForm $bounds $ExpectedOutline $attempt
+        })
+    }
+    # Exercise the exact production-test decision loop independently with
+    # deterministic observations. These never substitute for CopyFromScreen.
+    function Test-Lbs260AcquisitionPolicy {
+        $invalid=[pscustomobject]@{Valid=$false;Present=$false;Reason='controlled wrong-surface observation'}
+        $absent=[pscustomobject]@{Valid=$true;Present=$false;Reason='valid absent'}
+        $present=[pscustomobject]@{Valid=$true;Present=$true;Reason='valid present'}
+        $cases=@(
+            @{Name='valid missing outline fails immediately';Frames=@($absent,$present);Expected=$true;Calls=1;Error='LBS260 VALID OUTLINE MISMATCH*'},
+            @{Name='valid unexpected outline fails immediately';Frames=@($present,$absent);Expected=$false;Calls=1;Error='LBS260 VALID OUTLINE MISMATCH*'},
+            @{Name='invalid frame then valid outline succeeds';Frames=@($invalid,$present);Expected=$true;Calls=2;Error=$null},
+            @{Name='invalid frame then valid missing outline fails without further retry';Frames=@($invalid,$absent,$present);Expected=$true;Calls=2;Error='LBS260 VALID OUTLINE MISMATCH*'},
+            @{Name='invalid frame cannot satisfy expected absence';Frames=@($invalid,$invalid,$invalid,$invalid,$invalid);Expected=$false;Calls=5;Error='LBS260 INVALID SCREEN FRAME*'}
+        )
+        foreach ($case in $cases) {
+            $state=@{Calls=0;Waits=0}
+            $failure=$null
+            $matched=$false
+            try {
+                $matched=Resolve-Lbs260Raster -ExpectedOutline $case.Expected -Acquire {
+                    param($attempt)
+                    $state.Calls++
+                    if ($attempt -gt $case.Frames.Count) { throw 'LBS260 acquisition exceeded fixture observations' }
+                    $case.Frames[$attempt-1]
+                } -BetweenInvalid { $state.Waits++ }
+            } catch { $failure=$_.Exception.Message }
+            $expectedResult=if ($null -eq $case.Error) { $matched -and $null -eq $failure } else { $failure -like $case.Error -and -not $matched }
+            Assert-Lbs247 ("LBS260 "+$case.Name) ($expectedResult -and $state.Calls -eq $case.Calls -and $state.Waits -eq ($case.Calls-1))
+        }
+    }
+    # LBS-260 negative control: an actual visible wrong surface over the
+    # focused switch must never be interpreted as a valid absent outline.
+    function Test-Lbs260OccludedScreen($Control) {
+        $cover=New-Object Windows.Forms.Panel
+        $cover.BackColor=[Drawing.Color]::FromArgb(133,133,133)
+        $cover.Bounds=$Control.Bounds
+        $cover.TabStop=$false
+        $parent=$Control.Parent
+        $focus=[Lbs229Native]::GetFocus()
+        $foreground=[Lbs229Native]::GetForegroundWindow()
+        try {
+            $parent.Controls.Add($cover)
+            $cover.BringToFront()
+            $cover.Refresh()
+            [Windows.Forms.Application]::DoEvents()
+            $bm=[Drawing.Bitmap]::new($Control.ClientSize.Width,$Control.ClientSize.Height)
+            $g=[Drawing.Graphics]::FromImage($bm)
+            try {
+                $g.CopyFromScreen($Control.PointToScreen([Drawing.Point]::Empty),[Drawing.Point]::Empty,$Control.ClientSize)
+                $bg=$bm.GetPixel(1,1).ToArgb()
+                $far=$bm.GetPixel($bm.Width-2,$bm.Height-2).ToArgb()
+                Write-Host "LBS260 NEGATIVE CONTROL foreground=$foreground focus=$focus switch=$($Control.Handle) cover=$($cover.Handle) bounds=$($Control.RectangleToScreen($Control.ClientRectangle)) bg=$bg far=$far"
+                if ($bg -ne $cover.BackColor.ToArgb() -or $far -ne $bg -or [Lbs229Native]::GetFocus() -ne $focus -or [Lbs229Native]::GetForegroundWindow() -ne $foreground -or -not $Control.Focused) { throw 'LBS260 negative-control fixture did not establish visible occlusion with retained focus' }
+            } finally { $g.Dispose(); $bm.Dispose() }
+            $invalid=$false
+            try { $present=Test-Lbs247FocusRaster $Control }
+            catch {
+                if ($_.Exception.Message -notlike 'LBS260 INVALID SCREEN FRAME*') { throw }
+                $invalid=$true
+            }
+            if (-not $invalid) { throw "LBS260 RED: wrong-surface raster returned ordinary outline result=$present instead of invalid-frame failure" }
+            Assert-Lbs247 'LBS260 actual occlusion is rejected rather than interpreted as an absent outline' $true
+        } finally {
+            $cover.Dispose()
+            $Control.Refresh()
+            [Windows.Forms.Application]::DoEvents()
+        }
+        if ([Lbs229Native]::GetFocus() -ne $focus -or [Lbs229Native]::GetForegroundWindow() -ne $foreground) { throw 'LBS260 negative-control cleanup changed native focus/foreground' }
     }
     # F03: use the actual owned modal route, including the navigation trigger
     # and connector. Observe natural initial focus before any input. A second,
@@ -381,7 +502,7 @@ try {
                             [Windows.Forms.SendKeys]::SendWait('{TAB}')
                             [Windows.Forms.Application]::DoEvents()
                             $next=[Lbs229Native]::GetFocus()
-                            $lostRaster=if (-not $InitialFocusProbeOnly) { -not (Test-Lbs247FocusRaster $toggle) } else { $true }
+                            $lostRaster=if (-not $InitialFocusProbeOnly) { Test-Lbs247FocusRaster $toggle -ExpectedOutline $false } else { $true }
                             [Windows.Forms.SendKeys]::SendWait('+{TAB}')
                             [Windows.Forms.Application]::DoEvents()
                             $back=[Lbs229Native]::GetFocus()
@@ -391,6 +512,7 @@ try {
                             }
                             $script:F03Initial=$next -ne [IntPtr]::Zero -and $next -ne $focusBefore -and $back -eq $focusBefore -and $active.ContainsFocus
                         }
+                        if (-not $InitialFocusProbeOnly -and $script:F03State -and $script:F04LossReturn) { Test-Lbs260OccludedScreen $toggle }
                         # Explicitly separate a controlled focus loss from the
                         # natural opening observation. No click or action dispatch.
                         [void][Lbs229Native]::SetFocus([IntPtr]::Zero)
@@ -471,8 +593,9 @@ try {
         }
         if ($f03Errors.Count) { throw ('LBS247 F03 RED: '+($f03Errors -join '; ')) }
         if ($f04Errors.Count) { throw ('LBS247 F04 RED: '+($f04Errors -join '; ')) }
+        if (-not $InitialFocusProbeOnly) { Test-Lbs260AcquisitionPolicy; Write-Host 'LBS260 RASTER VALIDITY TOTAL 6/6' }
         if ($FocusOutlineProbeOnly) {
-            if ($script:Lbs247Checks -ne 9) { throw 'Unexpected F04 fixture total' }
+            if ($script:Lbs247Checks -ne 15) { throw 'Unexpected F04/LBS260 fixture total' }
             Write-Host "LBS247 F04 TOTAL 4/4"
             return
         }
@@ -1380,5 +1503,5 @@ try {
     $tray.Dispose()
 }
 Write-Host "LBS229 CONFIGURATION TOTAL $script:Checks"
-if ($script:Lbs247Checks -ne 37) { throw "Unexpected LBS247 test count: $script:Lbs247Checks" }
-Write-Host "LBS247 SETTINGS TOTAL $script:Lbs247Checks/37"
+if ($script:Lbs247Checks -ne 43) { throw "Unexpected LBS247/LBS260 test count: $script:Lbs247Checks" }
+Write-Host "LBS247 SETTINGS TOTAL $script:Lbs247Checks/43"
