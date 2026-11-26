@@ -44,6 +44,8 @@ function Set-RowHoverState($Control, [bool]$Hover) {
         if ($script:BootNextPendingGuid -or $script:DefaultTargetChangePending) { $hot = $false }
         if ($observed -and -not $observed.CanSetBootNext -and -not ($observed.State -eq 'Checking' -and $observed.CanUseCachedBootState)) { $hot = $false }
     }
+    $hc = [Windows.Forms.SystemInformation]::HighContrast
+    $rowHover = if ($hc) { $script:ColorHover } else { [LenovoInteractionPalette]::Tint($script:ColorRow) }
     $title=$row.Controls['BootTitleLabel']
     if ($title) {
         $hiddenInk=$script:IsManageEntriesMode -and (Test-ManageEntryHidden -Guid $rowGuid)
@@ -56,10 +58,11 @@ function Set-RowHoverState($Control, [bool]$Hover) {
         }
         $hidden = Test-ManageEntryHidden -Guid $rowGuid
         if ($hidden) {
-            $row.BackColor = if ($hot) { [Drawing.Color]::FromArgb(37,37,37) } else { [Drawing.Color]::FromArgb(27,27,27) }
+            $hiddenSurface = [Drawing.Color]::FromArgb(27,27,27)
+            $row.BackColor = if ($hot) { if ($hc) { [Drawing.Color]::FromArgb(37,37,37) } else { [LenovoInteractionPalette]::Tint($hiddenSurface) } } else { $hiddenSurface }
         }
         else {
-            $row.BackColor = if ($hot) { $script:ColorHover } else { $script:ColorRow }
+            $row.BackColor = if ($hot) { $rowHover } else { $script:ColorRow }
         }
         $row.Invalidate($true)
         return
@@ -72,7 +75,7 @@ function Set-RowHoverState($Control, [bool]$Hover) {
         $row.BackColor = $script:ColorSelectedRow
     }
     elseif ($hot) {
-        $row.BackColor = $script:ColorHover
+        $row.BackColor = $rowHover
     }
     else {
         $row.BackColor = $script:ColorRow

@@ -56,29 +56,54 @@ function Test-Lbs270DialogHover([Windows.Forms.Button]$Button) {
     try {
         $Button.Enabled=$true
         [void]$leave.Invoke($Button,@([EventArgs]::Empty))
+        $oldSurface=$Button.FlatAppearance.MouseOverBackColor
+        $idleForeground=$Button.ForeColor
+        $idleBack=$Button.BackColor
         $idle=Get-Lbs270DialogHoverPixels $Button $hoverInk
         [void]$enter.Invoke($Button,@([EventArgs]::Empty))
-        $hot=Get-Lbs270DialogHoverPixels $Button $hoverInk
+        $expectedSurface=if ($idleBack.ToArgb() -eq [Drawing.Color]::FromArgb(225,37,27).ToArgb()) {
+            [Drawing.Color]::FromArgb(225,41,32)
+        } else {
+            [Drawing.Color]::FromArgb([int][Math]::Round($idleBack.R*0.88+255*0.12),[int][Math]::Round($idleBack.G*0.88+110*0.12),[int][Math]::Round($idleBack.B*0.88+102*0.12))
+        }
+        $hot=Get-Lbs270DialogHoverPixels $Button $hoverInk $expectedSurface.ToArgb()
+        $hotStyle=($Button.ForeColor -eq $idleForeground -and $Button.BackColor -eq $idleBack -and $Button.FlatAppearance.MouseOverBackColor.ToArgb() -eq $expectedSurface.ToArgb())
         [void]$leave.Invoke($Button,@([EventArgs]::Empty))
         $restored=Get-Lbs270DialogHoverPixels $Button $hoverInk
+        $restoredStyle=$Button.FlatAppearance.MouseOverBackColor -eq $oldSurface
         $Button.Enabled=$false
         [void]$enter.Invoke($Button,@([EventArgs]::Empty))
         $disabled=Get-Lbs270DialogHoverPixels $Button $hoverInk
-        return ($idle -eq 0 -and $restored -eq 0 -and $disabled -eq 0 -and $(if($hc){$hot -eq 0}else{$hot -gt 0}))
+        $disabledStyle=$Button.FlatAppearance.MouseOverBackColor -eq $oldSurface
+        $noOverlay=(-not $idle.Any -and -not $restored.Any -and -not $disabled.Any)
+        return ($noOverlay -and $restoredStyle -and $disabledStyle -and $(if($hc){-not $hot.Any}else{$hot.All -and $hot.Fill -and $hotStyle}))
     } finally { [void]$leave.Invoke($Button,@([EventArgs]::Empty)); $Button.Enabled=$oldEnabled }
 }
-function Get-Lbs270DialogHoverPixels([Windows.Forms.Button]$Button,[int]$Ink) {
+function Get-Lbs270DialogHoverPixels([Windows.Forms.Button]$Button,[int]$Ink,[int]$Surface=0) {
     $bmp=[Drawing.Bitmap]::new($Button.Width,$Button.Height)
     try {
         $Button.DrawToBitmap($bmp,$Button.ClientRectangle)
-        $pixels=0
-        # The shared edge is inside the bottom of the native button, away from text.
-        for ($y=[Math]::Max(1,$bmp.Height-8);$y -lt $bmp.Height-1;$y++) {
-            for ($x=4;$x -lt $bmp.Width-4;$x++) {
-                if ($bmp.GetPixel($x,$y).ToArgb() -eq $Ink) { $pixels++ }
+        # Sample each edge separately, away from text and corner intersections.
+        $top=0; $bottom=0; $left=0; $right=0
+        for ($x=4;$x -lt $bmp.Width-4;$x++) {
+            for ($offset=0;$offset -lt [Math]::Min(4,[int]($bmp.Height/3));$offset++) {
+                if ($bmp.GetPixel($x,$offset).ToArgb() -eq $Ink) { $top++ }
+                if ($bmp.GetPixel($x,$bmp.Height-1-$offset).ToArgb() -eq $Ink) { $bottom++ }
             }
         }
-        return $pixels
+        for ($y=4;$y -lt $bmp.Height-4;$y++) {
+            for ($offset=0;$offset -lt [Math]::Min(4,[int]($bmp.Width/3));$offset++) {
+                if ($bmp.GetPixel($offset,$y).ToArgb() -eq $Ink) { $left++ }
+                if ($bmp.GetPixel($bmp.Width-1-$offset,$y).ToArgb() -eq $Ink) { $right++ }
+            }
+        }
+        $fill=0
+        for ($x=4;$x -lt $bmp.Width-4;$x++) {
+            for ($y=4;$y -lt [Math]::Min(8,[int]($bmp.Height/3));$y++) {
+                if ($bmp.GetPixel($x,$y).ToArgb() -eq $Surface) { $fill++ }
+            }
+        }
+        return [pscustomobject]@{ Any=($top+$bottom+$left+$right -gt 0); All=($top -gt 0 -and $bottom -gt 0 -and $left -gt 0 -and $right -gt 0); Fill=($fill -ge $bmp.Width/2) }
     } finally { $bmp.Dispose() }
 }
 # Real controls and mocked side effects. Actual modal lifecycle is covered by LBS202/229.

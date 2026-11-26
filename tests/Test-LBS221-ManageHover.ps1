@@ -15,6 +15,50 @@ function Assert-Lbs221([string]$Name,[bool]$Good) {
     $script:checks++
     Write-Host "PASS LBS221 $Name"
 }
+function Test-Lbs270Halo([Windows.Forms.Control]$Control) {
+    # Transparent child panels/labels need their opaque row composited first.
+    # Capture the actual parent paint, not an isolated alpha-channel bitmap.
+    $row=$Control.Parent
+    $bmp=[Drawing.Bitmap]::new($row.Width,$row.Height,[Drawing.Imaging.PixelFormat]::Format24bppRgb)
+    try {
+        $row.DrawToBitmap($bmp,$row.ClientRectangle)
+        $size=[Math]::Min($Control.Width,$Control.Height)
+        $side=$size-2*[Math]::Max(2,[int][Math]::Floor($size/10))
+        $cx=$Control.Left+[int][Math]::Floor($Control.Width/2)
+        $cy=$Control.Top+[int][Math]::Floor($Control.Height/2)
+        # The four cardinal pixels can land on the grip strokes or pencil ink.
+        # Measure a two-dimensional interior region instead of glyph-covered points.
+        $radius=$side*0.40
+        $extent=[int][Math]::Floor($radius)
+        $corner=$bmp.GetPixel($Control.Left,$Control.Top)
+        $r=[Math]::Round(($corner.R*224+255*31)/255)
+        $g=[Math]::Round(($corner.G*224+110*31)/255)
+        $b=[Math]::Round(($corner.B*224+102*31)/255)
+        $matches=0
+        $tested=0
+        $sectors=@(0,0,0,0)
+        for ($dy=-$extent; $dy -le $extent; $dy++) {
+            for ($dx=-$extent; $dx -le $extent; $dx++) {
+                if (($dx*$dx+$dy*$dy) -gt ($radius*$radius)) { continue }
+                $tested++
+                $p=$bmp.GetPixel($cx+$dx,$cy+$dy)
+                if ([Math]::Abs($p.R-$r) -le 3 -and [Math]::Abs($p.G-$g) -le 3 -and [Math]::Abs($p.B-$b) -le 3) {
+                    $matches++
+                    $sector=0
+                    if ($dx -ge 0) { $sector+=1 }
+                    if ($dy -ge 0) { $sector+=2 }
+                    $sectors[$sector]++
+                }
+            }
+        }
+        # Require area coverage and spatially separated evidence. Foreground
+        # antialiasing alone must not qualify as a filled circular halo.
+        $required=[Math]::Max(4,[int][Math]::Ceiling($tested*0.10))
+        $occupied=@($sectors | Where-Object { $_ -ge 2 }).Count
+        Write-Host ("LBS270 halo {0}: background={1}/{2}/{3} expected={4}/{5}/{6} matches={7}/{8} required={9} sectors={10}" -f $Control.Name,$corner.R,$corner.G,$corner.B,$r,$g,$b,$matches,$tested,$required,($sectors -join ','))
+        return ($matches -ge $required -and $occupied -ge 2)
+    } finally { $bmp.Dispose() }
+}
 function Get-LocalizedString { param([string]$Key,$Values) Get-LocalizedStringCore -Key $Key -Locale $script:TestLocale -Values $Values }
 function Show-DarkActionTooltip { param($Owner,[string]$Text) $script:TipOwner = $Owner; $script:TipText = $Text; $script:ShowCalls++ }
 function Hide-DarkActionTooltip { $script:TipOwner = $null; $script:TipText = ''; $script:HideCalls++ }
@@ -78,25 +122,30 @@ foreach ($locale in @('en-US','de-DE')) {
                 Assert-Lbs221 "$prefix original action dimensions" ($eye.Width -eq [int][Math]::Round(32*$factor) -and $grip.Width -eq [int][Math]::Round(26*$factor) -and $pencil.Width -eq [int][Math]::Round(25*$factor) -and $row.Height -eq [int][Math]::Round(60*$factor))
                 Assert-Lbs221 "$prefix idle ink unchanged" ($eye.ForeColor -eq $eyeIdle -and $grip.ForeColor -eq [Drawing.Color]::FromArgb(145,145,145))
                 [void]$enter.Invoke($eye,@([EventArgs]::Empty))
-                Assert-Lbs221 "$prefix eye hover preserves visibility semantics" ($eye.ForeColor -eq $eyeHover -and $eye.AccessibleName -eq $stateName -and $script:TipOwner -eq $eye)
+                Assert-Lbs221 "$prefix eye hover preserves visibility semantics" ($eye.ForeColor -eq $eyeHover -and $eye.AccessibleName -eq $stateName -and $script:TipOwner -eq $eye -and ((Test-Lbs270Halo $eye) -ne [Windows.Forms.SystemInformation]::HighContrast))
                 [void]$leave.Invoke($eye,@([EventArgs]::Empty))
-                Assert-Lbs221 "$prefix eye leave restores idle ink and closes help" ($eye.ForeColor -eq $eyeIdle -and $children[2].ForeColor -eq $titleIdle -and $null -eq $script:TipOwner)
+                Assert-Lbs221 "$prefix eye leave restores idle ink and closes help" ($eye.ForeColor -eq $eyeIdle -and $children[2].ForeColor -eq $titleIdle -and $null -eq $script:TipOwner -and -not (Test-Lbs270Halo $eye))
                 [void]$enter.Invoke($grip,@([EventArgs]::Empty))
-                Assert-Lbs221 "$prefix grip hover brightens and routes localized dark help" ($grip.ForeColor -eq $gripHover -and $script:TipOwner -eq $grip -and $script:TipText -eq $expectedHint)
+                Assert-Lbs221 "$prefix grip hover brightens and routes localized dark help" ($grip.ForeColor -eq $gripHover -and $script:TipOwner -eq $grip -and $script:TipText -eq $expectedHint -and ((Test-Lbs270Halo $grip) -ne [Windows.Forms.SystemInformation]::HighContrast))
                 [void]$down.Invoke($grip,@([Windows.Forms.MouseEventArgs]::new([Windows.Forms.MouseButtons]::Left,1,5,5,0)))
                 Assert-Lbs221 "$prefix grip down hides help without changing drag admission" ($null -eq $script:TipOwner -and $script:ManageDragGuid -eq $entry.Guid)
                 [void]$click.Invoke($grip,@([EventArgs]::Empty))
                 Assert-Lbs221 "$prefix stationary grip click remains no-op" ($script:Mutations -eq 0)
                 [void]$leave.Invoke($grip,@([EventArgs]::Empty))
-                Assert-Lbs221 "$prefix grip leave restores neutral ink" ($grip.ForeColor -eq [Drawing.Color]::FromArgb(145,145,145) -and $null -eq $script:TipOwner)
+                Assert-Lbs221 "$prefix grip leave restores neutral ink" ($grip.ForeColor -eq [Drawing.Color]::FromArgb(145,145,145) -and $null -eq $script:TipOwner -and -not (Test-Lbs270Halo $grip))
                 $script:ManageActiveDragGuid = $entry.Guid
                 $before = $script:ShowCalls
                 foreach ($control in @($grip,$eye,$pencil)) { [void]$enter.Invoke($control,@([EventArgs]::Empty)) }
                 Assert-Lbs221 "$prefix active drag suppresses all three action hints" ($script:ShowCalls -eq $before -and $null -eq $script:TipOwner -and $eye.ForeColor -eq $eyeIdle -and $grip.ForeColor -eq [Drawing.Color]::FromArgb(145,145,145))
                 $script:ManageActiveDragGuid = $null
                 [void]$enter.Invoke($grip,@([EventArgs]::Empty))
-                Assert-Lbs221 "$prefix hover help recovers after drag" ($script:TipOwner -eq $grip -and $script:TipText -eq $expectedHint)
+                $gripRecovered=($script:TipOwner -eq $grip -and $script:TipText -eq $expectedHint)
                 [void]$leave.Invoke($grip,@([EventArgs]::Empty))
+                [void]$enter.Invoke($pencil,@([EventArgs]::Empty))
+                $pencilInk=if ([Windows.Forms.SystemInformation]::HighContrast) { [Drawing.Color]::FromArgb(190,190,190) } else { [Drawing.Color]::FromArgb(255,110,102) }
+                $pencilHot=($script:TipOwner -eq $pencil -and $pencil.ForeColor -eq $pencilInk -and ((Test-Lbs270Halo $pencil) -ne [Windows.Forms.SystemInformation]::HighContrast))
+                [void]$leave.Invoke($pencil,@([EventArgs]::Empty))
+                Assert-Lbs221 "$prefix hover help recovers after drag and pencil halo restores" ($gripRecovered -and $pencilHot -and -not (Test-Lbs270Halo $pencil) -and $null -eq $script:TipOwner)
             } finally { $row.Dispose(); $script:ManageActiveDragGuid=$null; $script:ManageDragGuid=$null }
         }
     }

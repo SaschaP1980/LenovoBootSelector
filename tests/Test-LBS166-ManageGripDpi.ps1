@@ -64,7 +64,7 @@ $small = Get-LenovoManageGripGlyphGeometry -ClientSize ([Drawing.Size]::new(12,9
 Check 'Small control clamps DPI stroke and spacing' ($small.Width -le 12 -and $small.Stroke -le $small.Width -and $small.TopY -ge 0 -and $small.BottomY -le 8)
 $source = [IO.File]::ReadAllText((Join-Path $root 'src\UI\BootEntryRows.ps1'))
 Check 'The real paint event uses the shared DPI renderer' ($source.Contains('Paint-LenovoManageGripGlyph -Graphics $eventArgs.Graphics -ClientSize $sender.ClientSize'))
-Check 'Existing pencil text, eye and drag hookups preserved' ($source.Contains("-Text '$([char]0x270E)'") -and $source.Contains('Get-LenovoManageEyeGlyphGeometry') -and $source.Contains('$control.Add_MouseDown($mouseDownHandler)') -and -not $source.Contains("-Text '$([char]0x2261)'"))
+Check 'Existing pencil text, eye and drag hookups preserved' ($source.Contains('$editAlias = New-Object LenovoHoverGlyphLabel') -and $source.Contains("`$editAlias.Text = '$([char]0x270E)'") -and $source.Contains('Get-LenovoManageEyeGlyphGeometry') -and $source.Contains('$control.Add_MouseDown($mouseDownHandler)') -and -not $source.Contains("-Text '$([char]0x2261)'") -and -not $source.Contains("`$editAlias.Text = '$([char]0x2261)'"))
 $script:ColorAccent = [Drawing.Color]::FromArgb(225,37,27)
 $row = New-Object System.Windows.Forms.Panel
 $row.Size = [Drawing.Size]::new(390,60)

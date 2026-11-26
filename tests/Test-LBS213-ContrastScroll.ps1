@@ -40,9 +40,9 @@ $hotBg = [Drawing.Color]::FromArgb(64,31,29)
 $normalHiddenBg = [Drawing.Color]::FromArgb(27,27,27)
 $hoverHiddenBg = [Drawing.Color]::FromArgb(37,37,37)
 Assert-Lbs213 'Tray Open text passes root contrast benchmark' ((Get-Lbs213Contrast $lightRed $rootBg) -ge 4.5)
-Assert-Lbs213 'Tray Open text passes selected contrast benchmark' ((Get-Lbs213Contrast $lightRed $hotBg) -ge 4.5)
+Assert-Lbs213 'Tray Open text passes selected and tinted pointer contrast benchmark' ((Get-Lbs213Contrast $lightRed $hotBg) -ge 4.5 -and (Get-Lbs213Contrast $lightRed ([Drawing.Color]::FromArgb(50,33,32))) -ge 4.5 -and (Get-Lbs213Contrast $lightRed ([Drawing.Color]::FromArgb(59,41,40))) -ge 4.5)
 Assert-Lbs213 'Hidden symbol passes normal non-text guidance' ((Get-Lbs213Contrast $hiddenInk $normalHiddenBg) -ge 3.0)
-Assert-Lbs213 'Hidden symbol passes hover non-text guidance' ((Get-Lbs213Contrast $hiddenInk $hoverHiddenBg) -ge 3.0)
+Assert-Lbs213 'Hidden symbol and primary hover retain contrast guidance' ((Get-Lbs213Contrast $hiddenInk $hoverHiddenBg) -ge 3.0 -and (Get-Lbs213Contrast $hiddenInk ([Drawing.Color]::FromArgb(54,37,36))) -ge 3.0 -and (Get-Lbs213Contrast ([Drawing.Color]::FromArgb(252,252,252)) ([Drawing.Color]::FromArgb(225,41,32))) -ge 4.5)
 $prefix = 'Add-Type -TypeDefinition @"'
 $start = $template.IndexOf($prefix,[StringComparison]::Ordinal)
 if ($start -lt 0) { throw 'Canonical native renderer C# start missing.' }
