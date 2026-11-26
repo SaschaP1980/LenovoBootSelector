@@ -40,6 +40,10 @@ $configurationProbe = Join-Path $root 'tests\Test-LBS229-ConfigurationPopups.ps1
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $configurationProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-229 native configuration popup regression failed' }
 
+$ownerDismissProbe = Join-Path $root 'tests\Test-LBS267-OwnerDismiss.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $ownerDismissProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-267 owner click dismissal regression failed' }
+
 # LBS-252: native disabled Customize text and unchanged capability transition.
 $customizeProbe = Join-Path $root 'tests\Test-LBS252-CustomizeButton.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $customizeProbe
