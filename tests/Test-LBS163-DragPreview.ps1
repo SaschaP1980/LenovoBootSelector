@@ -6,6 +6,7 @@ Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 . (Join-Path $root 'src\UI\BootEntryList.ps1')
 . (Join-Path $root 'src\UI\BootEntryRows.ps1')
+. (Join-Path $root 'src\Core\EntryPreferences.ps1')
 . (Join-Path $root 'src\UI\ManageEntries.ps1')
 $script:checks = 0
 function Check([string]$Name,[bool]$Pass) {
@@ -16,6 +17,7 @@ function Check([string]$Name,[bool]$Pass) {
 $script:IsManageEntriesMode = $true
 $script:ColorAccent = [Drawing.Color]::Red
 $script:ManageEntryOrder = @('a','b','c','d')
+$script:CurrentEntries = @($script:ManageEntryOrder | ForEach-Object { [pscustomobject]@{Guid=$_} })
 $script:ManageActiveDragGuid = 'b'
 $script:ManageDropPreview = $null
 $form = New-Object System.Windows.Forms.Form

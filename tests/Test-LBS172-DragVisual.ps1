@@ -7,6 +7,7 @@ Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 . (Join-Path $root 'src\UI\BootEntryList.ps1')
 . (Join-Path $root 'src\UI\BootEntryRows.ps1')
+. (Join-Path $root 'src\Core\EntryPreferences.ps1')
 . (Join-Path $root 'src\UI\ManageEntries.ps1')
 $script:checks = 0
 function Assert-Lbs172([string]$Name,[bool]$Ok) {
@@ -96,6 +97,7 @@ function Test-Lbs172VisibleInk($Bitmap,[Drawing.Rectangle]$Bounds) {
 # Exercise the physical-size 250% case before 100% when establishing RED.
 foreach ($scale in @(2.5,1.0)) {
     $script:ManageEntryOrder = @('a','b','c','d')
+    $script:CurrentEntries = @($script:ManageEntryOrder | ForEach-Object { [pscustomobject]@{Guid=$_} })
     $script:ManageActiveDragGuid = 'b'
     $form = New-Object System.Windows.Forms.Form
     $form.ClientSize = [Drawing.Size]::new([int][Math]::Round(390*$scale),[int][Math]::Round(670*$scale))

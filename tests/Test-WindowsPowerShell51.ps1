@@ -203,6 +203,11 @@ $manageUndoProbe = Join-Path $root 'tests\Test-LBS179-ManageUndo.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $manageUndoProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-179 Manage Undo regression failed' }
 
+# LBS-178: focused Manage row keyboard commands and draft integration.
+$manageKeyboardProbe = Join-Path $root 'tests\Test-LBS178-ManageKeyboard.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $manageKeyboardProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-178 Manage keyboard regression failed' }
+
 # LBS-167: isolate real WinForms refresh/drag row identity and diagnostics.
 $refreshRowsProbe = Join-Path $root 'tests\Test-LBS167-RefreshRendering.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $refreshRowsProbe
