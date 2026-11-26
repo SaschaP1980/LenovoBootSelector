@@ -142,7 +142,7 @@ function Add-PopupHeaderSection {
     $manageButton.Location = New-Object Drawing.Point(268, 1)
     $manageButton.Size = New-Object Drawing.Size(104, 25)
     $manageButton.Cursor = [System.Windows.Forms.Cursors]::Hand
-    $manageButton.Add_Click({ Start-ManageEntriesMode })
+    $manageButton.Add_Click({ param($sender,$eventArgs) Start-ManageEntriesMode -PointerActivation:([bool]$sender.PointerActivation) })
     $script:ManageEntriesButton = $manageButton
     $section.Controls.Add($manageButton)
     $Root.Controls.Add($section)
