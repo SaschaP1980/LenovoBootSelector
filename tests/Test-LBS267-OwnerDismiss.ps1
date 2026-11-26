@@ -240,6 +240,14 @@ try {
                             $iconBounds=$trigger.RectangleToScreen($trigger.ClientRectangle)
                             Write-Host "LBS182 POLISH ownerTop=$($main.Top) childTop=$($child.Top) bridgeCount=$($bridge.Count) hole=$($dimmer[0].HighlightedRowBounds) icon=$iconBounds"
                             Assert-Lbs267 'LBS182 header aligned native connector and isolated icon cutout' ($child.Top -eq $main.Top -and $bridge.Count -eq 1 -and $bridge[0].Visible -and $bridge[0].VisualBounds.Right -eq $main.Left -and $dimmer.Count -eq 1 -and $dimmer[0].HighlightedRowBounds -eq $iconBounds -and $trigger.ModalActive)
+                            # Read the actual native connector paint state; its shared OnPaint uses this fill.
+                            # The existing geometry/raster/focus assertions remain independent and unchanged.
+                            $fillField=$bridge[0].GetType().GetField('fill',[Reflection.BindingFlags]'Instance,NonPublic')
+                            if (-not $fillField) { throw 'LBS182 connector paint state unavailable' }
+                            $expectedFill=if ([Windows.Forms.SystemInformation]::HighContrast) { $child.Tag.Header.BackColor } else { $script:ColorAccent }
+                            $actualFill=[Drawing.Color]$fillField.GetValue($bridge[0])
+                            Write-Host "LBS182 CONNECTOR FILL expected=$($expectedFill.ToArgb()) actual=$($actualFill.ToArgb())"
+                            Assert-Lbs267 'LBS182 status connector uses active accent fill (High Contrast retains surface)' ($actualFill.ToArgb() -eq $expectedFill.ToArgb())
                             [Windows.Forms.Cursor]::Position=Center-Lbs267 $child.Tag.Header
                             [Windows.Forms.Application]::DoEvents()
                             Assert-Lbs267 'LBS182 active Info actual screen accent while pointer outside' (Test-Lbs182ActiveInfoRaster $trigger $child $iconBounds)
@@ -349,5 +357,5 @@ try {
     [Windows.Forms.Cursor]::Position=$cursor
     $owner.Dispose();$tray.Dispose()
 }
-Write-Host "LBS267 OWNER DISMISS TOTAL $script:Checks/237"
-if ($script:Checks -ne 237) { throw "Unexpected LBS267 total $script:Checks" }
+Write-Host "LBS267 OWNER DISMISS TOTAL $script:Checks/239"
+if ($script:Checks -ne 239) { throw "Unexpected LBS267 total $script:Checks" }
