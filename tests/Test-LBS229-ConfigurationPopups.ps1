@@ -1,5 +1,5 @@
 ﻿#requires -version 5.1
-param([switch]$CorrectionProbeOnly,[switch]$SettingsCorrectionProbeOnly,[switch]$InitialFocusProbeOnly,[switch]$FocusOutlineProbeOnly,[switch]$DefaultInitialFocusProbeOnly)
+param([switch]$CorrectionProbeOnly,[switch]$SettingsCorrectionProbeOnly,[switch]$InitialFocusProbeOnly,[switch]$FocusOutlineProbeOnly,[switch]$DefaultInitialFocusProbeOnly,[switch]$Lbs182StatusProbeOnly)
 # LBS-229: actual native owned forms, no live firmware or privileged actions.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -46,6 +46,8 @@ Add-Type -TypeDefinition ($template.Substring($begin,$end-$begin)) -ReferencedAs
 . (Join-Path $root 'src\UI\DefaultTargetMenu.ps1')
 . (Join-Path $root 'src\UI\DefaultTargetPresentation.ps1')
 . (Join-Path $root 'src\UI\Dialogs.ps1')
+. (Join-Path $root 'src\Core\SystemStatus.ps1')
+. (Join-Path $root 'src\UI\SystemStatusPresentation.ps1')
 $script:ColorBackground=[Drawing.Color]::FromArgb(31,31,31)
 $script:ColorHeader=[Drawing.Color]::Black
 $script:ColorRow=$script:ColorBackground
@@ -136,6 +138,148 @@ $area=[Drawing.Rectangle]::new(-1000,-100,3000,1700)
 $anchor=[Drawing.Rectangle]::new(0,0,390,672)
 $size=[Drawing.Size]::new(390,514)
 try {
+    function Test-Lbs182StatusOverview {
+        $startChecks=$script:Checks
+        $savedLocale=$script:Locale
+        $savedScale=$script:Scale
+        $savedDefault=$script:DefaultGuid
+        $savedSelected=$script:SelectedGuid
+        $savedReady=$script:Ready
+        $savedActions=$script:Actions.Count
+        $savedCalls=$script:BootCalls
+        $savedDefaultCalls=$script:DefaultCalls.Count
+        $savedCursor=[Windows.Forms.Cursor]::Position
+        . (Join-Path $root 'src\Application\RefreshRuntime.ps1')
+        . (Join-Path $root 'src\UI\RefreshPresentation.ps1')
+        $script:BackgroundRefreshState=New-BackgroundRefreshRuntimeState
+        $script:SystemStatusDefaultEvidence='configured'
+        $script:DefaultTargetReadUncertain=$false
+        $script:SystemStatusCapabilities=[pscustomobject]@{State='Ready'}
+        $script:NextBootFirmwareReadVerified=$true
+        $script:SystemStatusNextObservedUtc=[datetime]::UtcNow.AddMinutes(-2)
+        $script:SystemStatusEntriesObservedUtc=[datetime]::UtcNow.AddMinutes(-4)
+        $script:SystemStatusReadinessObservedUtc=[datetime]::UtcNow.AddMinutes(-3)
+        $script:SystemStatusLastRefresh='success'
+        $script:BootTargetDriftState=[pscustomobject]@{Evaluated=$true;HasDrift=$false}
+        $script:SystemStatusDriftFailed=$false
+        $rootPanel=New-Object Windows.Forms.Panel
+        $rootPanel.Size=$owner.ClientSize
+        $owner.Controls.Add($rootPanel)
+        try {
+            $tokens=$null; $parseErrors=$null
+            $brokerAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $root 'src\Infrastructure\TaskBroker.ps1'),[ref]$tokens,[ref]$parseErrors)
+            if ($parseErrors.Count) { throw 'LBS182 broker source cannot be parsed' }
+            foreach ($functionName in @('Get-SystemStatusObservationHash','Test-SystemStatusObservationMatch')) {
+                $definition=$brokerAst.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $functionName },$true)
+                if (-not $definition) { throw "Missing observation helper $functionName" }
+                . ([scriptblock]::Create($definition.Extent.Text))
+            }
+            $observed=Get-SystemStatusObservationHash 'fixture observed content'
+            Assert-Lbs229 'LBS182 identical observed content retains provenance' ($observed -and (Test-SystemStatusObservationMatch 'fixture observed content' $observed))
+            Assert-Lbs229 'LBS182 changed cache content cannot retain observation provenance' (-not (Test-SystemStatusObservationMatch 'different cache content' $observed))
+            Assert-Lbs229 'LBS182 missing observation cannot establish provenance' (-not (Test-SystemStatusObservationMatch 'fixture observed content' $null))
+            $model=Get-SystemStatusPresentation
+            Assert-Lbs229 'LBS182 different targets remain valid and require no intervention' ($model.Default -eq 'Value' -and $model.Next -eq 'Value' -and $model.Relation -eq 'Differs' -and $model.Summary -eq 'SummaryReady')
+            $script:SelectedGuid='a'
+            Assert-Lbs229 'LBS182 aligned confirmed targets' ((Get-SystemStatusPresentation).Relation -eq 'Matches')
+            $script:SelectedGuid=$null
+            Assert-Lbs229 'LBS182 confirmed firmware order is not unknown' ((Get-SystemStatusPresentation).Next -eq 'FirmwareOrder')
+            $script:NextBootFirmwareReadVerified=$false
+            Assert-Lbs229 'LBS182 failed read cannot assert firmware order' ((Get-SystemStatusPresentation).Next -eq 'Unknown')
+            $script:NextBootFirmwareReadVerified=$true
+            $script:SystemStatusNextObservedUtc=$null
+            Assert-Lbs229 'LBS182 cached read without timestamp is unknown' ((Get-SystemStatusPresentation).Next -eq 'Unknown')
+            $script:SystemStatusNextObservedUtc=[datetime]::UtcNow.AddMinutes(-2)
+            $script:SelectedGuid='missing'
+            Assert-Lbs229 'LBS182 unavailable next target is not exposed as raw identifier' ((Get-SystemStatusPresentation).Next -eq 'Unavailable')
+            $script:SelectedGuid='b'
+            $script:BootNextPendingGuid='a'
+            Assert-Lbs229 'LBS182 pending selection cannot appear verified' ((Get-SystemStatusPresentation).Next -eq 'Pending')
+            $script:BootNextPendingGuid=$null
+            $script:SystemStatusDefaultEvidence='unknown'
+            Assert-Lbs229 'LBS182 missing default evidence is not a cleared setting' ((Get-SystemStatusPresentation).Default -eq 'Unknown')
+            $script:DefaultGuid=$null
+            $script:SystemStatusDefaultEvidence='none'
+            Assert-Lbs229 'LBS182 explicit unset default is distinct' ((Get-SystemStatusPresentation).Default -eq 'NoDefault')
+            $script:DefaultGuid='a'
+            $script:SystemStatusDefaultEvidence='configured'
+            $script:SystemStatusReadinessObservedUtc=$null
+            Assert-Lbs229 'LBS182 no readiness probe cannot claim readiness' ((Get-SystemStatusPresentation).Readiness -eq 'Unknown')
+            $script:SystemStatusReadinessObservedUtc=[datetime]::UtcNow.AddMinutes(-3)
+            $script:SystemStatusLastRefresh='error'
+            Assert-Lbs229 'LBS182 failed refresh not all clear' ((Get-SystemStatusPresentation).Summary -eq 'SummaryUnknown' -and (Get-SystemStatusPresentation).Refresh -eq 'RefreshFailed')
+            $script:SystemStatusLastRefresh='success'
+            $script:SystemStatusDriftFailed=$true
+            Assert-Lbs229 'LBS182 failed drift comparison cannot claim unchanged' ((Get-SystemStatusPresentation).Drift -eq 'Unknown')
+            $script:SystemStatusDriftFailed=$false
+            foreach ($state in @('SetupRequired','RepairRequired','ReinitializeRequired','Busy','Checking','Unknown')) {
+                $script:SystemStatusCapabilities.State=$state
+                $model=Get-SystemStatusPresentation
+                Assert-Lbs229 "LBS182 capability $state" ($model.Readiness -eq $state -and $model.Summary -ne 'SummaryReady' -and (($state -in @('SetupRequired','RepairRequired','ReinitializeRequired')) -eq [bool]$model.Hint))
+            }
+            $script:Ready=$false
+            Add-PopupHeaderSection -Root $rootPanel
+            $info=$script:SystemStatusButton
+            $refresh=$script:RefreshButton
+            Assert-Lbs229 'LBS182 info available while refresh disabled' ($info.Enabled -and $info.TabStop -and -not $refresh.Enabled)
+            foreach ($locale in @('de-DE','en-US')) {
+                $script:Locale=$locale
+                foreach ($scale in @(1.0,2.5)) {
+                    $script:Scale=$scale
+                    $script:SystemStatusCapabilities=[pscustomobject]@{State='Ready'}
+                    $form=New-SystemStatusPopup
+                    try {
+                        Set-AuxiliaryPopupLayout -Form $form -Scale $scale -WorkingArea $area -OwnerBounds $anchor
+                        $labels=@($form.Tag.Body.Controls | Where-Object Name -like 'SystemStatusValue-*')
+                        Assert-Lbs229 "LBS182 $locale/$scale localized read-only labels and layout" ($labels.Count -eq 6 -and @($labels | Where-Object {$_.Width -le 0 -or $_.Right -gt $form.Tag.Body.Width -or $_.Bottom -gt $form.Tag.Body.Height -or $_.AccessibleName -ne $_.Text -or $_.Text -match '^SystemStatus\.'}).Count -eq 0 -and $form.Tag.Body.Controls['SystemStatusValue-Stored'].Text -eq 'Corporate' -and $form.Tag.Body.Controls['SystemStatusValue-Next'].Text -match 'Gaming' -and @($form.Tag.Body.Controls | Where-Object TabStop).Count -eq 0)
+                    } finally { $form.Dispose() }
+                }
+            }
+            $script:Scale=1.0
+            $script:Locale='de-DE'
+            $script:Ready=$false
+            $script:SystemStatusCapabilities=[pscustomobject]@{State='Checking'}
+            $script:Lbs182OwnerProbe=$owner
+            $script:Lbs182ModalSeen=$false
+            $script:Lbs182ModalError=$null
+            $timer=New-Object Windows.Forms.Timer
+            $timer.Interval=50
+            $timer.Add_Tick({
+                param($sender,$eventArgs)
+                $child=$script:ActiveAuxiliaryPopup
+                if (-not $child -or -not $child.Visible -or -not $child.Tag.Timer.Enabled) { return }
+                $sender.Stop()
+                try {
+                    Write-Host "LBS182 MODAL name=$($child.Name) focus=$($child.ContainsFocus) foreground=$([Lbs229Native]::GetForegroundWindow()) child=$($child.Handle) owner=$($script:Lbs182OwnerProbe.Handle) nativeOwner=$([Lbs229Native]::GetWindow($child.Handle,4)) ownerEnabled=$([Lbs229Native]::IsWindowEnabled($script:Lbs182OwnerProbe.Handle)) readiness=$($child.Tag.Body.Controls['SystemStatusValue-Readiness'].Text) expected=$(Get-LocalizedString -Key 'SystemStatus.Checking')"
+                    Assert-Lbs229 'LBS182 actual native status modal owns focus and preserves disabled owner' ($child.Name -eq 'LenovoSystemStatusPopup' -and $child.ContainsFocus -and [Lbs229Native]::GetForegroundWindow() -eq $child.Handle -and [Lbs229Native]::GetWindow($child.Handle,4) -eq $script:Lbs182OwnerProbe.Handle -and -not [Lbs229Native]::IsWindowEnabled($script:Lbs182OwnerProbe.Handle) -and $child.Tag.Body.Controls['SystemStatusValue-Readiness'].Text -eq (Get-LocalizedString -Key 'SystemStatus.Checking'))
+                    $script:Lbs182ModalSeen=$true
+                } catch { $script:Lbs182ModalError=$_ }
+                finally { $child.Tag.Close.PerformClick() }
+            })
+            try { $owner.Activate(); [void]$info.Focus(); $timer.Start(); $info.PerformClick() }
+            finally { $timer.Stop();$timer.Dispose() }
+            if ($script:Lbs182ModalError) { throw $script:Lbs182ModalError }
+            Assert-Lbs229 'LBS182 modal close restores owner and no action dispatch' ($script:Lbs182ModalSeen -and $info.Focused -and [Lbs229Native]::IsWindowEnabled($owner.Handle) -and -not $script:ActiveAuxiliaryPopup -and @($owner.OwnedForms | Where-Object Name -in @('AuxiliaryOwnerDimmer','AuxiliaryOwnerClickShield')).Count -eq 0 -and $script:Actions.Count -eq $savedActions -and $script:BootCalls -eq $savedCalls -and $script:DefaultCalls.Count -eq $savedDefaultCalls)
+            Write-Host "LBS182 STATUS TOTAL $($script:Checks-$startChecks)/28"
+            if ($script:Checks-$startChecks -ne 28) { throw 'LBS182 status count mismatch' }
+        } finally {
+            $rootPanel.Dispose()
+            $script:SystemStatusButton=$null
+            $script:RefreshButton=$null
+            $script:HeaderStatusLabel=$null
+            $script:Locale=$savedLocale
+            $script:Scale=$savedScale
+            $script:DefaultGuid=$savedDefault
+            $script:SelectedGuid=$savedSelected
+            $script:Ready=$savedReady
+            $script:NextBootFirmwareReadVerified=$false
+            $script:BackgroundRefreshState=New-BackgroundRefreshRuntimeState
+            [Windows.Forms.Cursor]::Position=$savedCursor
+        }
+    }
+    if ($Lbs182StatusProbeOnly -or -not ($CorrectionProbeOnly -or $SettingsCorrectionProbeOnly -or $InitialFocusProbeOnly -or $FocusOutlineProbeOnly -or $DefaultInitialFocusProbeOnly)) { Test-Lbs182StatusOverview }
+    if ($Lbs182StatusProbeOnly) { return }
+
     # F10: observe actual picker foreground and keyboard focus before any
     # child input. Controlled loss during Shown tests the opening recovery
     # contract separately from unperturbed owner-specific reproduction.

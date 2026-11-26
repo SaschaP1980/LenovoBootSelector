@@ -54,6 +54,8 @@ function Invoke-DefaultTargetWorker {
         SavedGuid = ''
         NextGuid = ''
         NextVerified = $false
+        NextObservedUtc = $null
+        NextObservedHash = $null
         Stage = 'admission'
         Error = ''
     }
@@ -74,6 +76,8 @@ function Invoke-DefaultTargetWorker {
         $result.SavedGuid = [string]$script:DefaultGuid
         $result.NextGuid = [string]$script:SelectedGuid
         $result.NextVerified = [bool]$script:NextBootFirmwareReadVerified
+        $result.NextObservedUtc = $script:SystemStatusNextObservedUtc
+        $result.NextObservedHash = $script:SystemStatusManagerObservedHash
         $result.Stage = if ($result.NextVerified) { 'complete' } else { 'next-unverified' }
         $result.Success = $true
     }

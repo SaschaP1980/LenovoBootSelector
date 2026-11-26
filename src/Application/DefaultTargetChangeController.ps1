@@ -190,6 +190,7 @@ function Complete-DefaultTargetChange {
             if ($workerNext -ne $readNext) { throw 'Worker firmware result mismatch.' }
             $script:SelectedGuid = if ($readNext) { $readNext.ToLowerInvariant() } else { $null }
             $script:NextBootFirmwareReadVerified = $true
+            $script:SystemStatusNextObservedUtc = if ($result.NextObservedHash -and (Test-SystemStatusObservationMatch $managerText $result.NextObservedHash)) { $result.NextObservedUtc } else { $null }
             $verifiedNext = $true
         }
         catch { $failure = $_ }
@@ -199,6 +200,7 @@ function Complete-DefaultTargetChange {
         # unreadable. Never keep an old "confirmed" next-boot checkmark.
         $script:SelectedGuid = $null
         $script:NextBootFirmwareReadVerified = $false
+        $script:SystemStatusNextObservedUtc = $null
     }
     $outcome = if ($workerSuccess -and $verifiedDefault -and $verifiedNext) { 'complete' }
                elseif ($verifiedDefault) { 'partial' }

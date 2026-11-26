@@ -65,6 +65,12 @@ function Update-PopupLocalePresentation {
         foreach ($row in $script:Popup.Controls.Find('SettingsPanel',$true)) {
             $row.AccessibleName = Get-LocalizedString -Key 'Settings.More'
         }
+        if ($script:SystemStatusButton -and -not $script:SystemStatusButton.IsDisposed) {
+            $script:SystemStatusButton.AccessibleName = Get-LocalizedString -Key 'SystemStatus.Title'
+            $script:SystemStatusButton.AccessibleDescription = Get-LocalizedString -Key 'SystemStatus.Subtitle'
+            if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($script:SystemStatusButton,$script:SystemStatusButton.AccessibleName) }
+        }
+        if ($script:RefreshButton) { $script:RefreshButton.AccessibleName = Get-LocalizedString -Key 'Action.RefreshBootTargets' }
         if ($script:HeaderStatusLabel) { $script:HeaderStatusLabel.AccessibleDescription = Get-LocalizedString -Key 'Popup.HeaderUpdateAccessible' }
         if ($script:RestartUseDefaultButton) { $script:RestartUseDefaultButton.AccessibleName = $script:RestartUseDefaultButton.Text }
         if ($script:BootTypeToolTip) {

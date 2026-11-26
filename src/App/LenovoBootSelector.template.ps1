@@ -938,6 +938,59 @@ public static class LenovoSettingsInk
 }
 
 // LBS-252: the same glyph renderer and layout are used in every state.
+// Header icon ink is independent of native disabled text rendering.
+// Keep the native Button adapter, focus cues, and all input/admission semantics.
+public sealed class LenovoHeaderIconButton : Button
+{
+    public bool InfoIcon { get; set; }
+    public LenovoHeaderIconButton()
+    {
+        SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+    }
+
+    protected override void OnEnabledChanged(EventArgs e)
+    { base.OnEnabledChanged(e); Invalidate(); }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        Color ink = SystemInformation.HighContrast
+            ? (Enabled ? SystemColors.ControlText : SystemColors.GrayText)
+            : (Enabled ? ForeColor : Color.FromArgb(119,119,119));
+        if (SystemInformation.HighContrast) {
+            Rectangle center = ClientRectangle;
+            int inset = Math.Max(2, Math.Min(center.Width,center.Height)/7);
+            center.Inflate(-inset,-inset);
+            using (SolidBrush surface = new SolidBrush(SystemColors.Control))
+                if (center.Width > 0 && center.Height > 0) e.Graphics.FillRectangle(surface,center);
+        }
+        float size = Math.Min(ClientSize.Width,ClientSize.Height) * 0.60f;
+        if (size <= 0) return;
+        GraphicsState saved = e.Graphics.Save();
+        try {
+            e.Graphics.TranslateTransform((ClientSize.Width-size)/2f,(ClientSize.Height-size)/2f);
+            e.Graphics.ScaleTransform(size/24f,size/24f);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using (Pen p = new Pen(ink,2.4f)) {
+                p.StartCap = p.EndCap = LineCap.Round;
+                p.LineJoin = LineJoin.Round;
+                if (InfoIcon) {
+                    e.Graphics.DrawEllipse(p,2.5f,2.5f,19f,19f);
+                    e.Graphics.DrawLine(p,12f,11f,12f,17f);
+                    using (SolidBrush dot = new SolidBrush(ink))
+                        e.Graphics.FillEllipse(dot,10.7f,6.1f,2.6f,2.6f);
+                } else {
+                    e.Graphics.DrawArc(p,3f,3f,18f,18f,185f,153f);
+                    e.Graphics.DrawLines(p,new PointF[] { new PointF(16f,8f),new PointF(21f,8f),new PointF(21f,3f) });
+                    e.Graphics.DrawArc(p,3f,3f,18f,18f,5f,153f);
+                    e.Graphics.DrawLines(p,new PointF[] { new PointF(8f,16f),new PointF(3f,16f),new PointF(3f,21f) });
+                }
+            }
+        }
+        finally { e.Graphics.Restore(saved); }
+    }
+}
+
 // Button retains native input, accessibility, Enabled and Click semantics.
 public sealed class LenovoCustomizeButton : Button
 {
@@ -1543,6 +1596,18 @@ $script:PreferencesImportMenuItem = $null
 $script:PreferencesUiActive = $false
 $script:TrayExitMenuItem = $null
 $script:RefreshButton = $null
+$script:SystemStatusButton = $null
+$script:SystemStatusCapabilities = $null
+$script:SystemStatusManagerObservedUtc = $null
+$script:SystemStatusManagerObservedHash = $null
+$script:SystemStatusEntriesObservedUtc = $null
+$script:SystemStatusEntriesObservedHash = $null
+$script:SystemStatusReadinessObservedUtc = $null
+$script:SystemStatusNextObservedUtc = $null
+$script:SystemStatusDefaultObservedUtc = $null
+$script:SystemStatusDefaultEvidence = 'unknown'
+$script:SystemStatusLastRefresh = 'unknown'
+$script:SystemStatusDriftFailed = $false
 $script:RefreshButtonHovered = $false
 $script:HeaderTitleLabel = $null
 $script:HeaderStatusLabel = $null
@@ -1788,11 +1853,13 @@ function Refresh-EffectiveNextBootState {
         $manager = ConvertFrom-FirmwareManagerText -Text ([string]$managerText)
         $script:SelectedGuid = if ($manager.SelectedGuid) { ([string]$manager.SelectedGuid).ToLowerInvariant() } else { $null }
         $script:NextBootFirmwareReadVerified = $true
+        $script:SystemStatusNextObservedUtc = $script:SystemStatusManagerObservedUtc
         Update-RestartTargetUi
         return $script:SelectedGuid
     }
     catch {
         $script:NextBootFirmwareReadVerified = $false
+        $script:SystemStatusNextObservedUtc = $null
         $script:SelectedGuid = $null
         Update-RestartTargetUi
         throw
@@ -1970,6 +2037,7 @@ function Update-BootTargetDriftState {
         $descriptions = ConvertFrom-FirmwareEntriesText -Text $firmwareText
         $drift = Compare-BootTargetDriftCore -InstalledTargets @($meta.targets) -Descriptions $descriptions -DisplayOrder @($manager.DisplayOrder)
         [void](Set-BootTargetDriftRuntimeState -State $script:BootTargetDriftState -Drift $drift)
+        $script:SystemStatusDriftFailed = $false
         Write-RuntimeDiagnosticEvent -Event 'BOOT_TARGET_DRIFT_CHECK' -Stage 'drift' -Success $true -Data (New-RuntimeDiagnosticData @{
             hasDrift = [bool]$drift.HasDrift
             hasNewTargets = [bool]$drift.HasNewTargets
@@ -1981,6 +2049,7 @@ function Update-BootTargetDriftState {
         return [bool]$drift.HasDrift
     }
     catch {
+        $script:SystemStatusDriftFailed = $true
         Write-RuntimeDiagnosticEvent -Event 'BOOT_TARGET_DRIFT_CHECK' -Stage 'drift' -Success $false -ErrorRecord $_ -Level warning
         return $false
     }
@@ -2215,6 +2284,15 @@ function Complete-TaskBrokerRemove {
         $script:TaskBrokerRemoveTimer = $null
     }
     $script:TaskBrokerRemoveProcess = $null
+    $script:SystemStatusManagerObservedUtc = $null
+    $script:SystemStatusManagerObservedHash = $null
+    $script:SystemStatusEntriesObservedUtc = $null
+    $script:SystemStatusEntriesObservedHash = $null
+    $script:SystemStatusReadinessObservedUtc = $null
+    $script:SystemStatusNextObservedUtc = $null
+    $script:SystemStatusDefaultObservedUtc = $null
+    $script:SystemStatusDefaultEvidence = 'unknown'
+    $script:SystemStatusLastRefresh = 'unknown'
     $script:TaskBrokerMetadata = $null
     $script:ManagerCacheText = $null
     $script:FirmwareCacheText = $null
@@ -2457,6 +2535,7 @@ function Apply-FirmwareBootState {
     $script:CurrentEntries = @($State.Entries)
     $script:SelectedGuid = if ($State.SelectedGuid) { $State.SelectedGuid.ToLowerInvariant() } else { $null }
     $script:NextBootFirmwareReadVerified = [bool]$VerifiedFresh
+    $script:SystemStatusNextObservedUtc = if ($VerifiedFresh) { $script:SystemStatusManagerObservedUtc } else { $null }
 
     if ($script:SelectedGuid) {
         $selected = Get-EntryByGuid $script:SelectedGuid
@@ -2483,11 +2562,13 @@ function Refresh-BootState {
         $state = Get-FirmwareBootState -RefreshStorage:$RefreshStorage -ForceManagerRefresh
         [void](Update-BootTargetDriftState)
         Apply-FirmwareBootState -State $state -VerifiedFresh
+        $script:SystemStatusLastRefresh = 'success'
         $sw.Stop()
         Write-RuntimeDiagnosticEvent -Event 'BOOT_STATE_REFRESH' -Stage 'boot-state' -Success $true -DurationMs $sw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{ refreshStorage = [bool]$RefreshStorage; entryCount = @($state.Entries).Count; selectedGuid = $state.SelectedGuid })
     }
     catch {
         $script:NextBootFirmwareReadVerified = $false
+        $script:SystemStatusLastRefresh = 'error'
         $sw.Stop()
         Write-RuntimeDiagnosticEvent -Event 'BOOT_STATE_REFRESH' -Stage 'boot-state' -Success $false -DurationMs $sw.ElapsedMilliseconds -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ refreshStorage = [bool]$RefreshStorage }) -Level error
         $script:LastStatusText = Get-LocalizedString -Key 'Status.BootTargetsReadFailed'
@@ -2512,6 +2593,8 @@ function Load-BootStateFromExistingCache {
 }
 
 # @include src/UI/PopupComposition.ps1
+# @include src/Core/SystemStatus.ps1
+# @include src/UI/SystemStatusPresentation.ps1
 # @include src/UI/PopupPosition.ps1
 # @include src/UI/Popup.ps1
 

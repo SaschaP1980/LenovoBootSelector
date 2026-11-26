@@ -1,4 +1,5 @@
 #requires -version 5.1
+param([switch]$Lbs182StartupProbeOnly)
 # LBS-174: real WinForms header state and DPI regression in an isolated STA process.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -85,6 +86,63 @@ function New-Lbs174Fixture {
     Complete-PopupDpiLayout -Form $form -Scale 1.0
     return $form
 }
+# LBS-182: startup visibility is a real-screen ink contract, not Visible alone.
+function Test-Lbs182StartupRefresh {
+    $script:TestCapabilities.State='Checking'
+    $script:TestCapabilities.CanRefresh=$false
+    $script:BackgroundRefreshState.Active=$true
+    $form=New-Lbs174Fixture
+    $form.StartPosition=[Windows.Forms.FormStartPosition]::Manual
+    $form.Location=[Drawing.Point]::new(40,40)
+    $form.TopMost=$true
+    $cursor=[Windows.Forms.Cursor]::Position
+    try {
+        $form.Show()
+        $form.Activate()
+        [Windows.Forms.Cursor]::Position=$form.PointToScreen([Drawing.Point]::new(5,5))
+        $button=$script:RefreshButton
+        if (-not $button.Visible -or $button.Enabled -or $button.CanSelect) { throw 'LBS182 invalid disabled-startup fixture' }
+        $bounds=$button.RectangleToScreen($button.ClientRectangle)
+        $valid=$false
+        $peak=0;$ink=0
+        for ($attempt=1;$attempt -le 5;$attempt++) {
+            [Windows.Forms.Application]::DoEvents()
+            $button.Refresh()
+            $bm=[Drawing.Bitmap]::new($button.ClientSize.Width,$button.ClientSize.Height)
+            $g=[Drawing.Graphics]::FromImage($bm)
+            try {
+                $g.CopyFromScreen($bounds.Location,[Drawing.Point]::Empty,$button.ClientSize)
+                $corners=@($bm.GetPixel(1,1).ToArgb(),$bm.GetPixel($bm.Width-2,1).ToArgb(),$bm.GetPixel(1,$bm.Height-2).ToArgb(),$bm.GetPixel($bm.Width-2,$bm.Height-2).ToArgb())
+                $valid=$form.ContainsFocus -and $form.Visible -and $button.RectangleToScreen($button.ClientRectangle) -eq $bounds -and @($corners | Where-Object { $_ -ne $button.BackColor.ToArgb() }).Count -eq 0
+                $peak=0;$ink=0
+                for ($y=5;$y -lt $bm.Height-5;$y++) {
+                    for ($x=5;$x -lt $bm.Width-5;$x++) {
+                        $p=$bm.GetPixel($x,$y)
+                        $v=[Math]::Min([int]$p.R,[Math]::Min([int]$p.G,[int]$p.B))
+                        $peak=[Math]::Max($peak,$v)
+                        if ($v -ge 100) { $ink++ }
+                    }
+                }
+                Write-Host "LBS182 STARTUP SCREEN attempt=$attempt valid=$valid corners=$($corners -join ',') focus=$($form.ContainsFocus) bounds=$bounds enabled=$($button.Enabled) peak=$peak ink=$ink"
+            } finally { $g.Dispose();$bm.Dispose() }
+            if ($valid) { break }
+            if ($attempt -lt 5) { Start-Sleep -Milliseconds 25 }
+        }
+        if (-not $valid) { throw 'LBS182 invalid startup screen capture; no visual conclusion' }
+        if ($peak -lt 119 -or $ink -lt 8) { throw "LBS182 RED: disabled Refresh glyph lacks approved legible ink (peak=$peak, ink=$ink)" }
+        Write-Host 'PASS LBS182 initial disabled Refresh ink is legible'
+    } finally {
+        $form.Dispose()
+        [Windows.Forms.Cursor]::Position=$cursor
+        $script:TestCapabilities.State='Ready'
+        $script:TestCapabilities.CanRefresh=$true
+        $script:BackgroundRefreshState.Active=$false
+    }
+}
+if ($Lbs182StartupProbeOnly) { Test-Lbs182StartupRefresh; return }
+Test-Lbs182StartupRefresh
+Assert-Lbs174 'LBS182 startup disabled ink confirmed by actual screen before input' $true
+
 $form = New-Lbs174Fixture
 try {
     $title = $script:HeaderTitleLabel
@@ -112,6 +170,9 @@ try {
     Assert-Lbs174 'title clears refresh affordance horizontally' ($title.Right + 8 -le $refresh.Left)
     Assert-Lbs174 'status clears refresh affordance horizontally' ($status.Right + 8 -le $refresh.Left)
     Assert-Lbs174 'status keeps bottom breathing room' ($status.Bottom + 4 -le 60)
+    $info = $script:SystemStatusButton
+    Assert-Lbs174 'LBS182 info and refresh equal native button sizes and alignment' ($info -is [Windows.Forms.Button] -and $info.Enabled -and $info.Size -eq $refresh.Size -and $info.Top -eq $refresh.Top -and $info.Right+4 -le $refresh.Left)
+    Assert-Lbs174 'LBS182 title and status clear info button' ($title.Right+8 -le $info.Left -and $status.Right+8 -le $info.Left)
 
     $script:UpdateState.Status = 'UpdateAvailable'
     $script:UpdateState.AvailableManifest = [pscustomobject]@{ Version='9.9.9.9' }
@@ -150,6 +211,7 @@ try {
     Assert-Lbs174 '250 percent title and status have physical gap' ($title.Bottom + 5 -le $status.Top)
     Assert-Lbs174 '250 percent title avoids refresh icon' ($title.Right + 15 -le $refresh.Left)
     Assert-Lbs174 '250 percent status avoids refresh icon' ($status.Right + 15 -le $refresh.Left)
+    Assert-Lbs174 'LBS182 scaled header retains equal icons and clearance' ($info.Size -eq $refresh.Size -and $info.Top -eq $refresh.Top -and $info.Right+10 -le $refresh.Left -and $title.Right+15 -le $info.Left -and $status.Right+15 -le $info.Left)
     Assert-Lbs174 '250 percent title font fits its label box' ($title.Font.GetHeight([single]240) -le $title.Height)
     Assert-Lbs174 '250 percent status font fits its button box' ($status.Font.GetHeight([single]240) -le $status.Height)
 
@@ -179,5 +241,5 @@ try {
 }
 finally { $form2.Dispose() }
 
-Write-Host "LBS174 HEADER TOTAL $script:checks/44"
-if ($script:checks -ne 44) { throw "LBS174 header count mismatch: $script:checks" }
+Write-Host "LBS174 HEADER TOTAL $script:checks/48"
+if ($script:checks -ne 48) { throw "LBS174 header count mismatch: $script:checks" }
