@@ -943,6 +943,8 @@ public static class LenovoSettingsInk
 public sealed class LenovoHeaderIconButton : Button
 {
     public bool InfoIcon { get; set; }
+    private bool modalActive;
+    public bool ModalActive { get { return modalActive; } set { modalActive = value; Invalidate(); } }
     public LenovoHeaderIconButton()
     {
         SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
@@ -954,9 +956,10 @@ public sealed class LenovoHeaderIconButton : Button
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
+        bool activeInfo = InfoIcon && ModalActive;
         Color ink = SystemInformation.HighContrast
-            ? (Enabled ? SystemColors.ControlText : SystemColors.GrayText)
-            : (Enabled ? ForeColor : Color.FromArgb(119,119,119));
+            ? (Enabled || activeInfo ? SystemColors.ControlText : SystemColors.GrayText)
+            : (activeInfo ? Color.FromArgb(225,37,27) : (Enabled ? ForeColor : Color.FromArgb(119,119,119)));
         if (SystemInformation.HighContrast) {
             Rectangle center = ClientRectangle;
             int inset = Math.Max(2, Math.Min(center.Width,center.Height)/7);

@@ -112,6 +112,23 @@ function Get-LocalizationCatalogCore {
             'Popup.Customize' = 'CUSTOMIZE'
             'Status.ScrollPositionFailed' = 'The scroll position could not be updated.'
             'Settings.Title' = 'SETTINGS'
+            'SystemStatus.JustNow' = 'Just now'
+            'SystemStatus.MinutesAgo' = '{Minutes} min ago'
+            'SystemStatus.Targets' = 'BOOT TARGETS'
+            'SystemStatus.StoredCaption' = 'Saved default target'
+            'SystemStatus.NextCaption' = 'Next restart · firmware readback'
+            'SystemStatus.SummaryReadyShort' = 'No action required'
+            'SystemStatus.LastCheck' = 'As of the last check'
+            'SystemStatus.ReadyShort' = 'Ready'
+            'SystemStatus.ConfigurationChecked' = 'Configuration checked'
+            'SystemStatus.DriftNoneShort' = 'Boot targets unchanged'
+            'SystemStatus.DriftChangedShort' = 'Boot targets changed'
+            'SystemStatus.LastComparison' = 'As of the last comparison'
+            'SystemStatus.DriftUnknown' = 'Boot target comparison not verified'
+            'SystemStatus.Checks' = 'LAST CHECKS'
+            'SystemStatus.ManagerCaption' = 'Next target'
+            'SystemStatus.EntriesCaption' = 'Boot targets'
+            'SystemStatus.ReadinessCaption' = 'System functions'
             'SystemStatus.Title' = 'System status'
             'SystemStatus.Subtitle' = 'Boot configuration and readiness'
             'SystemStatus.SummaryReady' = 'No action required in the last checks'
@@ -601,6 +618,23 @@ function Get-LocalizationCatalogCore {
             'Popup.Customize' = 'ANPASSEN'
             'Status.ScrollPositionFailed' = 'Scrollposition konnte nicht aktualisiert werden.'
             'Settings.Title' = 'EINSTELLUNGEN'
+            'SystemStatus.JustNow' = 'Gerade eben'
+            'SystemStatus.MinutesAgo' = 'vor {Minutes} Min.'
+            'SystemStatus.Targets' = 'STARTZIELE'
+            'SystemStatus.StoredCaption' = 'Gespeichertes Standard-Startziel'
+            'SystemStatus.NextCaption' = 'Nächster Start · Firmware-Auslesung'
+            'SystemStatus.SummaryReadyShort' = 'Kein Handlungsbedarf'
+            'SystemStatus.LastCheck' = 'Stand der letzten Prüfung'
+            'SystemStatus.ReadyShort' = 'Bereit'
+            'SystemStatus.ConfigurationChecked' = 'Konfiguration geprüft'
+            'SystemStatus.DriftNoneShort' = 'Boot-Ziele unverändert'
+            'SystemStatus.DriftChangedShort' = 'Boot-Ziele verändert'
+            'SystemStatus.LastComparison' = 'Stand des letzten Abgleichs'
+            'SystemStatus.DriftUnknown' = 'Abgleich der Boot-Ziele nicht bestätigt'
+            'SystemStatus.Checks' = 'LETZTE PRÜFUNGEN'
+            'SystemStatus.ManagerCaption' = 'Nächstes Startziel'
+            'SystemStatus.EntriesCaption' = 'Boot-Ziele'
+            'SystemStatus.ReadinessCaption' = 'Systemfunktionen'
             'SystemStatus.Title' = 'Systemstatus'
             'SystemStatus.Subtitle' = 'Boot-Konfiguration und Einsatzbereitschaft'
             'SystemStatus.SummaryReady' = 'Bei letzter Prüfung kein Handlungsbedarf'
@@ -2878,6 +2912,8 @@ public static class LenovoSettingsInk
 public sealed class LenovoHeaderIconButton : Button
 {
     public bool InfoIcon { get; set; }
+    private bool modalActive;
+    public bool ModalActive { get { return modalActive; } set { modalActive = value; Invalidate(); } }
     public LenovoHeaderIconButton()
     {
         SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
@@ -2889,9 +2925,10 @@ public sealed class LenovoHeaderIconButton : Button
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
+        bool activeInfo = InfoIcon && ModalActive;
         Color ink = SystemInformation.HighContrast
-            ? (Enabled ? SystemColors.ControlText : SystemColors.GrayText)
-            : (Enabled ? ForeColor : Color.FromArgb(119,119,119));
+            ? (Enabled || activeInfo ? SystemColors.ControlText : SystemColors.GrayText)
+            : (activeInfo ? Color.FromArgb(225,37,27) : (Enabled ? ForeColor : Color.FromArgb(119,119,119)));
         if (SystemInformation.HighContrast) {
             Rectangle center = ClientRectangle;
             int inset = Math.Max(2, Math.Min(center.Width,center.Height)/7);
@@ -3449,7 +3486,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.10.0.0'
+$script:AppVersion = '1.10.1.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -16807,12 +16844,31 @@ function ConvertTo-SystemStatusObservedTime {
     } catch { return $null }
 }
 
-function Format-SystemStatusObservedTime {
-    param($Value)
-    $utc = ConvertTo-SystemStatusObservedTime $Value
-    if (-not $utc) { return (Get-LocalizedString -Key 'SystemStatus.TimeUnknown') }
-    $minutes = [int][Math]::Floor(([datetime]::UtcNow-$utc).TotalMinutes)
-    return (Get-LocalizedString -Key 'SystemStatus.Age' -Values @{ Time=$utc.ToLocalTime().ToString('yyyy-MM-dd HH:mm:ss'); Minutes=$minutes })
+function Format-SystemStatusObservationAge {
+    param([datetime]$Utc,[datetime]$Now = [datetime]::UtcNow)
+    $minutes = [int][Math]::Max(0,[Math]::Floor(($Now-$Utc).TotalMinutes))
+    if ($minutes -eq 0) { return (Get-LocalizedString -Key 'SystemStatus.JustNow') }
+    return (Get-LocalizedString -Key 'SystemStatus.MinutesAgo' -Values @{Minutes=$minutes})
+}
+
+function Get-SystemStatusObservationPresentation {
+    param($Next,$Entries,$Readiness,[datetime]$Now = [datetime]::UtcNow)
+    $times = @((ConvertTo-SystemStatusObservedTime $Next),(ConvertTo-SystemStatusObservedTime $Entries),(ConvertTo-SystemStatusObservedTime $Readiness))
+    # Only share a date and age when all three independent observations agree
+    # at the displayed second. Never imply a shared time for missing evidence.
+    $shared = ($null -ne $times[0] -and $null -ne $times[1] -and $null -ne $times[2] -and
+        $times[0].ToString('yyyyMMddHHmmss') -eq $times[1].ToString('yyyyMMddHHmmss') -and
+        $times[0].ToString('yyyyMMddHHmmss') -eq $times[2].ToString('yyyyMMddHHmmss') -and
+        (Format-SystemStatusObservationAge $times[0] $Now) -eq (Format-SystemStatusObservationAge $times[1] $Now) -and
+        (Format-SystemStatusObservationAge $times[0] $Now) -eq (Format-SystemStatusObservationAge $times[2] $Now))
+    $values = @(
+        foreach ($utc in $times) {
+            if ($null -eq $utc) { Get-LocalizedString -Key 'SystemStatus.TimeUnknown' }
+            elseif ($shared) { $utc.ToLocalTime().ToString('HH:mm:ss') }
+            else { $utc.ToLocalTime().ToString('dd.MM.yyyy HH:mm:ss') + ' · ' + (Format-SystemStatusObservationAge $utc $Now) }
+        }
+    )
+    [pscustomobject]@{Values=$values;Shared=if ($shared) { $times[0].ToLocalTime().ToString('dd.MM.yyyy') + ' · ' + (Format-SystemStatusObservationAge $times[0] $Now) } else { '' }}
 }
 
 function Get-SystemStatusPresentation {
@@ -16829,97 +16885,217 @@ function Get-SystemStatusPresentation {
     return $model
 }
 
+function Set-SystemStatusLabelContent {
+    param($Form,[string]$Name,[string]$Text)
+    $label = $Form.Tag.Body.Controls[$Name]
+    if (-not $label) { return $false }
+    $changed = $label.Text -cne $Text
+    if ($changed) { $label.Text = $Text }
+    $label.AccessibleName = $Text
+    $label.AccessibleDescription = $Text
+    if ($changed) { $Form.Tag.Tip.SetToolTip($label,$Text) }
+    return $changed
+}
+
+function Set-SystemStatusSymbol {
+    param($Form,[string]$Name,[string]$State)
+    $label = $Form.Tag.Body.Controls['SystemStatusSymbol-'+$Name]
+    $label.Text = switch ($State) { 'good' {'✓'} 'attention' {'!'} 'busy' {'…'} default {'?'} }
+    $label.ForeColor = if ([Windows.Forms.SystemInformation]::HighContrast) { [Drawing.SystemColors]::WindowText }
+        elseif ($State -eq 'good') { [Drawing.Color]::FromArgb(129,184,149) }
+        elseif ($State -in @('attention','unknown')) { [Drawing.Color]::FromArgb(234,182,94) }
+        else { $script:ColorSecondary }
+}
+
 function Update-SystemStatusPopupPresentation {
     param([Windows.Forms.Form]$Form)
     $model = Get-SystemStatusPresentation
     $default = if ($model.Default -eq 'Value') { $model.DefaultName } else { Get-LocalizedString -Key ('SystemStatus.'+$model.Default) }
-    $next = if ($model.Next -eq 'Value') {
-        $model.NextName + [Environment]::NewLine + (Get-LocalizedString -Key ('SystemStatus.'+$model.Relation))
-    } else { Get-LocalizedString -Key ('SystemStatus.'+$model.Next) }
-    $ready = Get-LocalizedString -Key ('SystemStatus.'+$model.Readiness)
-    if ($model.Hint) { $ready += [Environment]::NewLine + (Get-LocalizedString -Key ('SystemStatus.'+$model.Hint)) }
-    $summary = Get-LocalizedString -Key ('SystemStatus.'+$model.Summary)
-    if ($model.Refresh) { $summary += [Environment]::NewLine + (Get-LocalizedString -Key ('SystemStatus.'+$model.Refresh)) }
-    $freshness = @(
-        (Get-LocalizedString -Key 'SystemStatus.ManagerTime' -Values @{Time=(Format-SystemStatusObservedTime $(if ($script:NextBootFirmwareReadVerified) { $script:SystemStatusNextObservedUtc } else { $null }))}),
-        (Get-LocalizedString -Key 'SystemStatus.EntriesTime' -Values @{Time=(Format-SystemStatusObservedTime $script:SystemStatusEntriesObservedUtc)}),
-        (Get-LocalizedString -Key 'SystemStatus.ReadinessTime' -Values @{Time=(Format-SystemStatusObservedTime $script:SystemStatusReadinessObservedUtc)})
-    ) -join [Environment]::NewLine
-    $values = @{Summary=$summary;Stored=$default;Next=$next;Readiness=$ready;Drift=(Get-LocalizedString -Key ('SystemStatus.'+$model.Drift));Freshness=$freshness}
-    foreach ($key in $values.Keys) {
-        $label = $Form.Tag.Body.Controls['SystemStatusValue-'+$key]
-        if ($label -and $label.Text -cne $values[$key]) {
-            $label.Text = $values[$key]
-            $label.AccessibleName = $label.Text
-            $label.AccessibleDescription = $label.Text
-            $Form.Tag.Tip.SetToolTip($label,$label.Text)
-        }
+    $next = if ($model.Next -eq 'Value') { $model.NextName } else { Get-LocalizedString -Key ('SystemStatus.'+$model.Next) }
+    $relation = if ($model.Next -eq 'Value') { Get-LocalizedString -Key ('SystemStatus.'+$model.Relation) } else { '' }
+    $ready = if ($model.Readiness -eq 'Ready') { Get-LocalizedString -Key 'SystemStatus.ReadyShort' } else { Get-LocalizedString -Key ('SystemStatus.'+$model.Readiness) }
+    $readyDetail = if ($model.Hint) { Get-LocalizedString -Key ('SystemStatus.'+$model.Hint) } elseif ($model.Readiness -eq 'Ready') { Get-LocalizedString -Key 'SystemStatus.ConfigurationChecked' } else { '' }
+    $summary = if ($model.Summary -eq 'SummaryReady') { Get-LocalizedString -Key 'SystemStatus.SummaryReadyShort' } else { Get-LocalizedString -Key ('SystemStatus.'+$model.Summary) }
+    $summaryDetail = if ($model.Refresh) { Get-LocalizedString -Key ('SystemStatus.'+$model.Refresh) } elseif ($model.Summary -eq 'SummaryReady') { Get-LocalizedString -Key 'SystemStatus.LastCheck' } else { '' }
+    $drift = if ($model.Drift -eq 'DriftNone') { Get-LocalizedString -Key 'SystemStatus.DriftNoneShort' } elseif ($model.Drift -eq 'DriftChanged') { Get-LocalizedString -Key 'SystemStatus.DriftChangedShort' } else { Get-LocalizedString -Key 'SystemStatus.Unknown' }
+    $driftDetail = if ($model.Drift -in @('DriftNone','DriftChanged')) { Get-LocalizedString -Key 'SystemStatus.LastComparison' } else { Get-LocalizedString -Key 'SystemStatus.DriftUnknown' }
+    $times = Get-SystemStatusObservationPresentation -Next $(if ($script:NextBootFirmwareReadVerified) { $script:SystemStatusNextObservedUtc } else { $null }) -Entries $script:SystemStatusEntriesObservedUtc -Readiness $script:SystemStatusReadinessObservedUtc
+    $values = @{Summary=$summary;Stored=$default;Next=$next;Readiness=$ready;Drift=$drift;Freshness=$times.Shared}
+    $details = @{Summary=$summaryDetail;Next=$relation;Readiness=$readyDetail;Drift=$driftDetail}
+    $changed = $false
+    foreach ($key in $values.Keys) { if (Set-SystemStatusLabelContent $Form ('SystemStatusValue-'+$key) $values[$key]) { $changed=$true } }
+    foreach ($key in $details.Keys) { if (Set-SystemStatusLabelContent $Form ('SystemStatusDetail-'+$key) $details[$key]) { $changed=$true } }
+    $index=0
+    foreach ($key in @('Manager','Entries','Readiness')) {
+        if (Set-SystemStatusLabelContent $Form ('SystemStatusTimeValue-'+$key) $times.Values[$index]) { $changed=$true }
+        $index++
     }
-    $label = $Form.Tag.Body.Controls['SystemStatusValue-Summary']
-    $label.ForeColor = if ([Windows.Forms.SystemInformation]::HighContrast) { [Drawing.SystemColors]::WindowText } elseif ($model.Summary -in @('SummaryAttention','SummaryUnknown')) { [Drawing.Color]::FromArgb(234,182,94) } else { $script:ColorPrimary }
+    Set-SystemStatusSymbol $Form 'Summary' $(switch ($model.Summary) { 'SummaryReady' {'good'} 'SummaryAttention' {'attention'} 'SummaryBusy' {'busy'} default {'unknown'} })
+    Set-SystemStatusSymbol $Form 'Readiness' $(switch ($model.Readiness) { 'Ready' {'good'} 'Checking' {'busy'} 'Busy' {'busy'} 'Unknown' {'unknown'} default {'attention'} })
+    Set-SystemStatusSymbol $Form 'Drift' $(switch ($model.Drift) { 'DriftNone' {'good'} 'DriftChanged' {'attention'} default {'unknown'} })
+    if ($changed) { Set-SystemStatusPopupWidth -Form $Form -Scale ([Math]::Max(1.0,$Form.Tag.Scale)) }
+}
+
+# Measure actual text at the available width and current native font.
+# Empty secondary lines consume no vertical space.
+function Set-SystemStatusTextBounds {
+    param($Control,[int]$X,[int]$Y,[int]$Width,[double]$Scale)
+    $Control.Visible = -not [string]::IsNullOrEmpty($Control.Text)
+    if (-not $Control.Text) { $Control.Bounds=[Drawing.Rectangle]::new($X,$Y,[Math]::Max(1,$Width),0); return 0 }
+    $flags=[Windows.Forms.TextFormatFlags]::WordBreak -bor [Windows.Forms.TextFormatFlags]::NoPrefix
+    $measured=[Windows.Forms.TextRenderer]::MeasureText($Control.Text,$Control.Font,[Drawing.Size]::new([Math]::Max(1,$Width),32767),$flags)
+    $height=[Math]::Max([int][Math]::Ceiling(17*$Scale),$measured.Height+2)
+    $Control.Bounds=[Drawing.Rectangle]::new($X,$Y,[Math]::Max(1,$Width),$height)
+    return $height
+}
+
+function Set-SystemStatusContentLayout {
+    param($Form,[int]$Width,[double]$Scale)
+    $controls=$Form.Tag.Body.Controls
+    $margin=[int][Math]::Round(16*$Scale)
+    $gap=[Math]::Max(2,[int][Math]::Round(4*$Scale))
+    $sectionGap=[Math]::Max(4,[int][Math]::Round(8*$Scale))
+    $iconWidth=[Math]::Max(1,[int][Math]::Round(30*$Scale))
+    $available=[Math]::Max(1,$Width-2*$margin)
+    $y=$sectionGap
+    foreach ($key in @('Summary','Stored','Next','Readiness','Drift')) {
+        $heading=$controls['SystemStatusHeading-'+$key]
+        $section=$controls['SystemStatusSection-'+$key]
+        if ($section) {
+            $y+=$sectionGap
+            $divider=$controls['SystemStatusDivider-'+$key]
+            $divider.Bounds=[Drawing.Rectangle]::new($margin,$y,$available,[Math]::Max(1,[int][Math]::Round($Scale)))
+            $y+=$sectionGap
+            $y+=Set-SystemStatusTextBounds $section $margin $y $available $Scale
+            $y+=$gap
+        }
+        if ($heading) { $y+=Set-SystemStatusTextBounds $heading $margin $y $available $Scale }
+        $symbol=$controls['SystemStatusSymbol-'+$key]
+        $offset=if ($symbol) { [Math]::Min($iconWidth,[Math]::Max(0,$available-1)) } else { 0 }
+        $top=$y
+        $value=$controls['SystemStatusValue-'+$key]
+        $y+=Set-SystemStatusTextBounds $value ($margin+$offset) $y ($available-$offset) $Scale
+        $detail=$controls['SystemStatusDetail-'+$key]
+        if ($detail) { $y+=Set-SystemStatusTextBounds $detail ($margin+$offset) $y ($available-$offset) $Scale }
+        if ($symbol) {
+            $symbol.Bounds=[Drawing.Rectangle]::new($margin,$top,[Math]::Max(1,$offset-$gap),[Math]::Max(1,$y-$top))
+        }
+        $y+=$gap
+    }
+    $y+=$sectionGap
+    $controls['SystemStatusDivider-Freshness'].Bounds=[Drawing.Rectangle]::new($margin,$y,$available,[Math]::Max(1,[int][Math]::Round($Scale)))
+    $y+=$sectionGap
+    $y+=Set-SystemStatusTextBounds $controls['SystemStatusSection-Freshness'] $margin $y $available $Scale
+    $y+=$gap
+    $leftWidth=[Math]::Max(1,[int][Math]::Floor($available*0.39))
+    $rightWidth=[Math]::Max(1,$available-$leftWidth-$gap)
+    foreach ($key in @('Manager','Entries','Readiness')) {
+        $left=Set-SystemStatusTextBounds $controls['SystemStatusTimeLabel-'+$key] $margin $y $leftWidth $Scale
+        $right=Set-SystemStatusTextBounds $controls['SystemStatusTimeValue-'+$key] ($margin+$leftWidth+$gap) $y $rightWidth $Scale
+        $y+=[Math]::Max($left,$right)+$gap
+    }
+    $y+=Set-SystemStatusTextBounds $controls['SystemStatusValue-Freshness'] $margin $y $available $Scale
+    return ($y+$sectionGap)
 }
 
 function Set-SystemStatusPopupWidth {
     param($Form,[double]$Scale)
-    $margin = [int][Math]::Round(16*$Scale)
-    foreach ($control in $Form.Tag.Body.Controls) {
-        $control.Left = $margin
-        $control.Width = [Math]::Max(1,$Form.Tag.Body.Width-2*$margin)
-    }
+    $state=$Form.Tag
+    $width=$state.Viewport.Width
+    $height=$state.Viewport.Height
+    if ($width -le 0 -or $height -le 0) { return }
+    $state.Body.SuspendLayout()
+    try {
+        $content=Set-SystemStatusContentLayout -Form $Form -Width $width -Scale $Scale
+        $gutter=0
+        if ($content -gt $height) {
+            $gutter=[Math]::Min($width-1,[int][Math]::Round(8*$Scale))
+            $content=Set-SystemStatusContentLayout -Form $Form -Width ($width-$gutter) -Scale $Scale
+        }
+        $range=[Math]::Max(0,$content-$height)
+        $previous=$state.Scroll.Value
+        $state.Scroll.Bounds=[Drawing.Rectangle]::new($width-$gutter,0,$gutter,$height)
+        $state.Scroll.Maximum=$range
+        $state.Scroll.LargeChange=$height
+        $state.Scroll.Value=[Math]::Min($previous,$range)
+        $state.Scroll.Visible=($range -gt 0 -and $gutter -gt 0)
+        $state.Body.Bounds=[Drawing.Rectangle]::new(0,-$state.Scroll.Value,$width-$gutter,[Math]::Max($height,$content))
+    } finally { $state.Body.ResumeLayout($false) }
+}
+
+function Add-SystemStatusLabel {
+    param($Form,[string]$Name,[string]$Text,$Font,[Drawing.Color]$Ink,[switch]$Right)
+    $label=New-Label -Text $Text -Font $Font -ForeColor $Ink -X 16 -Y 0 -Width 358 -Height 20
+    $label.Name=$Name
+    $label.BackColor=$Form.Tag.Body.BackColor
+    $label.AutoSize=$false
+    $label.AutoEllipsis=$false
+    $label.UseMnemonic=$false
+    $label.TextAlign=if ($Right) { [Drawing.ContentAlignment]::TopRight } else { [Drawing.ContentAlignment]::TopLeft }
+    $label.AccessibleRole=[Windows.Forms.AccessibleRole]::StaticText
+    $label.AccessibleName=$Text
+    $label.AccessibleDescription=$Text
+    $Form.Tag.Body.Controls.Add($label)
 }
 
 function New-SystemStatusPopup {
     $form = New-AuxiliaryPopupForm -Name 'LenovoSystemStatusPopup' -Title (Get-LocalizedString -Key 'SystemStatus.Title') -Subtitle (Get-LocalizedString -Key 'SystemStatus.Subtitle') -ContentHeight 440
-    $y = 8
-    $highContrast = [Windows.Forms.SystemInformation]::HighContrast
-    $surface = if ($highContrast) { [Drawing.SystemColors]::Window } else { [Drawing.Color]::FromArgb(37,37,37) }
-    $valueInk = if ($highContrast) { [Drawing.SystemColors]::WindowText } else { $script:ColorPrimary }
-    $headingInk = if ($highContrast) { [Drawing.SystemColors]::WindowText } else { $script:ColorSecondary }
+    $highContrast=[Windows.Forms.SystemInformation]::HighContrast
+    $valueInk=if ($highContrast) { [Drawing.SystemColors]::WindowText } else { $script:ColorPrimary }
+    $secondaryInk=if ($highContrast) { [Drawing.SystemColors]::WindowText } else { $script:ColorSecondary }
+    $lineInk=if ($highContrast) { [Drawing.SystemColors]::WindowText } else { [Drawing.Color]::FromArgb(57,57,57) }
     if ($highContrast) {
-        $form.BackColor = [Drawing.SystemColors]::Window
-        $form.Tag.Body.BackColor = [Drawing.SystemColors]::Window
-        $form.Tag.Viewport.BackColor = [Drawing.SystemColors]::Window
-        $form.Tag.Header.BackColor = [Drawing.SystemColors]::Control
-        $form.Tag.Title.ForeColor = [Drawing.SystemColors]::ControlText
-        $form.Tag.Subtitle.ForeColor = [Drawing.SystemColors]::ControlText
-        $form.Tag.Close.BackColor = [Drawing.SystemColors]::Control
-        $form.Tag.Close.ForeColor = [Drawing.SystemColors]::ControlText
+        $form.BackColor=[Drawing.SystemColors]::Window
+        $form.Tag.Body.BackColor=[Drawing.SystemColors]::Window
+        $form.Tag.Viewport.BackColor=[Drawing.SystemColors]::Window
+        $form.Tag.Header.BackColor=[Drawing.SystemColors]::Control
+        $form.Tag.Title.ForeColor=[Drawing.SystemColors]::ControlText
+        $form.Tag.Subtitle.ForeColor=[Drawing.SystemColors]::ControlText
+        $form.Tag.Close.BackColor=[Drawing.SystemColors]::Control
+        $form.Tag.Close.ForeColor=[Drawing.SystemColors]::ControlText
     }
-    foreach ($row in @(
-        @{Key='Summary';Height=52},
-        @{Key='Stored';Height=40},
-        @{Key='Next';Height=48},
-        @{Key='Readiness';Height=66},
-        @{Key='Drift';Height=34},
-        @{Key='Freshness';Height=64}
-    )) {
-        if ($row.Key -ne 'Summary') {
-            $heading = New-Label -Text (Get-LocalizedString -Key ('SystemStatus.'+$row.Key)) -Font $form.Tag.Heading -ForeColor $headingInk -X 16 -Y $y -Width 358 -Height 20
-            $heading.Name = 'SystemStatusHeading-'+$row.Key
-            $form.Tag.Body.Controls.Add($heading)
-            $y += 20
-        }
-        $label = New-Label -Text '' -Font $form.Tag.Regular -ForeColor $valueInk -X 16 -Y $y -Width 358 -Height $row.Height
-        $label.Name = 'SystemStatusValue-'+$row.Key
-        $label.BackColor = $surface
-        $label.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
-        $label.Padding = [Windows.Forms.Padding]::new(6,2,6,2)
-        $label.AutoEllipsis = $true
-        $label.AccessibleRole = [Windows.Forms.AccessibleRole]::StaticText
-        $form.Tag.Body.Controls.Add($label)
-        $y += $row.Height+4
+    foreach ($key in @('Stored','Readiness','Freshness')) {
+        $sectionKey=switch ($key) { 'Stored' {'Targets'} 'Readiness' {'Readiness'} default {'Checks'} }
+        Add-SystemStatusLabel $form ('SystemStatusSection-'+$key) (Get-LocalizedString -Key ('SystemStatus.'+$sectionKey)) $form.Tag.Heading $secondaryInk
+        $divider=New-Object Windows.Forms.Panel
+        $divider.Name='SystemStatusDivider-'+$key
+        $divider.BackColor=$lineInk
+        $divider.TabStop=$false
+        $form.Tag.Body.Controls.Add($divider)
+    }
+    foreach ($key in @('Stored','Next')) {
+        Add-SystemStatusLabel $form ('SystemStatusHeading-'+$key) (Get-LocalizedString -Key ('SystemStatus.'+$key+'Caption')) $form.Tag.Regular $secondaryInk
+    }
+    foreach ($key in @('Summary','Stored','Next','Readiness','Drift','Freshness')) {
+        $font=if ($key -eq 'Freshness') { $form.Tag.Regular } else { $form.Tag.Bold }
+        $ink=if ($key -eq 'Freshness') { $secondaryInk } else { $valueInk }
+        Add-SystemStatusLabel $form ('SystemStatusValue-'+$key) '' $font $ink
+    }
+    foreach ($key in @('Summary','Next','Readiness','Drift')) {
+        Add-SystemStatusLabel $form ('SystemStatusDetail-'+$key) '' $form.Tag.Regular $secondaryInk
+    }
+    foreach ($key in @('Summary','Readiness','Drift')) {
+        Add-SystemStatusLabel $form ('SystemStatusSymbol-'+$key) '' $form.Tag.Bold $secondaryInk
+    }
+    foreach ($key in @('Manager','Entries','Readiness')) {
+        Add-SystemStatusLabel $form ('SystemStatusTimeLabel-'+$key) (Get-LocalizedString -Key ('SystemStatus.'+$key+'Caption')) $form.Tag.Regular $secondaryInk
+        Add-SystemStatusLabel $form ('SystemStatusTimeValue-'+$key) '' $form.Tag.Regular $valueInk -Right
     }
     Update-SystemStatusPopupPresentation -Form $form
-    # Reflect only in-memory state; no extra refresh, readiness probe or hardware polling.
-    $timer = New-Object Windows.Forms.Timer
-    $timer.Interval = 500
+    $content=Set-SystemStatusContentLayout -Form $form -Width $form.ClientSize.Width -Scale 1.0
+    $form.Tag.ContentHeight=$content
+    $form.ClientSize=[Drawing.Size]::new(390,[Math]::Min(540,64+$content))
+    $form.Tag.Viewport.Height=$form.ClientSize.Height-64
+    Set-SystemStatusPopupWidth -Form $form -Scale 1.0
+    # Presentation only; the existing lifecycle owns and disposes this timer.
+    $timer=New-Object Windows.Forms.Timer
+    $timer.Interval=500
     $timer.Add_Tick({
         if ($script:ActiveAuxiliaryPopup -and $script:ActiveAuxiliaryPopup.Name -eq 'LenovoSystemStatusPopup') {
             Update-SystemStatusPopupPresentation -Form $script:ActiveAuxiliaryPopup
         }
     })
-    $form.Tag.Timer = $timer
-    # The shared owned-surface lifecycle starts this timer only after its initial activation handler.
+    $form.Tag.Timer=$timer
     $form.Add_KeyDown({
         param($sender,$eventArgs)
         $scroll = $sender.Tag.Scroll
@@ -17395,15 +17571,16 @@ function Set-AuxiliaryPopupLayout {
     $state.Scroll.LargeChange = $viewportHeight
     $state.Scroll.SmallChange = [Math]::Max(1,[int][Math]::Round(60*$Scale))
     if ($Form.Name -eq 'LenovoConfigurationPopup') { Set-ConfigurationPopupWidth -Form $Form -Scale $Scale }
-    if ($Form.Name -eq 'LenovoSystemStatusPopup') { Set-SystemStatusPopupWidth -Form $Form -Scale $Scale }
     $state.Scroll.Maximum = $range
     $state.Scroll.Value = 0
     $state.Scroll.Visible = ($range -gt 0 -and $gutter -gt 0)
+    if ($Form.Name -eq 'LenovoSystemStatusPopup') { Set-SystemStatusPopupWidth -Form $Form -Scale $Scale }
     foreach ($control in $state.Body.Controls) {
         $control.Add_GotFocus({ param($sender,$eventArgs) Set-AuxiliaryPopupControlVisible -Control $sender })
     }
     Add-AuxiliaryPopupWheelHandlers -Control $Form
-    $Form.Location = Get-AuxiliaryPopupLocation -WorkingArea $WorkingArea -OwnerBounds $OwnerBounds -SurfaceSize $Form.Size -TriggerBounds $TriggerBounds -Scale $Scale
+    $placementTrigger = if ($Form.Name -eq 'LenovoSystemStatusPopup') { [Drawing.Rectangle]::Empty } else { $TriggerBounds }
+    $Form.Location = Get-AuxiliaryPopupLocation -WorkingArea $WorkingArea -OwnerBounds $OwnerBounds -SurfaceSize $Form.Size -TriggerBounds $placementTrigger -Scale $Scale
 }
 
 # Owner-local black scrim. A separate layered, non-activating owned window
@@ -17625,6 +17802,7 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
     private readonly Color accent;
     private Color previousRowColor;
     private bool rowHighlighted;
+    private bool headerTrigger;
     private bool childShown;
     private LenovoAuxiliaryConnector connector;
     private bool dismissOnOwnerClick;
@@ -17641,7 +17819,8 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
         scale = coordinateScale;
         highlight = highlightColor;
         accent = accentColor;
-        if (trigger != null && (trigger.Name == "SettingsPanel" || trigger.Name == "DefaultPanel")
+        headerTrigger = trigger != null && trigger.Name == "HeaderSystemStatusButton" && surface.Name == "LenovoSystemStatusPopup";
+        if (trigger != null && (trigger.Name == "SettingsPanel" || trigger.Name == "DefaultPanel" || headerTrigger)
             && trigger.FindForm() == owner)
         {
             row = trigger;
@@ -17710,16 +17889,16 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
     {
         if (row == null || row.IsDisposed || row.Disposing || rowHighlighted == enabled) return;
         rowHighlighted = enabled;
-        row.BackColor = enabled ? highlight : previousRowColor;
+        if (!headerTrigger) row.BackColor = enabled ? highlight : previousRowColor;
         row.Invalidate();
     }
     private void KeepRowHighlight(object sender, EventArgs args)
     {
-        if (rowHighlighted && row.BackColor != highlight) row.BackColor = highlight;
+        if (!headerTrigger && rowHighlighted && row.BackColor != highlight) row.BackColor = highlight;
     }
     private void PaintRow(object sender, PaintEventArgs args)
     {
-        if (!rowHighlighted) return;
+        if (!rowHighlighted || headerTrigger) return;
         using (var brush = new SolidBrush(accent))
             args.Graphics.FillRectangle(brush, 0, 0, Math.Max(1, (int)Math.Round(3 * scale)), row.Height);
     }
@@ -17769,8 +17948,13 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
             HideConnector();
             return;
         }
+        // The Info cutout is only the icon. Project its vertical span onto the owner edge for the bridge;
+        // never cut out or recolor the entire header.
+        Rectangle bridgeAnchor = headerTrigger
+            ? new Rectangle(ownerBounds.Left, rowBounds.Top, rowBounds.Right - ownerBounds.Left, rowBounds.Height)
+            : rowBounds;
         Rectangle bridge = LenovoAuxiliaryConnector.GetConnectorBounds(
-            Screen.FromControl(parent).WorkingArea, ownerBounds, rowBounds, child.Bounds, scale);
+            Screen.FromControl(parent).WorkingArea, ownerBounds, bridgeAnchor, child.Bounds, scale);
         if (bridge.IsEmpty)
         {
             HideConnector();
@@ -17869,6 +18053,7 @@ function Show-OwnedAuxiliaryPopup {
         }
         if ($script:SystemStatusButton -and -not $script:SystemStatusButton.IsDisposed -and [object]::ReferenceEquals($script:SystemStatusButton.FindForm(),$parent)) {
             $ownerStatusButton = $script:SystemStatusButton
+            $ownerStatusButton.ModalActive = ($Form.Name -eq 'LenovoSystemStatusPopup' -and [object]::ReferenceEquals($Owner,$ownerStatusButton))
             $ownerStatusButton.Refresh()
         }
         Initialize-AuxiliaryOwnerDimmer
@@ -17911,7 +18096,11 @@ function Show-OwnedAuxiliaryPopup {
             finally {
                 if ($dimmer -and $Owner -and -not $Owner.IsDisposed -and $Owner.Name -in @('SettingsPanel','DefaultPanel')) { Set-PopupNavigationRowHover -Control $Owner -Hover $false }
                 if ($ownerRefreshButton -and -not $ownerRefreshButton.IsDisposed) { $ownerRefreshButton.Refresh() }
-                if ($ownerStatusButton -and -not $ownerStatusButton.IsDisposed) { $ownerStatusButton.Refresh() }
+                if ($ownerStatusButton -and -not $ownerStatusButton.IsDisposed) {
+                    $ownerStatusButton.ModalActive = $false
+                    $ownerStatusButton.ForeColor = $script:ColorSecondary
+                    $ownerStatusButton.Refresh()
+                }
                 if ($dimmer -and $Owner -and -not $Owner.IsDisposed -and $Owner.Name -eq 'HeaderSystemStatusButton' -and $Owner.CanFocus) { [void]$Owner.Focus() }
             }
         }
