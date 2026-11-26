@@ -103,7 +103,30 @@ foreach ($locale in @('en-US','de-DE')) {
             Assert-AliasCue "$prefix empty native field has cue, not actual text" ($editor -is [Windows.Forms.TextBox] -and $editor.Text -eq '' -and $editor.SelectedText -eq '' -and $cue.Visible -and -not $clear.Visible -and $editor.Focused)
             Assert-AliasCue "$prefix localized cue and accessible field hint" ($cue.Text -eq $expectedCue -and $editor.AccessibleName -eq (Get-LocalizedString -Key 'Manage.EditAliasAccessible') -and $editor.AccessibleDescription -eq $expectedHint)
             Assert-AliasCue "$prefix nonselectable label, no static hint and no dirty side effect" (-not $cue.TabStop -and -not $cue.CanSelect -and $cue.AccessibleRole -eq [Windows.Forms.AccessibleRole]::None -and $null -eq $row.Controls['AliasOriginalNameHint'] -and $script:SaveStateCalls -eq 0 -and $script:DraftCalls -eq 0)
-            Assert-AliasCue "$prefix unchanged editor and action geometry" ($row.Height -eq [int][Math]::Round(92*$factor) -and $frame.Width -eq [int][Math]::Round(318*$factor) -and $editor.Width -eq [int][Math]::Round(288*$factor) -and $clear.Left -eq [int][Math]::Round(292*$factor) -and $clear.Width -eq [int][Math]::Round(26*$factor) -and $apply.Left -eq [int][Math]::Round(58*$factor) -and $cancel.Left -eq [int][Math]::Round(154*$factor))
+            $inlineOk=$true
+            foreach ($action in @($apply,$cancel)) {
+                [void]$leave.Invoke($action,@([EventArgs]::Empty))
+                $normalInk=$action.ForeColor
+                $normalSurface=$action.FlatAppearance.MouseOverBackColor
+                [void]$enter.Invoke($action,@([EventArgs]::Empty))
+                $bmp=[Drawing.Bitmap]::new($action.Width,$action.Height)
+                try {
+                    $action.DrawToBitmap($bmp,$action.ClientRectangle)
+                    $ink=[Drawing.Color]::FromArgb(255,110,102).ToArgb()
+                    $bottom=0; $top=0
+                    for ($x=4;$x -lt $bmp.Width-4;$x++) {
+                        for ($y=0;$y -lt 4;$y++) {
+                            if ($bmp.GetPixel($x,$y).ToArgb() -eq $ink) {$top++}
+                            if ($bmp.GetPixel($x,$bmp.Height-1-$y).ToArgb() -eq $ink) {$bottom++}
+                        }
+                    }
+                    $hc=[Windows.Forms.SystemInformation]::HighContrast
+                    $paintOk=if ($hc) { $bottom -eq 0 -and $action.ForeColor -eq $normalInk } else { $bottom -gt 0 -and $top -eq 0 -and $action.ForeColor.ToArgb() -eq $ink -and $action.FlatAppearance.MouseOverBackColor -eq $action.BackColor }
+                    $inlineOk=$inlineOk -and $action.InlineAction -and $paintOk
+                } finally { $bmp.Dispose(); [void]$leave.Invoke($action,@([EventArgs]::Empty)) }
+                $inlineOk=$inlineOk -and $action.ForeColor -eq $normalInk -and $action.FlatAppearance.MouseOverBackColor -eq $normalSurface
+            }
+            Assert-AliasCue "$prefix unchanged editor and action geometry, inline hover raster" ($inlineOk -and $row.Height -eq [int][Math]::Round(92*$factor) -and $frame.Width -eq [int][Math]::Round(318*$factor) -and $editor.Width -eq [int][Math]::Round(288*$factor) -and $clear.Left -eq [int][Math]::Round(292*$factor) -and $clear.Width -eq [int][Math]::Round(26*$factor) -and $apply.Left -eq [int][Math]::Round(58*$factor) -and $cancel.Left -eq [int][Math]::Round(154*$factor))
             Assert-AliasCue "$prefix cue bounds reserve caret and stay inside editor" ($cue.Left -eq [int][Math]::Round(4*$factor) -and $cue.Top -eq $editor.Top -and $cue.Right -eq $editor.Right -and $cue.Bottom -lt $frame.Controls['AliasEditorUnderline'].Top)
             $cue.Invalidate(); $cue.Update(); [Windows.Forms.Application]::DoEvents()
             Start-Sleep -Milliseconds 100

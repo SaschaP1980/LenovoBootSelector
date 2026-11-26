@@ -1012,7 +1012,7 @@ function Add-BootEntryAliasEditor {
     $editorFrame.Controls.Add($aliasUnderline)
 
 
-    $clearAlias = New-Object System.Windows.Forms.Button
+    $clearAlias = New-Object LenovoHoverGlyphButton
     $clearAlias.Name = 'AliasClearButton'
     $clearAlias.Text = '×'
     $clearAlias.Font = New-Object Drawing.Font('Segoe UI', 13.0, [Drawing.FontStyle]::Regular)
@@ -1140,10 +1140,11 @@ function Add-BootEntryAliasEditor {
 
     $applyAlias = New-Object LenovoActionButton
     $applyAlias.Name = 'AliasApplyButton'
+    $applyAlias.InlineAction = $true
     $applyAlias.Text = Get-LocalizedString -Key 'Common.Apply'
     $applyAlias.Tag = $entry.Guid
     $applyAlias.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
-    $applyAlias.ForeColor = [Drawing.Color]::FromArgb(255,110,102)
+    $applyAlias.ForeColor = $script:ColorPrimary
     $applyAlias.BackColor = $script:ColorRow
     $applyAlias.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $applyAlias.FlatAppearance.BorderSize = 0
@@ -1175,6 +1176,7 @@ function Add-BootEntryAliasEditor {
 
     $cancelAlias = New-Object LenovoActionButton
     $cancelAlias.Name = 'AliasCancelButton'
+    $cancelAlias.InlineAction = $true
     $cancelAlias.Tag = $entry.Guid
     $cancelAlias.Text = Get-LocalizedString -Key 'Common.Cancel'
     $cancelAlias.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
@@ -1406,6 +1408,9 @@ $state.Add_Paint({
     } else {
         if ($hover) { [LenovoInteractionPalette]::Hover } else { $script:ColorAccent }
     }
+    if ($hover -and ([Windows.Forms.Control]::MouseButtons -band [Windows.Forms.MouseButtons]::Left) -eq 0) {
+        [LenovoInteractionPalette]::DrawIconHalo($eventArgs.Graphics,$sender.ClientRectangle)
+    }
     $geometry = Get-LenovoManageEyeGlyphGeometry -ClientSize $sender.ClientSize -Dpi $eventArgs.Graphics.DpiX
     $eventArgs.Graphics.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $pen = New-Object Drawing.Pen($color, $geometry.Stroke)
@@ -1440,8 +1445,12 @@ $state.Add_MouseLeave({
 })
 $row.Controls.Add($state)
 
-$editAlias = New-Label -Text '✎' -Font (New-Object Drawing.Font('Segoe UI Symbol', 14.0, [Drawing.FontStyle]::Regular)) `
-    -ForeColor ([Drawing.Color]::FromArgb(190,190,190)) -X 321 -Y 12 -Width 25 -Height 34
+$editAlias = New-Object LenovoHoverGlyphLabel
+$editAlias.Text = '✎'
+$editAlias.Font = New-Object Drawing.Font('Segoe UI Symbol',14.0,[Drawing.FontStyle]::Regular)
+$editAlias.ForeColor = [Drawing.Color]::FromArgb(190,190,190)
+$editAlias.BackColor = [Drawing.Color]::Transparent
+$editAlias.Bounds = [Drawing.Rectangle]::new(321,12,25,34)
 $editAlias.Name = 'AliasEditButton'
 $editAlias.Tag = $entry.Guid
 $editAlias.AccessibleDescription = Get-LocalizedString -Key 'Manage.EditAliasAccessible'
@@ -1489,6 +1498,9 @@ $grip | Add-Member -NotePropertyName ManagePointerHovered -NotePropertyValue $fa
 $grip.Add_Paint({
     param($sender,$eventArgs)
     $color = if ($script:ManageActiveDragGuid) { [Drawing.Color]::FromArgb(145,145,145) } else { $sender.ForeColor }
+    if (-not $script:ManageActiveDragGuid -and $sender.Enabled -and $sender.ManagePointerHovered -and $color -eq [LenovoInteractionPalette]::Hover -and ([Windows.Forms.Control]::MouseButtons -band [Windows.Forms.MouseButtons]::Left) -eq 0) {
+        [LenovoInteractionPalette]::DrawIconHalo($eventArgs.Graphics,$sender.ClientRectangle)
+    }
     Paint-LenovoManageGripGlyph -Graphics $eventArgs.Graphics -ClientSize $sender.ClientSize -Color $color
 })
 $grip.Add_MouseEnter({

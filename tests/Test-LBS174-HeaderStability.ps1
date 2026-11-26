@@ -23,6 +23,24 @@ function Assert-Lbs174([string]$Name,[bool]$Ok) {
     $script:checks++
     Write-Host "PASS LBS174 $Name"
 }
+function Test-Lbs270Halo([Windows.Forms.Control]$Control) {
+    $bmp=[Drawing.Bitmap]::new($Control.Width,$Control.Height)
+    try {
+        $Control.DrawToBitmap($bmp,$Control.ClientRectangle)
+        $size=[Math]::Min($bmp.Width,$bmp.Height)
+        $side=$size-2*[Math]::Max(2,[int][Math]::Floor($size/10))
+        $x=[int][Math]::Floor($bmp.Width/2)
+        $y=[int][Math]::Floor(($bmp.Height-$side)/2)+2
+        $corner=$bmp.GetPixel(0,0)
+        $p=$bmp.GetPixel($x,$y)
+        # Exact source-over blend of the 31/255 pale-red halo over the
+        # actual control background, away from the glyph and focus perimeter.
+        $r=[Math]::Round(($corner.R*224+255*31)/255)
+        $g=[Math]::Round(($corner.G*224+110*31)/255)
+        $b=[Math]::Round(($corner.B*224+102*31)/255)
+        return ([Math]::Abs($p.R-$r) -le 3 -and [Math]::Abs($p.G-$g) -le 3 -and [Math]::Abs($p.B-$b) -le 3)
+    } finally { $bmp.Dispose() }
+}
 function New-Label {
     param([string]$Text,[Drawing.Font]$Font,[Drawing.Color]$ForeColor,
           [int]$X,[int]$Y,[int]$Width,[int]$Height)
@@ -177,14 +195,14 @@ try {
     $script:RefreshButtonHovered=$true
     Update-RefreshButtonVisual
     $hoverInk=if ([Windows.Forms.SystemInformation]::HighContrast) { [Drawing.Color]::FromArgb(184,184,184) } else { [Drawing.Color]::FromArgb(255,110,102) }
-    Assert-Lbs174 'LBS270 enabled refresh uses hover ink' ($refresh.Enabled -and -not $refresh.OperationActive -and $refresh.ForeColor -eq $hoverInk)
+    Assert-Lbs174 'LBS270 enabled refresh uses hover ink' ($refresh.Enabled -and -not $refresh.OperationActive -and $refresh.ForeColor -eq $hoverInk -and ((Test-Lbs270Halo $refresh) -ne [Windows.Forms.SystemInformation]::HighContrast))
     $script:BackgroundRefreshState.Active=$true
     Update-RefreshButtonVisual
-    Assert-Lbs174 'LBS270 active refresh takes precedence over hover' ($refresh.OperationActive -and $refresh.ForeColor -eq [Drawing.Color]::FromArgb(225,37,27))
+    Assert-Lbs174 'LBS270 active refresh takes precedence over hover' ($refresh.OperationActive -and $refresh.ForeColor -eq [Drawing.Color]::FromArgb(225,37,27) -and -not (Test-Lbs270Halo $refresh))
     $script:TestCapabilities.State='Checking'
     $script:TestCapabilities.CanRefresh=$false
     Update-RefreshButtonVisual
-    Assert-Lbs174 'LBS270 startup remains disabled and subdued despite pointer' (-not $refresh.Enabled -and -not $refresh.OperationActive -and $refresh.ForeColor -eq [Drawing.Color]::FromArgb(119,119,119))
+    Assert-Lbs174 'LBS270 startup remains disabled and subdued despite pointer' (-not $refresh.Enabled -and -not $refresh.OperationActive -and $refresh.ForeColor -eq [Drawing.Color]::FromArgb(119,119,119) -and -not (Test-Lbs270Halo $refresh))
     $script:TestCapabilities.State='Ready'
     $script:TestCapabilities.CanRefresh=$true
     $script:BackgroundRefreshState.Active=$false
@@ -195,9 +213,9 @@ try {
     $enter=[Windows.Forms.Control].GetMethod('OnMouseEnter',$flags)
     $leave=[Windows.Forms.Control].GetMethod('OnMouseLeave',$flags)
     [void]$enter.Invoke($info,@([EventArgs]::Empty))
-    Assert-Lbs174 'LBS270 enabled Info uses the same hover ink' ($info.ForeColor -eq $hoverInk)
+    Assert-Lbs174 'LBS270 enabled Info uses the same hover ink' ($info.ForeColor -eq $hoverInk -and ((Test-Lbs270Halo $info) -ne [Windows.Forms.SystemInformation]::HighContrast))
     [void]$leave.Invoke($info,@([EventArgs]::Empty))
-    Assert-Lbs174 'LBS270 Info pointer exit restores neutral ink' ($info.ForeColor -eq $script:ColorSecondary)
+    Assert-Lbs174 'LBS270 Info pointer exit restores neutral ink' ($info.ForeColor -eq $script:ColorSecondary -and -not (Test-Lbs270Halo $info))
 
     $script:UpdateState.Status = 'UpdateAvailable'
     $script:UpdateState.AvailableManifest = [pscustomobject]@{ Version='9.9.9.9' }

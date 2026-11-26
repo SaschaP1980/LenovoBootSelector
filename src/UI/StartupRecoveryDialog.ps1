@@ -10,19 +10,35 @@
     return 'en-US'
 }
 
-# This dialog is usable before the canonical embedded WinForms types compile.
-# Retain a small independent fallback so a failed type initialization cannot
-# prevent recovery. The fallback literal is the approved action-hover token.
+# Recovery must remain usable even when the embedded WinForms assembly failed.
+# Keep the tiny independent native flat-button fallback with matching tokens.
 function Connect-StartupRecoveryActionHover {
     param([Parameter(Mandatory=$true)][Windows.Forms.Button]$Button)
-    $idle = $Button.ForeColor
-    $hover = if ('LenovoInteractionPalette' -as [type]) { [LenovoInteractionPalette]::Hover } else { [Drawing.Color]::FromArgb(255,110,102) }
-    $Button.Add_MouseEnter({
-        param($sender,$eventArgs)
-        if ($sender.Enabled -and -not [Windows.Forms.SystemInformation]::HighContrast) { $sender.ForeColor = $hover }
-    }.GetNewClosure())
-    $Button.Add_MouseLeave({ param($sender,$eventArgs) $sender.ForeColor = $idle }.GetNewClosure())
-    $Button.Add_EnabledChanged({ param($sender,$eventArgs) if (-not $sender.Enabled) { $sender.ForeColor = $idle } }.GetNewClosure())
+    $idleBorder=$Button.FlatAppearance.BorderColor
+    $idleSurface=$Button.FlatAppearance.MouseOverBackColor
+    $hover=if ('LenovoInteractionPalette' -as [type]) { [LenovoInteractionPalette]::Hover } else { [Drawing.Color]::FromArgb(255,110,102) }
+    $surface=if ('LenovoInteractionPalette' -as [type]) { [LenovoInteractionPalette]::ButtonHoverSurface($Button.BackColor) } else {
+        $base=$Button.BackColor
+        [Drawing.Color]::FromArgb([int][Math]::Round($base.R*0.88+255*0.12),[int][Math]::Round($base.G*0.88+110*0.12),[int][Math]::Round($base.B*0.88+102*0.12))
+    }
+    $state=[pscustomobject]@{ Hot=$false; MousePressed=$false; KeyPressed=$false }
+    $sync={
+        param($sender)
+        $active=$state.Hot -and $sender.Enabled -and -not [Windows.Forms.SystemInformation]::HighContrast
+        $sender.FlatAppearance.MouseOverBackColor=if ($active) {$surface} else {$idleSurface}
+        $sender.FlatAppearance.BorderColor=if ($active -and -not $state.MousePressed -and -not $state.KeyPressed) {$hover} else {$idleBorder}
+        $sender.Invalidate()
+    }.GetNewClosure()
+    $Button.Add_MouseEnter({ param($sender,$eventArgs) $state.Hot=$sender.Enabled; & $sync $sender }.GetNewClosure())
+    $Button.Add_MouseLeave({ param($sender,$eventArgs) $state.Hot=$false; & $sync $sender }.GetNewClosure())
+    $Button.Add_MouseDown({ param($sender,$eventArgs) $state.MousePressed=$eventArgs.Button -eq [Windows.Forms.MouseButtons]::Left; & $sync $sender }.GetNewClosure())
+    $Button.Add_MouseUp({ param($sender,$eventArgs) $state.MousePressed=$false; & $sync $sender }.GetNewClosure())
+    $Button.Add_MouseCaptureChanged({ param($sender,$eventArgs) $state.MousePressed=$false; & $sync $sender }.GetNewClosure())
+    $Button.Add_KeyDown({ param($sender,$eventArgs) if ($eventArgs.KeyCode -eq [Windows.Forms.Keys]::Space) {$state.KeyPressed=$true; & $sync $sender} }.GetNewClosure())
+    $Button.Add_KeyUp({ param($sender,$eventArgs) if ($eventArgs.KeyCode -eq [Windows.Forms.Keys]::Space) {$state.KeyPressed=$false; & $sync $sender} }.GetNewClosure())
+    $Button.Add_LostFocus({ param($sender,$eventArgs) $state.KeyPressed=$false; & $sync $sender }.GetNewClosure())
+    $Button.Add_EnabledChanged({ param($sender,$eventArgs) if (-not $sender.Enabled) {$state.Hot=$state.MousePressed=$state.KeyPressed=$false}; & $sync $sender }.GetNewClosure())
+    $Button.Add_SystemColorsChanged({ param($sender,$eventArgs) & $sync $sender }.GetNewClosure())
 }
 
 function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {

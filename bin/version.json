@@ -1,10 +1,9 @@
 {
   "schemaVersion": 2,
-  "version": "1.10.2.0",
+  "version": "1.10.2.1",
   "releaseProfile": "patch",
   "protectedFragmentIntent": [
-    "cs:protected override void OnRenderToolStripBackground",
-    "ps:Show-LenovoNoticeDialog"
+    "cs:protected override void OnRenderToolStripBackground"
   ],
   "repositoryDeleteIntent": []
 }

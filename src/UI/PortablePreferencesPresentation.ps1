@@ -146,6 +146,7 @@ function New-PreferencesViewButton {
     $button.FlatStyle='Flat';$button.Font=$Form.Tag.Fonts.Body
     $button.ForeColor=$script:ColorPrimary
     $button.BackColor=if ($Selected) {[Drawing.Color]::FromArgb(62,32,30)} else {[Drawing.Color]::FromArgb(37,37,37)}
+    $button.PreserveSelection=[bool]$Selected
     $button.FlatAppearance.BorderColor=if ($Selected) {$script:ColorAccent} else {[Drawing.Color]::FromArgb(72,72,72)}
     $button.FlatAppearance.MouseOverBackColor=[Drawing.Color]::FromArgb(55,55,55)
     $button.Cursor=[Windows.Forms.Cursors]::Hand

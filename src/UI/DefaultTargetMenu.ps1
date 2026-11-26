@@ -18,7 +18,8 @@ function Set-DefaultPickerHover {
     if (-not $row) { return }
     if (-not $Hover -and $row.ClientRectangle.Contains($row.PointToClient([Windows.Forms.Cursor]::Position))) { return }
     $hot = $Hover -and $row.Enabled -and -not $script:DefaultTargetChangePending -and -not $script:BootNextPendingGuid
-    $row.BackColor = if ($row.Tag.Selected) { $script:ColorSelectedRow } elseif ($hot) { $script:ColorHover } else { $script:ColorRow }
+    $hoverSurface = if ([Windows.Forms.SystemInformation]::HighContrast) { $script:ColorHover } else { [LenovoInteractionPalette]::Tint($script:ColorRow) }
+    $row.BackColor = if ($row.Tag.Selected) { $script:ColorSelectedRow } elseif ($hot) { $hoverSurface } else { $script:ColorRow }
     $title=$row.Controls['DefaultPickerTitle']
     if ($title) { $title.ForeColor=if ($hot -and -not [Windows.Forms.SystemInformation]::HighContrast) { [LenovoInteractionPalette]::Hover } else { $script:ColorPrimary } }
 }

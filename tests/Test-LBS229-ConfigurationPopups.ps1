@@ -1478,7 +1478,8 @@ try {
             foreach ($kind in @('SettingsPanel','DefaultPanel')) {
                 $script:Lbs233Row = $nativeRoot.Controls[$kind]
                 Set-PopupNavigationRowHover -Control $script:Lbs233Row -Hover $true
-                Require-Lbs229Correction ($script:Lbs233Row.BackColor.ToArgb() -eq [Drawing.Color]::FromArgb(48,48,48).ToArgb()) 'LBS233 hotfix ordinary navigation hover uses brighter color'
+                $pointerSurface=if ([Windows.Forms.SystemInformation]::HighContrast) { [Drawing.Color]::FromArgb(48,48,48) } else { [LenovoInteractionPalette]::Tint($script:ColorSurface) }
+            Require-Lbs229Correction ($script:Lbs233Row.BackColor.ToArgb() -eq $pointerSurface.ToArgb()) 'LBS270 ordinary navigation pointer hover uses distinct tint'
                 $script:Lbs233Owner = $nativeOwner
                 $script:Lbs233Observed = $false
                 $script:Lbs233Error = $null
@@ -1545,7 +1546,7 @@ try {
                     }
                 } finally { $timer.Stop(); $timer.Dispose() }
                 if ($script:Lbs233Error) { throw $script:Lbs233Error }
-                $expectedHover = if ($script:Lbs233Row.RectangleToScreen($script:Lbs233Row.ClientRectangle).Contains([Windows.Forms.Cursor]::Position) -and (Test-PopupNavigationRowInteractive -Row $script:Lbs233Row)) { [Drawing.Color]::FromArgb(48,48,48) } else { $script:ColorSurface }
+                $expectedHover = if ($script:Lbs233Row.RectangleToScreen($script:Lbs233Row.ClientRectangle).Contains([Windows.Forms.Cursor]::Position) -and (Test-PopupNavigationRowInteractive -Row $script:Lbs233Row)) { if ([Windows.Forms.SystemInformation]::HighContrast) { [Drawing.Color]::FromArgb(48,48,48) } else { [LenovoInteractionPalette]::Tint($script:ColorSurface) } } else { $script:ColorSurface }
                 Assert-Lbs229 "LBS233 $locale $kind real navigation modal highlight and cleanup" ($script:Lbs233Observed -and $script:Lbs233Dimmer.IsDisposed -and (-not $script:Lbs233Connector -or $script:Lbs233Connector.IsDisposed) -and -not $script:ActiveAuxiliaryPopup -and $script:Lbs233Row.BackColor.ToArgb() -eq $expectedHover.ToArgb() -and [Lbs229Native]::IsWindowEnabled($nativeOwner.Handle))
             }
             foreach ($control in @($nativeRoot.Controls)) { $control.Dispose() }

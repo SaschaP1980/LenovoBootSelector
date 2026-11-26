@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.10.2.1 - Component-specific Soft Accent Hover (LBS-270)
+
+- Replace the bottom-edge-only hover on framed neutral and red primary actions with full pale-red framing and contrast-safe role-specific hover surfaces. Keep inline actions text-focused with an underline.
+- Apply consistent tinted row/menu/navigation and settings surfaces, selected-segment inner frames, and bounded icon halos while preserving native focus, selected/pending, disabled, pressed, drag, active-operation and active modal connector states.
+- Retain the independent startup recovery path and strengthen native raster, contrast and interaction coverage without changing action admission, firmware, task, persistence or update boundaries.
+
 ## v1.10.2.0 - Consistent action hover and side-popup connectors (LBS-270)
 
 - Apply the approved pale-red hover accent across application action surfaces, preserving disabled, selected, pressed, keyboard focus, checked and semantic status states.
