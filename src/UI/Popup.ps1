@@ -292,15 +292,16 @@ function Set-AuxiliaryPopupLayout {
     $state.Scroll.LargeChange = $viewportHeight
     $state.Scroll.SmallChange = [Math]::Max(1,[int][Math]::Round(60*$Scale))
     if ($Form.Name -eq 'LenovoConfigurationPopup') { Set-ConfigurationPopupWidth -Form $Form -Scale $Scale }
-    if ($Form.Name -eq 'LenovoSystemStatusPopup') { Set-SystemStatusPopupWidth -Form $Form -Scale $Scale }
     $state.Scroll.Maximum = $range
     $state.Scroll.Value = 0
     $state.Scroll.Visible = ($range -gt 0 -and $gutter -gt 0)
+    if ($Form.Name -eq 'LenovoSystemStatusPopup') { Set-SystemStatusPopupWidth -Form $Form -Scale $Scale }
     foreach ($control in $state.Body.Controls) {
         $control.Add_GotFocus({ param($sender,$eventArgs) Set-AuxiliaryPopupControlVisible -Control $sender })
     }
     Add-AuxiliaryPopupWheelHandlers -Control $Form
-    $Form.Location = Get-AuxiliaryPopupLocation -WorkingArea $WorkingArea -OwnerBounds $OwnerBounds -SurfaceSize $Form.Size -TriggerBounds $TriggerBounds -Scale $Scale
+    $placementTrigger = if ($Form.Name -eq 'LenovoSystemStatusPopup') { [Drawing.Rectangle]::Empty } else { $TriggerBounds }
+    $Form.Location = Get-AuxiliaryPopupLocation -WorkingArea $WorkingArea -OwnerBounds $OwnerBounds -SurfaceSize $Form.Size -TriggerBounds $placementTrigger -Scale $Scale
 }
 
 # Owner-local black scrim. A separate layered, non-activating owned window
@@ -522,6 +523,7 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
     private readonly Color accent;
     private Color previousRowColor;
     private bool rowHighlighted;
+    private bool headerTrigger;
     private bool childShown;
     private LenovoAuxiliaryConnector connector;
     private bool dismissOnOwnerClick;
@@ -538,7 +540,8 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
         scale = coordinateScale;
         highlight = highlightColor;
         accent = accentColor;
-        if (trigger != null && (trigger.Name == "SettingsPanel" || trigger.Name == "DefaultPanel")
+        headerTrigger = trigger != null && trigger.Name == "HeaderSystemStatusButton" && surface.Name == "LenovoSystemStatusPopup";
+        if (trigger != null && (trigger.Name == "SettingsPanel" || trigger.Name == "DefaultPanel" || headerTrigger)
             && trigger.FindForm() == owner)
         {
             row = trigger;
@@ -607,16 +610,16 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
     {
         if (row == null || row.IsDisposed || row.Disposing || rowHighlighted == enabled) return;
         rowHighlighted = enabled;
-        row.BackColor = enabled ? highlight : previousRowColor;
+        if (!headerTrigger) row.BackColor = enabled ? highlight : previousRowColor;
         row.Invalidate();
     }
     private void KeepRowHighlight(object sender, EventArgs args)
     {
-        if (rowHighlighted && row.BackColor != highlight) row.BackColor = highlight;
+        if (!headerTrigger && rowHighlighted && row.BackColor != highlight) row.BackColor = highlight;
     }
     private void PaintRow(object sender, PaintEventArgs args)
     {
-        if (!rowHighlighted) return;
+        if (!rowHighlighted || headerTrigger) return;
         using (var brush = new SolidBrush(accent))
             args.Graphics.FillRectangle(brush, 0, 0, Math.Max(1, (int)Math.Round(3 * scale)), row.Height);
     }
@@ -666,8 +669,13 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
             HideConnector();
             return;
         }
+        // The Info cutout is only the icon. Project its vertical span onto the owner edge for the bridge;
+        // never cut out or recolor the entire header.
+        Rectangle bridgeAnchor = headerTrigger
+            ? new Rectangle(ownerBounds.Left, rowBounds.Top, rowBounds.Right - ownerBounds.Left, rowBounds.Height)
+            : rowBounds;
         Rectangle bridge = LenovoAuxiliaryConnector.GetConnectorBounds(
-            Screen.FromControl(parent).WorkingArea, ownerBounds, rowBounds, child.Bounds, scale);
+            Screen.FromControl(parent).WorkingArea, ownerBounds, bridgeAnchor, child.Bounds, scale);
         if (bridge.IsEmpty)
         {
             HideConnector();
@@ -766,6 +774,7 @@ function Show-OwnedAuxiliaryPopup {
         }
         if ($script:SystemStatusButton -and -not $script:SystemStatusButton.IsDisposed -and [object]::ReferenceEquals($script:SystemStatusButton.FindForm(),$parent)) {
             $ownerStatusButton = $script:SystemStatusButton
+            $ownerStatusButton.ModalActive = ($Form.Name -eq 'LenovoSystemStatusPopup' -and [object]::ReferenceEquals($Owner,$ownerStatusButton))
             $ownerStatusButton.Refresh()
         }
         Initialize-AuxiliaryOwnerDimmer
@@ -808,7 +817,11 @@ function Show-OwnedAuxiliaryPopup {
             finally {
                 if ($dimmer -and $Owner -and -not $Owner.IsDisposed -and $Owner.Name -in @('SettingsPanel','DefaultPanel')) { Set-PopupNavigationRowHover -Control $Owner -Hover $false }
                 if ($ownerRefreshButton -and -not $ownerRefreshButton.IsDisposed) { $ownerRefreshButton.Refresh() }
-                if ($ownerStatusButton -and -not $ownerStatusButton.IsDisposed) { $ownerStatusButton.Refresh() }
+                if ($ownerStatusButton -and -not $ownerStatusButton.IsDisposed) {
+                    $ownerStatusButton.ModalActive = $false
+                    $ownerStatusButton.ForeColor = $script:ColorSecondary
+                    $ownerStatusButton.Refresh()
+                }
                 if ($dimmer -and $Owner -and -not $Owner.IsDisposed -and $Owner.Name -eq 'HeaderSystemStatusButton' -and $Owner.CanFocus) { [void]$Owner.Focus() }
             }
         }
