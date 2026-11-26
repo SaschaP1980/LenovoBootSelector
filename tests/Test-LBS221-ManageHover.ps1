@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+. (Join-Path $PSScriptRoot 'Import-LenovoInteractionTestTypes.ps1')
 . (Join-Path $root 'src\Core\Localization.ps1')
 . (Join-Path $root 'src\UI\BootEntryList.ps1')
 . (Join-Path $root 'src\UI\BootEntryRows.ps1')
@@ -24,6 +25,7 @@ function Update-PopupRows { param([string]$Reason) $script:Mutations++ }
 function Save-AppSettings { $script:Mutations++ }
 function Invoke-NormalBootTargetSelection { param([string]$Guid) $script:Mutations++ }
 $script:ColorAccent = [Drawing.Color]::FromArgb(225,37,27)
+$script:ColorPrimary = [Drawing.Color]::FromArgb(252,252,252)
 $script:ColorRow = [Drawing.Color]::FromArgb(32,32,32)
 $script:ColorHover = [Drawing.Color]::FromArgb(42,42,42)
 $script:IsManageEntriesMode = $true
@@ -69,16 +71,18 @@ foreach ($locale in @('en-US','de-DE')) {
                 $eye = $row.Controls['VisibilityGlyph']; $grip = $row.Controls['ManageReorderGrip']; $pencil = $row.Controls['AliasEditButton']
                 $prefix = "$locale $factor hidden=$hidden"
                 $eyeIdle = if ($hidden) { [Drawing.Color]::FromArgb(115,115,115) } else { $script:ColorAccent }
-                $eyeHover = if ($hidden) { [Drawing.Color]::FromArgb(160,160,160) } else { [Drawing.Color]::FromArgb(255,110,102) }
+                $eyeHover = if ([Windows.Forms.SystemInformation]::HighContrast) { $eyeIdle } else { [Drawing.Color]::FromArgb(255,110,102) }
+                $gripHover = if ([Windows.Forms.SystemInformation]::HighContrast) { [Drawing.Color]::FromArgb(145,145,145) } else { [Drawing.Color]::FromArgb(255,110,102) }
                 $stateName = if ($hidden) { 'hidden' } else { 'visible' }
+                $titleIdle = if ($hidden) { [Drawing.Color]::FromArgb(175,175,175) } else { $script:ColorPrimary }
                 Assert-Lbs221 "$prefix original action dimensions" ($eye.Width -eq [int][Math]::Round(32*$factor) -and $grip.Width -eq [int][Math]::Round(26*$factor) -and $pencil.Width -eq [int][Math]::Round(25*$factor) -and $row.Height -eq [int][Math]::Round(60*$factor))
                 Assert-Lbs221 "$prefix idle ink unchanged" ($eye.ForeColor -eq $eyeIdle -and $grip.ForeColor -eq [Drawing.Color]::FromArgb(145,145,145))
                 [void]$enter.Invoke($eye,@([EventArgs]::Empty))
                 Assert-Lbs221 "$prefix eye hover preserves visibility semantics" ($eye.ForeColor -eq $eyeHover -and $eye.AccessibleName -eq $stateName -and $script:TipOwner -eq $eye)
                 [void]$leave.Invoke($eye,@([EventArgs]::Empty))
-                Assert-Lbs221 "$prefix eye leave restores idle ink and closes help" ($eye.ForeColor -eq $eyeIdle -and $null -eq $script:TipOwner)
+                Assert-Lbs221 "$prefix eye leave restores idle ink and closes help" ($eye.ForeColor -eq $eyeIdle -and $children[2].ForeColor -eq $titleIdle -and $null -eq $script:TipOwner)
                 [void]$enter.Invoke($grip,@([EventArgs]::Empty))
-                Assert-Lbs221 "$prefix grip hover brightens and routes localized dark help" ($grip.ForeColor -eq [Drawing.Color]::FromArgb(220,220,220) -and $script:TipOwner -eq $grip -and $script:TipText -eq $expectedHint)
+                Assert-Lbs221 "$prefix grip hover brightens and routes localized dark help" ($grip.ForeColor -eq $gripHover -and $script:TipOwner -eq $grip -and $script:TipText -eq $expectedHint)
                 [void]$down.Invoke($grip,@([Windows.Forms.MouseEventArgs]::new([Windows.Forms.MouseButtons]::Left,1,5,5,0)))
                 Assert-Lbs221 "$prefix grip down hides help without changing drag admission" ($null -eq $script:TipOwner -and $script:ManageDragGuid -eq $entry.Guid)
                 [void]$click.Invoke($grip,@([EventArgs]::Empty))

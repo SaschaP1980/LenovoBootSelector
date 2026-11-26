@@ -210,6 +210,41 @@ public static class LenovoLocaleFlags
     }
 }
 
+// LBS-270: action hover is independent of status, selection and operation ink.
+public static class LenovoInteractionPalette
+{
+    public static readonly Color Hover = Color.FromArgb(255,110,102);
+    public static readonly Color Normal = Color.FromArgb(184,184,184);
+    public static readonly Color Disabled = Color.FromArgb(119,119,119);
+    public static readonly Color Active = Color.FromArgb(225,37,27);
+    // Keep contrast-safe existing surfaces; overlay a precise hover accent.
+    public static void DrawHoverEdge(Graphics g, Rectangle bounds)
+    {
+        if (SystemInformation.HighContrast || bounds.Width < 4 || bounds.Height < 4) return;
+        int line = Math.Max(1,(int)Math.Round(g.DpiX / 96f));
+        using (Brush brush = new SolidBrush(Hover))
+            g.FillRectangle(brush,bounds.Left+line,bounds.Bottom-2*line,
+                Math.Max(1,bounds.Width-2*line),line);
+    }
+}
+
+// Keep the native Button input and focus renderer; only supplement hover ink.
+public sealed class LenovoActionButton : Button
+{
+    private bool hovered;
+    protected override void OnMouseEnter(EventArgs e) { hovered=Enabled; base.OnMouseEnter(e); Invalidate(); }
+    protected override void OnMouseLeave(EventArgs e) { hovered=false; base.OnMouseLeave(e); Invalidate(); }
+    protected override void OnEnabledChanged(EventArgs e) {
+        hovered=Enabled && IsHandleCreated && Visible && ClientRectangle.Contains(PointToClient(Cursor.Position));
+        base.OnEnabledChanged(e); Invalidate();
+    }
+    protected override void OnPaint(PaintEventArgs e) {
+        base.OnPaint(e);
+        if (Enabled && hovered && !SystemInformation.HighContrast && (Control.MouseButtons & System.Windows.Forms.MouseButtons.Left) == 0)
+            LenovoInteractionPalette.DrawHoverEdge(e.Graphics,ClientRectangle);
+    }
+}
+
 public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
 {
     private readonly Color accent = Color.FromArgb(225, 37, 27);
@@ -438,7 +473,7 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
         {
             e.Graphics.ResetClip();
             using (StringFormat format = (StringFormat)StringFormat.GenericTypographic.Clone())
-            using (Brush brush = new SolidBrush(e.TextColor))
+            using (Brush brush = new SolidBrush(!SystemInformation.HighContrast && e.Item.Enabled && !e.Item.Pressed && Object.ReferenceEquals(LenovoMenuLayout.GetVisualHotItem(owner), e.Item) && Object.ReferenceEquals(LenovoMenuLayout.HitTestRow(owner, owner.PointToClient(Control.MousePosition)), e.Item) ? LenovoInteractionPalette.Hover : e.TextColor))
             {
                 format.Alignment = StringAlignment.Near;
                 format.LineAlignment = StringAlignment.Center;
@@ -767,7 +802,7 @@ public sealed class LenovoCheckBox : CheckBox
         AccentColor = Color.FromArgb(225, 37, 27);
         BoxBackColor = Color.FromArgb(30, 30, 30);
         BoxBorderColor = Color.FromArgb(82, 82, 82);
-        HoverColor = Color.FromArgb(242, 59, 49);
+        HoverColor = LenovoInteractionPalette.Hover;
         Cursor = Cursors.Hand;
         AutoSize = false;
     }
@@ -799,9 +834,9 @@ public sealed class LenovoCheckBox : CheckBox
         Rectangle box = GetGlyphBounds(ClientSize, e.Graphics.DpiX);
         if (!box.IsEmpty)
         {
-            Color fill = Checked ? (hovering ? HoverColor : AccentColor) : BoxBackColor;
+            Color fill = Checked ? AccentColor : BoxBackColor;
             using (Brush b = new SolidBrush(fill)) e.Graphics.FillRectangle(b, box);
-            using (Pen p = new Pen(Checked ? AccentColor : BoxBorderColor, Math.Max(1f, scale)))
+            using (Pen p = new Pen(Enabled && hovering && !SystemInformation.HighContrast ? HoverColor : Checked ? AccentColor : BoxBorderColor, Math.Max(1f, scale)))
                 e.Graphics.DrawRectangle(p, box);
             if (Checked)
             {
@@ -943,6 +978,7 @@ public static class LenovoSettingsInk
 public sealed class LenovoHeaderIconButton : Button
 {
     public bool InfoIcon { get; set; }
+    public bool OperationActive { get; set; }
     private bool modalActive;
     public bool ModalActive { get { return modalActive; } set { modalActive = value; Invalidate(); } }
     public LenovoHeaderIconButton()
@@ -957,9 +993,10 @@ public sealed class LenovoHeaderIconButton : Button
     {
         base.OnPaint(e);
         bool activeInfo = InfoIcon && ModalActive;
+        bool active = activeInfo || OperationActive;
         Color ink = SystemInformation.HighContrast
-            ? (Enabled || activeInfo ? SystemColors.ControlText : SystemColors.GrayText)
-            : (activeInfo ? Color.FromArgb(225,37,27) : (Enabled ? ForeColor : Color.FromArgb(119,119,119)));
+            ? (Enabled || active ? SystemColors.ControlText : SystemColors.GrayText)
+            : (active ? LenovoInteractionPalette.Active : (Enabled ? ForeColor : LenovoInteractionPalette.Disabled));
         if (SystemInformation.HighContrast) {
             Rectangle center = ClientRectangle;
             int inset = Math.Max(2, Math.Min(center.Width,center.Height)/7);
@@ -1049,7 +1086,7 @@ public sealed class LenovoCustomizeButton : Button
         Color bg = pressed ? FlatAppearance.MouseDownBackColor :
             Enabled && hovering ? FlatAppearance.MouseOverBackColor : BackColor;
         if (bg.IsEmpty) bg = BackColor;
-        Color ink = Enabled ? ForeColor : Color.FromArgb(138,138,138);
+        Color ink = Enabled ? (hovering && !pressed && !SystemInformation.HighContrast ? LenovoInteractionPalette.Hover : ForeColor) : Color.FromArgb(138,138,138);
         using (SolidBrush brush = new SolidBrush(bg))
             e.Graphics.FillRectangle(brush, ClientRectangle);
         TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ink,
@@ -1122,6 +1159,7 @@ public sealed class LenovoSettingsActionButton : Button
             (Enabled && (LanguageSelected || pressed) ? SelectedSurface : Enabled && hovering ? HoverSurface : BackColor);
         Color fg = hc ? (Enabled ? (LanguageSelected ? SystemColors.HighlightText : SystemColors.ControlText) : SystemColors.GrayText) :
             (!Enabled ? LenovoSettingsInk.Muted(false) : Destructive ? Color.FromArgb(239,86,78) : ForeColor);
+        if (!hc && Enabled && hovering && !pressed) fg = LenovoInteractionPalette.Hover;
         g.Clear(bg);
         float dpi = g.DpiX;
         int px = LenovoSettingsInk.Px(dpi,1);
@@ -1136,7 +1174,7 @@ public sealed class LenovoSettingsActionButton : Button
         } else {
             int side = LenovoSettingsInk.Px(dpi,22);
             LenovoSettingsInk.DrawIcon(g,ActionIcon,new Rectangle(LenovoSettingsInk.Px(dpi,11),(Height-side)/2,side,side),
-                Destructive && Enabled ? fg : LenovoSettingsInk.Muted(Enabled));
+                Enabled && hovering && !pressed && !hc ? LenovoInteractionPalette.Hover : Destructive && Enabled ? fg : LenovoSettingsInk.Muted(Enabled));
             LenovoSettingsInk.DrawTextPair(g,text,TitleFont ?? Font,SubtitleFont ?? Font,Text,Subtitle,fg,LenovoSettingsInk.Muted(Enabled));
             if (Separator) using (Pen p = new Pen(hc ? SystemColors.ControlDark : Color.FromArgb(57,57,57),px))
                 g.DrawLine(p,LenovoSettingsInk.Px(dpi,44),Height-px,Math.Max(0,Width-LenovoSettingsInk.Px(dpi,12)),Height-px);
@@ -1165,7 +1203,8 @@ public sealed class LenovoSettingsAutostartLabel : Label
         int side=LenovoSettingsInk.Px(g.DpiX,22), left=LenovoSettingsInk.Px(g.DpiX,44);
         Color fg=hc ? (Enabled ? SystemColors.ControlText : SystemColors.GrayText) :
             (Enabled ? ForeColor : LenovoSettingsInk.Muted(false));
-        LenovoSettingsInk.DrawIcon(g,"autostart",new Rectangle(LenovoSettingsInk.Px(g.DpiX,11),(Height-side)/2,side,side),LenovoSettingsInk.Muted(Enabled));
+        if (!hc && Enabled && TileHovered) fg=LenovoInteractionPalette.Hover;
+        LenovoSettingsInk.DrawIcon(g,"autostart",new Rectangle(LenovoSettingsInk.Px(g.DpiX,11),(Height-side)/2,side,side),!hc && Enabled && TileHovered ? LenovoInteractionPalette.Hover : LenovoSettingsInk.Muted(Enabled));
         LenovoSettingsInk.DrawTextPair(g,new Rectangle(left,0,Math.Max(0,Width-left-LenovoSettingsInk.Px(g.DpiX,3)),Height),
             TitleFont ?? Font,SubtitleFont ?? Font,Text,Subtitle,fg,LenovoSettingsInk.Muted(Enabled));
     }
@@ -1202,6 +1241,9 @@ public sealed class LenovoSettingsToggle : CheckBox
                 path.AddArc(r.Right-h,r.Top,h,h,270,180);
                 path.CloseFigure();
                 using (Brush brush=new SolidBrush(fill)) g.FillPath(brush,path);
+                // Hover belongs to the switch, not its keyboard focus perimeter.
+                if (!hc && Enabled && TileHovered)
+                    using (Pen pen=new Pen(LenovoInteractionPalette.Hover,Math.Max(1f,LenovoSettingsInk.Px(g.DpiX,2)))) g.DrawPath(pen,path);
             }
             int pad=LenovoSettingsInk.Px(g.DpiX,3), d=Math.Max(1,h-2*pad);
             using (Brush brush=new SolidBrush(hc ? SystemColors.ControlText : Enabled ? Color.White : Color.FromArgb(155,155,155)))
@@ -1333,7 +1375,7 @@ public sealed class LenovoVerticalScrollBar : Control
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
         TrackColor = Color.FromArgb(18, 18, 18);
         ThumbColor = Color.FromArgb(225, 37, 27);
-        ThumbHoverColor = Color.FromArgb(242, 59, 49);
+        ThumbHoverColor = LenovoInteractionPalette.Hover;
         Width = 12;
         Cursor = Cursors.Hand;
         TabStop = false;
@@ -1393,7 +1435,7 @@ public sealed class LenovoVerticalScrollBar : Control
         Rectangle thumb = GetThumbRectangle();
         if (!thumb.IsEmpty)
         {
-            using (Brush b = new SolidBrush(hoverThumb || dragging ? ThumbHoverColor : ThumbColor))
+            using (Brush b = new SolidBrush(Enabled && hoverThumb && !dragging && !SystemInformation.HighContrast ? ThumbHoverColor : ThumbColor))
                 e.Graphics.FillRectangle(b, thumb);
         }
     }

@@ -88,6 +88,24 @@ $trayCreate = $appSource.IndexOf('$script:TrayIcon = New-Object System.Windows.F
 Assert-Lbs144Startup 'Real startup primes popup HWND before NotifyIcon is created' ($popupInit -ge 0 -and $trayInit -gt $popupInit -and $trayCreate -gt $trayInit)
 $recoverySource = [IO.File]::ReadAllText((Join-Path $root 'src\UI\StartupRecoveryDialog.ps1'))
 Assert-Lbs144Startup 'Fatal-recovery dialog retains separate AutoScaleMode DPI policy' ($recoverySource.Contains('$form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::Dpi'))
+. (Join-Path $root 'src\UI\StartupRecoveryDialog.ps1')
+$recoveryAction = New-Object Windows.Forms.Button
+try {
+    $recoveryAction.ForeColor = [Drawing.Color]::White
+    Connect-StartupRecoveryActionHover -Button $recoveryAction
+    $flags = [Reflection.BindingFlags]'Instance,NonPublic'
+    $enter = [Windows.Forms.Control].GetMethod('OnMouseEnter',$flags)
+    $leave = [Windows.Forms.Control].GetMethod('OnMouseLeave',$flags)
+    $expectedHover = if ([Windows.Forms.SystemInformation]::HighContrast) { [Drawing.Color]::White } else { [Drawing.Color]::FromArgb(255,110,102) }
+    [void]$enter.Invoke($recoveryAction,@([EventArgs]::Empty))
+    Assert-Lbs144Startup 'Recovery action uses approved hover or system High Contrast' ($recoveryAction.ForeColor -eq $expectedHover)
+    [void]$leave.Invoke($recoveryAction,@([EventArgs]::Empty))
+    Assert-Lbs144Startup 'Recovery action restores idle ink after pointer exit' ($recoveryAction.ForeColor -eq [Drawing.Color]::White)
+    [void]$enter.Invoke($recoveryAction,@([EventArgs]::Empty))
+    $recoveryAction.Enabled = $false
+    [void]$enter.Invoke($recoveryAction,@([EventArgs]::Empty))
+    Assert-Lbs144Startup 'Disabled recovery action cannot acquire hover ink' ($recoveryAction.ForeColor -eq [Drawing.Color]::White)
+} finally { $recoveryAction.Dispose() }
 $large = Get-LenovoDialogScaledSize -DesignSize ([Drawing.Size]::new(500,330)) -Scale 2.5
 Assert-Lbs144Startup 'Removal system dialog supports 1250x825 physical design' ($large.Width -eq 1250 -and $large.Height -eq 825)
 $restartSize = Get-LenovoDialogScaledSize -DesignSize ([Drawing.Size]::new(430,240)) -Scale 2.5
@@ -97,5 +115,5 @@ try {
     Assert-Lbs144Startup '240dpi label glyph height fits scaled dialog heading' ($fontHeight.GetHeight([single]240) -le 60)
 }
 finally { $fontHeight.Dispose() }
-Write-Host "LBS-144 STARTUP/DIALOG TOTAL $script:checks/18"
-if ($script:checks -ne 18) { throw "Expected 18 startup/dialog assertions, got $script:checks" }
+Write-Host "LBS-144 STARTUP/DIALOG TOTAL $script:checks/21"
+if ($script:checks -ne 21) { throw "Expected 21 startup/dialog assertions, got $script:checks" }

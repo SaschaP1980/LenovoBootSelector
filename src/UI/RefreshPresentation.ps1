@@ -1,8 +1,8 @@
 ﻿function Update-HeaderStatusInteractionVisual {
     if (-not $script:HeaderStatusLabel -or $script:HeaderStatusLabel.IsDisposed) { return }
     $interactive = [bool]$script:HeaderUpdateInteractionEnabled
-    $highlight = ($interactive -and ([bool]$script:HeaderStatusHovered -or $script:HeaderStatusLabel.Focused))
-    $script:HeaderStatusLabel.ForeColor = if ($highlight) { [Drawing.Color]::FromArgb(255,110,102) } else { $script:ColorSecondary }
+    $highlight = ($interactive -and [bool]$script:HeaderStatusHovered)
+    $script:HeaderStatusLabel.ForeColor = if ($highlight -and -not [Windows.Forms.SystemInformation]::HighContrast) { [LenovoInteractionPalette]::Hover } else { $script:ColorSecondary }
     $script:HeaderStatusLabel.Cursor = if ($interactive) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
     $script:HeaderStatusLabel.TabStop = $interactive
 }
@@ -74,7 +74,10 @@ function Update-RefreshButtonVisual {
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     $script:RefreshButton.Enabled = [bool]$capabilities.CanRefresh
     $script:RefreshButton.Cursor = if ($script:RefreshButton.Enabled) { [Windows.Forms.Cursors]::Hand } else { [Windows.Forms.Cursors]::Default }
-    $script:RefreshButton.ForeColor = if ($active -or $script:RefreshButtonHovered) { $script:ColorAccent } else { $script:ColorSecondary }
+    # Initialization is not an available Refresh action. Keep its legible
+    # disabled glyph distinct from a genuinely running available refresh.
+    $script:RefreshButton.OperationActive = ($active -and $script:RefreshButton.Enabled)
+    $script:RefreshButton.ForeColor = if ($script:RefreshButton.OperationActive) { [LenovoInteractionPalette]::Active } elseif (-not $script:RefreshButton.Enabled) { [LenovoInteractionPalette]::Disabled } elseif ($script:RefreshButtonHovered -and -not [Windows.Forms.SystemInformation]::HighContrast) { [LenovoInteractionPalette]::Hover } else { [LenovoInteractionPalette]::Normal }
     $script:RefreshButton.Invalidate()
     Update-HeaderRefreshStatus
 }

@@ -691,7 +691,7 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
             connector = new LenovoAuxiliaryConnector();
             connector.TopMost = child.TopMost;
         }
-        connector.SetGeometry(bridge, headerTrigger && !SystemInformation.HighContrast ? accent : fill);
+        connector.SetGeometry(bridge, !SystemInformation.HighContrast ? accent : fill);
         if (!connector.Visible)
         {
             connector.Owner = child;

@@ -31,18 +31,55 @@ function New-Label {
     return $label
 }
 $src=[IO.File]::ReadAllText((Join-Path $root 'src\App\LenovoBootSelector.template.ps1'))
-$start=$src.IndexOf('public sealed class LenovoVerticalScrollBar : Control')
-if ($start -lt 0) { throw 'Scrollbar source missing' }
-$depth=0; $opened=$false; $end=-1
-for ($i=$start;$i -lt $src.Length;$i++) {
-    if ($src[$i] -eq '{') { $depth++; $opened=$true }
-    elseif ($src[$i] -eq '}') { $depth--; if ($opened -and $depth -eq 0) { $end=$i; break } }
-}
-if ($end -lt 0) { throw 'Scrollbar source incomplete' }
-Add-Type -TypeDefinition ("using System; using System.Drawing; using System.Windows.Forms;"+$src.Substring($start,$end-$start+1)) -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility
+# Compile the complete canonical WinForms block in one assembly so the
+# scrollbar and action buttons resolve the shared interaction palette.
+$prefix='Add-Type -TypeDefinition @"'
+$begin=$src.IndexOf($prefix,[StringComparison]::Ordinal)
+if ($begin -lt 0) { throw 'Missing canonical WinForms C# source' }
+$begin+=$prefix.Length
+$end=$src.IndexOf('"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing',$begin,[StringComparison]::Ordinal)
+if ($end -lt 0) { throw 'Missing canonical WinForms C# source end' }
+Add-Type -TypeDefinition ($src.Substring($begin,$end-$begin)) -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility
 function Prepare-LenovoDialogDpiLayout {
     param([Windows.Forms.Form]$Form,$Owner,[string]$Role)
     Set-LenovoDialogDpiLayout -Form $Form -Scale $script:Scale -WorkingArea $script:Area
+}
+# Inspect the actual shared native Button paint, not a copied renderer.
+function Test-Lbs270DialogHover([Windows.Forms.Button]$Button) {
+    if ($Button -isnot [LenovoActionButton]) { return $false }
+    $flags=[Reflection.BindingFlags]'Instance,NonPublic'
+    $enter=[Windows.Forms.Control].GetMethod('OnMouseEnter',$flags)
+    $leave=[Windows.Forms.Control].GetMethod('OnMouseLeave',$flags)
+    $hoverInk=[Drawing.Color]::FromArgb(255,110,102).ToArgb()
+    $hc=[Windows.Forms.SystemInformation]::HighContrast
+    $oldEnabled=$Button.Enabled
+    try {
+        $Button.Enabled=$true
+        [void]$leave.Invoke($Button,@([EventArgs]::Empty))
+        $idle=Get-Lbs270DialogHoverPixels $Button $hoverInk
+        [void]$enter.Invoke($Button,@([EventArgs]::Empty))
+        $hot=Get-Lbs270DialogHoverPixels $Button $hoverInk
+        [void]$leave.Invoke($Button,@([EventArgs]::Empty))
+        $restored=Get-Lbs270DialogHoverPixels $Button $hoverInk
+        $Button.Enabled=$false
+        [void]$enter.Invoke($Button,@([EventArgs]::Empty))
+        $disabled=Get-Lbs270DialogHoverPixels $Button $hoverInk
+        return ($idle -eq 0 -and $restored -eq 0 -and $disabled -eq 0 -and $(if($hc){$hot -eq 0}else{$hot -gt 0}))
+    } finally { [void]$leave.Invoke($Button,@([EventArgs]::Empty)); $Button.Enabled=$oldEnabled }
+}
+function Get-Lbs270DialogHoverPixels([Windows.Forms.Button]$Button,[int]$Ink) {
+    $bmp=[Drawing.Bitmap]::new($Button.Width,$Button.Height)
+    try {
+        $Button.DrawToBitmap($bmp,$Button.ClientRectangle)
+        $pixels=0
+        # The shared edge is inside the bottom of the native button, away from text.
+        for ($y=[Math]::Max(1,$bmp.Height-8);$y -lt $bmp.Height-1;$y++) {
+            for ($x=4;$x -lt $bmp.Width-4;$x++) {
+                if ($bmp.GetPixel($x,$y).ToArgb() -eq $Ink) { $pixels++ }
+            }
+        }
+        return $pixels
+    } finally { $bmp.Dispose() }
 }
 # Real controls and mocked side effects. Actual modal lifecycle is covered by LBS202/229.
 function Show-LenovoOwnedDialog {
@@ -52,6 +89,9 @@ function Show-LenovoOwnedDialog {
         $s=$Form.Controls[0].Tag
         Assert-Dialog 'shared dark header and separate fixed action bar' ($s.Kind -eq 'LenovoRegularDialog' -and $s.Header.BackColor.R -eq 9 -and $s.Footer.Top -eq $s.Viewport.Bottom)
         Assert-Dialog 'visible action bar and bounded window' ($s.Footer.Bottom -le $Form.ClientSize.Height -and $Form.Width -le $script:Area.Width -and $Form.Height -le $script:Area.Height -and @($s.Buttons | Where-Object {$_.Right -gt $s.Footer.Width -or $_.Bottom -gt $s.Footer.Height}).Count -eq 0)
+        $hoverValid=$true
+        foreach ($action in $s.Buttons) { if (-not (Test-Lbs270DialogHover $action)) { $hoverValid=$false } }
+        Assert-Dialog "LBS270 $script:Locale/$script:Scale/$script:Case every dialog action paints hover only when enabled" $hoverValid
         if ($script:Case -eq 'copy') {
             $b=$s.Buttons[0]
             $handle=$Form.Handle
@@ -113,4 +153,4 @@ foreach ($locale in @('de-DE','en-US')) {
     }
 }
 Write-Host "LBS242 DIALOG COMPOSITION TOTAL $script:Checks"
-if ($script:Checks -ne 160) { throw "Expected 160 native dialog checks, got $script:Checks" }
+if ($script:Checks -ne 204) { throw "Expected 204 native dialog checks, got $script:Checks" }

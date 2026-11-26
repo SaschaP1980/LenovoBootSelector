@@ -45,7 +45,7 @@ function New-MaintenanceStatePanel {
     $message.TextAlign = [Drawing.ContentAlignment]::TopCenter
     $panel.Controls.Add($message)
 
-    $action = New-Object System.Windows.Forms.Button
+    $action = New-Object LenovoActionButton
     $action.Name = 'MaintenancePrimaryButton'
     $action.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHeading'
     $action.Font = New-Object Drawing.Font('Segoe UI', 8.7, [Drawing.FontStyle]::Bold)
@@ -53,7 +53,7 @@ function New-MaintenanceStatePanel {
     $action.BackColor = $script:ColorAccent
     $action.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $action.FlatAppearance.BorderSize = 0
-    $action.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(242,59,49)
+    $action.FlatAppearance.MouseOverBackColor = $script:ColorAccent
     $action.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(185,30,22)
     $action.Location = New-Object Drawing.Point(55, 334)
     $action.Size = New-Object Drawing.Size(280, 38)

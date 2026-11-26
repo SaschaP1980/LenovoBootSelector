@@ -33,6 +33,22 @@ function Set-RowHoverState($Control, [bool]$Hover) {
     if (-not $row) { return }
 
     $rowGuid = [string]$row.Tag
+    # Presentation only: use the already-observed capability projection, never
+    # perform a task/firmware/readiness probe on pointer movement. The existing
+    # click owner remains authoritative, including cold-start deferred intent.
+    $hot = $Hover -and $row.Enabled -and -not $script:ManageActiveDragGuid
+    $observed = $script:SystemStatusCapabilities
+    if ($script:IsManageEntriesMode) {
+        if ($observed -and -not $observed.CanManageEntries) { $hot = $false }
+    } else {
+        if ($script:BootNextPendingGuid -or $script:DefaultTargetChangePending) { $hot = $false }
+        if ($observed -and -not $observed.CanSetBootNext -and -not ($observed.State -eq 'Checking' -and $observed.CanUseCachedBootState)) { $hot = $false }
+    }
+    $title=$row.Controls['BootTitleLabel']
+    if ($title) {
+        $hiddenInk=$script:IsManageEntriesMode -and (Test-ManageEntryHidden -Guid $rowGuid)
+        $title.ForeColor=if ($hot -and -not [Windows.Forms.SystemInformation]::HighContrast) { [LenovoInteractionPalette]::Hover } elseif ($hiddenInk) { [Drawing.Color]::FromArgb(175,175,175) } else { $script:ColorPrimary }
+    }
     if ($script:IsManageEntriesMode) {
         if ($script:ManageActiveDragGuid -and $rowGuid -eq $script:ManageActiveDragGuid -and $script:ManageDragLayout) {
             $row.BackColor = [Drawing.Color]::FromArgb(48,48,54)
@@ -40,10 +56,10 @@ function Set-RowHoverState($Control, [bool]$Hover) {
         }
         $hidden = Test-ManageEntryHidden -Guid $rowGuid
         if ($hidden) {
-            $row.BackColor = if ($Hover) { [Drawing.Color]::FromArgb(37,37,37) } else { [Drawing.Color]::FromArgb(27,27,27) }
+            $row.BackColor = if ($hot) { [Drawing.Color]::FromArgb(37,37,37) } else { [Drawing.Color]::FromArgb(27,27,27) }
         }
         else {
-            $row.BackColor = if ($Hover) { $script:ColorHover } else { $script:ColorRow }
+            $row.BackColor = if ($hot) { $script:ColorHover } else { $script:ColorRow }
         }
         $row.Invalidate($true)
         return
@@ -55,7 +71,7 @@ function Set-RowHoverState($Control, [bool]$Hover) {
     elseif ($isSelected) {
         $row.BackColor = $script:ColorSelectedRow
     }
-    elseif ($Hover) {
+    elseif ($hot) {
         $row.BackColor = $script:ColorHover
     }
     else {

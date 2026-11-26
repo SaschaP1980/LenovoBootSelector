@@ -85,7 +85,7 @@ function Add-PopupHeaderSection {
     $info.Size = [Drawing.Size]::new(34,34)
     $info.Cursor = [Windows.Forms.Cursors]::Hand
     $info.Add_Paint({ param($sender,$eventArgs) Paint-ModalOwnerRefreshGlyph -Button $sender -EventArgs $eventArgs })
-    $info.Add_MouseEnter({ if ($this.Enabled) { $this.ForeColor = $script:ColorAccent; $this.Invalidate() } })
+    $info.Add_MouseEnter({ if ($this.Enabled -and -not [Windows.Forms.SystemInformation]::HighContrast) { $this.ForeColor = [LenovoInteractionPalette]::Hover; $this.Invalidate() } })
     $info.Add_MouseLeave({ $this.ForeColor = $script:ColorSecondary; $this.Invalidate() })
     $info.Add_Click({ Show-SystemStatusPopup -Owner $this })
     $script:SystemStatusButton = $info
@@ -199,7 +199,7 @@ function Add-PopupBootEntryListSection {
     $entryScroll.Size = New-Object Drawing.Size(8, 402)
     $entryScroll.TrackColor = [Drawing.Color]::FromArgb(23, 23, 23)
     $entryScroll.ThumbColor = $script:ColorAccent
-    $entryScroll.ThumbHoverColor = [Drawing.Color]::FromArgb(242, 59, 49)
+    $entryScroll.ThumbHoverColor = [LenovoInteractionPalette]::Hover
     $entryScroll.Visible = $false
     $entryScroll.Add_ValueChanged({
         try {
@@ -251,7 +251,13 @@ function Set-PopupNavigationRowHover {
     $row = Get-PopupNavigationRow -Control $Control
     if (-not $row -or $row.IsDisposed) { return }
     $inside = $Hover -or ($row.Visible -and $row.RectangleToScreen($row.ClientRectangle).Contains([Windows.Forms.Cursor]::Position))
-    $row.BackColor = if ($inside -and (Test-PopupNavigationRowInteractive -Row $row)) { Get-PopupNavigationHoverColor } else { $script:ColorSurface }
+    $hot=$inside -and (Test-PopupNavigationRowInteractive -Row $row)
+    $row.BackColor = if ($hot) { Get-PopupNavigationHoverColor } else { $script:ColorSurface }
+    $label=if ($row.Name -eq 'DefaultPanel') { $row.Controls['DefaultTargetNameLabel'] } else { $row.Controls['MoreSettingsButton'] }
+    if ($label) {
+        $idle = if ($row.Name -eq 'DefaultPanel' -and -not $script:DefaultInteractionEnabled) { [Drawing.Color]::FromArgb(146,146,146) } else { $script:ColorPrimary }
+        $label.ForeColor = if ($hot -and -not [Windows.Forms.SystemInformation]::HighContrast) { [LenovoInteractionPalette]::Hover } else { $idle }
+    }
 }
 
 function Invoke-PopupNavigationRow {
@@ -376,7 +382,7 @@ function Add-PopupRestartSection {
     $restartPanel.Size = New-Object Drawing.Size(390, 65)
     $restartPanel.BackColor = $script:ColorSurface
 
-    $restartButton = New-Object System.Windows.Forms.Button
+    $restartButton = New-Object LenovoActionButton
     $restartButton.Name = 'RestartActionButton'
     $restartButton.Text = Get-LocalizedString -Key 'Action.RestartWindows'
     $restartButton.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
@@ -439,7 +445,7 @@ function Add-PopupRestartSection {
     $restartPanel.Controls.Add($restartTarget)
     $script:RestartTargetLabel = $restartTarget
 
-    $defaultOnce = New-Object System.Windows.Forms.Button
+    $defaultOnce = New-Object LenovoActionButton
     $defaultOnce.Name = 'RestartUseDefaultButton'
     $defaultOnce.Text = Get-LocalizedString -Key 'BootNext.UseDefaultOnce'
     $defaultOnce.Font = New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)
@@ -506,7 +512,7 @@ function Add-PopupManageEntriesSection {
     $managePanel.Controls.Add($manageDivider)
 
     # LBS-179: one native Undo control in the existing action row, no history surface.
-    $undoManage = New-Object System.Windows.Forms.Button
+    $undoManage = New-Object LenovoActionButton
     $undoManage.Name = 'ManageUndoButton'
     $undoManage.Text = Get-LocalizedString -Key 'Manage.Undo'
     $undoManage.AccessibleName = $undoManage.Text
@@ -524,7 +530,7 @@ function Add-PopupManageEntriesSection {
     $undoManage.Add_Click({ Undo-ManageEntryDraft })
     $managePanel.Controls.Add($undoManage)
 
-    $cancelManage = New-Object System.Windows.Forms.Button
+    $cancelManage = New-Object LenovoActionButton
     $cancelManage.Name = 'ManageCancelButton'
     $cancelManage.Text = Get-LocalizedString -Key 'Common.Cancel'
     $cancelManage.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
@@ -542,7 +548,7 @@ function Add-PopupManageEntriesSection {
     $cancelManage.Add_Click({ Stop-ManageEntriesMode })
     $managePanel.Controls.Add($cancelManage)
 
-    $saveManage = New-Object System.Windows.Forms.Button
+    $saveManage = New-Object LenovoActionButton
     $saveManage.Name = 'ManageSaveButton'
     $saveManage.Text = Get-LocalizedString -Key 'Manage.Save'
     $saveManage.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
@@ -660,7 +666,7 @@ function New-AuxiliaryPopupForm {
     })
     $close.Add_GotFocus({ $this.Invalidate() })
     $close.Add_LostFocus({ $this.Invalidate() })
-    $close.Add_MouseEnter({ param($sender,$eventArgs) $sender.ForeColor = $script:ColorAccent })
+    $close.Add_MouseEnter({ param($sender,$eventArgs) if ($sender.Enabled -and -not [Windows.Forms.SystemInformation]::HighContrast) { $sender.ForeColor = [LenovoInteractionPalette]::Hover } })
     $close.Add_MouseLeave({ param($sender,$eventArgs) $sender.ForeColor = $script:ColorPrimary })
     $close.Location = [Drawing.Point]::new(350,7)
     $close.Size = [Drawing.Size]::new(28,30)
@@ -690,7 +696,7 @@ function New-AuxiliaryPopupForm {
     $scroll.Size = [Drawing.Size]::new(8,$viewport.Height)
     $scroll.TrackColor = [Drawing.Color]::FromArgb(23,23,23)
     $scroll.ThumbColor = $script:ColorAccent
-    $scroll.ThumbHoverColor = [Drawing.Color]::FromArgb(242,59,49)
+    $scroll.ThumbHoverColor = [LenovoInteractionPalette]::Hover
     $scroll.Visible = $false
     $scroll.Add_ValueChanged({
         param($sender,$eventArgs)

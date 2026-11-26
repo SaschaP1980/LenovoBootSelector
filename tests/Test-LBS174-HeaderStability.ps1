@@ -61,7 +61,7 @@ function Start-BackgroundBootRefresh { param([switch]$RefreshStorage) }
 $script:ColorHeader = [Drawing.Color]::FromArgb(0,0,0)
 $script:ColorBackground = [Drawing.Color]::FromArgb(28,28,28)
 $script:ColorAccent = [Drawing.Color]::FromArgb(225,37,27)
-$script:ColorSecondary = [Drawing.Color]::FromArgb(180,180,180)
+$script:ColorSecondary = [Drawing.Color]::FromArgb(184,184,184)
 $script:ColorSelectedRow = [Drawing.Color]::FromArgb(64,31,29)
 $script:BootTypeToolTip = $null
 $script:BackgroundRefreshState = [pscustomobject]@{ Active = $false }
@@ -174,6 +174,31 @@ try {
     Assert-Lbs174 'LBS182 info and refresh equal native button sizes and alignment' ($info -is [Windows.Forms.Button] -and $info.Enabled -and $info.Size -eq $refresh.Size -and $info.Top -eq $refresh.Top -and $info.Right+4 -le $refresh.Left)
     Assert-Lbs174 'LBS182 title and status clear info button' ($title.Right+8 -le $info.Left -and $status.Right+8 -le $info.Left)
 
+    $script:RefreshButtonHovered=$true
+    Update-RefreshButtonVisual
+    $hoverInk=if ([Windows.Forms.SystemInformation]::HighContrast) { [Drawing.Color]::FromArgb(184,184,184) } else { [Drawing.Color]::FromArgb(255,110,102) }
+    Assert-Lbs174 'LBS270 enabled refresh uses hover ink' ($refresh.Enabled -and -not $refresh.OperationActive -and $refresh.ForeColor -eq $hoverInk)
+    $script:BackgroundRefreshState.Active=$true
+    Update-RefreshButtonVisual
+    Assert-Lbs174 'LBS270 active refresh takes precedence over hover' ($refresh.OperationActive -and $refresh.ForeColor -eq [Drawing.Color]::FromArgb(225,37,27))
+    $script:TestCapabilities.State='Checking'
+    $script:TestCapabilities.CanRefresh=$false
+    Update-RefreshButtonVisual
+    Assert-Lbs174 'LBS270 startup remains disabled and subdued despite pointer' (-not $refresh.Enabled -and -not $refresh.OperationActive -and $refresh.ForeColor -eq [Drawing.Color]::FromArgb(119,119,119))
+    $script:TestCapabilities.State='Ready'
+    $script:TestCapabilities.CanRefresh=$true
+    $script:BackgroundRefreshState.Active=$false
+    $script:RefreshButtonHovered=$false
+    Update-RefreshButtonVisual
+    Assert-Lbs174 'LBS270 refresh completion restores neutral idle' ($refresh.Enabled -and -not $refresh.OperationActive -and $refresh.ForeColor -eq [Drawing.Color]::FromArgb(184,184,184))
+    $flags=[Reflection.BindingFlags]'Instance,NonPublic'
+    $enter=[Windows.Forms.Control].GetMethod('OnMouseEnter',$flags)
+    $leave=[Windows.Forms.Control].GetMethod('OnMouseLeave',$flags)
+    [void]$enter.Invoke($info,@([EventArgs]::Empty))
+    Assert-Lbs174 'LBS270 enabled Info uses the same hover ink' ($info.ForeColor -eq $hoverInk)
+    [void]$leave.Invoke($info,@([EventArgs]::Empty))
+    Assert-Lbs174 'LBS270 Info pointer exit restores neutral ink' ($info.ForeColor -eq $script:ColorSecondary)
+
     $script:UpdateState.Status = 'UpdateAvailable'
     $script:UpdateState.AvailableManifest = [pscustomobject]@{ Version='9.9.9.9' }
     Update-HeaderRefreshStatus
@@ -181,8 +206,35 @@ try {
     Assert-Lbs174 'update text is localized in German' ($status.Text -eq 'Neue App-Version verfuegbar')
     Assert-Lbs174 'update notification is interactive' ([bool]$script:HeaderUpdateInteractionEnabled -and $status.TabStop)
     Assert-Lbs174 'update notification has hand cursor' ($status.Cursor -eq [System.Windows.Forms.Cursors]::Hand)
+    # Exercise actual native focus in the absence of pointer hover.
+    $savedPointer = [Windows.Forms.Cursor]::Position
+    try {
+        $form.StartPosition = [Windows.Forms.FormStartPosition]::Manual
+        $form.Location = [Drawing.Point]::new(40,40)
+        $form.TopMost = $true
+        $form.Show()
+        $form.Activate()
+        [Windows.Forms.Cursor]::Position = $form.PointToScreen([Drawing.Point]::new(5,5))
+        [Windows.Forms.Application]::DoEvents()
+        [void]$status.Focus()
+        [Windows.Forms.Application]::DoEvents()
+        $script:HeaderStatusHovered = $false
+        Update-HeaderStatusInteractionVisual
+        Assert-Lbs174 'LBS270 native update focus remains available without pointer hover' ($status.Focused -and $status.CanSelect -and $status.TabStop -and $status.ForeColor -eq $script:ColorSecondary)
+        [void]$enter.Invoke($status,@([EventArgs]::Empty))
+        Assert-Lbs174 'LBS270 pointer hover remains independent of native update focus' ($status.Focused -and $status.ForeColor -eq $hoverInk)
+        [void]$leave.Invoke($status,@([EventArgs]::Empty))
+        Assert-Lbs174 'LBS270 pointer exit preserves native focus with neutral ink' ($status.Focused -and $status.ForeColor -eq $script:ColorSecondary)
+        $status.PerformClick()
+        Assert-Lbs174 'LBS270 focused update action retains native button activation' ($script:DialogCalls -eq 1)
+    } finally {
+        $form.Hide()
+        [Windows.Forms.Cursor]::Position = $savedPointer
+    }
     $script:BackgroundRefreshState.Active = $true
     Update-HeaderRefreshStatus
+    $status.PerformClick()
+    Assert-Lbs174 'LBS270 inactive update state blocks dispatch' ($script:DialogCalls -eq 1 -and -not $status.TabStop)
     Assert-Lbs174 'refresh takes precedence over available update' ($status.Text -eq 'Aktualisiere Bootziele...' -and -not $script:HeaderUpdateInteractionEnabled)
     Assert-Lbs174 'refresh/update precedence does not move title' ($title.Location -eq $atRest)
 
@@ -241,5 +293,5 @@ try {
 }
 finally { $form2.Dispose() }
 
-Write-Host "LBS174 HEADER TOTAL $script:checks/48"
-if ($script:checks -ne 48) { throw "LBS174 header count mismatch: $script:checks" }
+Write-Host "LBS174 HEADER TOTAL $script:checks/59"
+if ($script:checks -ne 59) { throw "LBS174 header count mismatch: $script:checks" }
