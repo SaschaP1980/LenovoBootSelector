@@ -72,6 +72,13 @@ function New-PopupForm {
 
     # v0.2.28: no window region is applied; the popup stays rectangular.
 
+    $form.Add_MouseWheel({
+        param($sender,$eventArgs)
+        $list = $sender.Controls.Find('EntryList',$true) | Select-Object -First 1
+        if ($list -and $list.Visible -and $list.RectangleToScreen($list.ClientRectangle).Contains([Windows.Forms.Cursor]::Position)) {
+            Invoke-BootEntryWheelScroll -ListPanel $list -EventArgs $eventArgs
+        }
+    })
     $form.Add_KeyDown({
         param($sender, $eventArgs)
         Invoke-PopupEscapeDismissal -Form $sender -EventArgs $eventArgs

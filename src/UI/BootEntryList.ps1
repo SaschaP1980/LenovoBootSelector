@@ -274,12 +274,13 @@ function Get-NormalBootFocusedGuid {
 }
 
 function Restore-NormalBootFocusedGuid {
-    param($ContentPanel,[string]$Guid)
+    param($ContentPanel,[string]$Guid,[Nullable[bool]]$KeyboardCue)
     if ($script:IsManageEntriesMode -or -not $Guid -or -not $ContentPanel -or $ContentPanel.IsDisposed) { return }
     foreach ($row in @($ContentPanel.Controls | Where-Object {
         $_.Name -eq 'BootRow' -and -not $_.IsDisposed
     })) {
         if (([string]$row.Tag).ToLowerInvariant() -eq $Guid.ToLowerInvariant()) {
+            if ($null -ne $KeyboardCue -and $row.PSObject.Methods['SetKeyboardCue']) { $row.SetKeyboardCue([bool]$KeyboardCue) }
             [void]$row.Focus()
             Set-NormalBootRowVisible -Row $row
             return
@@ -298,11 +299,17 @@ function Invoke-PopupRowsReconciliation {
     $focusedNormalGuid = if (-not $Snapshot.Mode) {
         Get-NormalBootFocusedGuid -ContentPanel $ContentPanel
     } else { '' }
+    $focusedNormalRow = if ($focusedNormalGuid) { $existingRows | Where-Object { $_.Focused -and [string]$_.Tag -eq $focusedNormalGuid } | Select-Object -First 1 }
+    $normalCue = if ($focusedNormalRow -and $focusedNormalRow.PSObject.Properties['KeyboardCueEnabled']) { [bool]$focusedNormalRow.KeyboardCueEnabled } else { $true }
+    $manageAnchor = if ($Snapshot.Mode -and $script:PopupRowsRenderedMode) { $existingRows | Where-Object { $_.TabStop -and $_.PSObject.Properties['ManageKeyboardMode'] -and $_.ManageKeyboardMode } | Select-Object -First 1 }
+    $manageAnchorGuid = if ($manageAnchor) { [string]$manageAnchor.Tag } else { '' }
+    $manageAnchorIndex = if ($manageAnchor) { [int]$manageAnchor.TabIndex } else { 0 }
     $focusedManageRow = if ($Snapshot.Mode -and $script:PopupRowsRenderedMode) {
         $existingRows | Where-Object { $_.Focused -and $_.TabStop } | Select-Object -First 1
     }
     $focusedManageGuid = if ($focusedManageRow) { [string]$focusedManageRow.Tag } else { '' }
     $focusedManageIndex = if ($focusedManageRow) { [int]$focusedManageRow.TabIndex } else { -1 }
+    $manageCue = if ($focusedManageRow -and $focusedManageRow.PSObject.Properties['KeyboardCueEnabled']) { [bool]$focusedManageRow.KeyboardCueEnabled } else { $true }
     if ($activeDrag) { Reset-ManageDragPreview }
     $previousSignatures = $script:PopupRowsRowSignatures
     $canReconcile = [object]::ReferenceEquals($script:PopupRowsContentPanel, $contentPanel) -and
@@ -388,13 +395,15 @@ function Invoke-PopupRowsReconciliation {
     finally { $contentPanel.ResumeLayout() }
     # Restore only if a normal row really owned focus before reconciliation.
     # Switching to Restart/settings/Manage Entries must never steal focus.
-    Restore-NormalBootFocusedGuid -ContentPanel $ContentPanel -Guid $focusedNormalGuid
+    Restore-NormalBootFocusedGuid -ContentPanel $ContentPanel -Guid $focusedNormalGuid -KeyboardCue:$normalCue
     if ($Snapshot.Mode) {
-        foreach ($row in @($ContentPanel.Controls | Where-Object { $_.Name -eq 'BootRow' })) {
-            Update-ManageKeyboardRowPresentation -Row $row
-        }
+        $manageRows = @($ContentPanel.Controls | Where-Object { $_.Name -eq 'BootRow' -and $_.PSObject.Properties['ManageKeyboardMode'] -and $_.ManageKeyboardMode } | Sort-Object Top)
+        foreach ($row in $manageRows) { Update-ManageKeyboardRowPresentation -Row $row }
+        $anchor = $manageRows | Where-Object { [string]$_.Tag -eq $manageAnchorGuid } | Select-Object -First 1
+        if (-not $anchor -and $manageRows.Count -gt 0) { $anchor = $manageRows[[Math]::Min($manageAnchorIndex,$manageRows.Count-1)] }
+        if ($anchor) { $anchor.SetManageTabAnchor() }
         if ($focusedManageGuid -and -not $script:ManageAliasEditGuid) {
-            Restore-ManageRowFocus -Guid $focusedManageGuid -FallbackIndex $focusedManageIndex
+            Restore-ManageRowFocus -Guid $focusedManageGuid -FallbackIndex $focusedManageIndex -KeyboardCue:$manageCue
         }
     }
     return [int]$affected
