@@ -3,6 +3,7 @@ $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root=Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'Import-LenovoInteractionTestTypes.ps1')
 foreach ($rel in @('src\Core\EntryPreferences.ps1','src\Core\Localization.ps1','src\UI\BootEntryList.ps1','src\UI\PopupDpiLayout.ps1','src\UI\PopupComposition.ps1','src\UI\ManageEntriesState.ps1','src\UI\ManageEntries.ps1')) {. (Join-Path $root $rel)}
 $script:checks=0
 function Assert-Undo([bool]$Pass,[string]$Name) {

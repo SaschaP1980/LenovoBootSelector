@@ -1031,7 +1031,7 @@ function Add-BootEntryAliasEditor {
     $clearAlias.Add_MouseEnter({
         param($sender,$eventArgs)
         if (-not $sender.Visible -or $script:ManageActiveDragGuid) { return }
-        $sender.ForeColor = [Drawing.Color]::FromArgb(255,110,102)
+        if ($sender.Enabled -and -not [Windows.Forms.SystemInformation]::HighContrast) { $sender.ForeColor = [LenovoInteractionPalette]::Hover }
         try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleName) } catch { }
     })
     $clearAlias.Add_MouseLeave({
@@ -1138,7 +1138,7 @@ function Add-BootEntryAliasEditor {
     }
     $row.Controls.Add($editorFrame)
 
-    $applyAlias = New-Object System.Windows.Forms.Button
+    $applyAlias = New-Object LenovoActionButton
     $applyAlias.Name = 'AliasApplyButton'
     $applyAlias.Text = Get-LocalizedString -Key 'Common.Apply'
     $applyAlias.Tag = $entry.Guid
@@ -1173,7 +1173,7 @@ function Add-BootEntryAliasEditor {
     })
     $row.Controls.Add($applyAlias)
 
-    $cancelAlias = New-Object System.Windows.Forms.Button
+    $cancelAlias = New-Object LenovoActionButton
     $cancelAlias.Name = 'AliasCancelButton'
     $cancelAlias.Tag = $entry.Guid
     $cancelAlias.Text = Get-LocalizedString -Key 'Common.Cancel'
@@ -1366,11 +1366,12 @@ function Update-ManageEditGlyphInk {
     param($Control)
     $row = $Control.Parent
     $keyboard = $row -and $row.PSObject.Properties['ManageEditCueActive'] -and $row.ManageEditCueActive
-    $hover = -not $script:ManageActiveDragGuid -and ($Control.ManagePointerHovered -or $keyboard)
+    $hover = $Control.Enabled -and -not $script:ManageActiveDragGuid -and $Control.ManagePointerHovered -and -not [Windows.Forms.SystemInformation]::HighContrast
+    $cue = -not $script:ManageActiveDragGuid -and $keyboard
     $color = if ($Control.Name -eq 'ManageReorderGrip') {
-        if ($hover) { [Drawing.Color]::FromArgb(220,220,220) } else { [Drawing.Color]::FromArgb(145,145,145) }
+        if ($hover) { [LenovoInteractionPalette]::Hover } elseif ($cue) { [Drawing.Color]::FromArgb(220,220,220) } else { [Drawing.Color]::FromArgb(145,145,145) }
     } else {
-        if ($hover) { $script:ColorAccent } else { [Drawing.Color]::FromArgb(190,190,190) }
+        if ($hover) { [LenovoInteractionPalette]::Hover } elseif ($cue) { $script:ColorAccent } else { [Drawing.Color]::FromArgb(190,190,190) }
     }
     if ($Control.ForeColor -ne $color) { $Control.ForeColor = $color; $Control.Invalidate() }
 }
@@ -1399,11 +1400,11 @@ $state.AllowDrop = $true
 $state.Add_Paint({
     param($sender,$eventArgs)
     $hidden = ([string]$sender.AccessibleName -eq 'hidden')
-    $hover = -not $script:ManageActiveDragGuid -and ($sender.ForeColor -eq [Drawing.Color]::FromArgb(160,160,160) -or $sender.ForeColor -eq [Drawing.Color]::FromArgb(255,110,102))
+    $hover = $sender.Enabled -and -not $script:ManageActiveDragGuid -and $sender.ForeColor -eq [LenovoInteractionPalette]::Hover -and -not [Windows.Forms.SystemInformation]::HighContrast
     $color = if ($hidden) {
-        if ($hover) { [Drawing.Color]::FromArgb(160,160,160) } else { [Drawing.Color]::FromArgb(115,115,115) }
+        if ($hover) { [LenovoInteractionPalette]::Hover } else { [Drawing.Color]::FromArgb(115,115,115) }
     } else {
-        if ($hover) { [Drawing.Color]::FromArgb(255,110,102) } else { $script:ColorAccent }
+        if ($hover) { [LenovoInteractionPalette]::Hover } else { $script:ColorAccent }
     }
     $geometry = Get-LenovoManageEyeGlyphGeometry -ClientSize $sender.ClientSize -Dpi $eventArgs.Graphics.DpiX
     $eventArgs.Graphics.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
@@ -1427,7 +1428,7 @@ $state.Add_Paint({
 $state.Add_MouseEnter({
     param($sender,$eventArgs)
     if ($script:ManageActiveDragGuid) { return }
-    $sender.ForeColor = if ($sender.AccessibleName -eq 'hidden') { [Drawing.Color]::FromArgb(160,160,160) } else { [Drawing.Color]::FromArgb(255,110,102) }
+    if ($sender.Enabled -and -not [Windows.Forms.SystemInformation]::HighContrast) { $sender.ForeColor = [LenovoInteractionPalette]::Hover }
     $sender.Invalidate()
     try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleDescription) } catch { }
 })

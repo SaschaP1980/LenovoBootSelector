@@ -168,7 +168,8 @@ foreach ($locale in @('de-DE','en-US')) {
             $ctrlEnd=[Windows.Forms.Keys]::Control -bor [Windows.Forms.Keys]::End
             $ctrlHome=[Windows.Forms.Keys]::Control -bor [Windows.Forms.Keys]::Home
             $gripIdle=[Drawing.Color]::FromArgb(145,145,145)
-            $gripHover=[Drawing.Color]::FromArgb(220,220,220)
+            $gripKeyboardCue=[Drawing.Color]::FromArgb(220,220,220)
+            $gripHover=if ([Windows.Forms.SystemInformation]::HighContrast) { $gripIdle } else { [Drawing.Color]::FromArgb(255,110,102) }
             $penIdle=[Drawing.Color]::FromArgb(190,190,190)
             $flags=[Reflection.BindingFlags]::Instance -bor [Reflection.BindingFlags]::NonPublic
             $bounds=$first.Bounds
@@ -177,7 +178,7 @@ foreach ($locale in @('de-DE','en-US')) {
             [Windows.Forms.Application]::DoEvents()
             $grip=$first.Controls['ManageReorderGrip'];$pencil=$first.Controls['AliasEditButton']
             Check "$locale/$scale first only down arrow painted" (Test-Cue $first $false $true)
-            Check "$locale/$scale existing hover inks without background or geometry" ($grip.ForeColor -eq $gripHover -and $pencil.ForeColor -eq $script:ColorAccent -and $grip.BackColor -eq [Drawing.Color]::Transparent -and $first.Bounds -eq $bounds -and -not $grip.ManagePointerHovered -and -not $pencil.ManagePointerHovered)
+            Check "$locale/$scale keyboard cue inks without synthesizing pointer hover" ($grip.ForeColor -eq $gripKeyboardCue -and $pencil.ForeColor -eq $script:ColorAccent -and $grip.BackColor -eq [Drawing.Color]::Transparent -and $first.Bounds -eq $bounds -and -not $grip.ManagePointerHovered -and -not $pencil.ManagePointerHovered)
             Check "$locale/$scale Ctrl alone leaves order and history unchanged" ((Test-RowOrder $originalOrder) -and $script:ManageUndoHistory.Count -eq 0 -and $script:saveCalls -eq 0 -and $script:bootCalls -eq 0 -and (Test-IdleCue $second))
             Dispatch-Key $first $ctrlDown Down
             $moved=Get-Row 'boot-0'
@@ -229,7 +230,7 @@ foreach ($locale in @('de-DE','en-US')) {
             Start-ManageEntriesMode
             $single=Get-Row 'boot-0';Dispatch-Key $single $ctrl Down
             $singleGrip=$single.Controls['ManageReorderGrip']
-            Check "$locale/$scale single entry no arrows but hover ink" ((Test-Cue $single $false $false) -and $singleGrip.ForeColor -eq $gripHover)
+            Check "$locale/$scale single entry no arrows but keyboard cue ink" ((Test-Cue $single $false $false) -and $singleGrip.ForeColor -eq $gripKeyboardCue)
             $script:manageAllowed=$false
             Update-PopupRows -Reason 'capability'
             Check "$locale/$scale unavailable row loses cue" ((Test-IdleCue $single) -and $singleGrip.ForeColor -eq $gripIdle)

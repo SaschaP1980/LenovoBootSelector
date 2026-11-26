@@ -10,6 +10,21 @@
     return 'en-US'
 }
 
+# This dialog is usable before the canonical embedded WinForms types compile.
+# Retain a small independent fallback so a failed type initialization cannot
+# prevent recovery. The fallback literal is the approved action-hover token.
+function Connect-StartupRecoveryActionHover {
+    param([Parameter(Mandatory=$true)][Windows.Forms.Button]$Button)
+    $idle = $Button.ForeColor
+    $hover = if ('LenovoInteractionPalette' -as [type]) { [LenovoInteractionPalette]::Hover } else { [Drawing.Color]::FromArgb(255,110,102) }
+    $Button.Add_MouseEnter({
+        param($sender,$eventArgs)
+        if ($sender.Enabled -and -not [Windows.Forms.SystemInformation]::HighContrast) { $sender.ForeColor = $hover }
+    }.GetNewClosure())
+    $Button.Add_MouseLeave({ param($sender,$eventArgs) $sender.ForeColor = $idle }.GetNewClosure())
+    $Button.Add_EnabledChanged({ param($sender,$eventArgs) if (-not $sender.Enabled) { $sender.ForeColor = $idle } }.GetNewClosure())
+}
+
 function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
     $diagnosticSaved = $false
     $diagDir = $null
@@ -118,6 +133,7 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
         $closeButton.ForeColor = [System.Drawing.Color]::White
         $closeButton.Font = New-Object System.Drawing.Font('Segoe UI', 9.0)
         $closeButton.Add_Click({ $form.Tag = 'close'; $form.Close() })
+        Connect-StartupRecoveryActionHover -Button $closeButton
         $buttonBar.Controls.Add($closeButton)
         $form.CancelButton = $closeButton
 
@@ -134,6 +150,7 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
         $diagnosticButton.Add_Click({
             try { Start-Process -FilePath 'explorer.exe' -ArgumentList ('"{0}"' -f $diagDir) | Out-Null } catch { }
         })
+        Connect-StartupRecoveryActionHover -Button $diagnosticButton
         $buttonBar.Controls.Add($diagnosticButton)
 
         $retryButton = New-Object System.Windows.Forms.Button
@@ -148,6 +165,7 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
         $launcherAvailable = Test-Path -LiteralPath (Join-Path $PSScriptRoot 'Start-LenovoBootMenuTray.vbs')
         $retryButton.Enabled = [bool]($AllowRestart -and -not $isAlreadyRunning -and $launcherAvailable)
         $retryButton.Add_Click({ $form.Tag = 'retry'; $form.Close() })
+        Connect-StartupRecoveryActionHover -Button $retryButton
         $buttonBar.Controls.Add($retryButton)
 
         if ($retryButton.Enabled) { $form.AcceptButton = $retryButton } else { $form.AcceptButton = $closeButton }

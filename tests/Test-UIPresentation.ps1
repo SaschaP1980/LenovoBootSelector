@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+. (Join-Path $PSScriptRoot 'Import-LenovoInteractionTestTypes.ps1')
 
 . (Join-Path $root 'src\Core\BootNextSelectionState.ps1')
 . (Join-Path $root 'src\UI\BootEntryList.ps1')
@@ -95,10 +96,21 @@ Set-RowHoverState -Control $normal.Row -Hover $true
 Assert-Equal $script:ColorSelectedRow.ToArgb() $normal.Row.BackColor.ToArgb() 'UI selected row hover does not replace selected surface'
 & $handlers.Click $normal.Row $null
 Assert-Equal 1 $script:BootNextCalls 'UI boot row consumes enabled canonical BootNext capability'
+$script:SystemStatusCapabilities = $script:TestCapabilities
 $script:TestCapabilities.CanSetBootNext = $false
+Set-RowHoverState -Control $normal.Row -Hover $true
+Assert-Equal $script:ColorPrimary.ToArgb() $normalTitle[0].ForeColor.ToArgb() 'LBS270 unavailable normal row does not acquire hover ink'
 & $handlers.Click $normal.Row $null
 Assert-Equal 1 $script:BootNextCalls 'UI boot row blocks interaction when canonical BootNext capability is disabled'
 $script:TestCapabilities.CanSetBootNext = $true
+$script:BootNextPendingGuid = $guid
+Set-RowHoverState -Control $normal.Row -Hover $true
+Assert-Equal $script:ColorPrimary.ToArgb() $normalTitle[0].ForeColor.ToArgb() 'LBS270 pending selection keeps idle title ink'
+$script:BootNextPendingGuid = $null
+Set-RowHoverState -Control $normal.Row -Hover $true
+$expectedHover=if ([Windows.Forms.SystemInformation]::HighContrast) { $script:ColorPrimary } else { [Drawing.Color]::FromArgb(255,110,102) }
+Assert-Equal $expectedHover.ToArgb() $normalTitle[0].ForeColor.ToArgb() 'LBS270 ready normal row paints approved hover independently of selection'
+$script:SystemStatusCapabilities = $null
 
 $script:IsManageEntriesMode = $true
 $script:SelectedGuid = $null
@@ -204,5 +216,5 @@ $placed = Get-PopupLocationFromAnchor -WorkingArea $negativeWork -DisplayBounds 
 Assert-Equal -398 $placed.X 'Negative-monitor fallback clamps correctly'
 Assert-Equal -20 $placed.Y 'Negative-monitor fallback places above usable bottom'
 
-Write-Host "UI PRESENTATION TOTAL $script:checks/46"
-if ($script:checks -ne 46) { throw "Unexpected UI presentation test count $script:checks" }
+Write-Host "UI PRESENTATION TOTAL $script:checks/49"
+if ($script:checks -ne 49) { throw "Unexpected UI presentation test count $script:checks" }

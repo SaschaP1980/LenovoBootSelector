@@ -1734,6 +1734,21 @@ function Get-StartupRecoveryLocale {
     return 'en-US'
 }
 
+# This dialog is usable before the canonical embedded WinForms types compile.
+# Retain a small independent fallback so a failed type initialization cannot
+# prevent recovery. The fallback literal is the approved action-hover token.
+function Connect-StartupRecoveryActionHover {
+    param([Parameter(Mandatory=$true)][Windows.Forms.Button]$Button)
+    $idle = $Button.ForeColor
+    $hover = if ('LenovoInteractionPalette' -as [type]) { [LenovoInteractionPalette]::Hover } else { [Drawing.Color]::FromArgb(255,110,102) }
+    $Button.Add_MouseEnter({
+        param($sender,$eventArgs)
+        if ($sender.Enabled -and -not [Windows.Forms.SystemInformation]::HighContrast) { $sender.ForeColor = $hover }
+    }.GetNewClosure())
+    $Button.Add_MouseLeave({ param($sender,$eventArgs) $sender.ForeColor = $idle }.GetNewClosure())
+    $Button.Add_EnabledChanged({ param($sender,$eventArgs) if (-not $sender.Enabled) { $sender.ForeColor = $idle } }.GetNewClosure())
+}
+
 function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
     $diagnosticSaved = $false
     $diagDir = $null
@@ -1842,6 +1857,7 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
         $closeButton.ForeColor = [System.Drawing.Color]::White
         $closeButton.Font = New-Object System.Drawing.Font('Segoe UI', 9.0)
         $closeButton.Add_Click({ $form.Tag = 'close'; $form.Close() })
+        Connect-StartupRecoveryActionHover -Button $closeButton
         $buttonBar.Controls.Add($closeButton)
         $form.CancelButton = $closeButton
 
@@ -1858,6 +1874,7 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
         $diagnosticButton.Add_Click({
             try { Start-Process -FilePath 'explorer.exe' -ArgumentList ('"{0}"' -f $diagDir) | Out-Null } catch { }
         })
+        Connect-StartupRecoveryActionHover -Button $diagnosticButton
         $buttonBar.Controls.Add($diagnosticButton)
 
         $retryButton = New-Object System.Windows.Forms.Button
@@ -1872,6 +1889,7 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
         $launcherAvailable = Test-Path -LiteralPath (Join-Path $PSScriptRoot 'Start-LenovoBootMenuTray.vbs')
         $retryButton.Enabled = [bool]($AllowRestart -and -not $isAlreadyRunning -and $launcherAvailable)
         $retryButton.Add_Click({ $form.Tag = 'retry'; $form.Close() })
+        Connect-StartupRecoveryActionHover -Button $retryButton
         $buttonBar.Controls.Add($retryButton)
 
         if ($retryButton.Enabled) { $form.AcceptButton = $retryButton } else { $form.AcceptButton = $closeButton }
@@ -2179,6 +2197,41 @@ public static class LenovoLocaleFlags
     }
 }
 
+// LBS-270: action hover is independent of status, selection and operation ink.
+public static class LenovoInteractionPalette
+{
+    public static readonly Color Hover = Color.FromArgb(255,110,102);
+    public static readonly Color Normal = Color.FromArgb(184,184,184);
+    public static readonly Color Disabled = Color.FromArgb(119,119,119);
+    public static readonly Color Active = Color.FromArgb(225,37,27);
+    // Keep contrast-safe existing surfaces; overlay a precise hover accent.
+    public static void DrawHoverEdge(Graphics g, Rectangle bounds)
+    {
+        if (SystemInformation.HighContrast || bounds.Width < 4 || bounds.Height < 4) return;
+        int line = Math.Max(1,(int)Math.Round(g.DpiX / 96f));
+        using (Brush brush = new SolidBrush(Hover))
+            g.FillRectangle(brush,bounds.Left+line,bounds.Bottom-2*line,
+                Math.Max(1,bounds.Width-2*line),line);
+    }
+}
+
+// Keep the native Button input and focus renderer; only supplement hover ink.
+public sealed class LenovoActionButton : Button
+{
+    private bool hovered;
+    protected override void OnMouseEnter(EventArgs e) { hovered=Enabled; base.OnMouseEnter(e); Invalidate(); }
+    protected override void OnMouseLeave(EventArgs e) { hovered=false; base.OnMouseLeave(e); Invalidate(); }
+    protected override void OnEnabledChanged(EventArgs e) {
+        hovered=Enabled && IsHandleCreated && Visible && ClientRectangle.Contains(PointToClient(Cursor.Position));
+        base.OnEnabledChanged(e); Invalidate();
+    }
+    protected override void OnPaint(PaintEventArgs e) {
+        base.OnPaint(e);
+        if (Enabled && hovered && !SystemInformation.HighContrast && (Control.MouseButtons & System.Windows.Forms.MouseButtons.Left) == 0)
+            LenovoInteractionPalette.DrawHoverEdge(e.Graphics,ClientRectangle);
+    }
+}
+
 public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
 {
     private readonly Color accent = Color.FromArgb(225, 37, 27);
@@ -2407,7 +2460,7 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
         {
             e.Graphics.ResetClip();
             using (StringFormat format = (StringFormat)StringFormat.GenericTypographic.Clone())
-            using (Brush brush = new SolidBrush(e.TextColor))
+            using (Brush brush = new SolidBrush(!SystemInformation.HighContrast && e.Item.Enabled && !e.Item.Pressed && Object.ReferenceEquals(LenovoMenuLayout.GetVisualHotItem(owner), e.Item) && Object.ReferenceEquals(LenovoMenuLayout.HitTestRow(owner, owner.PointToClient(Control.MousePosition)), e.Item) ? LenovoInteractionPalette.Hover : e.TextColor))
             {
                 format.Alignment = StringAlignment.Near;
                 format.LineAlignment = StringAlignment.Center;
@@ -2736,7 +2789,7 @@ public sealed class LenovoCheckBox : CheckBox
         AccentColor = Color.FromArgb(225, 37, 27);
         BoxBackColor = Color.FromArgb(30, 30, 30);
         BoxBorderColor = Color.FromArgb(82, 82, 82);
-        HoverColor = Color.FromArgb(242, 59, 49);
+        HoverColor = LenovoInteractionPalette.Hover;
         Cursor = Cursors.Hand;
         AutoSize = false;
     }
@@ -2768,9 +2821,9 @@ public sealed class LenovoCheckBox : CheckBox
         Rectangle box = GetGlyphBounds(ClientSize, e.Graphics.DpiX);
         if (!box.IsEmpty)
         {
-            Color fill = Checked ? (hovering ? HoverColor : AccentColor) : BoxBackColor;
+            Color fill = Checked ? AccentColor : BoxBackColor;
             using (Brush b = new SolidBrush(fill)) e.Graphics.FillRectangle(b, box);
-            using (Pen p = new Pen(Checked ? AccentColor : BoxBorderColor, Math.Max(1f, scale)))
+            using (Pen p = new Pen(Enabled && hovering && !SystemInformation.HighContrast ? HoverColor : Checked ? AccentColor : BoxBorderColor, Math.Max(1f, scale)))
                 e.Graphics.DrawRectangle(p, box);
             if (Checked)
             {
@@ -2912,6 +2965,7 @@ public static class LenovoSettingsInk
 public sealed class LenovoHeaderIconButton : Button
 {
     public bool InfoIcon { get; set; }
+    public bool OperationActive { get; set; }
     private bool modalActive;
     public bool ModalActive { get { return modalActive; } set { modalActive = value; Invalidate(); } }
     public LenovoHeaderIconButton()
@@ -2926,9 +2980,10 @@ public sealed class LenovoHeaderIconButton : Button
     {
         base.OnPaint(e);
         bool activeInfo = InfoIcon && ModalActive;
+        bool active = activeInfo || OperationActive;
         Color ink = SystemInformation.HighContrast
-            ? (Enabled || activeInfo ? SystemColors.ControlText : SystemColors.GrayText)
-            : (activeInfo ? Color.FromArgb(225,37,27) : (Enabled ? ForeColor : Color.FromArgb(119,119,119)));
+            ? (Enabled || active ? SystemColors.ControlText : SystemColors.GrayText)
+            : (active ? LenovoInteractionPalette.Active : (Enabled ? ForeColor : LenovoInteractionPalette.Disabled));
         if (SystemInformation.HighContrast) {
             Rectangle center = ClientRectangle;
             int inset = Math.Max(2, Math.Min(center.Width,center.Height)/7);
@@ -3018,7 +3073,7 @@ public sealed class LenovoCustomizeButton : Button
         Color bg = pressed ? FlatAppearance.MouseDownBackColor :
             Enabled && hovering ? FlatAppearance.MouseOverBackColor : BackColor;
         if (bg.IsEmpty) bg = BackColor;
-        Color ink = Enabled ? ForeColor : Color.FromArgb(138,138,138);
+        Color ink = Enabled ? (hovering && !pressed && !SystemInformation.HighContrast ? LenovoInteractionPalette.Hover : ForeColor) : Color.FromArgb(138,138,138);
         using (SolidBrush brush = new SolidBrush(bg))
             e.Graphics.FillRectangle(brush, ClientRectangle);
         TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ink,
@@ -3091,6 +3146,7 @@ public sealed class LenovoSettingsActionButton : Button
             (Enabled && (LanguageSelected || pressed) ? SelectedSurface : Enabled && hovering ? HoverSurface : BackColor);
         Color fg = hc ? (Enabled ? (LanguageSelected ? SystemColors.HighlightText : SystemColors.ControlText) : SystemColors.GrayText) :
             (!Enabled ? LenovoSettingsInk.Muted(false) : Destructive ? Color.FromArgb(239,86,78) : ForeColor);
+        if (!hc && Enabled && hovering && !pressed) fg = LenovoInteractionPalette.Hover;
         g.Clear(bg);
         float dpi = g.DpiX;
         int px = LenovoSettingsInk.Px(dpi,1);
@@ -3105,7 +3161,7 @@ public sealed class LenovoSettingsActionButton : Button
         } else {
             int side = LenovoSettingsInk.Px(dpi,22);
             LenovoSettingsInk.DrawIcon(g,ActionIcon,new Rectangle(LenovoSettingsInk.Px(dpi,11),(Height-side)/2,side,side),
-                Destructive && Enabled ? fg : LenovoSettingsInk.Muted(Enabled));
+                Enabled && hovering && !pressed && !hc ? LenovoInteractionPalette.Hover : Destructive && Enabled ? fg : LenovoSettingsInk.Muted(Enabled));
             LenovoSettingsInk.DrawTextPair(g,text,TitleFont ?? Font,SubtitleFont ?? Font,Text,Subtitle,fg,LenovoSettingsInk.Muted(Enabled));
             if (Separator) using (Pen p = new Pen(hc ? SystemColors.ControlDark : Color.FromArgb(57,57,57),px))
                 g.DrawLine(p,LenovoSettingsInk.Px(dpi,44),Height-px,Math.Max(0,Width-LenovoSettingsInk.Px(dpi,12)),Height-px);
@@ -3134,7 +3190,8 @@ public sealed class LenovoSettingsAutostartLabel : Label
         int side=LenovoSettingsInk.Px(g.DpiX,22), left=LenovoSettingsInk.Px(g.DpiX,44);
         Color fg=hc ? (Enabled ? SystemColors.ControlText : SystemColors.GrayText) :
             (Enabled ? ForeColor : LenovoSettingsInk.Muted(false));
-        LenovoSettingsInk.DrawIcon(g,"autostart",new Rectangle(LenovoSettingsInk.Px(g.DpiX,11),(Height-side)/2,side,side),LenovoSettingsInk.Muted(Enabled));
+        if (!hc && Enabled && TileHovered) fg=LenovoInteractionPalette.Hover;
+        LenovoSettingsInk.DrawIcon(g,"autostart",new Rectangle(LenovoSettingsInk.Px(g.DpiX,11),(Height-side)/2,side,side),!hc && Enabled && TileHovered ? LenovoInteractionPalette.Hover : LenovoSettingsInk.Muted(Enabled));
         LenovoSettingsInk.DrawTextPair(g,new Rectangle(left,0,Math.Max(0,Width-left-LenovoSettingsInk.Px(g.DpiX,3)),Height),
             TitleFont ?? Font,SubtitleFont ?? Font,Text,Subtitle,fg,LenovoSettingsInk.Muted(Enabled));
     }
@@ -3171,6 +3228,9 @@ public sealed class LenovoSettingsToggle : CheckBox
                 path.AddArc(r.Right-h,r.Top,h,h,270,180);
                 path.CloseFigure();
                 using (Brush brush=new SolidBrush(fill)) g.FillPath(brush,path);
+                // Hover belongs to the switch, not its keyboard focus perimeter.
+                if (!hc && Enabled && TileHovered)
+                    using (Pen pen=new Pen(LenovoInteractionPalette.Hover,Math.Max(1f,LenovoSettingsInk.Px(g.DpiX,2)))) g.DrawPath(pen,path);
             }
             int pad=LenovoSettingsInk.Px(g.DpiX,3), d=Math.Max(1,h-2*pad);
             using (Brush brush=new SolidBrush(hc ? SystemColors.ControlText : Enabled ? Color.White : Color.FromArgb(155,155,155)))
@@ -3302,7 +3362,7 @@ public sealed class LenovoVerticalScrollBar : Control
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
         TrackColor = Color.FromArgb(18, 18, 18);
         ThumbColor = Color.FromArgb(225, 37, 27);
-        ThumbHoverColor = Color.FromArgb(242, 59, 49);
+        ThumbHoverColor = LenovoInteractionPalette.Hover;
         Width = 12;
         Cursor = Cursors.Hand;
         TabStop = false;
@@ -3362,7 +3422,7 @@ public sealed class LenovoVerticalScrollBar : Control
         Rectangle thumb = GetThumbRectangle();
         if (!thumb.IsEmpty)
         {
-            using (Brush b = new SolidBrush(hoverThumb || dragging ? ThumbHoverColor : ThumbColor))
+            using (Brush b = new SolidBrush(Enabled && hoverThumb && !dragging && !SystemInformation.HighContrast ? ThumbHoverColor : ThumbColor))
                 e.Graphics.FillRectangle(b, thumb);
         }
     }
@@ -3486,7 +3546,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.10.1.1'
+$script:AppVersion = '1.10.2.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -4665,8 +4725,8 @@ function Hide-DarkActionTooltip {
 function Update-HeaderStatusInteractionVisual {
     if (-not $script:HeaderStatusLabel -or $script:HeaderStatusLabel.IsDisposed) { return }
     $interactive = [bool]$script:HeaderUpdateInteractionEnabled
-    $highlight = ($interactive -and ([bool]$script:HeaderStatusHovered -or $script:HeaderStatusLabel.Focused))
-    $script:HeaderStatusLabel.ForeColor = if ($highlight) { [Drawing.Color]::FromArgb(255,110,102) } else { $script:ColorSecondary }
+    $highlight = ($interactive -and [bool]$script:HeaderStatusHovered)
+    $script:HeaderStatusLabel.ForeColor = if ($highlight -and -not [Windows.Forms.SystemInformation]::HighContrast) { [LenovoInteractionPalette]::Hover } else { $script:ColorSecondary }
     $script:HeaderStatusLabel.Cursor = if ($interactive) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
     $script:HeaderStatusLabel.TabStop = $interactive
 }
@@ -4738,7 +4798,10 @@ function Update-RefreshButtonVisual {
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     $script:RefreshButton.Enabled = [bool]$capabilities.CanRefresh
     $script:RefreshButton.Cursor = if ($script:RefreshButton.Enabled) { [Windows.Forms.Cursors]::Hand } else { [Windows.Forms.Cursors]::Default }
-    $script:RefreshButton.ForeColor = if ($active -or $script:RefreshButtonHovered) { $script:ColorAccent } else { $script:ColorSecondary }
+    # Initialization is not an available Refresh action. Keep its legible
+    # disabled glyph distinct from a genuinely running available refresh.
+    $script:RefreshButton.OperationActive = ($active -and $script:RefreshButton.Enabled)
+    $script:RefreshButton.ForeColor = if ($script:RefreshButton.OperationActive) { [LenovoInteractionPalette]::Active } elseif (-not $script:RefreshButton.Enabled) { [LenovoInteractionPalette]::Disabled } elseif ($script:RefreshButtonHovered -and -not [Windows.Forms.SystemInformation]::HighContrast) { [LenovoInteractionPalette]::Hover } else { [LenovoInteractionPalette]::Normal }
     $script:RefreshButton.Invalidate()
     Update-HeaderRefreshStatus
 }
@@ -7668,7 +7731,10 @@ function Set-DefaultPickerHover {
     while ($row -and $row.Name -ne 'DefaultPickerRow') { $row = $row.Parent }
     if (-not $row) { return }
     if (-not $Hover -and $row.ClientRectangle.Contains($row.PointToClient([Windows.Forms.Cursor]::Position))) { return }
-    $row.BackColor = if ($row.Tag.Selected) { $script:ColorSelectedRow } elseif ($Hover) { $script:ColorHover } else { $script:ColorRow }
+    $hot = $Hover -and $row.Enabled -and -not $script:DefaultTargetChangePending -and -not $script:BootNextPendingGuid
+    $row.BackColor = if ($row.Tag.Selected) { $script:ColorSelectedRow } elseif ($hot) { $script:ColorHover } else { $script:ColorRow }
+    $title=$row.Controls['DefaultPickerTitle']
+    if ($title) { $title.ForeColor=if ($hot -and -not [Windows.Forms.SystemInformation]::HighContrast) { [LenovoInteractionPalette]::Hover } else { $script:ColorPrimary } }
 }
 
 function Invoke-DefaultPickerRow {
@@ -7912,7 +7978,7 @@ function Initialize-LenovoRegularDialog {
         $scroll.Name='DialogScroll'
         $scroll.TrackColor=[Drawing.Color]::FromArgb(23,23,23)
         $scroll.ThumbColor=$script:ColorAccent
-        $scroll.ThumbHoverColor=[Drawing.Color]::FromArgb(242,59,49)
+        $scroll.ThumbHoverColor=[LenovoInteractionPalette]::Hover
         $scroll.Visible=$false
         $viewport.Controls.Add($scroll)
         $scroll.Add_ValueChanged({ $body.Top=-$scroll.Value }.GetNewClosure())
@@ -8266,7 +8332,7 @@ function Show-LenovoNoticeDialog {
     $secondary=$null
 
     if (-not [string]::IsNullOrWhiteSpace($SecondaryButtonText) -and $SecondaryAction) {
-        $secondary = New-Object System.Windows.Forms.Button
+        $secondary = New-Object LenovoActionButton
         $secondary.Text = $SecondaryButtonText
         $secondary.Font = if ($PromoteSecondaryAction) {
             New-Object Drawing.Font('Segoe UI', 9.5, [Drawing.FontStyle]::Bold)
@@ -8276,7 +8342,7 @@ function Show-LenovoNoticeDialog {
         $secondary.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
         $secondary.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(70,70,70)
         $secondary.FlatAppearance.BorderSize = if ($PromoteSecondaryAction) { 0 } else { 1 }
-        $secondary.FlatAppearance.MouseOverBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(242,59,49) } else { [Drawing.Color]::FromArgb(46,46,46) }
+        $secondary.FlatAppearance.MouseOverBackColor = if ($PromoteSecondaryAction) { $script:ColorAccent } else { [Drawing.Color]::FromArgb(46,46,46) }
         $secondary.FlatAppearance.MouseDownBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(185,30,22) } else { [Drawing.Color]::FromArgb(38,38,38) }
         $secondary.Location = if ($PromoteSecondaryAction) { New-Object Drawing.Point(306,190) } else { New-Object Drawing.Point(184,190) }
         $secondary.Size = New-Object Drawing.Size(146,34)
@@ -8332,7 +8398,7 @@ function Show-LenovoNoticeDialog {
         $root.Controls.Add($secondary)
     }
 
-    $ok = New-Object System.Windows.Forms.Button
+    $ok = New-Object LenovoActionButton
     $ok.Text = if ($PromoteSecondaryAction) { $DismissButtonText } else { Get-LocalizedString -Key 'Common.OK' }
     $ok.Font = if ($PromoteSecondaryAction) {
         New-Object Drawing.Font('Segoe UI', 9.5, [Drawing.FontStyle]::Regular)
@@ -8342,7 +8408,7 @@ function Show-LenovoNoticeDialog {
     $ok.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $ok.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(70,70,70)
     $ok.FlatAppearance.BorderSize = if ($PromoteSecondaryAction) { 1 } else { 0 }
-    $ok.FlatAppearance.MouseOverBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(46,46,46) } else { [Drawing.Color]::FromArgb(242,59,49) }
+    $ok.FlatAppearance.MouseOverBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(46,46,46) } else { $script:ColorAccent }
     $ok.FlatAppearance.MouseDownBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(38,38,38) } else { [Drawing.Color]::FromArgb(185,30,22) }
     $ok.Location = if ($PromoteSecondaryAction) { New-Object Drawing.Point(184,190) } else { New-Object Drawing.Point(342,190) }
     $ok.Size = New-Object Drawing.Size(110,34)
@@ -8404,7 +8470,7 @@ function Show-LocaleMigrationDialog {
     $message.TextAlign = [Drawing.ContentAlignment]::TopLeft
     $root.Controls.Add($message)
 
-    $german = New-Object System.Windows.Forms.Button
+    $german = New-Object LenovoActionButton
     $german.Text = Get-LocalizedString -Key 'Language.MigrationKeepGerman'
     $german.Font = New-Object Drawing.Font('Segoe UI',9.5,[Drawing.FontStyle]::Regular)
     $german.ForeColor = $script:ColorPrimary
@@ -8418,7 +8484,7 @@ function Show-LocaleMigrationDialog {
     $german.Add_Click({ $form.Tag = 'de-DE'; $form.Close() })
     $root.Controls.Add($german)
 
-    $english = New-Object System.Windows.Forms.Button
+    $english = New-Object LenovoActionButton
     $english.Text = Get-LocalizedString -Key 'Language.MigrationUseEnglish'
     $english.Font = New-Object Drawing.Font('Segoe UI',9.5,[Drawing.FontStyle]::Bold)
     $english.ForeColor = [Drawing.Color]::White
@@ -8522,7 +8588,7 @@ function Show-LenovoSystemFunctionsDialog {
     $root.Controls.Add($body)
 
     $buttonY = $height - 54
-    $cancel = New-Object System.Windows.Forms.Button
+    $cancel = New-Object LenovoActionButton
     $cancel.Text = Get-LocalizedString -Key 'Common.Cancel'
     $cancel.Font = New-Object Drawing.Font('Segoe UI',9.5,[Drawing.FontStyle]::Regular)
     $cancel.ForeColor = $script:ColorPrimary
@@ -8537,14 +8603,14 @@ function Show-LenovoSystemFunctionsDialog {
     $cancel.DialogResult = [System.Windows.Forms.DialogResult]::No
     $root.Controls.Add($cancel)
 
-    $primary = New-Object System.Windows.Forms.Button
+    $primary = New-Object LenovoActionButton
     $primary.Text = $primaryText
     $primary.Font = New-Object Drawing.Font('Segoe UI',9.5,[Drawing.FontStyle]::Bold)
     $primary.ForeColor = [Drawing.Color]::White
     $primary.BackColor = $script:ColorAccent
     $primary.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $primary.FlatAppearance.BorderSize = 0
-    $primary.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(242,59,49)
+    $primary.FlatAppearance.MouseOverBackColor = $script:ColorAccent
     $primary.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(185,30,22)
     $primary.Location = New-Object Drawing.Point(382,$buttonY)
     $primary.Size = New-Object Drawing.Size(100,34)
@@ -8629,7 +8695,7 @@ function Show-LenovoRestartDialog {
     $target.AutoEllipsis = $true
     $root.Controls.Add($target)
 
-    $cancel = New-Object System.Windows.Forms.Button
+    $cancel = New-Object LenovoActionButton
     $cancel.Text = Get-LocalizedString -Key 'Common.Cancel'
     $cancel.Font = New-Object Drawing.Font('Segoe UI', 9.5, [Drawing.FontStyle]::Regular)
     $cancel.ForeColor = $script:ColorPrimary
@@ -8645,7 +8711,7 @@ function Show-LenovoRestartDialog {
     $cancel.DialogResult = [System.Windows.Forms.DialogResult]::No
     $root.Controls.Add($cancel)
 
-    $restart = New-Object System.Windows.Forms.Button
+    $restart = New-Object LenovoActionButton
     $restart.Text = Get-LocalizedString -Key 'Restart.Action'
     $restart.Font = New-Object Drawing.Font('Segoe UI', 9.5, [Drawing.FontStyle]::Bold)
     $restart.ForeColor = [Drawing.Color]::White
@@ -8653,7 +8719,7 @@ function Show-LenovoRestartDialog {
     $restart.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $restart.FlatAppearance.BorderColor = $script:ColorAccent
     $restart.FlatAppearance.BorderSize = 1
-    $restart.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(242,59,49)
+    $restart.FlatAppearance.MouseOverBackColor = $script:ColorAccent
     $restart.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(185,30,22)
     $restart.Location = New-Object Drawing.Point(312, 180)
     $restart.Size = New-Object Drawing.Size(96, 34)
@@ -8825,7 +8891,7 @@ function New-PreferencesTextControl {
 
 function New-PreferencesViewButton {
     param($Form,[string]$Name,[string]$Text,[string]$Action,$Value,[switch]$Selected)
-    $button=[Windows.Forms.Button]::new()
+    $button=[LenovoActionButton]::new()
     $button.Name=$Name;$button.Text=$Text;$button.AccessibleName=$Text
     $button.UseMnemonic=$false;$button.UseVisualStyleBackColor=$false
     $button.FlatStyle='Flat';$button.Font=$Form.Tag.Fonts.Body
@@ -9147,15 +9213,15 @@ function New-PreferencesConfirmationForm {
     $fonts=@{Title=[Drawing.Font]::new('Segoe UI',11,[Drawing.FontStyle]::Bold);Heading=[Drawing.Font]::new('Segoe UI',10,[Drawing.FontStyle]::Bold);Body=[Drawing.Font]::new('Segoe UI',9.5);Caption=[Drawing.Font]::new('Segoe UI',9);Metric=[Drawing.Font]::new('Segoe UI',19,[Drawing.FontStyle]::Bold)}
     $heading=[Windows.Forms.Label]::new();$heading.Text=$Title;$heading.Font=$fonts.Title;$heading.ForeColor=$script:ColorPrimary
     $divider=[Windows.Forms.Panel]::new();$divider.BackColor=$script:ColorAccent
-    $cancel=[Windows.Forms.Button]::new();$cancel.Name='PreferencesCancel';$cancel.Text=Get-LocalizedString -Key 'Common.Cancel';$cancel.DialogResult='Cancel'
-    $confirm=[Windows.Forms.Button]::new();$confirm.Name='PreferencesConfirm';$confirm.Text=$ConfirmText;$confirm.DialogResult='OK'
+    $cancel=[LenovoActionButton]::new();$cancel.Name='PreferencesCancel';$cancel.Text=Get-LocalizedString -Key 'Common.Cancel';$cancel.DialogResult='Cancel'
+    $confirm=[LenovoActionButton]::new();$confirm.Name='PreferencesConfirm';$confirm.Text=$ConfirmText;$confirm.DialogResult='OK'
     foreach ($button in @($cancel,$confirm)) {
         $button.AccessibleName=$button.Text;$button.Font=$fonts.Body;$button.FlatStyle='Flat'
         $button.UseVisualStyleBackColor=$false;$button.UseMnemonic=$false;$button.Cursor=[Windows.Forms.Cursors]::Hand
         $button.ForeColor=$script:ColorPrimary
         $button.BackColor=if ($button -eq $confirm) {$script:ColorAccent} else {$script:ColorSurface}
         $button.FlatAppearance.BorderColor=[Drawing.Color]::FromArgb(72,72,72)
-        $button.FlatAppearance.MouseOverBackColor=if ($button -eq $confirm) {[Drawing.Color]::FromArgb(242,59,49)} else {[Drawing.Color]::FromArgb(45,45,45)}
+        $button.FlatAppearance.MouseOverBackColor=if ($button -eq $confirm) {$script:ColorAccent} else {[Drawing.Color]::FromArgb(45,45,45)}
     }
     $cancel.TabIndex=0;$confirm.TabIndex=1
     $form.AcceptButton=$cancel;$form.CancelButton=$cancel
@@ -9497,7 +9563,7 @@ function New-MaintenanceStatePanel {
     $message.TextAlign = [Drawing.ContentAlignment]::TopCenter
     $panel.Controls.Add($message)
 
-    $action = New-Object System.Windows.Forms.Button
+    $action = New-Object LenovoActionButton
     $action.Name = 'MaintenancePrimaryButton'
     $action.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHeading'
     $action.Font = New-Object Drawing.Font('Segoe UI', 8.7, [Drawing.FontStyle]::Bold)
@@ -9505,7 +9571,7 @@ function New-MaintenanceStatePanel {
     $action.BackColor = $script:ColorAccent
     $action.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $action.FlatAppearance.BorderSize = 0
-    $action.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(242,59,49)
+    $action.FlatAppearance.MouseOverBackColor = $script:ColorAccent
     $action.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(185,30,22)
     $action.Location = New-Object Drawing.Point(55, 334)
     $action.Size = New-Object Drawing.Size(280, 38)
@@ -13964,7 +14030,7 @@ function Add-BootEntryAliasEditor {
     $clearAlias.Add_MouseEnter({
         param($sender,$eventArgs)
         if (-not $sender.Visible -or $script:ManageActiveDragGuid) { return }
-        $sender.ForeColor = [Drawing.Color]::FromArgb(255,110,102)
+        if ($sender.Enabled -and -not [Windows.Forms.SystemInformation]::HighContrast) { $sender.ForeColor = [LenovoInteractionPalette]::Hover }
         try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleName) } catch { }
     })
     $clearAlias.Add_MouseLeave({
@@ -14071,7 +14137,7 @@ function Add-BootEntryAliasEditor {
     }
     $row.Controls.Add($editorFrame)
 
-    $applyAlias = New-Object System.Windows.Forms.Button
+    $applyAlias = New-Object LenovoActionButton
     $applyAlias.Name = 'AliasApplyButton'
     $applyAlias.Text = Get-LocalizedString -Key 'Common.Apply'
     $applyAlias.Tag = $entry.Guid
@@ -14106,7 +14172,7 @@ function Add-BootEntryAliasEditor {
     })
     $row.Controls.Add($applyAlias)
 
-    $cancelAlias = New-Object System.Windows.Forms.Button
+    $cancelAlias = New-Object LenovoActionButton
     $cancelAlias.Name = 'AliasCancelButton'
     $cancelAlias.Tag = $entry.Guid
     $cancelAlias.Text = Get-LocalizedString -Key 'Common.Cancel'
@@ -14299,11 +14365,12 @@ function Update-ManageEditGlyphInk {
     param($Control)
     $row = $Control.Parent
     $keyboard = $row -and $row.PSObject.Properties['ManageEditCueActive'] -and $row.ManageEditCueActive
-    $hover = -not $script:ManageActiveDragGuid -and ($Control.ManagePointerHovered -or $keyboard)
+    $hover = $Control.Enabled -and -not $script:ManageActiveDragGuid -and $Control.ManagePointerHovered -and -not [Windows.Forms.SystemInformation]::HighContrast
+    $cue = -not $script:ManageActiveDragGuid -and $keyboard
     $color = if ($Control.Name -eq 'ManageReorderGrip') {
-        if ($hover) { [Drawing.Color]::FromArgb(220,220,220) } else { [Drawing.Color]::FromArgb(145,145,145) }
+        if ($hover) { [LenovoInteractionPalette]::Hover } elseif ($cue) { [Drawing.Color]::FromArgb(220,220,220) } else { [Drawing.Color]::FromArgb(145,145,145) }
     } else {
-        if ($hover) { $script:ColorAccent } else { [Drawing.Color]::FromArgb(190,190,190) }
+        if ($hover) { [LenovoInteractionPalette]::Hover } elseif ($cue) { $script:ColorAccent } else { [Drawing.Color]::FromArgb(190,190,190) }
     }
     if ($Control.ForeColor -ne $color) { $Control.ForeColor = $color; $Control.Invalidate() }
 }
@@ -14332,11 +14399,11 @@ $state.AllowDrop = $true
 $state.Add_Paint({
     param($sender,$eventArgs)
     $hidden = ([string]$sender.AccessibleName -eq 'hidden')
-    $hover = -not $script:ManageActiveDragGuid -and ($sender.ForeColor -eq [Drawing.Color]::FromArgb(160,160,160) -or $sender.ForeColor -eq [Drawing.Color]::FromArgb(255,110,102))
+    $hover = $sender.Enabled -and -not $script:ManageActiveDragGuid -and $sender.ForeColor -eq [LenovoInteractionPalette]::Hover -and -not [Windows.Forms.SystemInformation]::HighContrast
     $color = if ($hidden) {
-        if ($hover) { [Drawing.Color]::FromArgb(160,160,160) } else { [Drawing.Color]::FromArgb(115,115,115) }
+        if ($hover) { [LenovoInteractionPalette]::Hover } else { [Drawing.Color]::FromArgb(115,115,115) }
     } else {
-        if ($hover) { [Drawing.Color]::FromArgb(255,110,102) } else { $script:ColorAccent }
+        if ($hover) { [LenovoInteractionPalette]::Hover } else { $script:ColorAccent }
     }
     $geometry = Get-LenovoManageEyeGlyphGeometry -ClientSize $sender.ClientSize -Dpi $eventArgs.Graphics.DpiX
     $eventArgs.Graphics.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
@@ -14360,7 +14427,7 @@ $state.Add_Paint({
 $state.Add_MouseEnter({
     param($sender,$eventArgs)
     if ($script:ManageActiveDragGuid) { return }
-    $sender.ForeColor = if ($sender.AccessibleName -eq 'hidden') { [Drawing.Color]::FromArgb(160,160,160) } else { [Drawing.Color]::FromArgb(255,110,102) }
+    if ($sender.Enabled -and -not [Windows.Forms.SystemInformation]::HighContrast) { $sender.ForeColor = [LenovoInteractionPalette]::Hover }
     $sender.Invalidate()
     try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleDescription) } catch { }
 })
@@ -15263,6 +15330,22 @@ function Set-RowHoverState($Control, [bool]$Hover) {
     if (-not $row) { return }
 
     $rowGuid = [string]$row.Tag
+    # Presentation only: use the already-observed capability projection, never
+    # perform a task/firmware/readiness probe on pointer movement. The existing
+    # click owner remains authoritative, including cold-start deferred intent.
+    $hot = $Hover -and $row.Enabled -and -not $script:ManageActiveDragGuid
+    $observed = $script:SystemStatusCapabilities
+    if ($script:IsManageEntriesMode) {
+        if ($observed -and -not $observed.CanManageEntries) { $hot = $false }
+    } else {
+        if ($script:BootNextPendingGuid -or $script:DefaultTargetChangePending) { $hot = $false }
+        if ($observed -and -not $observed.CanSetBootNext -and -not ($observed.State -eq 'Checking' -and $observed.CanUseCachedBootState)) { $hot = $false }
+    }
+    $title=$row.Controls['BootTitleLabel']
+    if ($title) {
+        $hiddenInk=$script:IsManageEntriesMode -and (Test-ManageEntryHidden -Guid $rowGuid)
+        $title.ForeColor=if ($hot -and -not [Windows.Forms.SystemInformation]::HighContrast) { [LenovoInteractionPalette]::Hover } elseif ($hiddenInk) { [Drawing.Color]::FromArgb(175,175,175) } else { $script:ColorPrimary }
+    }
     if ($script:IsManageEntriesMode) {
         if ($script:ManageActiveDragGuid -and $rowGuid -eq $script:ManageActiveDragGuid -and $script:ManageDragLayout) {
             $row.BackColor = [Drawing.Color]::FromArgb(48,48,54)
@@ -15270,10 +15353,10 @@ function Set-RowHoverState($Control, [bool]$Hover) {
         }
         $hidden = Test-ManageEntryHidden -Guid $rowGuid
         if ($hidden) {
-            $row.BackColor = if ($Hover) { [Drawing.Color]::FromArgb(37,37,37) } else { [Drawing.Color]::FromArgb(27,27,27) }
+            $row.BackColor = if ($hot) { [Drawing.Color]::FromArgb(37,37,37) } else { [Drawing.Color]::FromArgb(27,27,27) }
         }
         else {
-            $row.BackColor = if ($Hover) { $script:ColorHover } else { $script:ColorRow }
+            $row.BackColor = if ($hot) { $script:ColorHover } else { $script:ColorRow }
         }
         $row.Invalidate($true)
         return
@@ -15285,7 +15368,7 @@ function Set-RowHoverState($Control, [bool]$Hover) {
     elseif ($isSelected) {
         $row.BackColor = $script:ColorSelectedRow
     }
-    elseif ($Hover) {
+    elseif ($hot) {
         $row.BackColor = $script:ColorHover
     }
     else {
@@ -15884,7 +15967,7 @@ function Add-PopupHeaderSection {
     $info.Size = [Drawing.Size]::new(34,34)
     $info.Cursor = [Windows.Forms.Cursors]::Hand
     $info.Add_Paint({ param($sender,$eventArgs) Paint-ModalOwnerRefreshGlyph -Button $sender -EventArgs $eventArgs })
-    $info.Add_MouseEnter({ if ($this.Enabled) { $this.ForeColor = $script:ColorAccent; $this.Invalidate() } })
+    $info.Add_MouseEnter({ if ($this.Enabled -and -not [Windows.Forms.SystemInformation]::HighContrast) { $this.ForeColor = [LenovoInteractionPalette]::Hover; $this.Invalidate() } })
     $info.Add_MouseLeave({ $this.ForeColor = $script:ColorSecondary; $this.Invalidate() })
     $info.Add_Click({ Show-SystemStatusPopup -Owner $this })
     $script:SystemStatusButton = $info
@@ -15998,7 +16081,7 @@ function Add-PopupBootEntryListSection {
     $entryScroll.Size = New-Object Drawing.Size(8, 402)
     $entryScroll.TrackColor = [Drawing.Color]::FromArgb(23, 23, 23)
     $entryScroll.ThumbColor = $script:ColorAccent
-    $entryScroll.ThumbHoverColor = [Drawing.Color]::FromArgb(242, 59, 49)
+    $entryScroll.ThumbHoverColor = [LenovoInteractionPalette]::Hover
     $entryScroll.Visible = $false
     $entryScroll.Add_ValueChanged({
         try {
@@ -16050,7 +16133,13 @@ function Set-PopupNavigationRowHover {
     $row = Get-PopupNavigationRow -Control $Control
     if (-not $row -or $row.IsDisposed) { return }
     $inside = $Hover -or ($row.Visible -and $row.RectangleToScreen($row.ClientRectangle).Contains([Windows.Forms.Cursor]::Position))
-    $row.BackColor = if ($inside -and (Test-PopupNavigationRowInteractive -Row $row)) { Get-PopupNavigationHoverColor } else { $script:ColorSurface }
+    $hot=$inside -and (Test-PopupNavigationRowInteractive -Row $row)
+    $row.BackColor = if ($hot) { Get-PopupNavigationHoverColor } else { $script:ColorSurface }
+    $label=if ($row.Name -eq 'DefaultPanel') { $row.Controls['DefaultTargetNameLabel'] } else { $row.Controls['MoreSettingsButton'] }
+    if ($label) {
+        $idle = if ($row.Name -eq 'DefaultPanel' -and -not $script:DefaultInteractionEnabled) { [Drawing.Color]::FromArgb(146,146,146) } else { $script:ColorPrimary }
+        $label.ForeColor = if ($hot -and -not [Windows.Forms.SystemInformation]::HighContrast) { [LenovoInteractionPalette]::Hover } else { $idle }
+    }
 }
 
 function Invoke-PopupNavigationRow {
@@ -16175,7 +16264,7 @@ function Add-PopupRestartSection {
     $restartPanel.Size = New-Object Drawing.Size(390, 65)
     $restartPanel.BackColor = $script:ColorSurface
 
-    $restartButton = New-Object System.Windows.Forms.Button
+    $restartButton = New-Object LenovoActionButton
     $restartButton.Name = 'RestartActionButton'
     $restartButton.Text = Get-LocalizedString -Key 'Action.RestartWindows'
     $restartButton.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
@@ -16238,7 +16327,7 @@ function Add-PopupRestartSection {
     $restartPanel.Controls.Add($restartTarget)
     $script:RestartTargetLabel = $restartTarget
 
-    $defaultOnce = New-Object System.Windows.Forms.Button
+    $defaultOnce = New-Object LenovoActionButton
     $defaultOnce.Name = 'RestartUseDefaultButton'
     $defaultOnce.Text = Get-LocalizedString -Key 'BootNext.UseDefaultOnce'
     $defaultOnce.Font = New-Object Drawing.Font('Segoe UI', 8.5, [Drawing.FontStyle]::Bold)
@@ -16305,7 +16394,7 @@ function Add-PopupManageEntriesSection {
     $managePanel.Controls.Add($manageDivider)
 
     # LBS-179: one native Undo control in the existing action row, no history surface.
-    $undoManage = New-Object System.Windows.Forms.Button
+    $undoManage = New-Object LenovoActionButton
     $undoManage.Name = 'ManageUndoButton'
     $undoManage.Text = Get-LocalizedString -Key 'Manage.Undo'
     $undoManage.AccessibleName = $undoManage.Text
@@ -16323,7 +16412,7 @@ function Add-PopupManageEntriesSection {
     $undoManage.Add_Click({ Undo-ManageEntryDraft })
     $managePanel.Controls.Add($undoManage)
 
-    $cancelManage = New-Object System.Windows.Forms.Button
+    $cancelManage = New-Object LenovoActionButton
     $cancelManage.Name = 'ManageCancelButton'
     $cancelManage.Text = Get-LocalizedString -Key 'Common.Cancel'
     $cancelManage.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
@@ -16341,7 +16430,7 @@ function Add-PopupManageEntriesSection {
     $cancelManage.Add_Click({ Stop-ManageEntriesMode })
     $managePanel.Controls.Add($cancelManage)
 
-    $saveManage = New-Object System.Windows.Forms.Button
+    $saveManage = New-Object LenovoActionButton
     $saveManage.Name = 'ManageSaveButton'
     $saveManage.Text = Get-LocalizedString -Key 'Manage.Save'
     $saveManage.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Bold)
@@ -16459,7 +16548,7 @@ function New-AuxiliaryPopupForm {
     })
     $close.Add_GotFocus({ $this.Invalidate() })
     $close.Add_LostFocus({ $this.Invalidate() })
-    $close.Add_MouseEnter({ param($sender,$eventArgs) $sender.ForeColor = $script:ColorAccent })
+    $close.Add_MouseEnter({ param($sender,$eventArgs) if ($sender.Enabled -and -not [Windows.Forms.SystemInformation]::HighContrast) { $sender.ForeColor = [LenovoInteractionPalette]::Hover } })
     $close.Add_MouseLeave({ param($sender,$eventArgs) $sender.ForeColor = $script:ColorPrimary })
     $close.Location = [Drawing.Point]::new(350,7)
     $close.Size = [Drawing.Size]::new(28,30)
@@ -16489,7 +16578,7 @@ function New-AuxiliaryPopupForm {
     $scroll.Size = [Drawing.Size]::new(8,$viewport.Height)
     $scroll.TrackColor = [Drawing.Color]::FromArgb(23,23,23)
     $scroll.ThumbColor = $script:ColorAccent
-    $scroll.ThumbHoverColor = [Drawing.Color]::FromArgb(242,59,49)
+    $scroll.ThumbHoverColor = [LenovoInteractionPalette]::Hover
     $scroll.Visible = $false
     $scroll.Add_ValueChanged({
         param($sender,$eventArgs)
@@ -17970,7 +18059,7 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
             connector = new LenovoAuxiliaryConnector();
             connector.TopMost = child.TopMost;
         }
-        connector.SetGeometry(bridge, headerTrigger && !SystemInformation.HighContrast ? accent : fill);
+        connector.SetGeometry(bridge, !SystemInformation.HighContrast ? accent : fill);
         if (!connector.Visible)
         {
             connector.Owner = child;

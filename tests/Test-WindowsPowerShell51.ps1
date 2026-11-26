@@ -143,7 +143,11 @@ foreach ($preferencesProbe in @('Test-LBS180-PortablePreferences.ps1','Test-LBS1
 }
 & (Join-Path $root 'tests\Test-FunctionalCore.ps1')
 & (Join-Path $root 'tests\Test-StorageInfrastructure.ps1')
-& (Join-Path $root 'tests\Test-UIPresentation.ps1')
+# LBS-270: this fixture compiles a subset of the canonical WinForms C# types.
+# Isolate it from the resident localization fixture's complete C# assembly.
+$uiPresentationProbe = Join-Path $root 'tests\Test-UIPresentation.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $uiPresentationProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-270 native UI presentation regression failed' }
 & (Join-Path $root 'tests\Test-LBS163-DragPreview.ps1')
 & (Join-Path $root 'tests\Test-PopupDpiLayout.ps1')
 & (Join-Path $root 'tests\Test-LocalizationRuntime.ps1')
