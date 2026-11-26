@@ -3322,7 +3322,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.9.0.1'
+$script:AppVersion = '1.9.1.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -13443,6 +13443,7 @@ function New-BootEntryInteractionHandlers {
         try { Hide-DarkActionTooltip } catch { }
         $sourceRow = Get-BootRowFromControl $sender
         if ($sourceRow -and $sourceRow.PSObject.Properties['ManageSpaceArmed']) { $sourceRow.ManageSpaceArmed = $false }
+        if ($sourceRow -and $sourceRow.PSObject.Methods['SetManageEditCue']) { $sourceRow.SetManageEditCue($false,$false,$false) }
         if ($sourceRow) { Start-ManageDragReflow -SourceRow $sourceRow }
         try { [void]$sender.DoDragDrop($guid, [System.Windows.Forms.DragDropEffects]::Move) }
         catch { }
@@ -14005,7 +14006,7 @@ function Start-ManageRowAliasEdit {
 }
 
 function Restore-ManageRowFocus {
-    param([string]$Guid,[int]$FallbackIndex = -1,[Nullable[bool]]$KeyboardCue)
+    param([string]$Guid,[int]$FallbackIndex = -1,[Nullable[bool]]$KeyboardCue,[switch]$EditCue)
     if (-not $script:IsManageEntriesMode -or -not $script:Popup -or $script:Popup.IsDisposed) { return }
     $rows = @($script:Popup.Controls.Find('BootRow',$true) | Where-Object {
         -not $_.IsDisposed -and $_.CanFocus -and $_.PSObject.Properties['ManageKeyboardMode'] -and $_.ManageKeyboardMode
@@ -14018,7 +14019,23 @@ function Restore-ManageRowFocus {
         if ($null -ne $KeyboardCue) { $target.SetKeyboardCue([bool]$KeyboardCue) }
         [void]$target.Focus()
         Set-NormalBootRowVisible -Row $target
+        if ($EditCue -and [string]$target.Tag -eq $Guid) { Update-ManageKeyboardEditCue -Row $target -Active:$true }
     }
+}
+
+# Keyboard emphasis and actual pointer hover are independent. Reuse the
+# existing hover ink; never synthesize hover, change a background, or show help.
+function Update-ManageEditGlyphInk {
+    param($Control)
+    $row = $Control.Parent
+    $keyboard = $row -and $row.PSObject.Properties['ManageEditCueActive'] -and $row.ManageEditCueActive
+    $hover = -not $script:ManageActiveDragGuid -and ($Control.ManagePointerHovered -or $keyboard)
+    $color = if ($Control.Name -eq 'ManageReorderGrip') {
+        if ($hover) { [Drawing.Color]::FromArgb(220,220,220) } else { [Drawing.Color]::FromArgb(145,145,145) }
+    } else {
+        if ($hover) { $script:ColorAccent } else { [Drawing.Color]::FromArgb(190,190,190) }
+    }
+    if ($Control.ForeColor -ne $color) { $Control.ForeColor = $color; $Control.Invalidate() }
 }
 
 function Add-ManageBootEntryControls {
@@ -14092,16 +14109,19 @@ $editAlias.Tag = $entry.Guid
 $editAlias.AccessibleDescription = Get-LocalizedString -Key 'Manage.EditAliasAccessible'
 $editAlias.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
 $editAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
+$editAlias | Add-Member -NotePropertyName ManagePointerHovered -NotePropertyValue $false
 $editAlias.Add_MouseEnter({
     param($sender,$eventArgs)
     if ($script:ManageActiveDragGuid) { return }
-    $sender.ForeColor = $script:ColorAccent
+    $sender.ManagePointerHovered = $true
+    Update-ManageEditGlyphInk -Control $sender
     Set-RowHoverState $sender $true
     try { Show-DarkActionTooltip -Owner $sender -Text ([string]$sender.AccessibleDescription) } catch { }
 })
 $editAlias.Add_MouseLeave({
     param($sender,$eventArgs)
-    $sender.ForeColor = [Drawing.Color]::FromArgb(190,190,190)
+    $sender.ManagePointerHovered = $false
+    Update-ManageEditGlyphInk -Control $sender
     Set-RowHoverState $sender $false
     try { Hide-DarkActionTooltip } catch { }
 })
@@ -14127,6 +14147,7 @@ $grip.BackColor = [Drawing.Color]::Transparent
 $grip.ForeColor = [Drawing.Color]::FromArgb(145,145,145)
 $grip.Cursor = [System.Windows.Forms.Cursors]::SizeAll
 $grip.AllowDrop = $true
+$grip | Add-Member -NotePropertyName ManagePointerHovered -NotePropertyValue $false
 $grip.Add_Paint({
     param($sender,$eventArgs)
     $color = if ($script:ManageActiveDragGuid) { [Drawing.Color]::FromArgb(145,145,145) } else { $sender.ForeColor }
@@ -14135,14 +14156,14 @@ $grip.Add_Paint({
 $grip.Add_MouseEnter({
     param($sender,$eventArgs)
     if ($script:ManageActiveDragGuid) { return }
-    $sender.ForeColor = [Drawing.Color]::FromArgb(220,220,220)
-    $sender.Invalidate()
+    $sender.ManagePointerHovered = $true
+    Update-ManageEditGlyphInk -Control $sender
     try { Show-DarkActionTooltip -Owner $sender -Text (Get-LocalizedString -Key 'Manage.ReorderHint') } catch { }
 })
 $grip.Add_MouseLeave({
     param($sender,$eventArgs)
-    $sender.ForeColor = [Drawing.Color]::FromArgb(145,145,145)
-    $sender.Invalidate()
+    $sender.ManagePointerHovered = $false
+    Update-ManageEditGlyphInk -Control $sender
     try { Hide-DarkActionTooltip } catch { }
 })
 $grip.Add_MouseDown({
@@ -14313,6 +14334,22 @@ public sealed class LenovoNormalBootKeyboardRow : Panel
     public bool ManageKeyboardMode { get; set; }
     public bool ManageSpaceArmed { get; set; }
     private bool keyboardCue = true;
+    private bool editCue, moveUp, moveDown;
+    public bool ManageEditCueActive { get { return editCue && ManageKeyboardMode && Focused && Enabled; } }
+    public bool ManageMoveUp { get { return ManageEditCueActive && moveUp; } }
+    public bool ManageMoveDown { get { return ManageEditCueActive && moveDown; } }
+    public event EventHandler ManageEditCueChanged;
+
+    public void SetManageEditCue(bool active, bool up, bool down)
+    {
+        active = active && ManageKeyboardMode && Focused && Enabled && Visible;
+        up = active && up; down = active && down;
+        if (editCue == active && moveUp == up && moveDown == down) return;
+        editCue = active; moveUp = up; moveDown = down;
+        EventHandler changed = ManageEditCueChanged;
+        if (changed != null) changed(this, EventArgs.Empty);
+        Invalidate();
+    }
     public bool KeyboardCueVisible { get { return Focused && keyboardCue; } }
     public bool KeyboardCueEnabled { get { return keyboardCue; } }
 
@@ -14335,6 +14372,7 @@ public sealed class LenovoNormalBootKeyboardRow : Panel
     public bool FocusForPointer()
     {
         if (!CanFocus || !Enabled || !Visible) return false;
+        SetManageEditCue(false, false, false);
         SetKeyboardCue(false);
         return Focus();
     }
@@ -14372,7 +14410,7 @@ public sealed class LenovoNormalBootKeyboardRow : Panel
     protected override bool IsInputKey(Keys keyData)
     {
         Keys key = keyData & Keys.KeyCode;
-        if (ManageKeyboardMode && (key == Keys.PageUp || key == Keys.PageDown ||
+        if (ManageKeyboardMode && (key == Keys.ControlKey || key == Keys.LControlKey || key == Keys.RControlKey || key == Keys.PageUp || key == Keys.PageDown ||
             (key == Keys.E && (keyData & Keys.Modifiers) == Keys.Control))) return true;
         if (key == Keys.Up || key == Keys.Down || key == Keys.Home ||
             key == Keys.End || key == Keys.Return || key == Keys.Space)
@@ -14390,10 +14428,23 @@ public sealed class LenovoNormalBootKeyboardRow : Panel
     protected override void OnLostFocus(EventArgs e)
     {
         ManageSpaceArmed = false;
+        SetManageEditCue(false, false, false);
         base.OnLostFocus(e);
         // A new independent focus acquisition defaults to keyboard visibility.
         keyboardCue = true;
         Invalidate();
+    }
+
+    protected override void OnEnabledChanged(EventArgs e)
+    {
+        if (!Enabled) SetManageEditCue(false, false, false);
+        base.OnEnabledChanged(e);
+    }
+
+    protected override void OnVisibleChanged(EventArgs e)
+    {
+        if (!Visible) SetManageEditCue(false, false, false);
+        base.OnVisibleChanged(e);
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -14405,7 +14456,36 @@ public sealed class LenovoNormalBootKeyboardRow : Panel
         if (r.Width > 0 && r.Height > 0)
         {
             using (Brush tint = new SolidBrush(Color.FromArgb(18, 180, 196, 214))) e.Graphics.FillRectangle(tint, r);
-            using (Pen p = new Pen(Color.FromArgb(181, 196, 212), 1.5f)) e.Graphics.DrawRectangle(p, r);
+            using (Pen p = new Pen(Color.FromArgb(181, 196, 212), 1.5f)) {
+                if (!ManageMoveUp && !ManageMoveDown) {
+                    e.Graphics.DrawRectangle(p, r);
+                } else {
+                    // Continuous outline; the arrow tips and wings stay inside
+                    // the existing free top/bottom margins, above/below labels.
+                    float scale = Height / 60f;
+                    float cx = (r.Left + r.Right) / 2f;
+                    float half = Math.Min(r.Width / 6f, Math.Max(4f, 7f * scale));
+                    float top = ManageMoveUp ? Math.Max(r.Top, (float)Math.Floor(5f * scale)) : r.Top;
+                    float bottom = ManageMoveDown ? Math.Min(r.Bottom, Height - (float)Math.Floor(5f * scale)) : r.Bottom;
+                    var outline = new System.Collections.Generic.List<PointF>();
+                    outline.Add(new PointF(r.Left, top));
+                    if (ManageMoveUp) {
+                        outline.Add(new PointF(cx-half, top));
+                        outline.Add(new PointF(cx, 1f));
+                        outline.Add(new PointF(cx+half, top));
+                    }
+                    outline.Add(new PointF(r.Right, top));
+                    outline.Add(new PointF(r.Right, bottom));
+                    if (ManageMoveDown) {
+                        outline.Add(new PointF(cx+half, bottom));
+                        outline.Add(new PointF(cx, Height-2f));
+                        outline.Add(new PointF(cx-half, bottom));
+                    }
+                    outline.Add(new PointF(r.Left, bottom));
+                    outline.Add(new PointF(r.Left, top));
+                    e.Graphics.DrawLines(p, outline.ToArray());
+                }
+            }
         }
     }
 }
@@ -14497,6 +14577,21 @@ function Test-ManageRowKeyboardAdmission {
         [bool](Get-CurrentSystemFunctionsCapabilities).CanManageEntries)
 }
 
+function Update-ManageKeyboardEditCue {
+    param($Row,[bool]$Active)
+    if (-not $Row -or $Row.IsDisposed -or -not $Row.PSObject.Methods['SetManageEditCue']) { return }
+    if (-not $Active -or -not (Test-ManageRowKeyboardAdmission -Row $Row)) {
+        $Row.SetManageEditCue($false,$false,$false)
+        return
+    }
+    $entries = @(Get-OrderedEntriesForUi -IncludeHidden -UseManageDraft)
+    $position = -1
+    for ($i=0; $i -lt $entries.Count; $i++) {
+        if ([string]$entries[$i].Guid -eq [string]$Row.Tag) { $position=$i; break }
+    }
+    $Row.SetManageEditCue(($position -ge 0),($position -gt 0),($position -ge 0 -and $position -lt $entries.Count-1))
+}
+
 function Update-ManageKeyboardRowPresentation {
     param($Row)
     if (-not $Row -or $Row.IsDisposed -or -not $Row.Parent -or -not $Row.PSObject.Properties['ManageKeyboardMode'] -or -not $Row.ManageKeyboardMode) { return }
@@ -14511,6 +14606,7 @@ function Update-ManageKeyboardRowPresentation {
     $state = if (Test-ManageEntryHidden -Guid ([string]$Row.Tag)) { Get-LocalizedString -Key 'Manage.HiddenAccessible' } else { Get-LocalizedString -Key 'Manage.VisibleAccessible' }
     $values = @{ Position=$position; Count=$entries.Count }
     $Row.AccessibleDescription = ('{0}. {1}. {2}' -f (Get-LocalizedString -Key 'Manage.KeyboardPosition' -Values $values),$state,(Get-LocalizedString -Key 'Manage.KeyboardInstructions'))
+    if ($Row.ManageEditCueActive) { Update-ManageKeyboardEditCue -Row $Row -Active:$true }
     if ($Row.Focused -and $script:Popup) {
         $hint = $script:Popup.Controls.Find('ManageKeyboardHint',$true) | Select-Object -First 1
         if ($hint) { $hint.Text = Get-LocalizedString -Key 'Manage.KeyboardPositionHint' -Values $values }
@@ -14545,10 +14641,11 @@ function Invoke-ManageRowKeyboardMove {
     if ($target -eq $index) { return }
     if ($Reorder) {
         $guid = [string]$Row.Tag
+        $editCue = [bool]$Row.ManageEditCueActive
         Move-ManageEntry -MovedGuid $guid -TargetGuid ([string]$entries[$target].Guid) -After:($target -gt $index)
         $script:LastStatusText = Get-LocalizedString -Key 'Manage.KeyboardPosition' -Values @{Position=($target+1);Count=$entries.Count}
         Update-PopupRows -Reason 'manage-keyboard-reorder'
-        Restore-ManageRowFocus -Guid $guid
+        Restore-ManageRowFocus -Guid $guid -EditCue:$editCue
     }
     else {
         if ($Key -in @([Windows.Forms.Keys]::PageUp,[Windows.Forms.Keys]::PageDown)) {
@@ -14564,6 +14661,13 @@ function Invoke-ManageRowKeyboardMove {
 
 function Connect-ManageRowKeyboard {
     param($Row)
+    $Row.Add_ManageEditCueChanged({
+        param($sender,$eventArgs)
+        foreach ($name in @('ManageReorderGrip','AliasEditButton')) {
+            $glyph = $sender.Controls[$name]
+            if ($glyph -and -not $glyph.IsDisposed) { Update-ManageEditGlyphInk -Control $glyph }
+        }
+    })
     $Row.Add_GotFocus({
         param($sender,$eventArgs)
         Set-NormalBootRowVisible -Row $sender
@@ -14577,9 +14681,14 @@ function Connect-ManageRowKeyboard {
     })
     $Row.Add_KeyDown({
         param($sender,$eventArgs)
-        if (-not (Test-ManageRowKeyboardAdmission -Row $sender)) { return }
+        if (-not (Test-ManageRowKeyboardAdmission -Row $sender)) {
+            Update-ManageKeyboardEditCue -Row $sender -Active:$false
+            return
+        }
         $key=$eventArgs.KeyCode
         $modifiers=$eventArgs.Modifiers
+        $controlKey = $key -in @([Windows.Forms.Keys]::ControlKey,[Windows.Forms.Keys]::LControlKey,[Windows.Forms.Keys]::RControlKey)
+        Update-ManageKeyboardEditCue -Row $sender -Active:($modifiers -eq [Windows.Forms.Keys]::Control -or ($controlKey -and $modifiers -eq [Windows.Forms.Keys]::None))
         if ($modifiers -eq [Windows.Forms.Keys]::None -and $key -in @([Windows.Forms.Keys]::Up,[Windows.Forms.Keys]::Down,[Windows.Forms.Keys]::Home,[Windows.Forms.Keys]::End,[Windows.Forms.Keys]::PageUp,[Windows.Forms.Keys]::PageDown)) {
             $eventArgs.SuppressKeyPress=$true
             Invoke-ManageRowKeyboardMove -Row $sender -Key $key -Reorder:$false
@@ -14595,6 +14704,7 @@ function Connect-ManageRowKeyboard {
         }
         elseif ($modifiers -eq [Windows.Forms.Keys]::Control -and $key -eq [Windows.Forms.Keys]::E) {
             $eventArgs.SuppressKeyPress=$true
+            Update-ManageKeyboardEditCue -Row $sender -Active:$false
             Start-ManageRowAliasEdit -Guid ([string]$sender.Tag)
         }
         elseif ($modifiers -eq [Windows.Forms.Keys]::None -and $key -eq [Windows.Forms.Keys]::Enter) {
@@ -14603,6 +14713,9 @@ function Connect-ManageRowKeyboard {
     })
     $Row.Add_KeyUp({
         param($sender,$eventArgs)
+        if ($eventArgs.KeyCode -in @([Windows.Forms.Keys]::ControlKey,[Windows.Forms.Keys]::LControlKey,[Windows.Forms.Keys]::RControlKey) -or $eventArgs.Modifiers -ne [Windows.Forms.Keys]::Control) {
+            Update-ManageKeyboardEditCue -Row $sender -Active:$false
+        }
         if ($eventArgs.KeyCode -ne [Windows.Forms.Keys]::Space) { return }
         $armed=$sender.ManageSpaceArmed
         $sender.ManageSpaceArmed=$false
@@ -15157,6 +15270,7 @@ function Invoke-PopupRowsReconciliation {
     $focusedManageGuid = if ($focusedManageRow) { [string]$focusedManageRow.Tag } else { '' }
     $focusedManageIndex = if ($focusedManageRow) { [int]$focusedManageRow.TabIndex } else { -1 }
     $manageCue = if ($focusedManageRow -and $focusedManageRow.PSObject.Properties['KeyboardCueEnabled']) { [bool]$focusedManageRow.KeyboardCueEnabled } else { $true }
+    $manageEditCue = [bool]($focusedManageRow -and $focusedManageRow.PSObject.Properties['ManageEditCueActive'] -and $focusedManageRow.ManageEditCueActive -and -not $activeDrag -and -not $script:ManageAliasEditGuid)
     if ($activeDrag) { Reset-ManageDragPreview }
     $previousSignatures = $script:PopupRowsRowSignatures
     $canReconcile = [object]::ReferenceEquals($script:PopupRowsContentPanel, $contentPanel) -and
@@ -15250,7 +15364,7 @@ function Invoke-PopupRowsReconciliation {
         if (-not $anchor -and $manageRows.Count -gt 0) { $anchor = $manageRows[[Math]::Min($manageAnchorIndex,$manageRows.Count-1)] }
         if ($anchor) { $anchor.SetManageTabAnchor() }
         if ($focusedManageGuid -and -not $script:ManageAliasEditGuid) {
-            Restore-ManageRowFocus -Guid $focusedManageGuid -FallbackIndex $focusedManageIndex -KeyboardCue:$manageCue
+            Restore-ManageRowFocus -Guid $focusedManageGuid -FallbackIndex $focusedManageIndex -KeyboardCue:$manageCue -EditCue:$manageEditCue
         }
     }
     return [int]$affected

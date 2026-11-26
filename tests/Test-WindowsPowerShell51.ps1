@@ -218,6 +218,10 @@ $manageEntryFocusProbe = Join-Path $root 'tests\Test-LBS262-EntryFocus.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $manageEntryFocusProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-262 initial entry focus regression failed' }
 
+$manageEditCueProbe = Join-Path $root 'tests\Test-LBS265-ManageEditCue.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $manageEditCueProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-265 contextual editing cue regression failed' }
+
 # LBS-167: isolate real WinForms refresh/drag row identity and diagnostics.
 $refreshRowsProbe = Join-Path $root 'tests\Test-LBS167-RefreshRendering.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $refreshRowsProbe

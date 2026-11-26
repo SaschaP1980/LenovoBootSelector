@@ -188,6 +188,7 @@ jobs:
               manageKeyboard = Get-TestTotal $logText '^LBS178 KEYBOARD TOTAL\s+(\d+)/(\d+)\s*$'
               manageMixedFocus = Get-TestTotal $logText '^LBS262 MIXED FOCUS TOTAL\s+(\d+)/(\d+)\s*$'
               manageEntryFocus = Get-TestTotal $logText '^LBS262 ENTRY FOCUS TOTAL\s+(\d+)/(\d+)\s*$'
+              manageEditCue = Get-TestTotal $logText '^LBS265 EDIT CUE TOTAL\s+(\d+)/(\d+)\s*$'
               localizationRuntime = Get-TestTotal $logText '^LOCALIZATION TOTAL\s+(\d+)/(\d+)\s*$'
               liveLocalization = Get-TestTotal $logText '^LBS191 LIVE LOCALIZATION TOTAL\s+(\d+)/(\d+)\s*$'
               refreshRuntime = Get-TestTotal $logText '^REFRESH TOTAL\s+(\d+)/(\d+)\s*$'
@@ -234,6 +235,7 @@ jobs:
               'manageKeyboard',
               'manageMixedFocus',
               'manageEntryFocus',
+              'manageEditCue',
               'localizationRuntime',
               'liveLocalization',
               'refreshRuntime',
@@ -286,6 +288,7 @@ jobs:
               $totals.manageKeyboard.passed +
               $totals.manageMixedFocus.passed +
               $totals.manageEntryFocus.passed +
+              $totals.manageEditCue.passed +
               $totals.localizationRuntime.passed +
               $totals.liveLocalization.passed +
               $totals.refreshRuntime.passed +
@@ -329,6 +332,7 @@ jobs:
               $totals.manageKeyboard.expected +
               $totals.manageMixedFocus.expected +
               $totals.manageEntryFocus.expected +
+              $totals.manageEditCue.expected +
               $totals.localizationRuntime.expected +
               $totals.liveLocalization.expected +
               $totals.refreshRuntime.expected +
