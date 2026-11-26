@@ -102,6 +102,8 @@ function Get-PopupRowsPresentationState {
         (Get-LocalizedString -Key 'Manage.HiddenAccessible'),
         (Get-LocalizedString -Key 'Manage.VisibleAccessible'),
         (Get-LocalizedString -Key 'Manage.ReorderHint'),
+        (Get-LocalizedString -Key 'Manage.KeyboardInstructions'),
+        (Get-LocalizedString -Key 'Manage.KeyboardPosition' -Values @{Position=1;Count=1}),
         (Get-LocalizedString -Key 'Manage.ClearAliasHint'),
         (Get-LocalizedString -Key 'Manage.AliasCue'),
         (Get-LocalizedString -Key 'Manage.AliasFieldHint'),
@@ -172,6 +174,10 @@ function Get-PopupRowsPresentationState {
 function Update-PopupRowsPeripheralUi {
     param($StatusLabel)
     if ($StatusLabel) { $StatusLabel.Text = $script:LastStatusText }
+    if ($script:IsManageEntriesMode -and $script:Popup) {
+        $focused = $script:Popup.Controls.Find('BootRow',$true) | Where-Object { $_.Focused -and $_.TabStop } | Select-Object -First 1
+        if ($focused) { Update-ManageKeyboardRowPresentation -Row $focused }
+    }
     Update-DefaultUi
     Update-RestartTargetUi
     Update-ManageSaveButtonState
@@ -292,6 +298,11 @@ function Invoke-PopupRowsReconciliation {
     $focusedNormalGuid = if (-not $Snapshot.Mode) {
         Get-NormalBootFocusedGuid -ContentPanel $ContentPanel
     } else { '' }
+    $focusedManageRow = if ($Snapshot.Mode -and $script:PopupRowsRenderedMode) {
+        $existingRows | Where-Object { $_.Focused -and $_.TabStop } | Select-Object -First 1
+    }
+    $focusedManageGuid = if ($focusedManageRow) { [string]$focusedManageRow.Tag } else { '' }
+    $focusedManageIndex = if ($focusedManageRow) { [int]$focusedManageRow.TabIndex } else { -1 }
     if ($activeDrag) { Reset-ManageDragPreview }
     $previousSignatures = $script:PopupRowsRowSignatures
     $canReconcile = [object]::ReferenceEquals($script:PopupRowsContentPanel, $contentPanel) -and
@@ -357,12 +368,9 @@ function Invoke-PopupRowsReconciliation {
                 $row.Location = [Drawing.Point]::new(0, $y)
                 $height = $row.Height
             }
-            if (-not $Snapshot.Mode) {
-                # A stable visual Tab order even when Controls are reused
-                # or created in a different native Z-order.
-                $row.TabIndex = $keyboardTabIndex
-                $keyboardTabIndex++
-            }
+            # A stable visual Tab order even when Controls are reused.
+            $row.TabIndex = $keyboardTabIndex
+            $keyboardTabIndex++
             $y += ($height + $rowGap)
         }
         if ($canReconcile) {
@@ -381,6 +389,14 @@ function Invoke-PopupRowsReconciliation {
     # Restore only if a normal row really owned focus before reconciliation.
     # Switching to Restart/settings/Manage Entries must never steal focus.
     Restore-NormalBootFocusedGuid -ContentPanel $ContentPanel -Guid $focusedNormalGuid
+    if ($Snapshot.Mode) {
+        foreach ($row in @($ContentPanel.Controls | Where-Object { $_.Name -eq 'BootRow' })) {
+            Update-ManageKeyboardRowPresentation -Row $row
+        }
+        if ($focusedManageGuid -and -not $script:ManageAliasEditGuid) {
+            Restore-ManageRowFocus -Guid $focusedManageGuid -FallbackIndex $focusedManageIndex
+        }
+    }
     return [int]$affected
 }
 

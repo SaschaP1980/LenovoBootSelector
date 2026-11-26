@@ -122,6 +122,13 @@ function Add-PopupHeaderSection {
     $sectionLabel.Name = 'SectionLabel'
     $section.Controls.Add($sectionLabel)
 
+    $keyboardHint = New-Label -Text (Get-LocalizedString -Key 'Manage.KeyboardHint') -Font (New-Object Drawing.Font('Segoe UI', 8.0, [Drawing.FontStyle]::Regular)) `
+        -ForeColor $script:ColorSecondary -X 210 -Y 4 -Width 164 -Height 20
+    $keyboardHint.Name = 'ManageKeyboardHint'
+    $keyboardHint.TextAlign = [Drawing.ContentAlignment]::MiddleRight
+    $keyboardHint.Visible = $false
+    $section.Controls.Add($keyboardHint)
+
     $manageButton = New-Object LenovoCustomizeButton
     $manageButton.Name = 'ManageEntriesButton'
     $manageButton.Text = Get-LocalizedString -Key 'Popup.Customize'
@@ -191,7 +198,7 @@ function Add-PopupBootEntryListSection {
             $bar.Value = $bar.Value + ($direction * $bar.SmallChange)
         }
     })
-    $listPanel.Add_MouseEnter({ $this.Focus() })
+    $listPanel.Add_MouseEnter({ if (-not $script:IsManageEntriesMode) { $this.Focus() } })
     $Root.Controls.Add($listPanel)
 }
 
