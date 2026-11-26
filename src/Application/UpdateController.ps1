@@ -2,16 +2,54 @@
 # UI owns presentation and user commands; Infrastructure owns transport/process/filesystem/install mechanics.
 
 function Stop-UpdateCheckWorkflow {
-    param([Parameter(Mandatory=$true)]$State)
+    param([Parameter(Mandatory=$true)]$State,[switch]$Terminate)
 
     if ($State.CheckTimer) {
         try { $State.CheckTimer.Stop() } catch { }
         try { $State.CheckTimer.Dispose() } catch { }
         $State.CheckTimer = $null
     }
-    if ($State.CheckProcess) {
-        try { $State.CheckProcess.Dispose() } catch { }
-        $State.CheckProcess = $null
+    $process = $State.CheckProcess
+    $State.CheckProcess = $null
+    if (-not $process) { return }
+    if ($Terminate) {
+        try {
+            $process.Refresh()
+            if (-not $process.HasExited) {
+                $process.Kill()
+                [void]$process.WaitForExit(250)
+            }
+            $process.Refresh()
+            if (-not $process.HasExited) { throw 'Update check worker did not exit after termination.' }
+        }
+        catch {
+            # Retain the exact owned handle until exit. Never start a competing
+            # operation or trust a late result while cleanup is unresolved.
+            $State.CheckCleanupProcess = $process
+            $State.CheckCleanupResultPath = $State.CheckResultPath
+            Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_CLEANUP_PENDING' -Stage 'check-cleanup' -Success $false -ErrorRecord $_ -Level warning
+            return
+        }
+    }
+    try { $process.Dispose() } catch { }
+}
+
+function Test-UpdateCheckCleanupReady {
+    param([Parameter(Mandatory=$true)]$State)
+    $process = $State.CheckCleanupProcess
+    if (-not $process) { return $true }
+    try {
+        $process.Refresh()
+        if (-not $process.HasExited) { return $false }
+        $process.Dispose()
+        Remove-LenovoUpdateWorkflowFile -Path $State.CheckCleanupResultPath
+        $State.CheckCleanupProcess = $null
+        $State.CheckCleanupResultPath = $null
+        return $true
+    }
+    catch {
+        Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_CLEANUP_PENDING' -Stage 'check-cleanup' -Success $false -ErrorRecord $_ -Level warning
+        return $false
     }
 }
 
@@ -22,34 +60,55 @@ function Start-UpdateCheckWorkflow {
         [AllowNull()][string]$RuntimeSessionId,
         [Parameter(Mandatory=$true)][scriptblock]$CompletionAction,
         [Parameter(Mandatory=$true)][scriptblock]$TimerFactory,
-        [Parameter(Mandatory=$true)][string]$StartFailureMessage
+        [Parameter(Mandatory=$true)][string]$StartFailureMessage,
+        [ValidateRange(1,600000)][int]$DeadlineMs = 115000
     )
 
     if (Test-UpdateRuntimeBusy -State $State) {
         return [pscustomobject]@{ Started=$false; Reason='Busy'; Error='' }
     }
+    if (-not (Test-UpdateCheckCleanupReady -State $State)) {
+        return [pscustomobject]@{ Started=$false; Reason='StartFailed'; Error=$StartFailureMessage }
+    }
+    if ($Mode -eq 'Popup' -and (Test-UpdateRuntimePopupCheckFresh -State $State)) {
+        Write-RuntimeDiagnosticEvent -Event 'POPUP_UPDATE_CHECK_SKIPPED' -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ reason='cooldown'; lastCheckSucceeded=$State.LastCheckSucceeded; ageMs=$State.CheckCooldownClock.ElapsedMilliseconds })
+        return [pscustomobject]@{ Started=$false; Reason='FreshnessCooldown'; Error='' }
+    }
 
     [void](Set-UpdateRuntimeChecking -State $State)
     $State.CheckMode = $Mode
-    $resultPath = New-LenovoUpdateCheckResultPath
-    $State.CheckResultPath = $resultPath
+    $State.CheckClock = [System.Diagnostics.Stopwatch]::StartNew()
+    $State.CheckTerminationReason = ''
+    $resultPath = $null
 
     try {
+        $resultPath = New-LenovoUpdateCheckResultPath
+        $State.CheckResultPath = $resultPath
         $process = Start-UpdateCheckWorkerProcess -ResultPath $resultPath -RuntimeSessionId $RuntimeSessionId
         if (-not $process) { throw $StartFailureMessage }
         $State.CheckProcess = $process
 
         $stateForTick = $State
         $completionForTick = $CompletionAction
+        $processForTick = $process
+        $pathForTick = $resultPath
+        $deadlineForTick = $DeadlineMs
         $tickAction = {
+            if (-not [object]::ReferenceEquals($stateForTick.CheckProcess,$processForTick) -or $stateForTick.CheckResultPath -ne $pathForTick) { return }
+            $complete = $false
             try {
-                if (-not $stateForTick.CheckProcess) { return }
-                $stateForTick.CheckProcess.Refresh()
-                if ($stateForTick.CheckProcess.HasExited) { & $completionForTick }
+                $processForTick.Refresh()
+                if ($processForTick.HasExited) { $complete = $true }
+                elseif ($stateForTick.CheckClock.ElapsedMilliseconds -ge $deadlineForTick) {
+                    $stateForTick.CheckTerminationReason = 'deadline'
+                    $complete = $true
+                }
             }
             catch {
-                & $completionForTick
+                $stateForTick.CheckTerminationReason = 'process-monitor'
+                $complete = $true
             }
+            if ($complete) { & $completionForTick }
         }.GetNewClosure()
 
         $timer = & $TimerFactory $tickAction
@@ -57,17 +116,20 @@ function Start-UpdateCheckWorkflow {
         $State.CheckTimer = $timer
         $timer.Start()
 
-        Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_STARTED' } else { 'UPDATE_CHECK_STARTED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ mode=$Mode })
+        Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_STARTED' } else { 'UPDATE_CHECK_STARTED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ mode=$Mode; deadlineMs=$DeadlineMs; processId=$process.Id; workerLaunchMs=$State.CheckClock.ElapsedMilliseconds })
         return [pscustomobject]@{ Started=$true; Reason='Started'; Error='' }
     }
     catch {
         $errorMessage = $_.Exception.Message
         [void](Set-UpdateRuntimeFailed -State $State -Message $errorMessage)
-        Stop-UpdateCheckWorkflow -State $State
+        Stop-UpdateCheckWorkflow -State $State -Terminate
         Remove-LenovoUpdateWorkflowFile -Path $resultPath
         $State.CheckResultPath = $null
         $State.CheckMode = ''
-        [void](Set-UpdateRuntimeIdle -State $State)
+        $State.CheckClock = $null
+        $State.CheckTerminationReason = ''
+        Set-UpdateRuntimeCheckOutcome -State $State -Success $false
+        [void](Restore-UpdateRuntimeAfterCheckFailure -State $State)
         Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_STARTED' } else { 'UPDATE_CHECK_STARTED' }) -Stage 'update-check' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode=$Mode }) -Level warning
         return [pscustomobject]@{ Started=$false; Reason='StartFailed'; Error=$errorMessage }
     }
@@ -80,8 +142,14 @@ function Complete-UpdateCheckWorkflow {
         [Parameter(Mandatory=$true)][string]$NoResultMessage
     )
 
-    Stop-UpdateCheckWorkflow -State $State
     $path = [string]$State.CheckResultPath
+    if ($State.Status -ne 'Checking' -or $State.CheckMode -ne $Mode -or -not $path) {
+        return [pscustomobject]@{ Success=$false; Mode=$Mode; UpdateAvailable=$false; Manifest=$null; Error=''; ErrorCategory='runtime'; FailureStage='stale-completion'; ErrorClass=''; NetworkStatus='' }
+    }
+    $reason = [string]$State.CheckTerminationReason
+    $elapsedMs = if ($State.CheckClock) { [int64]$State.CheckClock.ElapsedMilliseconds } else { 0 }
+    Stop-UpdateCheckWorkflow -State $State -Terminate:([bool]$reason)
+    $consumeClock = [System.Diagnostics.Stopwatch]::StartNew()
     $failureCategory = ''
     $failureStage = ''
     $errorClass = ''
@@ -99,6 +167,12 @@ function Complete-UpdateCheckWorkflow {
     }
 
     try {
+        if ($reason) {
+            $failureCategory = 'runtime'
+            $failureStage = if ($reason -eq 'deadline') { 'check-watchdog' } else { 'check-process-monitor' }
+            $errorClass = if ($reason -eq 'deadline') { 'System.TimeoutException' } else { 'System.InvalidOperationException' }
+            throw $NoResultMessage
+        }
         $result = Read-LenovoUpdateWorkerResult -Path $path
         if ($null -eq $result) {
             $failureCategory = 'runtime'
@@ -124,13 +198,13 @@ function Complete-UpdateCheckWorkflow {
             $outcome.Success = $true
             $outcome.UpdateAvailable = $true
             $outcome.Manifest = $validated
-            Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$true; availableVersion=$validated.Version; mode=$Mode })
+            Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$true; availableVersion=$validated.Version; mode=$Mode; workerElapsedMs=$elapsedMs; resultConsumeMs=$consumeClock.ElapsedMilliseconds })
         }
         else {
             $State.AvailableManifest = $null
             [void](Set-UpdateRuntimeIdle -State $State)
             $outcome.Success = $true
-            Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$false; mode=$Mode })
+            Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$false; mode=$Mode; workerElapsedMs=$elapsedMs; resultConsumeMs=$consumeClock.ElapsedMilliseconds })
         }
     }
     catch {
@@ -141,13 +215,16 @@ function Complete-UpdateCheckWorkflow {
         $outcome.FailureStage = $failureStage
         $outcome.ErrorClass = $errorClass
         $outcome.NetworkStatus = $networkStatus
-        Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage $(if ($failureStage) { $failureStage } else { 'update-check' }) -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode=$Mode; errorCategory=$failureCategory; failureStage=$failureStage; errorClass=$errorClass; networkStatus=$networkStatus }) -Level warning
+        Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage $(if ($failureStage) { $failureStage } else { 'update-check' }) -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode=$Mode; errorCategory=$failureCategory; failureStage=$failureStage; errorClass=$errorClass; networkStatus=$networkStatus; terminationReason=$reason; workerElapsedMs=$elapsedMs; resultConsumeMs=$consumeClock.ElapsedMilliseconds; retainedAvailability=($null -ne $State.AvailableManifest) }) -Level warning
     }
     finally {
         Remove-LenovoUpdateWorkflowFile -Path $path
         $State.CheckResultPath = $null
         $State.CheckMode = ''
-        if ($State.Status -eq 'Failed') { [void](Set-UpdateRuntimeIdle -State $State) }
+        $State.CheckClock = $null
+        $State.CheckTerminationReason = ''
+        Set-UpdateRuntimeCheckOutcome -State $State -Success ([bool]$outcome.Success)
+        if ($State.Status -eq 'Failed') { [void](Restore-UpdateRuntimeAfterCheckFailure -State $State) }
     }
 
     return [pscustomobject]$outcome
@@ -179,6 +256,9 @@ function Start-UpdatePrepareWorkflow {
 
     if (Test-UpdateRuntimeBusy -State $State) {
         return [pscustomobject]@{ Started=$false; Reason='Busy'; Error=''; Version='' }
+    }
+    if (-not (Test-UpdateCheckCleanupReady -State $State)) {
+        return [pscustomobject]@{ Started=$false; Reason='StartFailed'; Error=$StartFailureMessage; Version='' }
     }
     if ($null -eq $Manifest) {
         return [pscustomobject]@{ Started=$false; Reason='NoManifest'; Error=''; Version='' }

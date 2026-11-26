@@ -158,15 +158,15 @@ def main():
         if re.match(r'\s*function\s+Assert-(?:True|Equal)\b',line,re.I):
             continue
         update_assertion_calls += len(re.findall(r'(?:^|;\s*)Assert-(?:True|Equal)\b',line))
-    s.eq('Update native test has exact 79 assertion call sites',update_assertion_calls,79)
+    s.eq('Update native test has exact 113 assertion call sites',update_assertion_calls,113)
     s.has('Update native test self-audits source via PowerShell AST',update_test,'[System.Management.Automation.Language.Parser]::ParseFile')
     s.has('Update native test derives command names from AST',update_test,'$node.GetCommandName()')
     s.has('Update native test compares executed and source assertion counts',update_test,'if ($checks -ne $sourceAssertionCount)')
-    s.has('Update native test keeps explicit source coverage guard 79',update_test,'if ($sourceAssertionCount -ne 79) { throw "Unexpected update assertion source count $sourceAssertionCount" }')
-    s.has('Update native test keeps explicit runtime coverage output 79',update_test,'Write-Host "UPDATE TOTAL $checks/79"')
+    s.has('Update native test keeps explicit source coverage guard 113',update_test,'if ($sourceAssertionCount -ne 113) { throw "Unexpected update assertion source count $sourceAssertionCount" }')
+    s.has('Update native test keeps explicit runtime coverage output 113',update_test,'Write-Host "UPDATE TOTAL $checks/113"')
     s.c('LBS-26 native update controller test exists',bool(update_controller_test))
-    s.has('LBS-26 update controller suite keeps fixed total 56',update_controller_test,'Write-Host "UPDATE CONTROLLER TOTAL $script:checks/56"')
-    s.has('Update native test keeps explicit runtime coverage guard 79',update_test,'if ($checks -ne 79) { throw "Unexpected update test count $checks" }')
+    s.has('LBS-277 update controller suite keeps fixed total 72',update_controller_test,'Write-Host "UPDATE CONTROLLER TOTAL $script:checks/72"')
+    s.has('Update native test keeps explicit runtime coverage guard 113',update_test,'if ($checks -ne 113) { throw "Unexpected update test count $checks" }')
     localization_native=txt(root/'tests/Test-LocalizationRuntime.ps1') if (root/'tests/Test-LocalizationRuntime.ps1').is_file() else ''
     windows_wrapper=txt(root/'tests/Test-WindowsPowerShell51.ps1')
     s.has('LBS-26 native aggregate runner invokes update controller suite',windows_wrapper,'Test-UpdateController.ps1')
@@ -659,7 +659,7 @@ def main():
         '$refreshVisible = -not [string]::IsNullOrEmpty($refreshKey)' in refresh_ui and
         '$popupUpdateActive = ($script:UpdateState -and $script:UpdateState.CheckProcess' in refresh_ui and
         "elseif ($active) { 'Header.Refreshing' }" in refresh_ui and
-        'Set-HeaderUpdateInteractionState -Enabled (-not $refreshVisible -and $updateAvailable)' in refresh_ui)
+        'Set-HeaderUpdateInteractionState -Enabled (-not $refreshVisible -and $updateAvailable -and -not $knownRecheck)' in refresh_ui)
     s.has('LBS-14 maintenance disables header update interaction',refresh_ui,'Set-HeaderUpdateInteractionState -Enabled $false')
     s.has('LBS-17 LBS-14 shared dialog title uses canonical localization key',available_dialog,"-Title (Get-LocalizedString -Key 'Update.Available')")
     s.has('LBS-14 shared dialog uses already validated manifest',available_dialog,'$script:UpdateState.AvailableManifest')

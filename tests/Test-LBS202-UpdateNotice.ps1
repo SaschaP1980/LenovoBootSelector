@@ -134,6 +134,7 @@ foreach ($locale in @('en-US','de-DE')) {
         $tag = "$locale/$scale"
         $script:UpdateState = [pscustomobject]@{
             Status = 'UpdateAvailable'
+            LastCheckSucceeded = $true
             AvailableManifest = [pscustomobject]@{ Version='9.8.7.6' }
         }
         $script:UpdateStarts = 0
@@ -186,7 +187,17 @@ foreach ($locale in @('en-US','de-DE')) {
             $legacy -and $legacy.Count -eq 1 -and
             $legacy.RightText -eq 'OK' -and $legacy.RightColor -eq $script:ColorAccent.ToArgb() -and
             $script:UpdateStarts -eq 1 -and -not $global:Lbs202CapturedError)
-        $expectedCases+=16
+        $script:UpdateState.LastCheckSucceeded = $false
+        $global:Lbs202CaseMode = 'safe'
+        $global:Lbs202CapturedError = $null
+        $global:Lbs202Captured = $null
+        [void](Show-AvailableUpdateDialog)
+        $stale=$global:Lbs202Captured
+        Assert-Lbs202 "$tag LBS-277 retained manifest discloses failed latest check" (
+            $stale -and $stale.Heading.Contains('9.8.7.6') -and
+            $stale.Message -eq (Get-LocalizedString -Key 'Update.KnownAvailableMessage') -and
+            $stale.AcceptIsLeft -and $script:UpdateStarts -eq 1 -and -not $global:Lbs202CapturedError)
+        $expectedCases+=17
     }
 }
 # Legacy two-action notice semantics must remain unchanged: outlined
@@ -209,6 +220,46 @@ foreach ($locale in @('en-US','de-DE')) {
         $script:OtherActions -eq $previous -and -not $global:Lbs202CapturedError)
     $expectedCases+=2
 }
+. (Join-Path $root 'src\Application\UpdateRuntime.ps1')
+. (Join-Path $root 'src\UI\RefreshPresentation.ps1')
+function Get-CurrentSystemFunctionsCapabilities { return [pscustomobject]@{ State='Ready' } }
+function Test-BackgroundRefreshActive { param($State) return [bool]$script:TestRefreshActive }
+$script:BackgroundRefreshState = [pscustomobject]@{ ActiveRequest=[pscustomobject]@{Origin='Manual'}; PendingRequest=$null }
+$script:HeaderStatusHovered=$false
+$script:HeaderStatusLabel = New-Object Windows.Forms.Label
+try {
+    foreach ($locale in @('en-US','de-DE')) {
+        $script:CaseLocale=$locale
+        $script:TestRefreshActive=$false
+        $script:UpdateState=New-UpdateRuntimeState
+        [void](Set-UpdateRuntimeAvailable -State $script:UpdateState -Manifest ([pscustomobject]@{Version='9.8.7.6'}))
+        $script:UpdateState.LastCheckSucceeded=$true
+        Update-HeaderRefreshStatus
+        Assert-Lbs202 "$locale LBS-277 known fresh update remains actionable" ($script:HeaderStatusLabel.Text -eq (Get-LocalizedString -Key 'Update.Available') -and $script:HeaderUpdateInteractionEnabled)
+        [void](Set-UpdateRuntimeChecking -State $script:UpdateState)
+        $script:UpdateState.CheckMode='Popup'
+        $script:UpdateState.CheckProcess=[pscustomobject]@{Id=1}
+        Update-HeaderRefreshStatus
+        Assert-Lbs202 "$locale LBS-277 recheck keeps known hint without concurrent install" ($script:HeaderStatusLabel.Text -eq (Get-LocalizedString -Key 'Update.KnownChecking') -and -not $script:HeaderUpdateInteractionEnabled)
+        $script:TestRefreshActive=$true
+        Update-HeaderRefreshStatus
+        Assert-Lbs202 "$locale LBS-277 deliberate boot refresh retains priority" ($script:HeaderStatusLabel.Text -eq (Get-LocalizedString -Key 'Header.Refreshing') -and -not $script:HeaderUpdateInteractionEnabled)
+        $script:TestRefreshActive=$false
+        $script:UpdateState.CheckProcess=$null
+        $script:UpdateState.CheckMode=''
+        [void](Set-UpdateRuntimeFailed -State $script:UpdateState -Message 'network')
+        Set-UpdateRuntimeCheckOutcome -State $script:UpdateState -Success $false
+        [void](Restore-UpdateRuntimeAfterCheckFailure -State $script:UpdateState)
+        Update-HeaderRefreshStatus
+        Assert-Lbs202 "$locale LBS-277 known failed-check hint remains actionable" ($script:HeaderStatusLabel.Text -eq (Get-LocalizedString -Key 'Update.KnownCheckFailed') -and $script:HeaderUpdateInteractionEnabled)
+        $script:UpdateState.AvailableManifest=$null
+        [void](Set-UpdateRuntimeIdle -State $script:UpdateState)
+        Update-HeaderRefreshStatus
+        Assert-Lbs202 "$locale LBS-277 unknown failed check is not an install action" ($script:HeaderStatusLabel.Text -eq (Get-LocalizedString -Key 'Update.CheckFailedStatus') -and -not $script:HeaderUpdateInteractionEnabled)
+        $expectedCases+=5
+    }
+}
+finally { $script:HeaderStatusLabel.Dispose() }
 Write-Host "LBS202 UPDATE NOTICE TOTAL $script:checks/$expectedCases"
 Write-Host ("LBS202 UPDATE NOTICE RESULT={0}" -f $(if($script:failures.Count -eq 0){'PASS'}else{'RED'}))
 if ($script:checks -ne $expectedCases -or $script:failures.Count -gt 0) {

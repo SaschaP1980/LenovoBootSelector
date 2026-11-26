@@ -72,10 +72,15 @@ function New-LenovoUpdatePrepareInput {
 
 
 function Get-LenovoUpdateManifestRemote {
-    $json = Invoke-LenovoUpdateTextDownload -Uri (Get-LenovoUpdateManifestUri)
+    param([hashtable]$Timings=@{})
+    $clock = [System.Diagnostics.Stopwatch]::StartNew()
+    try { $json = Invoke-LenovoUpdateTextDownload -Uri (Get-LenovoUpdateManifestUri) -Timings $Timings }
+    finally { $Timings.manifestFetchMs = $clock.ElapsedMilliseconds }
     if ([string]::IsNullOrWhiteSpace($json)) { throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-content' -Message 'Update-Manifest ist leer.') }
-    try { return ($json | ConvertFrom-Json) }
+    $clock.Restart()
+    try { return ($json | ConvertFrom-Json -ErrorAction Stop) }
     catch { throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-parse' -Message ('Update-Manifest ist kein gültiges JSON: ' + $_.Exception.Message) -InnerException $_.Exception) }
+    finally { $Timings.manifestParseMs = $clock.ElapsedMilliseconds }
 }
 function Get-LenovoSha256Hex {
     param([Parameter(Mandatory=$true)][string]$Path)
@@ -102,21 +107,40 @@ function Invoke-UpdateCheckWorker {
     $result = [ordered]@{ Success=$false; UpdateAvailable=$false; Manifest=$null; Error=''; ErrorCategory=''; FailureStage=''; ErrorClass=''; NetworkStatus='' }
     $manifestVersion = ''
     $manifestPublishedUtc = ''
+    $timings = @{}
+    $workerClock = [System.Diagnostics.Stopwatch]::StartNew()
+    $phaseClock = [System.Diagnostics.Stopwatch]::new()
     try {
-        $raw = Get-LenovoUpdateManifestRemote
+        $raw = Get-LenovoUpdateManifestRemote -Timings $timings
         $manifestVersion = ([string]$raw.version).Trim()
         $manifestPublishedUtc = ([string]$raw.publishedUtc).Trim()
-        $validated = Test-LenovoUpdateManifestCore -Manifest $raw
-        if (-not $validated.IsValid) { throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-validation' -Message $validated.Error) }
-        $comparison = Compare-LenovoAppVersionCore -Current $script:AppVersion -Candidate $validated.Version
+        $phaseClock.Restart()
+        try {
+            $validated = Test-LenovoUpdateManifestCore -Manifest $raw
+            if (-not $validated.IsValid) { throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-validation' -Message $validated.Error) }
+        }
+        finally { $timings.manifestValidationMs = $phaseClock.ElapsedMilliseconds }
+        $phaseClock.Restart()
+        try { $comparison = Compare-LenovoAppVersionCore -Current $script:AppVersion -Candidate $validated.Version }
+        finally { $timings.versionCompareMs = $phaseClock.ElapsedMilliseconds }
         $result.Success = $true; $result.UpdateAvailable = ($comparison -gt 0); $result.Manifest = $validated
     }
     catch {
         $failure = Get-LenovoUpdateFailureInfo -ErrorRecord $_ -DefaultCategory 'runtime' -DefaultStage 'update-check'
         $result.Error=$failure.Message; $result.ErrorCategory=$failure.Category; $result.FailureStage=$failure.Stage; $result.ErrorClass=$failure.ErrorClass; $result.NetworkStatus=$failure.NetworkStatus
     }
-    Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_WORKER_COMPLETED' -Stage $(if ($result.FailureStage) { [string]$result.FailureStage } else { 'update-check' }) -Success ([bool]$result.Success) -Data (New-RuntimeDiagnosticData @{ runningVersion=[string]$script:AppVersion; manifestVersion=[string]$manifestVersion; manifestPublishedUtc=[string]$manifestPublishedUtc; updateAvailable=[bool]$result.UpdateAvailable; errorCategory=[string]$result.ErrorCategory; failureStage=[string]$result.FailureStage; errorClass=[string]$result.ErrorClass; networkStatus=[string]$result.NetworkStatus; workerError=[string]$result.Error }) -Level $(if ($result.Success) { 'info' } else { 'warning' })
-    if ($UpdateResultPath) { Write-LenovoUpdateWorkerResult -Path $UpdateResultPath -Value ([pscustomobject]$result) }
+    if ($UpdateResultPath) {
+        $phaseClock.Restart()
+        try { Write-LenovoUpdateWorkerResult -Path $UpdateResultPath -Value ([pscustomobject]$result) }
+        catch {
+            $failure = Get-LenovoUpdateFailureInfo -ErrorRecord $_ -DefaultCategory 'runtime' -DefaultStage 'check-result-write'
+            $result.Success=$false; $result.UpdateAvailable=$false; $result.Manifest=$null
+            $result.Error=$failure.Message; $result.ErrorCategory=$failure.Category; $result.FailureStage=$failure.Stage; $result.ErrorClass=$failure.ErrorClass; $result.NetworkStatus=$failure.NetworkStatus
+            Remove-LenovoUpdateWorkflowFile -Path $UpdateResultPath
+        }
+        finally { $timings.resultWriteMs = $phaseClock.ElapsedMilliseconds }
+    }
+    Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_WORKER_COMPLETED' -Stage $(if ($result.FailureStage) { [string]$result.FailureStage } else { 'update-check' }) -Success ([bool]$result.Success) -Data (New-RuntimeDiagnosticData @{ runningVersion=[string]$script:AppVersion; manifestVersion=[string]$manifestVersion; manifestPublishedUtc=[string]$manifestPublishedUtc; updateAvailable=[bool]$result.UpdateAvailable; errorCategory=[string]$result.ErrorCategory; failureStage=[string]$result.FailureStage; errorClass=[string]$result.ErrorClass; networkStatus=[string]$result.NetworkStatus; workerError=[string]$result.Error; workerElapsedMs=$workerClock.ElapsedMilliseconds; timings=$timings }) -Level $(if ($result.Success) { 'info' } else { 'warning' })
     return $(if ($result.Success) { 0 } else { 1 })
 }
 function Start-UpdateCheckWorkerProcess {

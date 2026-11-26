@@ -16,8 +16,10 @@ function Assert-UpdateController {
 
 function New-FakeUpdateProcess {
     param([int]$Id,[bool]$HasExited=$false)
-    $p=[pscustomobject]@{Id=$Id;HasExited=$HasExited;RefreshCount=0;Disposed=$false}
+    $p=[pscustomobject]@{Id=$Id;HasExited=$HasExited;RefreshCount=0;Disposed=$false;KillCount=0;KillFails=$false}
     $p | Add-Member ScriptMethod Refresh { $this.RefreshCount++ }
+    $p | Add-Member ScriptMethod Kill { $this.KillCount++; if ($this.KillFails) { throw 'fake kill failure' }; $this.HasExited=$true }
+    $p | Add-Member ScriptMethod WaitForExit { param([int]$Ms) return [bool]$this.HasExited }
     $p | Add-Member ScriptMethod Dispose { $this.Disposed=$true }
     return $p
 }
@@ -160,7 +162,12 @@ Assert-UpdateController 'Check result file is removed' ($script:RemovedFiles -co
 Assert-UpdateController 'Manual completion diagnostic is emitted' (@($script:Diagnostics|Where-Object{$_.Event -eq 'UPDATE_CHECK_COMPLETED' -and $_.Success}).Count -eq 1)
 
 $script:ActiveTimerKind='check'
+$cooldown=Start-UpdateCheckWorkflow -State $state -Mode 'Popup' -RuntimeSessionId 'parent-session' -CompletionAction { } -TimerFactory $timerFactory -StartFailureMessage 'check-start-failed'
+Assert-UpdateController 'LBS-277 fresh popup check is skipped' (-not $cooldown.Started -and $cooldown.Reason -eq 'FreshnessCooldown')
+Assert-UpdateController 'LBS-277 cooldown retains available state' ($state.Status -eq 'UpdateAvailable' -and $script:CheckStarts -eq 1)
+$state.CheckCooldownClock=[pscustomobject]@{ElapsedMilliseconds=300000}
 $popupStart=Start-UpdateCheckWorkflow -State $state -Mode 'Popup' -RuntimeSessionId 'parent-session' -CompletionAction { $script:CompletionCount++ } -TimerFactory $timerFactory -StartFailureMessage 'check-start-failed'
+Assert-UpdateController 'LBS-277 recheck retains previously validated manifest' ([string]$state.AvailableManifest.Version -eq '0.10.4.0')
 $popupPath=[string]$state.CheckResultPath
 $script:FakeFiles[$popupPath]=[pscustomobject]@{Success=$true;UpdateAvailable=$false;Manifest=$null;Error='';ErrorCategory='';FailureStage='';ErrorClass='';NetworkStatus=''}
 $popupComplete=Complete-UpdateCheckWorkflow -State $state -Mode 'Popup' -NoResultMessage 'no-check-result'
@@ -189,6 +196,49 @@ Assert-UpdateController 'Missing check result fails closed' (-not [bool]$missing
 Assert-UpdateController 'Missing check result is cleaned by ownership path' ($script:RemovedFiles -contains $missingPath)
 
 $manifest=New-TestManifest
+[void](Set-UpdateRuntimeAvailable -State $state -Manifest $manifest)
+[void](Start-UpdateCheckWorkflow -State $state -Mode 'Manual' -RuntimeSessionId 'parent-session' -CompletionAction { } -TimerFactory $timerFactory -StartFailureMessage 'check-start-failed')
+$retainedPath=[string]$state.CheckResultPath
+$script:FakeFiles[$retainedPath]=[pscustomobject]@{Success=$false;UpdateAvailable=$false;Manifest=$null;Error='network down';ErrorCategory='network';FailureStage='manifest-download';ErrorClass='System.Net.WebException';NetworkStatus='Timeout'}
+$retained=Complete-UpdateCheckWorkflow -State $state -Mode 'Manual' -NoResultMessage 'no-check-result'
+Assert-UpdateController 'LBS-277 transient failure retains known manifest' (-not $retained.Success -and $state.AvailableManifest -eq $manifest)
+Assert-UpdateController 'LBS-277 transient failure restores available state and error' ($state.Status -eq 'UpdateAvailable' -and $state.LastError -eq 'network down')
+[void](Set-UpdateRuntimeAvailable -State $state -Manifest $manifest)
+$watch=Start-UpdateCheckWorkflow -State $state -Mode 'Manual' -RuntimeSessionId 'parent-session' -CompletionAction { $script:WatchdogCompletions++ } -TimerFactory $timerFactory -StartFailureMessage 'check-start-failed' -DeadlineMs 1000
+$script:WatchdogCompletions=0
+$watchProcess=$state.CheckProcess
+$watchTimer=$state.CheckTimer
+$watchPath=$state.CheckResultPath
+$state.CheckClock=[pscustomobject]@{ElapsedMilliseconds=1000}
+Assert-UpdateController 'LBS-277 manual check bypasses cooldown' ([bool]$watch.Started)
+& $watchTimer.Action
+Assert-UpdateController 'LBS-277 deadline triggers completion' ($script:WatchdogCompletions -eq 1 -and $state.CheckTerminationReason -eq 'deadline')
+$script:FakeFiles[$watchPath]=[pscustomobject]@{Success=$true;UpdateAvailable=$false}
+$timeout=Complete-UpdateCheckWorkflow -State $state -Mode 'Manual' -NoResultMessage 'no-check-result'
+Assert-UpdateController 'LBS-277 timeout ignores late result and classifies failure' (-not $timeout.Success -and $timeout.FailureStage -eq 'check-watchdog' -and $timeout.ErrorClass -eq 'System.TimeoutException')
+Assert-UpdateController 'LBS-277 timeout terminates exact worker and removes result' ($watchProcess.KillCount -eq 1 -and $watchProcess.Disposed -and $script:RemovedFiles -contains $watchPath)
+Assert-UpdateController 'LBS-277 timeout restores known availability' ($state.Status -eq 'UpdateAvailable' -and $null -ne $state.AvailableManifest)
+& $watchTimer.Action
+Assert-UpdateController 'LBS-277 stale tick cannot complete again' ($script:WatchdogCompletions -eq 1)
+$state.CheckCooldownClock=[pscustomobject]@{ElapsedMilliseconds=29999}
+$shortCooldown=Start-UpdateCheckWorkflow -State $state -Mode 'Popup' -RuntimeSessionId 'parent-session' -CompletionAction { } -TimerFactory $timerFactory -StartFailureMessage 'check-start-failed'
+Assert-UpdateController 'LBS-277 failed check has short popup cooldown' (-not $shortCooldown.Started -and $shortCooldown.Reason -eq 'FreshnessCooldown')
+$state.CheckCooldownClock=[pscustomobject]@{ElapsedMilliseconds=30000}
+$orphanStart=Start-UpdateCheckWorkflow -State $state -Mode 'Popup' -RuntimeSessionId 'parent-session' -CompletionAction { } -TimerFactory $timerFactory -StartFailureMessage 'check-start-failed' -DeadlineMs 1000
+$orphan=$state.CheckProcess
+$orphan.KillFails=$true
+$orphanPath=$state.CheckResultPath
+$state.CheckClock=[pscustomobject]@{ElapsedMilliseconds=1000}
+& $state.CheckTimer.Action
+$orphanResult=Complete-UpdateCheckWorkflow -State $state -Mode 'Popup' -NoResultMessage 'no-check-result'
+Assert-UpdateController 'LBS-277 expired failure cooldown permits next popup check' ([bool]$orphanStart.Started)
+Assert-UpdateController 'LBS-277 unresolved termination retains owned handle' (-not $orphanResult.Success -and [object]::ReferenceEquals($state.CheckCleanupProcess,$orphan) -and -not $orphan.Disposed)
+$blockedCheck=Start-UpdateCheckWorkflow -State $state -Mode 'Manual' -RuntimeSessionId 'parent-session' -CompletionAction { } -TimerFactory $timerFactory -StartFailureMessage 'check-start-failed'
+$blockedOrphanPrepare=Start-UpdatePrepareWorkflow -State $state -Manifest $manifest -RuntimeSessionId 'parent-session' -CompletionAction { } -TimerFactory $timerFactory -StartFailureMessage 'prepare-start-failed'
+Assert-UpdateController 'LBS-277 unresolved cleanup blocks new check and prepare' (-not $blockedCheck.Started -and -not $blockedOrphanPrepare.Started)
+$orphan.HasExited=$true
+$script:FakeFiles[$orphanPath]=[pscustomobject]@{Success=$true;UpdateAvailable=$false}
+Assert-UpdateController 'LBS-277 retired worker reaped and late file removed' ((Test-UpdateCheckCleanupReady -State $state) -and $orphan.Disposed -and -not $script:FakeFiles.ContainsKey($orphanPath))
 [void](Set-UpdateRuntimeAvailable -State $state -Manifest $manifest)
 $script:InstallDirectoryWritable=$false
 $script:ActiveTimerKind='prepare'
@@ -248,5 +298,5 @@ Assert-UpdateController 'Pending restart result resolves against running version
 Assert-UpdateController 'Pending restart result is consumed once' ($script:PendingRestartRemoved -eq 1)
 Assert-UpdateController 'Pending restart result emits diagnostic' (@($script:Diagnostics|Where-Object{$_.Event -eq 'UPDATE_RESTART_RESULT'}).Count -eq 1)
 
-Write-Host "UPDATE CONTROLLER TOTAL $script:checks/56"
-if ($script:checks -ne 56) { throw "Expected 56 update controller checks, got $script:checks" }
+Write-Host "UPDATE CONTROLLER TOTAL $script:checks/72"
+if ($script:checks -ne 72) { throw "Expected 72 update controller checks, got $script:checks" }

@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.10.3.0 - Reliable update checking and phase diagnostics (LBS-277)
+
+- Preserve the last validated newer manifest during a read-only recheck and transient check failure. Limit redundant popup-triggered checks with monotonic freshness and failure cooldowns; explicit manual checks remain available outside the single-flight gate.
+- Use Windows inbox curl for eligible direct HTTPS manifest checks, with explicit connection/transfer budgets, bounded process output, strict HTTP success and preserved certificate verification. Keep a bounded .NET compatibility route when curl is absent or configured proxy/trust settings require it. Bound the owned check worker, reject late results, and preserve explicit package validation and installation.
+- Record transport, parsing, manifest validation, version comparison and result-handoff timing. Add a read-only native transport probe and focused state, controller, transport and presentation regression coverage. Affected-host evidence isolated the slow .NET response-acquisition path; curl was fast on that host. End-to-end improvement remains subject to native owner acceptance.
+
 ## v1.10.2.1 - Component-specific Soft Accent Hover (LBS-270)
 
 - Replace the bottom-edge-only hover on framed neutral and red primary actions with full pale-red framing and contrast-safe role-specific hover surfaces. Keep inline actions text-focused with an underline.
