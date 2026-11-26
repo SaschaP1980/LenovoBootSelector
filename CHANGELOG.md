@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.9.3.0 – Native focus-raster evidence validity (LBS-260)
+
+- Distinguish invalid actual-screen captures from valid missing or unexpected focus outlines in native Windows tests. Reacquire only invalid frames within a fixed bound, retain the existing pixel threshold and fail closed on focus or geometry drift.
+- Add real occlusion and acquisition-policy regression coverage; retain the existing F03/F04 focus, traversal and action-dispatch checks. Product behavior is unchanged.
+
 ## v1.9.2.0 – Side-popup owner click dismissal (LBS-267)
 
 - Clicking the main surface while Further Settings or Default Startup Target is open cancels the side popup without dispatching the underlying action. The full click is consumed; modal ownership, the existing visual treatment and keyboard close paths remain intact.

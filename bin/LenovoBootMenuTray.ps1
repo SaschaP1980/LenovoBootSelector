@@ -3322,7 +3322,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.9.2.0'
+$script:AppVersion = '1.9.3.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
