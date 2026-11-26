@@ -1,7 +1,7 @@
 {
-  "version": "1.9.1.0",
+  "version": "1.9.2.0",
   "runtime": {
-    "lines": 17772,
+    "lines": 17894,
     "functions": 492,
     "scriptReferences": 2102,
     "scriptVariables": 203,
@@ -28,7 +28,7 @@
   },
   "ui": {
     "files": 21,
-    "lines": 8734,
+    "lines": 8856,
     "functions": 236,
     "scriptReferences": 1230
   },

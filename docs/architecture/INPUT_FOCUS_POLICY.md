@@ -26,6 +26,10 @@ The Manage list is one Tab zone when the inline editor is closed. A roving nativ
 
 Ctrl on an admitted focused Customize row reveals the existing hover ink of the grip and pencil and continuous up/down contours in the focus border where reorder is possible. The cue is presentation-only, never a synthetic pointer hover or tooltip. Direction availability follows the existing draft order (including hidden targets); one item has no arrows. The cue is cleared on Ctrl release, pointer focus acquisition, lost focus, disabled/hidden rows, alias entry or drag. Reconciliation restores it only for the same eligible GUID; native alias text input and other focus zones retain their prior behavior. No new persisted state, layout space or command owner.
 
+## Side-popup owner click dismissal (LBS-267)
+
+The main owner remains natively disabled during the two side popups. A separate nonactivating layered hit surface covers the main client area, including the highlighted trigger; it excludes any child overlap and consumes the entire left press/release before invoking the existing CancelButton. The existing dimmer and connector stay visual-only. It is created inside the side-popup modal lifetime and disposed with the dimmer. Native nested modal ownership and the child's enabled state prevent dismissal through a nested dialog. No global hooks, input replay or underlying action dispatch.
+
 ## Validation boundaries
 
 LBS-262's defect-specific focused native RED/GREEN test observes real WinForms focus after pointer input, subsequent keyboard reorder and draft ownership; the row-paint test observes the actual custom OnPaint output in an isolated bitmap, not a screen-capture substitute for LBS-247 F04. Retain LBS-178, LBS-179, LBS-197, LBS-229, LBS-247, alias, drag, refresh, language and DPI suites. Hosted WinForms qualification does not imply physical owner acceptance or screen-reader certification.

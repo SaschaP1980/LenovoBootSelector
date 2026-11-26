@@ -176,6 +176,7 @@ jobs:
               tooltipCoverage = Get-TestTotal $logText '^LBS244 COVERAGE TOTAL\s+(\d+)/(\d+)\s*$'
               tooltipAction = Get-TestTotal $logText '^LBS244 ACTION TOTAL\s+(\d+)/(\d+)\s*$'
               settingsPolish = Get-TestTotal $logText '^LBS247 SETTINGS TOTAL\s+(\d+)/(\d+)\s*$'
+              ownerDismiss = Get-TestTotal $logText '^LBS267 OWNER DISMISS TOTAL\s+(\d+)/(\d+)\s*$'
               portablePreferencesCore = Get-TestTotal $logText '^LBS180 CORE TOTAL\s+(\d+)/(\d+)\s*$'
               portablePreferencesTransaction = Get-TestTotal $logText '^LBS180 TRANSACTION TOTAL\s+(\d+)/(\d+)\s*$'
               portablePreferencesUi = Get-TestTotal $logText '^LBS180 UI TOTAL\s+(\d+)/(\d+)\s*$'
@@ -223,6 +224,7 @@ jobs:
               'tooltipCoverage',
               'tooltipAction',
               'settingsPolish',
+              'ownerDismiss',
               'portablePreferencesCore',
               'portablePreferencesTransaction',
               'portablePreferencesUi',
@@ -276,6 +278,7 @@ jobs:
               $totals.tooltipCoverage.passed +
               $totals.tooltipAction.passed +
               $totals.settingsPolish.passed +
+              $totals.ownerDismiss.passed +
               $totals.portablePreferencesCore.passed +
               $totals.portablePreferencesTransaction.passed +
               $totals.portablePreferencesUi.passed +
@@ -320,6 +323,7 @@ jobs:
               $totals.tooltipCoverage.expected +
               $totals.tooltipAction.expected +
               $totals.settingsPolish.expected +
+              $totals.ownerDismiss.expected +
               $totals.portablePreferencesCore.expected +
               $totals.portablePreferencesTransaction.expected +
               $totals.portablePreferencesUi.expected +
