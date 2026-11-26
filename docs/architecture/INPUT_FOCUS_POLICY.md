@@ -18,6 +18,8 @@ The application distinguishes actual native focus (which control receives keyboa
 
 A page is the number of complete row-sized wheel units that fit the current viewport: max(1, floor(LargeChange / SmallChange)). The size adapts to DPI and viewport; it is not a fixed hard-coded number. Page Up/Down move the logical focus by that count and scroll/reveal the target without touching the draft. Ctrl+Page Up/Down and Ctrl+Home/End use one existing Move-ManageEntry call and one Undo checkpoint per actual completed move. Boundaries clamp; reorder no-ops do not add history. Save and Cancel retain their existing meanings.
 
+Explicit Customize entry gives the initial eligible row native focus after reconciliation. Pointer activation hides the initial custom cue; keyboard activation shows it. An empty list has no row target; refresh does not repeat entry focus transfer.
+
 The Manage list is one Tab zone when the inline editor is closed. A roving native TabStop identifies the latest row while all selectable rows remain focusable by arrow/page/explicit focus navigation. Forward Tab from a row targets Undo when enabled, otherwise the next enabled action. Reverse native traversal re-enters the anchor. Native editor child traversal is not globally intercepted. A replaced/removed row restores the surviving GUID or bounded fallback only when focus belonged to that list; background refresh must not steal focus from the action area. No second reorder path or independent icon Tab system is added (LBS-183 remains separate).
 
 ## Validation boundaries

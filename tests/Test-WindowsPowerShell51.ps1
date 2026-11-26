@@ -213,6 +213,11 @@ $manageMixedFocusProbe = Join-Path $root 'tests\Test-LBS262-MixedFocus.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $manageMixedFocusProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-262 mixed input focus regression failed' }
 
+# LBS-262 hotfix: real primary-list focus on explicit Customize entry.
+$manageEntryFocusProbe = Join-Path $root 'tests\Test-LBS262-EntryFocus.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $manageEntryFocusProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-262 initial entry focus regression failed' }
+
 # LBS-167: isolate real WinForms refresh/drag row identity and diagnostics.
 $refreshRowsProbe = Join-Path $root 'tests\Test-LBS167-RefreshRendering.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $refreshRowsProbe

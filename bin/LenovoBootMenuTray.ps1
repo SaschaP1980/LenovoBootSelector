@@ -2803,6 +2803,17 @@ public static class LenovoSettingsInk
 public sealed class LenovoCustomizeButton : Button
 {
     private bool hovering, mousePressed, keyPressed;
+    public bool PointerActivation { get; private set; }
+
+    // Scope provenance to the native mouse-up dispatch, not hover or a stale press.
+    // Keyboard/PerformClick activation retains the ordinary keyboard cue.
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg != 0x0202) { base.WndProc(ref m); return; } // WM_LBUTTONUP
+        PointerActivation = true;
+        try { base.WndProc(ref m); }
+        finally { PointerActivation = false; }
+    }
 
     public LenovoCustomizeButton()
     {
@@ -3311,7 +3322,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.9.0.0'
+$script:AppVersion = '1.9.0.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -7230,6 +7241,7 @@ function Update-ManageEntriesUiState {
 }
 
 function Start-ManageEntriesMode {
+    param([switch]$PointerActivation)
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     if (-not $capabilities.CanManageEntries) { return }
     if ($script:IsManageEntriesMode) { return }
@@ -7250,6 +7262,14 @@ function Start-ManageEntriesMode {
     Update-ManageEntriesUiState
     Update-PopupRows -Reason 'manage-enter'
     Update-ManageSaveButtonState
+    # Only explicit mode entry acquires the primary list focus. Ordinary
+    # reconciliation remains responsible for preserving the current owner.
+    if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) {
+        $anchor = $script:Popup.Controls.Find('BootRow',$true) | Where-Object {
+            $_.TabStop -and $_.CanFocus -and $_.PSObject.Properties['ManageKeyboardMode'] -and $_.ManageKeyboardMode
+        } | Sort-Object Top | Select-Object -First 1
+        if ($anchor) { Restore-ManageRowFocus -Guid ([string]$anchor.Tag) -KeyboardCue:(-not $PointerActivation.IsPresent) }
+    }
 }
 
 function Stop-ManageEntriesMode {
@@ -15534,7 +15554,7 @@ function Add-PopupHeaderSection {
     $manageButton.Location = New-Object Drawing.Point(268, 1)
     $manageButton.Size = New-Object Drawing.Size(104, 25)
     $manageButton.Cursor = [System.Windows.Forms.Cursors]::Hand
-    $manageButton.Add_Click({ Start-ManageEntriesMode })
+    $manageButton.Add_Click({ param($sender,$eventArgs) Start-ManageEntriesMode -PointerActivation:([bool]$sender.PointerActivation) })
     $script:ManageEntriesButton = $manageButton
     $section.Controls.Add($manageButton)
     $Root.Controls.Add($section)
