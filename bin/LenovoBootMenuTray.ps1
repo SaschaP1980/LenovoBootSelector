@@ -3486,7 +3486,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.10.1.0'
+$script:AppVersion = '1.10.1.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -17970,7 +17970,7 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
             connector = new LenovoAuxiliaryConnector();
             connector.TopMost = child.TopMost;
         }
-        connector.SetGeometry(bridge, fill);
+        connector.SetGeometry(bridge, headerTrigger && !SystemInformation.HighContrast ? accent : fill);
         if (!connector.Visible)
         {
             connector.Owner = child;

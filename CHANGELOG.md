@@ -1,5 +1,9 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.10.1.1 - System Status connector accent (LBS-182)
+
+- Use the existing Lenovo red accent for the normal-theme System Status connector fill to match the active Info icon. Preserve geometry, outline, opacity, High Contrast and all other popup behavior.
+
 ## v1.10.1.0 – System Status visual refinement (LBS-182)
 
 - Align the status side popup with the main header and restore the native connector and undimmed red Info glyph throughout the modal lifetime.
