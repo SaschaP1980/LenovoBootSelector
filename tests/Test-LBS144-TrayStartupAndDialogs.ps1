@@ -92,19 +92,26 @@ Assert-Lbs144Startup 'Fatal-recovery dialog retains separate AutoScaleMode DPI p
 $recoveryAction = New-Object Windows.Forms.Button
 try {
     $recoveryAction.ForeColor = [Drawing.Color]::White
+    $recoveryAction.BackColor = [Drawing.Color]::FromArgb(45,45,45)
+    $recoveryAction.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $recoveryAction.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(86,86,86)
+    $idleBorder=$recoveryAction.FlatAppearance.BorderColor
+    $idleSurface=$recoveryAction.FlatAppearance.MouseOverBackColor
     Connect-StartupRecoveryActionHover -Button $recoveryAction
     $flags = [Reflection.BindingFlags]'Instance,NonPublic'
     $enter = [Windows.Forms.Control].GetMethod('OnMouseEnter',$flags)
     $leave = [Windows.Forms.Control].GetMethod('OnMouseLeave',$flags)
-    $expectedHover = if ([Windows.Forms.SystemInformation]::HighContrast) { [Drawing.Color]::White } else { [Drawing.Color]::FromArgb(255,110,102) }
+    $hc=[Windows.Forms.SystemInformation]::HighContrast
+    $expectedHover = if ($hc) { $idleBorder } else { [Drawing.Color]::FromArgb(255,110,102) }
+    $expectedSurface=if ($hc) { $idleSurface } else { [Drawing.Color]::FromArgb(70,53,52) }
     [void]$enter.Invoke($recoveryAction,@([EventArgs]::Empty))
-    Assert-Lbs144Startup 'Recovery action uses approved hover or system High Contrast' ($recoveryAction.ForeColor -eq $expectedHover)
+    Assert-Lbs144Startup 'Recovery action uses approved frame and tint or system High Contrast' ($recoveryAction.ForeColor -eq [Drawing.Color]::White -and $recoveryAction.FlatAppearance.BorderColor -eq $expectedHover -and $recoveryAction.FlatAppearance.MouseOverBackColor -eq $expectedSurface)
     [void]$leave.Invoke($recoveryAction,@([EventArgs]::Empty))
-    Assert-Lbs144Startup 'Recovery action restores idle ink after pointer exit' ($recoveryAction.ForeColor -eq [Drawing.Color]::White)
+    Assert-Lbs144Startup 'Recovery action restores idle style after pointer exit' ($recoveryAction.ForeColor -eq [Drawing.Color]::White -and $recoveryAction.FlatAppearance.BorderColor -eq $idleBorder -and $recoveryAction.FlatAppearance.MouseOverBackColor -eq $idleSurface)
     [void]$enter.Invoke($recoveryAction,@([EventArgs]::Empty))
     $recoveryAction.Enabled = $false
     [void]$enter.Invoke($recoveryAction,@([EventArgs]::Empty))
-    Assert-Lbs144Startup 'Disabled recovery action cannot acquire hover ink' ($recoveryAction.ForeColor -eq [Drawing.Color]::White)
+    Assert-Lbs144Startup 'Disabled recovery action cannot acquire hover style' ($recoveryAction.ForeColor -eq [Drawing.Color]::White -and $recoveryAction.FlatAppearance.BorderColor -eq $idleBorder -and $recoveryAction.FlatAppearance.MouseOverBackColor -eq $idleSurface)
 } finally { $recoveryAction.Dispose() }
 $large = Get-LenovoDialogScaledSize -DesignSize ([Drawing.Size]::new(500,330)) -Scale 2.5
 Assert-Lbs144Startup 'Removal system dialog supports 1250x825 physical design' ($large.Width -eq 1250 -and $large.Height -eq 825)

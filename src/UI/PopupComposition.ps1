@@ -59,6 +59,16 @@ function Add-PopupHeaderSection {
         $script:HeaderStatusHovered = $false
         Update-HeaderStatusInteractionVisual
     })
+    $headerSub.Add_Paint({
+        param($sender,$eventArgs)
+        if ($sender.Enabled -and $script:HeaderUpdateInteractionEnabled -and $script:HeaderStatusHovered -and -not $script:HeaderStatusKeyPressed -and ([Windows.Forms.Control]::MouseButtons -band [Windows.Forms.MouseButtons]::Left) -eq 0) {
+            [LenovoInteractionPalette]::DrawInlineUnderline($eventArgs.Graphics,$sender.ClientRectangle,$sender.Text,$sender.Font,$true)
+        }
+    })
+    $headerSub.Add_KeyDown({ param($sender,$eventArgs) if ($eventArgs.KeyCode -eq [Windows.Forms.Keys]::Space) { $script:HeaderStatusKeyPressed=$true; $sender.Invalidate() } })
+    $headerSub.Add_KeyUp({ param($sender,$eventArgs) if ($eventArgs.KeyCode -eq [Windows.Forms.Keys]::Space) { $script:HeaderStatusKeyPressed=$false; $sender.Invalidate() } })
+    $headerSub.Add_LostFocus({ $script:HeaderStatusKeyPressed=$false; $this.Invalidate() })
+    $script:HeaderStatusKeyPressed=$false
     $headerSub.Add_Enter({ Update-HeaderStatusInteractionVisual })
     $headerSub.Add_Leave({ Update-HeaderStatusInteractionVisual })
     $headerSub.Add_Click({
@@ -163,7 +173,7 @@ function Add-PopupHeaderSection {
     $manageButton.BackColor = $script:ColorBackground
     $manageButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $manageButton.FlatAppearance.BorderSize = 0
-    $manageButton.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(38, 38, 38)
+    $manageButton.FlatAppearance.MouseOverBackColor = $manageButton.BackColor
     $manageButton.FlatAppearance.MouseDownBackColor = $script:ColorSelectedRow
     $manageButton.Location = New-Object Drawing.Point(268, 1)
     $manageButton.Size = New-Object Drawing.Size(104, 25)
@@ -252,7 +262,12 @@ function Set-PopupNavigationRowHover {
     if (-not $row -or $row.IsDisposed) { return }
     $inside = $Hover -or ($row.Visible -and $row.RectangleToScreen($row.ClientRectangle).Contains([Windows.Forms.Cursor]::Position))
     $hot=$inside -and (Test-PopupNavigationRowInteractive -Row $row)
-    $row.BackColor = if ($hot) { Get-PopupNavigationHoverColor } else { $script:ColorSurface }
+    # Pointer hover is not the active modal owner highlight; retain the
+    # latter's existing Get-PopupNavigationHoverColor contract.
+    $row.BackColor = if ($hot) {
+        if ([Windows.Forms.SystemInformation]::HighContrast) { Get-PopupNavigationHoverColor }
+        else { [LenovoInteractionPalette]::Tint($script:ColorSurface) }
+    } else { $script:ColorSurface }
     $label=if ($row.Name -eq 'DefaultPanel') { $row.Controls['DefaultTargetNameLabel'] } else { $row.Controls['MoreSettingsButton'] }
     if ($label) {
         $idle = if ($row.Name -eq 'DefaultPanel' -and -not $script:DefaultInteractionEnabled) { [Drawing.Color]::FromArgb(146,146,146) } else { $script:ColorPrimary }
@@ -635,7 +650,7 @@ function New-AuxiliaryPopupForm {
     $tip.SetToolTip($subtitleLabel,$Subtitle)
     $header.Controls.Add($titleLabel)
     $header.Controls.Add($subtitleLabel)
-    $close = New-Object Windows.Forms.Button
+    $close = New-Object LenovoHoverGlyphButton
     $close.Name = 'AuxiliaryClose'
     $close.Text = '×'
     $close.AccessibleName = Get-LocalizedString -Key 'Common.Close'
@@ -867,7 +882,7 @@ function Add-ConfigurationActionButton {
     $button.SubtitleFont = $Form.Tag.Regular
     $button.ForeColor = $script:ColorPrimary
     $button.BackColor = [Drawing.Color]::FromArgb(37,37,37)
-    $button.HoverSurface = $script:ColorHover
+    $button.HoverSurface = [LenovoInteractionPalette]::Tint($button.BackColor)
     $button.SelectedSurface = $script:ColorSelectedRow
     $button.AccentColor = $script:ColorAccent
     $button.FlatStyle = [Windows.Forms.FlatStyle]::Flat
@@ -941,7 +956,7 @@ function New-ConfigurationPopup {
     $autostartLabel.SubtitleFont = $form.Tag.Regular
     $autostartLabel.ForeColor = $script:ColorPrimary
     $autostartLabel.BackColor = $groupSurface
-    $autostartLabel.HoverSurface = $script:ColorHover
+    $autostartLabel.HoverSurface = [LenovoInteractionPalette]::Tint($groupSurface)
     $autostartLabel.Location = [Drawing.Point]::new(16,32)
     $autostartLabel.Size = [Drawing.Size]::new(286,52)
     $autostartLabel.Cursor = [Windows.Forms.Cursors]::Hand
@@ -960,7 +975,7 @@ function New-ConfigurationPopup {
     $check.AccessibleName = $autostartLabel.Text
     $check.Font = $form.Tag.Regular
     $check.BackColor = $groupSurface
-    $check.HoverSurface = $script:ColorHover
+    $check.HoverSurface = $autostartLabel.HoverSurface
     $check.AccentColor = $script:ColorAccent
     $check.Location = [Drawing.Point]::new(302,32)
     $check.Size = [Drawing.Size]::new(64,52)

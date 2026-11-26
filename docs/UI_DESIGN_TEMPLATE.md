@@ -24,7 +24,7 @@ This document records the approved **target design**, not an assertion that the 
 
 No runtime, build, release or dependency change is implied by this documentation.
 
-## LBS-270 rollout inventory (implementation checkpoint; qualification pending)
+## LBS-270 rollout inventory (v1.10.2.0 historical implementation)
 
 Normal-theme hover uses `#FF6E66` in action ink, or a contrasting edge when preserving an existing filled button is necessary. `#E1251B` stays the active-operation/relationship accent; checked and selected indicators keep their own meaning.
 
@@ -49,3 +49,20 @@ Normal-theme hover uses `#FF6E66` in action ink, or a contrasting edge when pres
 | High Contrast | Existing Windows system colors/contrast policy | Exception: suppress new pale-red custom hover overlay and preserve existing system-controlled branches. |
 
 This inventory describes source migration decisions, not a completed native acceptance record. Verify DE/EN, 96/240 DPI, native pointer/keyboard, disabled/selected/pressed/active, High Contrast and all three connectors in the final frozen revision; owner-native visual acceptance is recorded separately.
+
+## Owner-approved corrective Soft Accent Hover (v1.10.2.1)
+
+The owner observed that the shared lower edge in v1.10.2.0 is awkward on neutral framed buttons and barely visible on red confirmation buttons. The approved visual concept differentiates control roles without changing action admission or semantic state. All values below are normal-theme presentation tokens; no OS-owned High Contrast override.
+
+| Role | Normal / hover contract |
+| --- | --- |
+| Neutral framed action | Configured idle fill/ink; hover surface blends 12% #FF6E66 into idle fill, full 1-design-pixel pale-red frame; no lone bottom edge. |
+| Filled primary action | Existing #E1251B; hover #E12920 and full #FF6E66 frame, retain configured white/off-white ink. The proposed #F03A30 was rejected for small white-text contrast; #E12920 retains >=4.5:1 for #FCFCFC. |
+| Inline action/link | Idle ink, pale-red pointer ink and 2-design-pixel text-width underline, no framed button. Applies to alias Apply/Cancel, Customize and available-update header link. |
+| Row / menu / navigation | 12% hover tint and pale-red action title; existing selection, pending, hidden and keyboard focus remain distinct. No added row stripe because existing selection markers already own that position. Tray keyboard-selected background and active modal navigation highlight remain unchanged. |
+| Icon | Pale-red pointer glyph plus 31/255-alpha circular halo within existing hit target; no halo for disabled, active-operation/modal relationship, drag or keyboard-only cue. |
+| Segmented selection | Unselected hover tint and frame; selected fill and existing selection border remain, inner hover frame distinct. |
+| Switch | Existing on/off fill and pale-red track contour; shared label/toggle tint, separate focus perimeter. |
+| Startup recovery | Native framed tint with independent fallback tokens, even if embedded WinForms types cannot initialize. |
+
+Pressed states, actual focus cues, action guards, status dots, existing active side-popup connectors (#E1251B), native ownership and all product safety boundaries are retained. The corrected visual contract requires native qualification and physical owner acceptance before Issue closure.

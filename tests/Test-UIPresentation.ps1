@@ -107,9 +107,11 @@ $script:BootNextPendingGuid = $guid
 Set-RowHoverState -Control $normal.Row -Hover $true
 Assert-Equal $script:ColorPrimary.ToArgb() $normalTitle[0].ForeColor.ToArgb() 'LBS270 pending selection keeps idle title ink'
 $script:BootNextPendingGuid = $null
+$script:SelectedGuid = $null
 Set-RowHoverState -Control $normal.Row -Hover $true
 $expectedHover=if ([Windows.Forms.SystemInformation]::HighContrast) { $script:ColorPrimary } else { [Drawing.Color]::FromArgb(255,110,102) }
-Assert-Equal $expectedHover.ToArgb() $normalTitle[0].ForeColor.ToArgb() 'LBS270 ready normal row paints approved hover independently of selection'
+$expectedRowHover=if ([Windows.Forms.SystemInformation]::HighContrast) { $script:ColorHover } else { [Drawing.Color]::FromArgb(58,40,40) }
+Assert-True ($normalTitle[0].ForeColor.ToArgb() -eq $expectedHover.ToArgb() -and $normal.Row.BackColor.ToArgb() -eq $expectedRowHover.ToArgb() -and $normal.Row.BackColor -ne $script:ColorSelectedRow) 'LBS270 ready normal row paints distinct tinted hover independently of selection'
 $script:SystemStatusCapabilities = $null
 
 $script:IsManageEntriesMode = $true
@@ -126,7 +128,8 @@ Assert-Equal 'hidden' ([string]$visibility[0].AccessibleName) 'UI hidden manage 
 $aliasEdit = @($hidden.Row.Controls | Where-Object { $_.Name -eq 'AliasEditButton' })
 Assert-Equal 1 $aliasEdit.Count 'UI manage row keeps alias-edit action'
 Set-RowHoverState -Control $hidden.Row -Hover $true
-Assert-Equal ([Drawing.Color]::FromArgb(37,37,37).ToArgb()) $hidden.Row.BackColor.ToArgb() 'UI hidden row hover keeps hidden hover surface'
+$expectedHiddenHover=if ([Windows.Forms.SystemInformation]::HighContrast) { [Drawing.Color]::FromArgb(37,37,37) } else { [Drawing.Color]::FromArgb(54,37,36) }
+Assert-Equal $expectedHiddenHover.ToArgb() $hidden.Row.BackColor.ToArgb() 'UI hidden row hover keeps distinct hidden hover surface'
 Set-RowHoverState -Control $hidden.Row -Hover $false
 Assert-Equal ([Drawing.Color]::FromArgb(27,27,27).ToArgb()) $hidden.Row.BackColor.ToArgb() 'UI hidden row mouse-leave restores hidden surface'
 

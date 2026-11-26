@@ -217,31 +217,159 @@ public static class LenovoInteractionPalette
     public static readonly Color Normal = Color.FromArgb(184,184,184);
     public static readonly Color Disabled = Color.FromArgb(119,119,119);
     public static readonly Color Active = Color.FromArgb(225,37,27);
-    // Keep contrast-safe existing surfaces; overlay a precise hover accent.
-    public static void DrawHoverEdge(Graphics g, Rectangle bounds)
+    // The full-frame and inline treatments share a single hover token.
+    // Keep both pure white and the configured #FCFCFC text at >= 4.5:1.
+    public static readonly Color PrimaryHover = Color.FromArgb(225,41,32);
+    public static Color Tint(Color surface)
     {
-        if (SystemInformation.HighContrast || bounds.Width < 4 || bounds.Height < 4) return;
+        return Color.FromArgb((int)Math.Round(surface.R*0.88+Hover.R*0.12),
+            (int)Math.Round(surface.G*0.88+Hover.G*0.12),
+            (int)Math.Round(surface.B*0.88+Hover.B*0.12));
+    }
+    public static Color ButtonHoverSurface(Color surface)
+    {
+        return surface.ToArgb() == Active.ToArgb() ? PrimaryHover : Tint(surface);
+    }
+    public static void DrawHoverFrame(Graphics g, Rectangle bounds, int inset)
+    {
+        if (SystemInformation.HighContrast) return;
         int line = Math.Max(1,(int)Math.Round(g.DpiX / 96f));
-        using (Brush brush = new SolidBrush(Hover))
-            g.FillRectangle(brush,bounds.Left+line,bounds.Bottom-2*line,
-                Math.Max(1,bounds.Width-2*line),line);
+        bounds.Inflate(-inset*line,-inset*line);
+        if (bounds.Width < 2*line || bounds.Height < 2*line) return;
+        using (Brush brush = new SolidBrush(Hover)) {
+            g.FillRectangle(brush,bounds.Left,bounds.Top,bounds.Width,line);
+            g.FillRectangle(brush,bounds.Left,bounds.Bottom-line,bounds.Width,line);
+            g.FillRectangle(brush,bounds.Left,bounds.Top+line,line,bounds.Height-2*line);
+            g.FillRectangle(brush,bounds.Right-line,bounds.Top+line,line,bounds.Height-2*line);
+        }
+    }
+    public static void DrawInlineUnderline(Graphics g, Rectangle bounds, string text, Font font)
+    { DrawInlineUnderline(g,bounds,text,font,false); }
+    public static void DrawInlineUnderline(Graphics g, Rectangle bounds, string text, Font font, bool leftAligned)
+    {
+        if (SystemInformation.HighContrast || bounds.Width < 6 || bounds.Height < 6) return;
+        int px=Math.Max(1,(int)Math.Round(g.DpiX / 96f));
+        int width=Math.Min(bounds.Width-4*px,TextRenderer.MeasureText(g,text,font,
+            new Size(bounds.Width,bounds.Height),TextFormatFlags.SingleLine|TextFormatFlags.NoPadding).Width);
+        if (width <= 0) return;
+        using (Brush brush=new SolidBrush(Hover))
+            g.FillRectangle(brush,leftAligned ? bounds.Left+2*px : bounds.Left+(bounds.Width-width)/2,bounds.Bottom-3*px,width,2*px);
+    }
+    public static void DrawIconHalo(Graphics g, Rectangle bounds)
+    {
+        if (SystemInformation.HighContrast) return;
+        int side=Math.Min(bounds.Width,bounds.Height);
+        int inset=Math.Max(2,side/10);
+        side-=2*inset;
+        if (side <= 0) return;
+        var state=g.Save();
+        try {
+            g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using (Brush brush=new SolidBrush(Color.FromArgb(31,Hover)))
+                g.FillEllipse(brush,bounds.Left+(bounds.Width-side)/2,bounds.Top+(bounds.Height-side)/2,side,side);
+        } finally { g.Restore(state); }
     }
 }
 
-// Keep the native Button input and focus renderer; only supplement hover ink.
+// Native Button retains input, accessibility, DialogResult, default and focus
+// painting. Only pointer-owned appearance is changed and restored on exit.
 public sealed class LenovoActionButton : Button
 {
-    private bool hovered;
-    protected override void OnMouseEnter(EventArgs e) { hovered=Enabled; base.OnMouseEnter(e); Invalidate(); }
-    protected override void OnMouseLeave(EventArgs e) { hovered=false; base.OnMouseLeave(e); Invalidate(); }
+    public bool InlineAction { get; set; }
+    public bool PreserveSelection { get; set; }
+    private bool hovered, styled, keyPressed, mousePressed;
+    private Color oldSurface, oldInk;
+    private void ApplyPointerStyle()
+    {
+        bool hot=Enabled && hovered && !SystemInformation.HighContrast;
+        if (hot) {
+            if (!styled) {
+                oldSurface=FlatAppearance.MouseOverBackColor;
+                oldInk=ForeColor;
+                styled=true;
+            }
+            FlatAppearance.MouseOverBackColor=InlineAction ? BackColor :
+                PreserveSelection ? BackColor : LenovoInteractionPalette.ButtonHoverSurface(BackColor);
+            if (InlineAction) ForeColor=LenovoInteractionPalette.Hover;
+        } else if (styled) {
+            styled=false;
+            FlatAppearance.MouseOverBackColor=oldSurface;
+            if (InlineAction) ForeColor=oldInk;
+        }
+    }
+    protected override void OnMouseEnter(EventArgs e) {
+        hovered=Enabled; ApplyPointerStyle(); base.OnMouseEnter(e); Invalidate();
+    }
+    protected override void OnMouseLeave(EventArgs e) {
+        hovered=false; ApplyPointerStyle(); base.OnMouseLeave(e); Invalidate();
+    }
     protected override void OnEnabledChanged(EventArgs e) {
+        mousePressed=keyPressed=false;
         hovered=Enabled && IsHandleCreated && Visible && ClientRectangle.Contains(PointToClient(Cursor.Position));
-        base.OnEnabledChanged(e); Invalidate();
+        ApplyPointerStyle(); base.OnEnabledChanged(e); Invalidate();
+    }
+    protected override void OnBackColorChanged(EventArgs e) {
+        base.OnBackColorChanged(e);
+        if (hovered) ApplyPointerStyle();
+    }
+    protected override void OnSystemColorsChanged(EventArgs e) {
+        base.OnSystemColorsChanged(e); ApplyPointerStyle(); Invalidate();
+    }
+    protected override void OnVisibleChanged(EventArgs e) {
+        if (!Visible) { hovered=false; mousePressed=keyPressed=false; ApplyPointerStyle(); }
+        base.OnVisibleChanged(e);
+    }
+    protected override void OnMouseDown(MouseEventArgs e) {
+        mousePressed=e.Button==MouseButtons.Left; base.OnMouseDown(e); Invalidate();
+    }
+    protected override void OnMouseUp(MouseEventArgs e) {
+        mousePressed=false; base.OnMouseUp(e); Invalidate();
+    }
+    protected override void OnMouseCaptureChanged(EventArgs e) {
+        mousePressed=false; base.OnMouseCaptureChanged(e); Invalidate();
+    }
+    protected override void OnKeyDown(KeyEventArgs e) {
+        if (e.KeyCode==Keys.Space) keyPressed=true; base.OnKeyDown(e); Invalidate();
+    }
+    protected override void OnKeyUp(KeyEventArgs e) {
+        if (e.KeyCode==Keys.Space) keyPressed=false; base.OnKeyUp(e); Invalidate();
+    }
+    protected override void OnLostFocus(EventArgs e) {
+        keyPressed=false; base.OnLostFocus(e); Invalidate();
     }
     protected override void OnPaint(PaintEventArgs e) {
         base.OnPaint(e);
-        if (Enabled && hovered && !SystemInformation.HighContrast && (Control.MouseButtons & System.Windows.Forms.MouseButtons.Left) == 0)
-            LenovoInteractionPalette.DrawHoverEdge(e.Graphics,ClientRectangle);
+        if (!Enabled || !hovered || SystemInformation.HighContrast || keyPressed || mousePressed ||
+            (Control.MouseButtons & System.Windows.Forms.MouseButtons.Left) != 0) return;
+        if (InlineAction) LenovoInteractionPalette.DrawInlineUnderline(e.Graphics,ClientRectangle,Text,Font);
+        else LenovoInteractionPalette.DrawHoverFrame(e.Graphics,ClientRectangle,PreserveSelection ? 1 : 0);
+    }
+}
+
+// Native glyph controls retain their original hit area, focus and dispatch.
+// Hover is inferred only from the established pointer-owned hover ink.
+public sealed class LenovoHoverGlyphLabel : Label
+{
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        base.OnPaintBackground(e);
+        if (Enabled && ForeColor.ToArgb()==LenovoInteractionPalette.Hover.ToArgb() &&
+            (Control.MouseButtons & System.Windows.Forms.MouseButtons.Left)==0)
+            LenovoInteractionPalette.DrawIconHalo(e.Graphics,ClientRectangle);
+    }
+}
+public sealed class LenovoHoverGlyphButton : Button
+{
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        if (!Enabled || SystemInformation.HighContrast || ForeColor.ToArgb()!=LenovoInteractionPalette.Hover.ToArgb() ||
+            (Control.MouseButtons & System.Windows.Forms.MouseButtons.Left)!=0) return;
+        // The circular cue is inside the native focus perimeter.
+        LenovoInteractionPalette.DrawIconHalo(e.Graphics,ClientRectangle);
+        TextRenderer.DrawText(e.Graphics,Text,Font,ClientRectangle,ForeColor,
+            TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|
+            TextFormatFlags.SingleLine|TextFormatFlags.NoPrefix|TextFormatFlags.PreserveGraphicsClipping);
     }
 }
 
@@ -352,7 +480,10 @@ public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
             int bottom = Math.Min(dropDown.ClientRectangle.Bottom, hotItem.Bounds.Bottom);
             if (right > left && bottom > top)
             {
-                using (Brush selectionBrush = new SolidBrush(selected))
+                bool pointerHot = !SystemInformation.HighContrast && !hotItem.Pressed &&
+                    Object.ReferenceEquals(LenovoMenuLayout.HitTestRow(dropDown,dropDown.PointToClient(Control.MousePosition)),hotItem);
+                Color rowSurface = pointerHot ? LenovoInteractionPalette.Tint(submenu ? submenuBg : rootBg) : selected;
+                using (Brush selectionBrush = new SolidBrush(rowSurface))
                     e.Graphics.FillRectangle(selectionBrush, new Rectangle(left, top, right - left, bottom - top));
             }
         }
@@ -1004,6 +1135,9 @@ public sealed class LenovoHeaderIconButton : Button
             using (SolidBrush surface = new SolidBrush(SystemColors.Control))
                 if (center.Width > 0 && center.Height > 0) e.Graphics.FillRectangle(surface,center);
         }
+        if (Enabled && !active && ForeColor.ToArgb()==LenovoInteractionPalette.Hover.ToArgb() &&
+            (Control.MouseButtons & System.Windows.Forms.MouseButtons.Left)==0)
+            LenovoInteractionPalette.DrawIconHalo(e.Graphics,ClientRectangle);
         float size = Math.Min(ClientSize.Width,ClientSize.Height) * 0.60f;
         if (size <= 0) return;
         GraphicsState saved = e.Graphics.Save();
@@ -1093,6 +1227,8 @@ public sealed class LenovoCustomizeButton : Button
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
             TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix |
             TextFormatFlags.PreserveGraphicsClipping);
+        if (Enabled && hovering && !pressed && !SystemInformation.HighContrast)
+            LenovoInteractionPalette.DrawInlineUnderline(e.Graphics,ClientRectangle,Text,Font);
         if (Enabled && Focused && ShowFocusCues) {
             Rectangle focus = ClientRectangle;
             focus.Inflate(-3,-3);
@@ -1171,6 +1307,8 @@ public sealed class LenovoSettingsActionButton : Button
                 TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
             using (Pen border = new Pen(hc ? SystemColors.ControlText : LanguageSelected ? AccentColor : Color.FromArgb(68,68,68),px))
                 g.DrawRectangle(border,px/2,px/2,Math.Max(0,Width-px-1),Math.Max(0,Height-px-1));
+            if (!hc && Enabled && hovering && !pressed)
+                LenovoInteractionPalette.DrawHoverFrame(g,ClientRectangle,LanguageSelected ? 1 : 0);
         } else {
             int side = LenovoSettingsInk.Px(dpi,22);
             LenovoSettingsInk.DrawIcon(g,ActionIcon,new Rectangle(LenovoSettingsInk.Px(dpi,11),(Height-side)/2,side,side),
