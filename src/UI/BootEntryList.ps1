@@ -310,6 +310,7 @@ function Invoke-PopupRowsReconciliation {
     $focusedManageGuid = if ($focusedManageRow) { [string]$focusedManageRow.Tag } else { '' }
     $focusedManageIndex = if ($focusedManageRow) { [int]$focusedManageRow.TabIndex } else { -1 }
     $manageCue = if ($focusedManageRow -and $focusedManageRow.PSObject.Properties['KeyboardCueEnabled']) { [bool]$focusedManageRow.KeyboardCueEnabled } else { $true }
+    $manageEditCue = [bool]($focusedManageRow -and $focusedManageRow.PSObject.Properties['ManageEditCueActive'] -and $focusedManageRow.ManageEditCueActive -and -not $activeDrag -and -not $script:ManageAliasEditGuid)
     if ($activeDrag) { Reset-ManageDragPreview }
     $previousSignatures = $script:PopupRowsRowSignatures
     $canReconcile = [object]::ReferenceEquals($script:PopupRowsContentPanel, $contentPanel) -and
@@ -403,7 +404,7 @@ function Invoke-PopupRowsReconciliation {
         if (-not $anchor -and $manageRows.Count -gt 0) { $anchor = $manageRows[[Math]::Min($manageAnchorIndex,$manageRows.Count-1)] }
         if ($anchor) { $anchor.SetManageTabAnchor() }
         if ($focusedManageGuid -and -not $script:ManageAliasEditGuid) {
-            Restore-ManageRowFocus -Guid $focusedManageGuid -FallbackIndex $focusedManageIndex -KeyboardCue:$manageCue
+            Restore-ManageRowFocus -Guid $focusedManageGuid -FallbackIndex $focusedManageIndex -KeyboardCue:$manageCue -EditCue:$manageEditCue
         }
     }
     return [int]$affected

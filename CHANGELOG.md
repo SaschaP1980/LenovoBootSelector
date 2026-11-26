@@ -1,5 +1,9 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.9.1.0 – Contextual Ctrl editing cues (LBS-265)
+
+- While Ctrl is held in Customize, highlight the focused row's grip strokes and alias pencil with their existing hover ink and integrate available move directions into the focus outline. Clear the temporary cues on release, focus loss or editor/drag transitions; preserve the existing draft, Undo and keyboard actions.
+
 ## v1.9.0.1 – Initial Customize focus (LBS-262)
 
 - Focus the primary entry list immediately when Customize is opened. Keep the row cue hidden on pointer activation and visible on keyboard activation; no initial Tab press is required.
