@@ -1,5 +1,9 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.9.2.0 – Side-popup owner click dismissal (LBS-267)
+
+- Clicking the main surface while Further Settings or Default Startup Target is open cancels the side popup without dispatching the underlying action. The full click is consumed; modal ownership, the existing visual treatment and keyboard close paths remain intact.
+
 ## v1.9.1.0 – Contextual Ctrl editing cues (LBS-265)
 
 - While Ctrl is held in Customize, highlight the focused row's grip strokes and alias pencil with their existing hover ink and integrate available move directions into the focus outline. Clear the temporary cues on release, focus loss or editor/drag transitions; preserve the existing draft, Undo and keyboard actions.

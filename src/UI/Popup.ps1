@@ -402,6 +402,114 @@ public sealed class LenovoAuxiliaryConnector : Form
     }
 }
 
+// Separate input-only owner surface. Nonzero layered alpha is required for
+// native hit testing; one alpha unit is visually negligible. The original
+// scrim, its highlighted-row hole, and connector remain visual-only.
+public sealed class LenovoAuxiliaryOwnerClickShield : Form
+{
+    private readonly Form parent;
+    private readonly Form child;
+    private bool armed;
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool IsWindowEnabled(IntPtr hwnd);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+
+    public LenovoAuxiliaryOwnerClickShield(Form owner, Form surface)
+    {
+        parent = owner;
+        child = surface;
+        Name = "AuxiliaryOwnerClickShield";
+        AutoScaleMode = AutoScaleMode.None;
+        FormBorderStyle = FormBorderStyle.None;
+        ShowInTaskbar = false;
+        StartPosition = FormStartPosition.Manual;
+        BackColor = Color.Black;
+        Opacity = 1.0 / 255.0;
+        TopMost = surface.TopMost;
+        TabStop = false;
+        SetStyle(ControlStyles.Selectable, false);
+    }
+    protected override bool ShowWithoutActivation { get { return true; } }
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            CreateParams cp = base.CreateParams;
+            // TOOLWINDOW, NOACTIVATE; deliberately NOT WS_EX_TRANSPARENT.
+            cp.ExStyle |= 0x00000080 | 0x08000000;
+            return cp;
+        }
+    }
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == 0x0021) { m.Result = new IntPtr(3); return; } // MA_NOACTIVATE
+        if (m.Msg == 0x0202) { // WM_LBUTTONUP
+            bool dismiss = armed && CanDismiss() && InExposedOwner(PointToClient(Cursor.Position));
+            armed = false;
+            base.WndProc(ref m);
+            Capture = false;
+            if (dismiss && CanDismiss() && child.CancelButton != null)
+                child.CancelButton.PerformClick();
+            return;
+        }
+        base.WndProc(ref m);
+    }
+    private bool CanDismiss()
+    {
+        return !IsDisposed && !Disposing && parent.Visible && !parent.IsDisposed &&
+            child.Visible && !child.IsDisposed && child.IsHandleCreated &&
+            child.Modal && IsWindowEnabled(child.Handle) && child.DialogResult == DialogResult.None;
+    }
+    private bool InExposedOwner(Point point)
+    {
+        return ClientRectangle.Contains(point) &&
+            !child.Bounds.Contains(PointToScreen(point));
+    }
+    public void SyncOwnerBounds()
+    {
+        if (IsDisposed || Disposing || parent.IsDisposed || parent.Disposing ||
+            child.IsDisposed || child.Disposing || !parent.Visible || !child.Visible)
+        {
+            armed = false;
+            if (!IsDisposed && !Disposing) Hide();
+            return;
+        }
+        Rectangle ownerBounds = parent.RectangleToScreen(parent.ClientRectangle);
+        Bounds = ownerBounds;
+        Rectangle overlap = Rectangle.Intersect(ownerBounds, child.Bounds);
+        Region next = new Region(ClientRectangle);
+        if (!overlap.IsEmpty) {
+            overlap.Offset(-ownerBounds.Left, -ownerBounds.Top);
+            next.Exclude(overlap);
+        }
+        Region old = Region;
+        Region = next;
+        if (old != null) old.Dispose();
+        if (!Visible) { Owner = parent; Show(); }
+        // Keep the shield behind the child, including constrained overlap,
+        // and above the disabled owner. No activation or focus transfer.
+        SetWindowPos(Handle, child.Handle, 0, 0, 0, 0, 0x0013);
+    }
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (e.Button != MouseButtons.Left) return;
+        armed = CanDismiss() && InExposedOwner(e.Location);
+        if (armed) Capture = true;
+    }
+    protected override void OnMouseCaptureChanged(EventArgs e)
+    {
+        if (!Capture) armed = false;
+        base.OnMouseCaptureChanged(e);
+    }
+    protected override void OnEnabledChanged(EventArgs e)
+    {
+        if (!Enabled) { armed = false; Capture = false; }
+        base.OnEnabledChanged(e);
+    }
+}
+
 public sealed class LenovoAuxiliaryOwnerDimmer : Form
 {
     private Form parent;
@@ -415,6 +523,9 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
     private bool rowHighlighted;
     private bool childShown;
     private LenovoAuxiliaryConnector connector;
+    private bool dismissOnOwnerClick;
+    private LenovoAuxiliaryOwnerClickShield clickShield;
+    public void EnableOwnerClickDismissal() { dismissOnOwnerClick = true; }
     public Rectangle HighlightedRowBounds { get; private set; }
 
     public LenovoAuxiliaryOwnerDimmer(Form owner, Control trigger, Form surface,
@@ -511,6 +622,10 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
     private void SurfaceShown(object sender, EventArgs args)
     {
         childShown = true;
+        // Create after the native modal loop has disabled its existing owner
+        // windows; never enable the main owner or bypass nested modal state.
+        if (dismissOnOwnerClick && clickShield == null)
+            clickShield = new LenovoAuxiliaryOwnerClickShield(parent, child);
         SyncBounds(sender, args);
     }
     private void HideConnector()
@@ -543,6 +658,7 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
         Region = next;
         if (old != null) old.Dispose();
         SetRowHighlight(usable);
+        if (clickShield != null) clickShield.SyncOwnerBounds();
 
         if (!usable || !child.Visible || !childShown)
         {
@@ -609,6 +725,11 @@ public sealed class LenovoAuxiliaryOwnerDimmer : Form
                 row = null;
                 rowContainer = null;
             }
+            if (clickShield != null)
+            {
+                clickShield.Dispose();
+                clickShield = null;
+            }
             if (connector != null)
             {
                 connector.Dispose();
@@ -643,6 +764,7 @@ function Show-OwnedAuxiliaryPopup {
         }
         Initialize-AuxiliaryOwnerDimmer
         $dimmer = [LenovoAuxiliaryOwnerDimmer]::new($parent,$Owner,$Form,[double]$scale,(Get-PopupNavigationHoverColor),$script:ColorAccent)
+        if ($Form.Name -in @('LenovoConfigurationPopup','LenovoDefaultTargetPicker')) { $dimmer.EnableOwnerClickDismissal() }
         # Show without activation before the child, which retains its normal
         # modal ownership, z-order and focus even on overlapping placement.
         $dimmer.Show($parent)
