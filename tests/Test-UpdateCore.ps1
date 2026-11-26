@@ -111,7 +111,12 @@ function Write-RuntimeDiagnosticEvent {
     param([string]$Event,[string]$Stage,[bool]$Success,$Data,[string]$Level)
     if ($Event -eq 'UPDATE_CHECK_WORKER_COMPLETED') { $script:CapturedUpdateDiagnostic=$Data }
 }
-function Get-LenovoUpdateManifestRemote { return $script:UpdateManifestFixture }
+function Get-LenovoUpdateManifestRemote {
+    param([hashtable]$Timings)
+    $Timings.manifestFetchMs=1
+    $Timings.manifestParseMs=1
+    return $script:UpdateManifestFixture
+}
 
 $script:AppVersion='0.8.0.3'
 $script:UpdateResultPath=$null
@@ -122,6 +127,110 @@ Assert-Equal 'Update diagnostics record running version' '0.8.0.3' ([string]$scr
 Assert-Equal 'Update diagnostics record received manifest version' '0.8.0.4' ([string]$script:CapturedUpdateDiagnostic.manifestVersion)
 Assert-Equal 'Update diagnostics record manifest publishedUtc' '2026-10-07T03:00:00Z' ([string]$script:CapturedUpdateDiagnostic.manifestPublishedUtc)
 Assert-True 'Newer manifest reports update available' ([bool]$script:CapturedUpdateDiagnostic.updateAvailable)
+Assert-True 'LBS-277 diagnostics record monotonic worker timing' ($script:CapturedUpdateDiagnostic.workerElapsedMs -ge 0 -and $null -ne $script:CapturedUpdateDiagnostic.timings)
+Assert-Equal 'LBS-277 diagnostics propagate manifest fetch timing' 1 $script:CapturedUpdateDiagnostic.timings.manifestFetchMs
+Assert-Equal 'LBS-277 diagnostics propagate manifest parse timing' 1 $script:CapturedUpdateDiagnostic.timings.manifestParseMs
+Assert-True 'LBS-277 diagnostics measure validation and comparison' ($script:CapturedUpdateDiagnostic.timings.ContainsKey('manifestValidationMs') -and $script:CapturedUpdateDiagnostic.timings.ContainsKey('versionCompareMs'))
+$manifestRequest=New-LenovoUpdateManifestRequest -Uri ([uri]$manifestUri1)
+Assert-Equal 'LBS-277 explicit request response timeout' 100000 $manifestRequest.Timeout
+Assert-Equal 'LBS-277 explicit response read timeout' 15000 $manifestRequest.ReadWriteTimeout
+Assert-Equal 'LBS-277 request retains cache-busting URI' $manifestUri1 $manifestRequest.RequestUri.AbsoluteUri
+Assert-Equal 'LBS-277 request retains no-cache header' 'no-cache' $manifestRequest.Headers['Cache-Control']
+Assert-True 'LBS-277 request retains system proxy policy' ([object]::ReferenceEquals($manifestRequest.Proxy,[System.Net.WebRequest]::DefaultWebProxy))
+Assert-True 'LBS-277 compatibility request rejects redirects' (-not $manifestRequest.AllowAutoRedirect)
+$curlPath=Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::System)) 'curl.exe'
+Assert-Equal 'LBS-277 inbox curl selected on direct default route' 'curl' (Get-LenovoManifestTransportChoice -Uri ([uri]$manifestUri1) -CurlPath $curlPath -Proxy $null -CustomEnvironment $false)
+Assert-Equal 'LBS-277 missing curl selects compatibility transport' 'dotnet-curl-unavailable' (Get-LenovoManifestTransportChoice -Uri ([uri]$manifestUri1) -CurlPath $null -Proxy $null)
+Assert-Equal 'LBS-277 alternate environment selects compatibility transport' 'dotnet-custom-environment' (Get-LenovoManifestTransportChoice -Uri ([uri]$manifestUri1) -CurlPath $curlPath -Proxy $null -CustomEnvironment $true)
+$proxy=[System.Net.WebProxy]::new('http://127.0.0.1:8080')
+Assert-Equal 'LBS-277 configured proxy selects compatibility transport' 'dotnet-configured-proxy' (Get-LenovoManifestTransportChoice -Uri ([uri]$manifestUri1) -CurlPath $curlPath -Proxy $proxy)
+$curlInfo=New-LenovoManifestCurlStartInfo -CurlPath $curlPath -Uri ([uri]$manifestUri1)
+Assert-True 'LBS-277 fixed executable and no shell or visible console' ($curlInfo.FileName -eq $curlPath -and -not $curlInfo.UseShellExecute -and $curlInfo.CreateNoWindow -and $curlInfo.RedirectStandardOutput -and $curlInfo.RedirectStandardError)
+Assert-True 'LBS-277 curl ignores local config and fixes HTTPS protocol and budgets' ($curlInfo.Arguments.StartsWith('--disable --proto "=https" --http1.1 --tlsv1.2 ') -and $curlInfo.Arguments.Contains('--connect-timeout 5 --max-time 10 --max-filesize 65536') -and $curlInfo.Arguments.Contains($manifestUri1) -and $curlInfo.Arguments.Contains('%{http_code}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_starttransfer}|%{time_total}'))
+Assert-True 'LBS-277 no TLS bypass redirect proxy bypass or forced address family' ($curlInfo.Arguments -notmatch '(?i)(?:^|\s)(?:--insecure|-k|--location|-L|--noproxy|--ssl-no-revoke|--ssl-revoke-best-effort|-4|-6)(?:\s|$)')
+$uriRejected=$false
+try { [void](New-LenovoManifestCurlStartInfo -CurlPath $curlPath -Uri ([uri]'https://example.com/latest.json')) } catch { $uriRejected=$true }
+Assert-True 'LBS-277 rejects a noncanonical manifest URL before process launch' $uriRejected
+$fixtureBody='{"version":"1.10.2.1"}'
+$fixtureOutput=$fixtureBody + [char]10 + 'LBS277_CURL|200|0.021152|0.030485|0.138168|0.324335|0.324390' + [char]10
+$curlTiming=@{}
+$parsed=ConvertFrom-LenovoManifestCurlResponse -Result ([pscustomobject]@{ExitCode=0;Output=$fixtureOutput}) -Timings $curlTiming
+Assert-Equal 'LBS-277 curl response body separated from completion metadata' $fixtureBody $parsed
+Assert-True 'LBS-277 curl timing and HTTP status propagated' ($curlTiming.httpStatus -eq 200 -and $curlTiming.curldnsMs -eq 21 -and $curlTiming.curltcpMs -eq 30 -and $curlTiming.curltlsMs -eq 138 -and $curlTiming.curlfirstMs -eq 324 -and $curlTiming.curltotalMs -eq 324)
+$bad=$null
+try { [void](ConvertFrom-LenovoManifestCurlResponse -Result ([pscustomobject]@{ExitCode=0;Output=$fixtureOutput.Replace('|200|','|301|')}) -Timings @{}) } catch { $bad=Get-LenovoUpdateFailureInfo -ErrorRecord $_ }
+Assert-Equal 'LBS-277 HTTP redirect never becomes accepted manifest' 'ProtocolError' $bad.NetworkStatus
+$bad=$null
+try { [void](ConvertFrom-LenovoManifestCurlResponse -Result ([pscustomobject]@{ExitCode=60;Output=$fixtureOutput}) -Timings @{}) } catch { $bad=Get-LenovoUpdateFailureInfo -ErrorRecord $_ }
+Assert-Equal 'LBS-277 failed certificate rejects even an otherwise valid body' 'TrustFailure' $bad.NetworkStatus
+$bad=$false
+try { [void](ConvertFrom-LenovoManifestCurlResponse -Result ([pscustomobject]@{ExitCode=0;Output=$fixtureBody}) -Timings @{}) } catch { $bad=$true }
+Assert-True 'LBS-277 incomplete transport metadata fails closed' $bad
+$bad=$false
+try { [void](ConvertFrom-LenovoManifestCurlResponse -Result ([pscustomobject]@{ExitCode=0;Output=('a'*65537)+$fixtureOutput}) -Timings @{}) } catch { $bad=$true }
+Assert-True 'LBS-277 oversized curl manifest fails closed' $bad
+
+# Exercise the real child process/pipe lifecycle without making network calls.
+$childInfo=New-Object System.Diagnostics.ProcessStartInfo
+$childInfo.FileName=Join-Path $PSHOME 'powershell.exe'
+$childInfo.Arguments='-NoProfile -NonInteractive -Command "[Console]::Write(''fixture''); [Console]::Error.Write(''discard''); exit 7"'
+$childInfo.UseShellExecute=$false
+$childInfo.CreateNoWindow=$true
+$childInfo.RedirectStandardOutput=$true
+$childInfo.RedirectStandardError=$true
+$child=Invoke-LenovoManifestCurlProcess -StartInfo $childInfo
+Assert-True 'LBS-277 child drains both pipes and preserves output and exit code' ($child.Output -ceq 'fixture' -and $child.ExitCode -eq 7)
+$childInfo.Arguments='-NoProfile -NonInteractive -Command "Start-Sleep -Seconds 10"'
+$childFailure=$null
+$childClock=[System.Diagnostics.Stopwatch]::StartNew()
+try { [void](Invoke-LenovoManifestCurlProcess -StartInfo $childInfo -DeadlineMs 100) } catch { $childFailure=Get-LenovoUpdateFailureInfo -ErrorRecord $_ }
+Assert-True 'LBS-277 owned child deadline bounds hung process' ($childFailure.NetworkStatus -eq 'Timeout' -and $childClock.ElapsedMilliseconds -lt 5000)
+
+# Inject transport boundaries, keeping the real entrypoint and response parser.
+$script:FakeTransportChoice='curl'
+$script:FakeCurlResult=[pscustomobject]@{ExitCode=0;Output=$fixtureOutput}
+$script:FakeCurlStarts=0
+$script:FakeDotNetStarts=0
+function Get-LenovoManifestCurlPath { return (Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::System)) 'curl.exe') }
+function Get-LenovoManifestTransportChoice { param([uri]$Uri,[string]$CurlPath,$Proxy,[bool]$CustomEnvironment) return $script:FakeTransportChoice }
+function Invoke-LenovoManifestCurlProcess { param($StartInfo) $script:FakeCurlStarts++; return $script:FakeCurlResult }
+$script:FakeTransportFails=$false
+$script:FakeTransportResponse=$null
+function New-LenovoUpdateManifestRequest {
+    param([uri]$Uri)
+    $script:FakeDotNetStarts++
+    $req=[pscustomobject]@{Timeout=100000;ReadWriteTimeout=15000}
+    $req | Add-Member ScriptMethod GetResponse {
+        if ($script:FakeTransportFails) { throw [System.Net.WebException]::new('timeout',[System.Net.WebExceptionStatus]::Timeout) }
+        $r=[pscustomobject]@{Disposed=$false;StatusCode=200}
+        $r | Add-Member ScriptMethod GetResponseStream { return [System.IO.MemoryStream]::new([System.Text.Encoding]::UTF8.GetBytes('{"version":"1.10.2.1"}')) }
+        $r | Add-Member ScriptMethod Dispose { $this.Disposed=$true }
+        $script:FakeTransportResponse=$r
+        return $r
+    }
+    return $req
+}
+$transportTiming=@{}
+$curlText=Invoke-LenovoUpdateTextDownload -Uri ([uri]$manifestUri1) -Timings $transportTiming
+Assert-True 'LBS-277 real manifest entrypoint selects curl on eligible route' ($curlText -ceq $fixtureBody -and $transportTiming.transport -eq 'curl' -and $script:FakeCurlStarts -eq 1 -and $script:FakeDotNetStarts -eq 0)
+$script:FakeCurlResult=[pscustomobject]@{ExitCode=28;Output=$fixtureOutput}
+$curlFailure=$null
+try { [void](Invoke-LenovoUpdateTextDownload -Uri ([uri]$manifestUri1) -Timings @{}) } catch { $curlFailure=Get-LenovoUpdateFailureInfo -ErrorRecord $_ }
+Assert-True 'LBS-277 curl timeout does not retry through slow compatibility route' ($curlFailure.NetworkStatus -eq 'Timeout' -and $curlFailure.Stage -eq 'manifest-download' -and $script:FakeCurlStarts -eq 2 -and $script:FakeDotNetStarts -eq 0)
+$script:FakeTransportChoice='dotnet-configured-proxy'
+$transportTiming=@{}
+$textResult=Invoke-LenovoUpdateTextDownload -Uri ([uri]$manifestUri1) -Timings $transportTiming
+Assert-Equal 'LBS-277 offline transport reads response body' '{"version":"1.10.2.1"}' $textResult
+Assert-True 'LBS-277 explicit compatibility route never invokes curl' ($transportTiming.transport -eq 'dotnet-configured-proxy' -and $script:FakeDotNetStarts -eq 1 -and $script:FakeCurlStarts -eq 2)
+Assert-True 'LBS-277 successful response disposes owned handle' ([bool]$script:FakeTransportResponse.Disposed)
+Assert-True 'LBS-277 offline transport records setup wait and read' ($transportTiming.ContainsKey('transportSetupMs') -and $transportTiming.ContainsKey('responseWaitMs') -and $transportTiming.ContainsKey('responseReadMs'))
+$script:FakeTransportFails=$true
+$transportTiming=@{}
+$transportFailure=$null
+try { [void](Invoke-LenovoUpdateTextDownload -Uri ([uri]$manifestUri1) -Timings $transportTiming) }
+catch { $transportFailure=Get-LenovoUpdateFailureInfo -ErrorRecord $_ }
+Assert-True 'LBS-277 response timeout remains a classified network failure' ($transportFailure -and $transportFailure.Category -eq 'network' -and $transportFailure.Stage -eq 'manifest-download' -and $transportFailure.NetworkStatus -eq 'Timeout')
+Assert-True 'LBS-277 response failure records failed phase' ($transportTiming.transportFailurePhase -eq 'response-wait' -and $transportTiming.transportFailurePhaseMs -ge 0)
 
 $script:UpdateManifestFixture=New-UpdateCheckFixtureManifest -Version '0.8.0.3' -PublishedUtc '2026-10-07T03:01:00Z'
 $script:CapturedUpdateDiagnostic=$null
@@ -191,8 +300,8 @@ $sourceAssertionCount = @(
 if ($checks -ne $sourceAssertionCount) {
     throw "Update assertion execution/source mismatch: executed $checks, source $sourceAssertionCount"
 }
-Write-Host "UPDATE ASSERTION SOURCE $sourceAssertionCount/79"
-if ($sourceAssertionCount -ne 79) { throw "Unexpected update assertion source count $sourceAssertionCount" }
+Write-Host "UPDATE ASSERTION SOURCE $sourceAssertionCount/113"
+if ($sourceAssertionCount -ne 113) { throw "Unexpected update assertion source count $sourceAssertionCount" }
 
-Write-Host "UPDATE TOTAL $checks/79"
-if ($checks -ne 79) { throw "Unexpected update test count $checks" }
+Write-Host "UPDATE TOTAL $checks/113"
+if ($checks -ne 113) { throw "Unexpected update test count $checks" }

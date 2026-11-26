@@ -28,8 +28,12 @@ function Update-HeaderRefreshStatus {
     $active = $false
     try { $active = (Test-BackgroundRefreshActive -State $script:BackgroundRefreshState) } catch { }
     $updateAvailable = $false
+    $knownRecheck = $false
+    $checkFailed = $false
     try {
-        $updateAvailable = ($script:UpdateState -and [string]$script:UpdateState.Status -eq 'UpdateAvailable' -and $null -ne $script:UpdateState.AvailableManifest)
+        $updateAvailable = ($script:UpdateState -and @('UpdateAvailable','Checking') -contains [string]$script:UpdateState.Status -and $null -ne $script:UpdateState.AvailableManifest)
+        $knownRecheck = ($updateAvailable -and [string]$script:UpdateState.Status -eq 'Checking')
+        $checkFailed = ($script:UpdateState -and $script:UpdateState.LastCheckSucceeded -eq $false -and [string]$script:UpdateState.Status -in @('Idle','UpdateAvailable') -and -not [string]::IsNullOrWhiteSpace($script:UpdateState.LastError))
     } catch { }
     # Active request provenance affects presentation only, never worker admission.
     # Initial readiness wins until it ends; a deliberate manual refresh wins
@@ -39,11 +43,11 @@ function Update-HeaderRefreshStatus {
     $popupUpdateActive = ($script:UpdateState -and $script:UpdateState.CheckProcess -and [string]$script:UpdateState.CheckMode -eq 'Popup')
     $refreshKey = if ($active -and $origin -eq 'Startup') { 'Header.InitializingApplication' }
         elseif ($active -and ($origin -eq 'Manual' -or $pendingOrigin -eq 'Manual')) { 'Header.Refreshing' }
-        elseif (($active -and ($origin -eq 'Popup' -or $pendingOrigin -eq 'Popup')) -or $popupUpdateActive) { 'Header.RefreshingApplication' }
+        elseif (($active -and ($origin -eq 'Popup' -or $pendingOrigin -eq 'Popup')) -or ($popupUpdateActive -and -not $knownRecheck)) { 'Header.RefreshingApplication' }
         elseif ($active) { 'Header.Refreshing' }
         else { '' }
     $refreshVisible = -not [string]::IsNullOrEmpty($refreshKey)
-    $showStatus = ($refreshVisible -or $updateAvailable)
+    $showStatus = ($refreshVisible -or $updateAvailable -or $checkFailed)
 
     # LBS-174: status may appear/disappear, but title geometry belongs only
     # to Add-PopupHeaderSection and must not be mutated by refresh state.
@@ -54,14 +58,17 @@ function Update-HeaderRefreshStatus {
             else { Get-LocalizedString -Key $refreshKey }
         }
         elseif ($updateAvailable) {
-            Get-LocalizedString -Key 'Update.Available'
+            if ($knownRecheck) { Get-LocalizedString -Key 'Update.KnownChecking' }
+            elseif ($checkFailed) { Get-LocalizedString -Key 'Update.KnownCheckFailed' }
+            else { Get-LocalizedString -Key 'Update.Available' }
         }
+        elseif ($checkFailed) { Get-LocalizedString -Key 'Update.CheckFailedStatus' }
         else {
             ''
         }
         $script:HeaderStatusLabel.Visible = $showStatus
     }
-    Set-HeaderUpdateInteractionState -Enabled (-not $refreshVisible -and $updateAvailable)
+    Set-HeaderUpdateInteractionState -Enabled (-not $refreshVisible -and $updateAvailable -and -not $knownRecheck)
 }
 
 function Update-RefreshButtonVisual {
