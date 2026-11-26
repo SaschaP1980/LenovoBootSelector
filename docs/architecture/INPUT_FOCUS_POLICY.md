@@ -1,0 +1,25 @@
+# Input focus ownership (LBS-262)
+
+The application distinguishes actual native focus (which control receives keyboard input), the logical target GUID, and presentation of the keyboard cue. Focus changes alone must not invoke a boot, default-target, settings-write or privileged action. No global input hook, synthetic keystroke or system-wide keyboard-cue policy is introduced.
+
+| Surface | Real focus owner | Pointer policy | Keyboard / restoration policy |
+| --- | --- | --- | --- |
+| Main normal boot rows | Shared selectable LenovoNormalBootKeyboardRow | Left press on a row or its display children transfers native focus, hides custom outline/tint; existing Click alone dispatches selection | Up/Down/Home/End navigation, explicit Enter/Space selection; keyboard input restores cue; GUID and cue survive keyed reconstruction |
+| Customize rows, eye and grip | Same native row, logical GUID, existing draft action owners | Left press transfers row focus without keyboard adornment; eye Click toggles; grip retains existing drag path. Hover never focuses. | One roving Tab anchor; arrows/Home/End and page navigation; Ctrl variants reorder. Focused keyboard input restores cue. Hidden rows are navigable. |
+| Customize alias editor | Native TextBox and existing Apply/Cancel buttons | Pencil opens and focuses the native TextBox; caret and editor underline remain native/explicit. Pointer Apply/Cancel return to the row without keyboard cue. | Editor retains normal input and shortcuts; Enter/Escape and keyboard Apply/Cancel restore logical row with cue. |
+| Customize action area | Native Undo, Cancel, Save buttons | Native button focus and native cues; disabled controls cannot take focus | Tab from list to first enabled action; reverse traversal uses the roving anchor; no implicit action on focus. |
+| Main Further Settings / Default navigation | Shared selectable row for full hit surface | Left press on row/label transfers focus before existing modal action; custom cue hidden | Native tab/Enter/Space; owned modal lifetime and owner restoration unchanged. |
+| Default-target picker | Shared selectable row per target | Pointer focus before existing selection action; no hover focus | Retain initial focused row and existing native modal keyboard navigation, scrolling and explicit selection. |
+| Configuration settings and action buttons | Native Button/CheckBox controls | Native focus and cues; nonselectable autostart label delegates to its actual toggle | Existing native tab order, keyboard activation, availability and modal owner rules. F04 autostart's initial focus outline intentionally remains visible when enabled and focused, even after mouse-open. |
+| Header, refresh, restart, update, maintenance and other native dialog controls | Existing native controls | Native button/text focus and activation, existing hover and disabled semantics; no custom global suppression | Retain native tab/dialog focus, default/cancel behavior and owner restoration; existing header actionable status accent and F04/F10 initial focus contracts are intentional exceptions. |
+| Scrollbar / wheel | Nonselectable scroll presentation | Mouse wheel or scrollbar changes viewport only, not focus | Existing row-sized SmallChange; form hit-test routes list wheel if focus elsewhere, handled native wheel events cannot scroll twice. |
+
+## Page and Tab behavior
+
+A page is the number of complete row-sized wheel units that fit the current viewport: max(1, floor(LargeChange / SmallChange)). The size adapts to DPI and viewport; it is not a fixed hard-coded number. Page Up/Down move the logical focus by that count and scroll/reveal the target without touching the draft. Ctrl+Page Up/Down and Ctrl+Home/End use one existing Move-ManageEntry call and one Undo checkpoint per actual completed move. Boundaries clamp; reorder no-ops do not add history. Save and Cancel retain their existing meanings.
+
+The Manage list is one Tab zone when the inline editor is closed. A roving native TabStop identifies the latest row while all selectable rows remain focusable by arrow/page/explicit focus navigation. Forward Tab from a row targets Undo when enabled, otherwise the next enabled action. Reverse native traversal re-enters the anchor. Native editor child traversal is not globally intercepted. A replaced/removed row restores the surviving GUID or bounded fallback only when focus belonged to that list; background refresh must not steal focus from the action area. No second reorder path or independent icon Tab system is added (LBS-183 remains separate).
+
+## Validation boundaries
+
+LBS-262's defect-specific focused native RED/GREEN test observes real WinForms focus after pointer input, subsequent keyboard reorder and draft ownership; the row-paint test observes the actual custom OnPaint output in an isolated bitmap, not a screen-capture substitute for LBS-247 F04. Retain LBS-178, LBS-179, LBS-197, LBS-229, LBS-247, alias, drag, refresh, language and DPI suites. Hosted WinForms qualification does not imply physical owner acceptance or screen-reader certification.

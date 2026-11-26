@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.9.0.0 – Extended keyboard navigation and mixed-input focus (LBS-262)
+
+- Add Page Up/Down navigation, Ctrl+Page Up/Down and Ctrl+Home/End atomic draft reordering, and one Customize list Tab zone.
+- Transfer keyboard ownership to pointer-interacted rows without showing a keyboard cue until keyboard input resumes. Preserve GUID/cue state across reconciliation and native editor/modal focus contracts.
+- Retain the existing wheel row unit, shared Undo and explicit Save/Cancel; focus alone never dispatches a boot action.
+
 ## v1.8.0.0 – Keyboard-accessible boot-target management (LBS-178)
 
 - Navigate focused Customize rows using Tab, arrows, Home and End with GUID-stable focus and automatic scroll reveal.

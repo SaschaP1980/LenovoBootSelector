@@ -208,6 +208,11 @@ $manageKeyboardProbe = Join-Path $root 'tests\Test-LBS178-ManageKeyboard.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $manageKeyboardProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-178 Manage keyboard regression failed' }
 
+# LBS-262: mixed input focus, paging, endpoint reorder, roving Tab and wheel ownership.
+$manageMixedFocusProbe = Join-Path $root 'tests\Test-LBS262-MixedFocus.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $manageMixedFocusProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-262 mixed input focus regression failed' }
+
 # LBS-167: isolate real WinForms refresh/drag row identity and diagnostics.
 $refreshRowsProbe = Join-Path $root 'tests\Test-LBS167-RefreshRendering.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $refreshRowsProbe

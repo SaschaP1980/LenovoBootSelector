@@ -343,7 +343,7 @@ function Get-LocalizationCatalogCore {
             'Manage.KeyboardHint' = 'Ctrl+↑/↓ · Space · Ctrl+E'
             'Manage.KeyboardPositionHint' = '{Position}/{Count} · Ctrl+↑/↓ · Space · Ctrl+E'
             'Manage.KeyboardPosition' = 'Position {Position} of {Count}'
-            'Manage.KeyboardInstructions' = 'Arrow keys navigate. Ctrl+Up/Down moves. Space shows or hides. Ctrl+E edits display name.'
+            'Manage.KeyboardInstructions' = 'Arrows and Page Up/Down navigate. Ctrl+arrows/Page Up/Page Down/Home/End reorder. Space shows or hides. Ctrl+E edits display name. Tab moves to actions.'
             'Manage.ClearAliasHint' = 'Clear display name'
             'Manage.AliasCue' = 'Use original name'
             'Manage.AliasFieldHint' = 'Empty: use original name'
@@ -795,7 +795,7 @@ function Get-LocalizationCatalogCore {
             'Manage.KeyboardHint' = 'Strg+↑/↓ · Leer · Strg+E'
             'Manage.KeyboardPositionHint' = '{Position}/{Count} · Strg+↑/↓ · Leer · Strg+E'
             'Manage.KeyboardPosition' = 'Position {Position} von {Count}'
-            'Manage.KeyboardInstructions' = 'Pfeiltasten navigieren. Strg+Hoch/Runter verschiebt. Leertaste blendet ein oder aus. Strg+E ändert den Anzeigenamen.'
+            'Manage.KeyboardInstructions' = 'Pfeil- und Bildtasten navigieren. Strg+Pfeil/Bild/Pos1/Ende sortiert. Leertaste blendet ein oder aus. Strg+E ändert den Anzeigenamen. Tab wechselt zu den Aktionen.'
             'Manage.ClearAliasHint' = 'Anzeigename leeren'
             'Manage.AliasCue' = 'Originalname verwenden'
             'Manage.AliasFieldHint' = 'Leer: Originalname verwenden'
@@ -3311,7 +3311,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.8.0.0'
+$script:AppVersion = '1.9.0.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -7525,6 +7525,13 @@ function Add-DefaultPickerRow {
         $controlHint = $hint
         if ($control -eq $icon -and $Entry -and $Entry.TypeTooltip) { $controlHint = [string]$Entry.TypeTooltip + [Environment]::NewLine + $hint }
         $Form.Tag.Tip.SetToolTip($control,$controlHint)
+        $control.Add_MouseDown({
+            param($sender,$eventArgs)
+            if ($eventArgs.Button -ne [Windows.Forms.MouseButtons]::Left -or -not (Test-DefaultPickerInteraction)) { return }
+            $target = $sender
+            while ($target -and $target.Name -ne 'DefaultPickerRow') { $target = $target.Parent }
+            Set-LenovoPointerFocus -Control $target
+        })
         $control.Add_Click({ param($sender,$eventArgs) Invoke-DefaultPickerRow -Control $sender })
         $control.Add_MouseEnter({ param($sender,$eventArgs) Set-DefaultPickerHover -Control $sender -Hover $true })
         $control.Add_MouseLeave({ param($sender,$eventArgs) Set-DefaultPickerHover -Control $sender -Hover $false })
@@ -13334,6 +13341,19 @@ function Paint-ManageDropCue {
     finally { $brush.Dispose() }
 }
 
+# Wheel messages can arrive at a row, list, or the form when another control
+# owns keyboard focus. Mark native handled events to avoid parent double-scroll.
+function Invoke-BootEntryWheelScroll {
+    param($ListPanel,[Windows.Forms.MouseEventArgs]$EventArgs)
+    if (-not $ListPanel -or $ListPanel.IsDisposed -or -not $EventArgs -or $EventArgs.Delta -eq 0) { return }
+    if ($EventArgs -is [Windows.Forms.HandledMouseEventArgs] -and $EventArgs.Handled) { return }
+    $bar = $ListPanel.Controls['EntryScroll']
+    if (-not $bar -or -not $bar.Visible) { return }
+    $direction = if ($EventArgs.Delta -gt 0) { -1 } else { 1 }
+    $bar.Value = $bar.Value + ($direction * $bar.SmallChange)
+    if ($EventArgs -is [Windows.Forms.HandledMouseEventArgs]) { $EventArgs.Handled = $true }
+}
+
 function New-BootEntryInteractionHandlers {
     $clickHandler = {
         param($sender, $eventArgs)
@@ -13352,7 +13372,9 @@ function New-BootEntryInteractionHandlers {
 
         if ($script:IsManageEntriesMode) {
             if (([datetime]::UtcNow - $script:ManageLastDragUtc).TotalMilliseconds -lt 350) { return }
+            $hadAlias = [bool]$script:ManageAliasEditGuid
             Invoke-ManageRowVisibility -Guid $guid
+            if ($hadAlias -and -not $script:ManageAliasEditGuid) { Restore-ManageRowFocus -Guid $guid -KeyboardCue:$false }
             return
         }
 
@@ -13363,20 +13385,19 @@ function New-BootEntryInteractionHandlers {
     $leaveHandler = { param($sender,$eventArgs) Set-RowHoverState $sender $false }
     $wheelHandler = {
         param($sender, $eventArgs)
-        $panel = $null
-        if ($script:Popup -and -not $script:Popup.IsDisposed) {
-            $panelMatches = $script:Popup.Controls.Find('EntryList', $true)
-            if ($panelMatches.Count -gt 0) { $panel = $panelMatches[0] }
-        }
-        $bar = if ($panel) { $panel.Controls['EntryScroll'] } else { $null }
-        if ($bar -and $bar.Visible) {
-            $direction = if ($eventArgs.Delta -gt 0) { -1 } else { 1 }
-            $bar.Value = $bar.Value + ($direction * $bar.SmallChange)
-        }
+        $panel = if ($script:Popup -and -not $script:Popup.IsDisposed) {
+            $script:Popup.Controls.Find('EntryList',$true) | Select-Object -First 1
+        } else { $null }
+        Invoke-BootEntryWheelScroll -ListPanel $panel -EventArgs $eventArgs
     }
     $mouseDownHandler = {
         param($sender, $eventArgs)
-        if (-not $script:IsManageEntriesMode -or $eventArgs.Button -ne [System.Windows.Forms.MouseButtons]::Left) { return }
+        if ($eventArgs.Button -ne [System.Windows.Forms.MouseButtons]::Left) { return }
+        if ($script:IsManageEntriesMode -and (-not (Get-CurrentSystemFunctionsCapabilities).CanManageEntries -or $script:ManageActiveDragGuid)) { return }
+        # Focus transfer is presentation only; the existing Click owner still dispatches exactly once.
+        $row = Get-BootRowFromControl $sender
+        if ($row -and -not $script:ManageAliasEditGuid) { Set-LenovoPointerFocus -Control $row }
+        if (-not $script:IsManageEntriesMode) { return }
         $guid = [string]$sender.Tag
         if (-not $guid) {
             $row = Get-BootRowFromControl $sender
@@ -13581,6 +13602,17 @@ function Show-ManageAliasLimitFeedback {
     try { Show-DarkActionTooltip -Owner $Editor -Text $script:LastStatusText } catch { }
 }
 
+# Track only the initiating modality of the existing native editor buttons;
+# never replace their native keyboard/click activation or TextBox focus.
+function Connect-ManageAliasButtonModality {
+    param([Windows.Forms.Button]$Button)
+    $Button | Add-Member -NotePropertyName LenovoPointerPress -NotePropertyValue $false
+    $Button.Add_MouseDown({ param($sender,$eventArgs) $sender.LenovoPointerPress = ($eventArgs.Button -eq [Windows.Forms.MouseButtons]::Left) })
+    $Button.Add_MouseUp({ param($sender,$eventArgs) if (-not $sender.ClientRectangle.Contains($eventArgs.Location)) { $sender.LenovoPointerPress = $false } })
+    $Button.Add_KeyDown({ $this.LenovoPointerPress = $false })
+    $Button.Add_LostFocus({ $this.LenovoPointerPress = $false })
+}
+
 function Add-BootEntryAliasEditor {
     param(
         [Parameter(Mandatory=$true)]$Row,
@@ -13762,8 +13794,11 @@ function Add-BootEntryAliasEditor {
     $applyAlias.Location = New-Object Drawing.Point(58, 62)
     $applyAlias.Size = New-Object Drawing.Size(92, 24)
     $applyAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
+    Connect-ManageAliasButtonModality -Button $applyAlias
     $applyAlias.Add_Click({
         param($sender,$eventArgs)
+        $keyboardCue = -not $sender.LenovoPointerPress
+        $sender.LenovoPointerPress = $false
         $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
         if ($editor) {
             if (-not (Set-ManageEntryAliasDraft -Guid ([string]$editor.Tag) -Alias ([string]$editor.Text))) {
@@ -13775,7 +13810,7 @@ function Add-BootEntryAliasEditor {
             $script:ManageAliasEditGuid = $null
             $script:LastStatusText = if ($empty) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
             Update-PopupRows
-            Restore-ManageRowFocus -Guid $closedGuid
+            Restore-ManageRowFocus -Guid $closedGuid -KeyboardCue:$keyboardCue
         }
     })
     $row.Controls.Add($applyAlias)
@@ -13794,13 +13829,16 @@ function Add-BootEntryAliasEditor {
     $cancelAlias.Location = New-Object Drawing.Point(154, 62)
     $cancelAlias.Size = New-Object Drawing.Size(80, 24)
     $cancelAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
+    Connect-ManageAliasButtonModality -Button $cancelAlias
     $cancelAlias.Add_Click({
         param($sender,$eventArgs)
+        $keyboardCue = -not $sender.LenovoPointerPress
+        $sender.LenovoPointerPress = $false
         $closedGuid = [string]$sender.Tag
         $script:ManageAliasEditGuid = $null
         $script:LastStatusText = Get-LocalizedString -Key 'Manage.AliasDiscarded'
         Update-PopupRows
-        Restore-ManageRowFocus -Guid $closedGuid
+        Restore-ManageRowFocus -Guid $closedGuid -KeyboardCue:$keyboardCue
     })
     $row.Controls.Add($cancelAlias)
 
@@ -13947,16 +13985,17 @@ function Start-ManageRowAliasEdit {
 }
 
 function Restore-ManageRowFocus {
-    param([string]$Guid,[int]$FallbackIndex = -1)
+    param([string]$Guid,[int]$FallbackIndex = -1,[Nullable[bool]]$KeyboardCue)
     if (-not $script:IsManageEntriesMode -or -not $script:Popup -or $script:Popup.IsDisposed) { return }
     $rows = @($script:Popup.Controls.Find('BootRow',$true) | Where-Object {
-        -not $_.IsDisposed -and $_.TabStop -and $_.CanFocus
+        -not $_.IsDisposed -and $_.CanFocus -and $_.PSObject.Properties['ManageKeyboardMode'] -and $_.ManageKeyboardMode
     } | Sort-Object Top)
     $target = $rows | Where-Object { [string]$_.Tag -eq $Guid } | Select-Object -First 1
     if (-not $target -and $FallbackIndex -ge 0 -and $rows.Count -gt 0) {
         $target = $rows[[Math]::Min($FallbackIndex,$rows.Count-1)]
     }
     if ($target) {
+        if ($null -ne $KeyboardCue) { $target.SetKeyboardCue([bool]$KeyboardCue) }
         [void]$target.Focus()
         Set-NormalBootRowVisible -Row $target
     }
@@ -14045,6 +14084,12 @@ $editAlias.Add_MouseLeave({
     $sender.ForeColor = [Drawing.Color]::FromArgb(190,190,190)
     Set-RowHoverState $sender $false
     try { Hide-DarkActionTooltip } catch { }
+})
+$editAlias.Add_MouseDown({
+    param($sender,$eventArgs)
+    if ($eventArgs.Button -eq [Windows.Forms.MouseButtons]::Left -and -not $script:ManageActiveDragGuid) {
+        Set-LenovoPointerFocus -Control (Get-BootRowFromControl $sender)
+    }
 })
 $editAlias.Add_Click({
     param($sender,$eventArgs)
@@ -14146,8 +14191,8 @@ foreach ($control in $RowControls) {
     $control.Add_MouseEnter($enterHandler)
     $control.Add_MouseLeave($leaveHandler)
     $control.Add_MouseWheel($wheelHandler)
+    $control.Add_MouseDown($mouseDownHandler)
     if ($script:IsManageEntriesMode) {
-        $control.Add_MouseDown($mouseDownHandler)
         $control.Add_MouseMove($mouseMoveHandler)
         $control.Add_DragEnter($dragEnterHandler)
         $control.Add_DragOver($dragOverHandler)
@@ -14217,7 +14262,7 @@ function Update-BootEntryRowText {
     if ([string]$title.Text -cne [string]$text.Title) {
         $title.Text = [string]$text.Title
         $title.AccessibleDescription = [string]$text.Title
-        if (-not $script:IsManageEntriesMode -or $Row.TabStop) { $Row.AccessibleName = [string]$text.Title }
+        if (-not $script:IsManageEntriesMode -or ($Row.PSObject.Properties['ManageKeyboardMode'] -and $Row.ManageKeyboardMode)) { $Row.AccessibleName = [string]$text.Title }
         if ($script:IsManageEntriesMode -and $script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($title,[string]$text.Title) }
         $changed = $true
     }
@@ -14247,6 +14292,55 @@ public sealed class LenovoNormalBootKeyboardRow : Panel
 {
     public bool ManageKeyboardMode { get; set; }
     public bool ManageSpaceArmed { get; set; }
+    private bool keyboardCue = true;
+    public bool KeyboardCueVisible { get { return Focused && keyboardCue; } }
+    public bool KeyboardCueEnabled { get { return keyboardCue; } }
+
+    public void SetKeyboardCue(bool visible)
+    {
+        if (keyboardCue == visible) return;
+        keyboardCue = visible;
+        Invalidate();
+    }
+
+    public void SetManageTabAnchor()
+    {
+        if (!ManageKeyboardMode || Parent == null) return;
+        foreach (Control sibling in Parent.Controls) {
+            LenovoNormalBootKeyboardRow row = sibling as LenovoNormalBootKeyboardRow;
+            if (row != null && row.ManageKeyboardMode) row.TabStop = Object.ReferenceEquals(row, this);
+        }
+    }
+
+    public bool FocusForPointer()
+    {
+        if (!CanFocus || !Enabled || !Visible) return false;
+        SetKeyboardCue(false);
+        return Focus();
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        SetKeyboardCue(true);
+        base.OnKeyDown(e);
+    }
+
+    protected override bool ProcessDialogKey(Keys keyData)
+    {
+        if ((keyData & Keys.KeyCode) == Keys.Tab) {
+            SetKeyboardCue(true);
+            if (ManageKeyboardMode && (keyData & Keys.Modifiers) == Keys.None) {
+                Form form = FindForm();
+                if (form != null) {
+                    foreach (string name in new string[] { "ManageUndoButton", "ManageCancelButton", "ManageSaveButton" }) {
+                        Control[] targets = form.Controls.Find(name, true);
+                        if (targets.Length > 0 && targets[0].CanSelect && targets[0].CanFocus && targets[0].Focus()) return true;
+                    }
+                }
+            }
+        }
+        return base.ProcessDialogKey(keyData);
+    }
 
     public LenovoNormalBootKeyboardRow()
     {
@@ -14258,8 +14352,8 @@ public sealed class LenovoNormalBootKeyboardRow : Panel
     protected override bool IsInputKey(Keys keyData)
     {
         Keys key = keyData & Keys.KeyCode;
-        if (ManageKeyboardMode && key == Keys.E && (keyData & Keys.Modifiers) == Keys.Control)
-            return true;
+        if (ManageKeyboardMode && (key == Keys.PageUp || key == Keys.PageDown ||
+            (key == Keys.E && (keyData & Keys.Modifiers) == Keys.Control))) return true;
         if (key == Keys.Up || key == Keys.Down || key == Keys.Home ||
             key == Keys.End || key == Keys.Return || key == Keys.Space)
             return true;
@@ -14268,6 +14362,7 @@ public sealed class LenovoNormalBootKeyboardRow : Panel
 
     protected override void OnGotFocus(EventArgs e)
     {
+        SetManageTabAnchor();
         base.OnGotFocus(e);
         Invalidate();
     }
@@ -14276,13 +14371,15 @@ public sealed class LenovoNormalBootKeyboardRow : Panel
     {
         ManageSpaceArmed = false;
         base.OnLostFocus(e);
+        // A new independent focus acquisition defaults to keyboard visibility.
+        keyboardCue = true;
         Invalidate();
     }
 
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
-        if (!Focused) return;
+        if (!KeyboardCueVisible) return;
         Rectangle r = ClientRectangle;
         r.Inflate(-3, -3);
         if (r.Width > 0 && r.Height > 0)
@@ -14294,6 +14391,15 @@ public sealed class LenovoNormalBootKeyboardRow : Panel
 }
 '@
     Add-Type -ReferencedAssemblies @('System.Windows.Forms','System.Drawing') -TypeDefinition $keyboardSource -ErrorAction Stop
+}
+
+# One pointer focus owner for custom keyboard rows and native controls. No
+# business action, global cue override or synthetic input is performed here.
+function Set-LenovoPointerFocus {
+    param([Windows.Forms.Control]$Control)
+    if (-not $Control -or $Control.IsDisposed -or -not $Control.Enabled -or -not $Control.CanFocus) { return }
+    if ($Control.PSObject.Methods['FocusForPointer']) { [void]$Control.FocusForPointer() }
+    else { [void]$Control.Focus() }
 }
 
 # Keep the canonical BootNext controller as the sole selection owner. This
@@ -14373,7 +14479,7 @@ function Test-ManageRowKeyboardAdmission {
 
 function Update-ManageKeyboardRowPresentation {
     param($Row)
-    if (-not $Row -or $Row.IsDisposed -or -not $Row.TabStop -or -not $Row.Parent) { return }
+    if (-not $Row -or $Row.IsDisposed -or -not $Row.Parent -or -not $Row.PSObject.Properties['ManageKeyboardMode'] -or -not $Row.ManageKeyboardMode) { return }
     $entries = @($Row.Parent.Controls | Where-Object { $_.Name -eq 'BootRow' -and -not $_.IsDisposed } | Sort-Object Top)
     $position = 0
     for ($i=0; $i -lt $entries.Count; $i++) {
@@ -14391,6 +14497,13 @@ function Update-ManageKeyboardRowPresentation {
     }
 }
 
+function Get-ManageKeyboardPageStep {
+    param($Row)
+    $bar = if ($Row -and $Row.Parent -and $Row.Parent.Parent) { $Row.Parent.Parent.Controls['EntryScroll'] } else { $null }
+    if (-not $bar -or $bar.SmallChange -le 0) { return 1 }
+    return [Math]::Max(1,[int][Math]::Floor([double]$bar.LargeChange / [double]$bar.SmallChange))
+}
+
 function Invoke-ManageRowKeyboardMove {
     param($Row,[System.Windows.Forms.Keys]$Key,[bool]$Reorder)
     $entries = @(Get-OrderedEntriesForUi -IncludeHidden -UseManageDraft)
@@ -14399,9 +14512,12 @@ function Invoke-ManageRowKeyboardMove {
         if ([string]$entries[$i].Guid -eq [string]$Row.Tag) { $index=$i; break }
     }
     if ($index -lt 0) { return }
+    $pageStep = Get-ManageKeyboardPageStep -Row $Row
     $target = switch ($Key) {
         ([System.Windows.Forms.Keys]::Up) { [Math]::Max(0,$index-1); break }
         ([System.Windows.Forms.Keys]::Down) { [Math]::Min($entries.Count-1,$index+1); break }
+        ([System.Windows.Forms.Keys]::PageUp) { [Math]::Max(0,$index-$pageStep); break }
+        ([System.Windows.Forms.Keys]::PageDown) { [Math]::Min($entries.Count-1,$index+$pageStep); break }
         ([System.Windows.Forms.Keys]::Home) { 0; break }
         ([System.Windows.Forms.Keys]::End) { $entries.Count-1; break }
         default { $index }
@@ -14414,7 +14530,16 @@ function Invoke-ManageRowKeyboardMove {
         Update-PopupRows -Reason 'manage-keyboard-reorder'
         Restore-ManageRowFocus -Guid $guid
     }
-    else { Restore-ManageRowFocus -Guid ([string]$entries[$target].Guid) }
+    else {
+        if ($Key -in @([Windows.Forms.Keys]::PageUp,[Windows.Forms.Keys]::PageDown)) {
+            $bar = $Row.Parent.Parent.Controls['EntryScroll']
+            if ($bar -and $bar.Visible) {
+                $direction = if ($Key -eq [Windows.Forms.Keys]::PageUp) { -1 } else { 1 }
+                $bar.Value = $bar.Value + ($direction * $pageStep * $bar.SmallChange)
+            }
+        }
+        Restore-ManageRowFocus -Guid ([string]$entries[$target].Guid) -KeyboardCue:$true
+    }
 }
 
 function Connect-ManageRowKeyboard {
@@ -14435,11 +14560,11 @@ function Connect-ManageRowKeyboard {
         if (-not (Test-ManageRowKeyboardAdmission -Row $sender)) { return }
         $key=$eventArgs.KeyCode
         $modifiers=$eventArgs.Modifiers
-        if ($modifiers -eq [Windows.Forms.Keys]::None -and $key -in @([Windows.Forms.Keys]::Up,[Windows.Forms.Keys]::Down,[Windows.Forms.Keys]::Home,[Windows.Forms.Keys]::End)) {
+        if ($modifiers -eq [Windows.Forms.Keys]::None -and $key -in @([Windows.Forms.Keys]::Up,[Windows.Forms.Keys]::Down,[Windows.Forms.Keys]::Home,[Windows.Forms.Keys]::End,[Windows.Forms.Keys]::PageUp,[Windows.Forms.Keys]::PageDown)) {
             $eventArgs.SuppressKeyPress=$true
             Invoke-ManageRowKeyboardMove -Row $sender -Key $key -Reorder:$false
         }
-        elseif ($modifiers -eq [Windows.Forms.Keys]::Control -and $key -in @([Windows.Forms.Keys]::Up,[Windows.Forms.Keys]::Down)) {
+        elseif ($modifiers -eq [Windows.Forms.Keys]::Control -and $key -in @([Windows.Forms.Keys]::Up,[Windows.Forms.Keys]::Down,[Windows.Forms.Keys]::Home,[Windows.Forms.Keys]::End,[Windows.Forms.Keys]::PageUp,[Windows.Forms.Keys]::PageDown)) {
             $eventArgs.SuppressKeyPress=$true
             Invoke-ManageRowKeyboardMove -Row $sender -Key $key -Reorder:$true
         }
@@ -14976,12 +15101,13 @@ function Get-NormalBootFocusedGuid {
 }
 
 function Restore-NormalBootFocusedGuid {
-    param($ContentPanel,[string]$Guid)
+    param($ContentPanel,[string]$Guid,[Nullable[bool]]$KeyboardCue)
     if ($script:IsManageEntriesMode -or -not $Guid -or -not $ContentPanel -or $ContentPanel.IsDisposed) { return }
     foreach ($row in @($ContentPanel.Controls | Where-Object {
         $_.Name -eq 'BootRow' -and -not $_.IsDisposed
     })) {
         if (([string]$row.Tag).ToLowerInvariant() -eq $Guid.ToLowerInvariant()) {
+            if ($null -ne $KeyboardCue -and $row.PSObject.Methods['SetKeyboardCue']) { $row.SetKeyboardCue([bool]$KeyboardCue) }
             [void]$row.Focus()
             Set-NormalBootRowVisible -Row $row
             return
@@ -15000,11 +15126,17 @@ function Invoke-PopupRowsReconciliation {
     $focusedNormalGuid = if (-not $Snapshot.Mode) {
         Get-NormalBootFocusedGuid -ContentPanel $ContentPanel
     } else { '' }
+    $focusedNormalRow = if ($focusedNormalGuid) { $existingRows | Where-Object { $_.Focused -and [string]$_.Tag -eq $focusedNormalGuid } | Select-Object -First 1 }
+    $normalCue = if ($focusedNormalRow -and $focusedNormalRow.PSObject.Properties['KeyboardCueEnabled']) { [bool]$focusedNormalRow.KeyboardCueEnabled } else { $true }
+    $manageAnchor = if ($Snapshot.Mode -and $script:PopupRowsRenderedMode) { $existingRows | Where-Object { $_.TabStop -and $_.PSObject.Properties['ManageKeyboardMode'] -and $_.ManageKeyboardMode } | Select-Object -First 1 }
+    $manageAnchorGuid = if ($manageAnchor) { [string]$manageAnchor.Tag } else { '' }
+    $manageAnchorIndex = if ($manageAnchor) { [int]$manageAnchor.TabIndex } else { 0 }
     $focusedManageRow = if ($Snapshot.Mode -and $script:PopupRowsRenderedMode) {
         $existingRows | Where-Object { $_.Focused -and $_.TabStop } | Select-Object -First 1
     }
     $focusedManageGuid = if ($focusedManageRow) { [string]$focusedManageRow.Tag } else { '' }
     $focusedManageIndex = if ($focusedManageRow) { [int]$focusedManageRow.TabIndex } else { -1 }
+    $manageCue = if ($focusedManageRow -and $focusedManageRow.PSObject.Properties['KeyboardCueEnabled']) { [bool]$focusedManageRow.KeyboardCueEnabled } else { $true }
     if ($activeDrag) { Reset-ManageDragPreview }
     $previousSignatures = $script:PopupRowsRowSignatures
     $canReconcile = [object]::ReferenceEquals($script:PopupRowsContentPanel, $contentPanel) -and
@@ -15090,13 +15222,15 @@ function Invoke-PopupRowsReconciliation {
     finally { $contentPanel.ResumeLayout() }
     # Restore only if a normal row really owned focus before reconciliation.
     # Switching to Restart/settings/Manage Entries must never steal focus.
-    Restore-NormalBootFocusedGuid -ContentPanel $ContentPanel -Guid $focusedNormalGuid
+    Restore-NormalBootFocusedGuid -ContentPanel $ContentPanel -Guid $focusedNormalGuid -KeyboardCue:$normalCue
     if ($Snapshot.Mode) {
-        foreach ($row in @($ContentPanel.Controls | Where-Object { $_.Name -eq 'BootRow' })) {
-            Update-ManageKeyboardRowPresentation -Row $row
-        }
+        $manageRows = @($ContentPanel.Controls | Where-Object { $_.Name -eq 'BootRow' -and $_.PSObject.Properties['ManageKeyboardMode'] -and $_.ManageKeyboardMode } | Sort-Object Top)
+        foreach ($row in $manageRows) { Update-ManageKeyboardRowPresentation -Row $row }
+        $anchor = $manageRows | Where-Object { [string]$_.Tag -eq $manageAnchorGuid } | Select-Object -First 1
+        if (-not $anchor -and $manageRows.Count -gt 0) { $anchor = $manageRows[[Math]::Min($manageAnchorIndex,$manageRows.Count-1)] }
+        if ($anchor) { $anchor.SetManageTabAnchor() }
         if ($focusedManageGuid -and -not $script:ManageAliasEditGuid) {
-            Restore-ManageRowFocus -Guid $focusedManageGuid -FallbackIndex $focusedManageIndex
+            Restore-ManageRowFocus -Guid $focusedManageGuid -FallbackIndex $focusedManageIndex -KeyboardCue:$manageCue
         }
     }
     return [int]$affected
@@ -15450,13 +15584,10 @@ function Add-PopupBootEntryListSection {
 
     $listPanel.Add_MouseWheel({
         param($sender, $eventArgs)
-        $bar = $sender.Controls['EntryScroll']
-        if ($bar -and $bar.Visible) {
-            $direction = if ($eventArgs.Delta -gt 0) { -1 } else { 1 }
-            $bar.Value = $bar.Value + ($direction * $bar.SmallChange)
-        }
+        Invoke-BootEntryWheelScroll -ListPanel $sender -EventArgs $eventArgs
     })
-    $listPanel.Add_MouseEnter({ if (-not $script:IsManageEntriesMode) { $this.Focus() } })
+    # Hover never changes keyboard ownership. Mouse-wheel delivery remains
+    # on the existing list/row handlers and the form's list hit-test route.
     $Root.Controls.Add($listPanel)
 }
 
@@ -15504,6 +15635,12 @@ function Add-PopupNavigationRowHandlers {
         if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($control,(Get-LocalizedString -Key $hintKey)) }
         $control.Add_MouseEnter({ param($sender,$eventArgs) Set-PopupNavigationRowHover -Control $sender -Hover $true })
         $control.Add_MouseLeave({ param($sender,$eventArgs) Set-PopupNavigationRowHover -Control $sender -Hover $false })
+        $control.Add_MouseDown({
+            param($sender,$eventArgs)
+            if ($eventArgs.Button -ne [Windows.Forms.MouseButtons]::Left) { return }
+            $target = Get-PopupNavigationRow -Control $sender
+            if (Test-PopupNavigationRowInteractive -Row $target) { Set-LenovoPointerFocus -Control $target }
+        })
         $control.Add_Click({ param($sender,$eventArgs) Invoke-PopupNavigationRow -Control $sender })
     }
     $Row.Add_KeyDown({
@@ -16168,6 +16305,12 @@ function New-ConfigurationPopup {
     $autostartLabel.Location = [Drawing.Point]::new(16,32)
     $autostartLabel.Size = [Drawing.Size]::new(286,52)
     $autostartLabel.Cursor = [Windows.Forms.Cursors]::Hand
+    $autostartLabel.Add_MouseDown({
+        param($sender,$eventArgs)
+        if ($eventArgs.Button -eq [Windows.Forms.MouseButtons]::Left -and (Test-ConfigurationActionAvailable -Action 'autostart')) {
+            Set-LenovoPointerFocus -Control $sender.Parent.Controls['ConfigurationAutostart']
+        }
+    })
     $autostartLabel.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })
     $form.Tag.Body.Controls.Add($autostartLabel)
     $check = New-Object LenovoSettingsToggle
@@ -16454,6 +16597,13 @@ function New-PopupForm {
 
     # v0.2.28: no window region is applied; the popup stays rectangular.
 
+    $form.Add_MouseWheel({
+        param($sender,$eventArgs)
+        $list = $sender.Controls.Find('EntryList',$true) | Select-Object -First 1
+        if ($list -and $list.Visible -and $list.RectangleToScreen($list.ClientRectangle).Contains([Windows.Forms.Cursor]::Position)) {
+            Invoke-BootEntryWheelScroll -ListPanel $list -EventArgs $eventArgs
+        }
+    })
     $form.Add_KeyDown({
         param($sender, $eventArgs)
         Invoke-PopupEscapeDismissal -Form $sender -EventArgs $eventArgs

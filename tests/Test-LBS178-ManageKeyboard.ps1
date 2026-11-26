@@ -107,7 +107,7 @@ foreach ($locale in @('de-DE','en-US')) {
             $undo=$form.Controls.Find('ManageUndoButton',$true)[0]
             $save=$form.Controls.Find('ManageSaveButton',$true)[0]
             $cancel=$form.Controls.Find('ManageCancelButton',$true)[0]
-            Check "$locale/$scale rows and hidden row focusable" ($first.TabStop -and $second.TabStop -and $first.Focus() -and $first.Focused -and $first.AccessibleRole -eq [Windows.Forms.AccessibleRole]::ListItem)
+            Check "$locale/$scale rows and hidden row focusable" ($first.Focus() -and $first.Focused -and $first.TabStop -and -not $second.TabStop -and $second.CanFocus -and $first.AccessibleRole -eq [Windows.Forms.AccessibleRole]::ListItem)
             $flags=[Reflection.BindingFlags]::Instance -bor [Reflection.BindingFlags]::NonPublic
             $inputMethod=$first.GetType().GetMethod('IsInputKey',$flags)
             Check "$locale/$scale native input routing" ([bool]$inputMethod.Invoke($first,[object[]]@($ctrlE)) -and [bool]$inputMethod.Invoke($first,[object[]]@($ctrlDown)) -and [bool]$inputMethod.Invoke($first,[object[]]@([Windows.Forms.Keys]::Space)))
@@ -120,9 +120,10 @@ foreach ($locale in @('de-DE','en-US')) {
             } finally {$bmp.Dispose()}
             $tab=$first.GetType().GetMethod('ProcessDialogKey',$flags)
             [void]$tab.Invoke($first,[object[]]@([Windows.Forms.Keys]::Tab))
-            Check "$locale/$scale native Tab traverses next row" ($second.Focused)
-            [void]$tab.Invoke($second,[object[]]@([Windows.Forms.Keys]::Tab -bor [Windows.Forms.Keys]::Shift))
-            Check "$locale/$scale native Shift Tab traverses previous row" ($first.Focused)
+            Check "$locale/$scale native Tab exits list to Cancel when Undo disabled" ($cancel.Focused)
+            $reverseTab=$cancel.GetType().GetMethod('ProcessDialogKey',$flags)
+            [void]$reverseTab.Invoke($cancel,[object[]]@([Windows.Forms.Keys]::Tab -bor [Windows.Forms.Keys]::Shift))
+            Check "$locale/$scale native Shift Tab returns to last focused row" ($first.Focused)
             Press-Key $first ([Windows.Forms.Keys]::Down)
             Check "$locale/$scale navigation includes hidden entry" ($second.Focused -and $script:ManageUndoHistory.Count -eq 0)
             Press-Key $second ([Windows.Forms.Keys]::End)

@@ -192,13 +192,10 @@ function Add-PopupBootEntryListSection {
 
     $listPanel.Add_MouseWheel({
         param($sender, $eventArgs)
-        $bar = $sender.Controls['EntryScroll']
-        if ($bar -and $bar.Visible) {
-            $direction = if ($eventArgs.Delta -gt 0) { -1 } else { 1 }
-            $bar.Value = $bar.Value + ($direction * $bar.SmallChange)
-        }
+        Invoke-BootEntryWheelScroll -ListPanel $sender -EventArgs $eventArgs
     })
-    $listPanel.Add_MouseEnter({ if (-not $script:IsManageEntriesMode) { $this.Focus() } })
+    # Hover never changes keyboard ownership. Mouse-wheel delivery remains
+    # on the existing list/row handlers and the form's list hit-test route.
     $Root.Controls.Add($listPanel)
 }
 
@@ -246,6 +243,12 @@ function Add-PopupNavigationRowHandlers {
         if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($control,(Get-LocalizedString -Key $hintKey)) }
         $control.Add_MouseEnter({ param($sender,$eventArgs) Set-PopupNavigationRowHover -Control $sender -Hover $true })
         $control.Add_MouseLeave({ param($sender,$eventArgs) Set-PopupNavigationRowHover -Control $sender -Hover $false })
+        $control.Add_MouseDown({
+            param($sender,$eventArgs)
+            if ($eventArgs.Button -ne [Windows.Forms.MouseButtons]::Left) { return }
+            $target = Get-PopupNavigationRow -Control $sender
+            if (Test-PopupNavigationRowInteractive -Row $target) { Set-LenovoPointerFocus -Control $target }
+        })
         $control.Add_Click({ param($sender,$eventArgs) Invoke-PopupNavigationRow -Control $sender })
     }
     $Row.Add_KeyDown({
@@ -910,6 +913,12 @@ function New-ConfigurationPopup {
     $autostartLabel.Location = [Drawing.Point]::new(16,32)
     $autostartLabel.Size = [Drawing.Size]::new(286,52)
     $autostartLabel.Cursor = [Windows.Forms.Cursors]::Hand
+    $autostartLabel.Add_MouseDown({
+        param($sender,$eventArgs)
+        if ($eventArgs.Button -eq [Windows.Forms.MouseButtons]::Left -and (Test-ConfigurationActionAvailable -Action 'autostart')) {
+            Set-LenovoPointerFocus -Control $sender.Parent.Controls['ConfigurationAutostart']
+        }
+    })
     $autostartLabel.Add_Click({ param($sender,$eventArgs) Invoke-ConfigurationPopupAction -Control $sender })
     $form.Tag.Body.Controls.Add($autostartLabel)
     $check = New-Object LenovoSettingsToggle
