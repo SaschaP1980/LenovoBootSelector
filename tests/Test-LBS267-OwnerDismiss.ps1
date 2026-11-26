@@ -42,6 +42,10 @@ Add-Type -TypeDefinition ($template.Substring($begin,$end-$begin)) -ReferencedAs
 . (Join-Path $root 'src\UI\DefaultTargetMenu.ps1')
 . (Join-Path $root 'src\UI\DefaultTargetPresentation.ps1')
 . (Join-Path $root 'src\UI\Dialogs.ps1')
+. (Join-Path $root 'src\Core\SystemStatus.ps1')
+. (Join-Path $root 'src\UI\SystemStatusPresentation.ps1')
+. (Join-Path $root 'src\Application\RefreshRuntime.ps1')
+. (Join-Path $root 'src\UI\RefreshPresentation.ps1')
 $script:ColorBackground=[Drawing.Color]::FromArgb(31,31,31)
 $script:ColorHeader=[Drawing.Color]::Black
 $script:ColorRow=$script:ColorBackground
@@ -62,6 +66,7 @@ $script:DefaultTargetReadUncertain=$false
 $script:Busy=$false
 $script:Drift=$false
 $script:Ready=$true
+$script:BackgroundRefreshState=New-BackgroundRefreshRuntimeState
 $script:ActiveAuxiliaryPopup=$null
 $script:Checks=0
 $script:Lbs247Checks=0
@@ -161,8 +166,9 @@ try {
     foreach ($locale in @('de-DE','en-US')) {
         $script:Locale=$locale
         Add-PopupSettingsSection -Root $rootPanel
-        foreach ($kind in @('SettingsPanel','DefaultPanel')) {
-            $trigger=$rootPanel.Controls[$kind]
+        Add-PopupHeaderSection -Root $rootPanel
+        foreach ($kind in @('SettingsPanel','DefaultPanel','HeaderSystemStatusButton')) {
+            $trigger=$rootPanel.Controls.Find($kind,$true) | Select-Object -First 1
             foreach ($case in @('content','trigger','overlap','nested','escape','x','normal-child')) {
                 $script:Case=$case
                 $script:Kind=$kind
@@ -173,12 +179,22 @@ try {
                 $script:BeforeBoot=$script:BootCalls
                 $script:BeforeDefault=$script:DefaultCalls.Count
                 $script:BeforeActions=$script:Actions.Count
+                $script:OpeningWatch=[Diagnostics.Stopwatch]::StartNew()
                 $timer=New-Object Windows.Forms.Timer
                 $timer.Interval=100
                 $timer.Add_Tick({
                     param($sender,$eventArgs)
                     $child=$script:ActiveAuxiliaryPopup
-                    if (-not $child -or -not $child.Visible) { return }
+                    if (-not $child -or -not $child.Visible -or -not $child.Tag.InitialModalActivationComplete) {
+                        if ($child -and $child.Visible) {
+                            Write-Host "LBS267 INITIAL LIFECYCLE pending kind=$script:Kind case=$script:Case shieldCount=$(@($script:OwnerProbe.OwnedForms | Where-Object Name -eq 'AuxiliaryOwnerClickShield').Count) elapsed=$($script:OpeningWatch.ElapsedMilliseconds)"
+                        }
+                        if ($script:OpeningWatch.ElapsedMilliseconds -lt 5000) { return }
+                        $sender.Stop()
+                        $script:ProbeError='LBS267 initial native modal lifecycle did not complete within 5 seconds'
+                        if ($child -and $child.Visible) { $child.Tag.Close.PerformClick() }
+                        return
+                    }
                     $sender.Stop()
                     try {
                         $main=$script:OwnerProbe
@@ -198,6 +214,11 @@ try {
                                 $row=$child.Tag.Body.Controls | Where-Object { $_.Name -eq 'DefaultPickerRow' -and $_.Tag.Guid -eq 'a' } | Select-Object -First 1
                                 $p=Center-Lbs267 $row
                                 Click-Lbs267 $p -Down -Up
+                            } elseif ($script:Kind -eq 'HeaderSystemStatusButton') {
+                                $value=$child.Tag.Body.Controls['SystemStatusValue-Summary']
+                                Click-Lbs267 (Center-Lbs267 $value) -Down -Up
+                                Assert-Lbs267 'LBS182 read-only child remains open without dispatch' ($child.Visible -and $script:Actions.Count -eq $script:BeforeActions -and $script:BootCalls -eq $script:BeforeBoot -and $script:DefaultCalls.Count -eq $script:BeforeDefault)
+                                $child.Tag.Close.PerformClick()
                             } else {
                                 $toggle=$child.Tag.Body.Controls['ConfigurationAutostart']
                                 if (-not $toggle) { throw 'Native toggle missing' }
@@ -261,7 +282,7 @@ try {
                 try {
                     [void]$trigger.Focus()
                     $timer.Start()
-                    Invoke-PopupNavigationRow -Control $trigger
+                    if ($kind -eq 'HeaderSystemStatusButton') { $trigger.PerformClick() } else { Invoke-PopupNavigationRow -Control $trigger }
                 } finally { $timer.Stop();$timer.Dispose() }
                 if ($script:ProbeError) { throw $script:ProbeError }
                 Assert-Lbs267 "$locale/$kind/$case owner and shield fully restored" ($script:Observed -and $script:ShieldProbe.IsDisposed -and -not $script:ActiveAuxiliaryPopup -and $owner.Visible -and $owner.ContainsFocus -and $trigger.Focused -and [Lbs267Native]::IsWindowEnabled($owner.Handle) -and @($owner.OwnedForms | Where-Object Name -in @('AuxiliaryOwnerClickShield','AuxiliaryOwnerDimmer')).Count -eq 0)
@@ -286,5 +307,5 @@ try {
     [Windows.Forms.Cursor]::Position=$cursor
     $owner.Dispose();$tray.Dispose()
 }
-Write-Host "LBS267 OWNER DISMISS TOTAL $script:Checks/155"
-if ($script:Checks -ne 155) { throw "Unexpected LBS267 total $script:Checks" }
+Write-Host "LBS267 OWNER DISMISS TOTAL $script:Checks/233"
+if ($script:Checks -ne 233) { throw "Unexpected LBS267 total $script:Checks" }

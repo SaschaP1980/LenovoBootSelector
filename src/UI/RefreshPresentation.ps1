@@ -15,6 +15,7 @@ function Set-HeaderUpdateInteractionState {
 
 function Update-HeaderRefreshStatus {
     $capabilities = Get-CurrentSystemFunctionsCapabilities
+    $script:SystemStatusCapabilities = $capabilities
     if ([string]$capabilities.State -eq 'Busy') {
         if ($script:HeaderStatusLabel -and -not $script:HeaderStatusLabel.IsDisposed) {
             $script:HeaderStatusLabel.Text = Get-MaintenanceBusyStatusText
@@ -72,7 +73,9 @@ function Update-RefreshButtonVisual {
     try { $active = (Test-BackgroundRefreshActive -State $script:BackgroundRefreshState) } catch { }
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     $script:RefreshButton.Enabled = [bool]$capabilities.CanRefresh
+    $script:RefreshButton.Cursor = if ($script:RefreshButton.Enabled) { [Windows.Forms.Cursors]::Hand } else { [Windows.Forms.Cursors]::Default }
     $script:RefreshButton.ForeColor = if ($active -or $script:RefreshButtonHovered) { $script:ColorAccent } else { $script:ColorSecondary }
+    $script:RefreshButton.Invalidate()
     Update-HeaderRefreshStatus
 }
 

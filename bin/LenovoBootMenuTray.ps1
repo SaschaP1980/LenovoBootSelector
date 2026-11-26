@@ -112,6 +112,43 @@ function Get-LocalizationCatalogCore {
             'Popup.Customize' = 'CUSTOMIZE'
             'Status.ScrollPositionFailed' = 'The scroll position could not be updated.'
             'Settings.Title' = 'SETTINGS'
+            'SystemStatus.Title' = 'System status'
+            'SystemStatus.Subtitle' = 'Boot configuration and readiness'
+            'SystemStatus.SummaryReady' = 'No action required in the last checks'
+            'SystemStatus.SummaryAttention' = 'Action required'
+            'SystemStatus.SummaryUnknown' = 'Status not fully verified'
+            'SystemStatus.SummaryBusy' = 'Update or operation in progress'
+            'SystemStatus.Stored' = 'SAVED DEFAULT TARGET'
+            'SystemStatus.Next' = 'NEXT RESTART · FIRMWARE READBACK'
+            'SystemStatus.Readiness' = 'SYSTEM FUNCTIONS'
+            'SystemStatus.Drift' = 'BOOT TARGET COMPARISON'
+            'SystemStatus.Freshness' = 'LAST READ / CHECK'
+            'SystemStatus.Unknown' = 'Not verified'
+            'SystemStatus.NoDefault' = 'No default configured'
+            'SystemStatus.Unavailable' = 'Target unavailable'
+            'SystemStatus.FirmwareOrder' = 'Firmware order · no one-time target'
+            'SystemStatus.Matches' = 'Matches saved default'
+            'SystemStatus.Differs' = 'Differs from saved default · allowed'
+            'SystemStatus.Verified' = 'Last confirmed firmware read'
+            'SystemStatus.Ready' = 'Ready · configuration checked'
+            'SystemStatus.Checking' = 'Checking readiness …'
+            'SystemStatus.SetupRequired' = 'Setup required'
+            'SystemStatus.RepairRequired' = 'Repair required'
+            'SystemStatus.ReinitializeRequired' = 'New setup required'
+            'SystemStatus.Busy' = 'System functions are being maintained'
+            'SystemStatus.SetupHint' = 'Open Further settings to set up system functions.'
+            'SystemStatus.RepairHint' = 'Open Further settings to repair system functions.'
+            'SystemStatus.ReinitializeHint' = 'Open Further settings to set up system functions again.'
+            'SystemStatus.DriftNone' = 'No changes detected in last comparison'
+            'SystemStatus.DriftChanged' = 'Changes detected in last comparison'
+            'SystemStatus.RefreshFailed' = 'Last refresh failed · previous evidence only'
+            'SystemStatus.RefreshRunning' = 'Refresh in progress'
+            'SystemStatus.Pending' = 'Target change in progress · not yet confirmed'
+            'SystemStatus.ManagerTime' = 'Next target: {Time}'
+            'SystemStatus.EntriesTime' = 'Boot targets: {Time}'
+            'SystemStatus.ReadinessTime' = 'System functions: {Time}'
+            'SystemStatus.TimeUnknown' = 'unknown'
+            'SystemStatus.Age' = '{Time} · {Minutes} min ago'
             'Settings.More' = 'Further settings'
             'Settings.General' = 'GENERAL'
             'Settings.MoreSubtitle' = 'Manage application and system functions'
@@ -564,6 +601,43 @@ function Get-LocalizationCatalogCore {
             'Popup.Customize' = 'ANPASSEN'
             'Status.ScrollPositionFailed' = 'Scrollposition konnte nicht aktualisiert werden.'
             'Settings.Title' = 'EINSTELLUNGEN'
+            'SystemStatus.Title' = 'Systemstatus'
+            'SystemStatus.Subtitle' = 'Boot-Konfiguration und Einsatzbereitschaft'
+            'SystemStatus.SummaryReady' = 'Bei letzter Prüfung kein Handlungsbedarf'
+            'SystemStatus.SummaryAttention' = 'Handlungsbedarf'
+            'SystemStatus.SummaryUnknown' = 'Status nicht vollständig bestätigt'
+            'SystemStatus.SummaryBusy' = 'Aktualisierung oder Vorgang läuft'
+            'SystemStatus.Stored' = 'GESPEICHERTES STANDARD-STARTZIEL'
+            'SystemStatus.Next' = 'NÄCHSTER START · FIRMWARE-AUSLESUNG'
+            'SystemStatus.Readiness' = 'SYSTEMFUNKTIONEN'
+            'SystemStatus.Drift' = 'ABGLEICH DER BOOT-ZIELE'
+            'SystemStatus.Freshness' = 'LETZTE AUSLESUNG / PRÜFUNG'
+            'SystemStatus.Unknown' = 'Nicht bestätigt'
+            'SystemStatus.NoDefault' = 'Kein Standard-Startziel festgelegt'
+            'SystemStatus.Unavailable' = 'Ziel nicht verfügbar'
+            'SystemStatus.FirmwareOrder' = 'Firmware-Reihenfolge · kein Einmalziel'
+            'SystemStatus.Matches' = 'Entspricht dem Standard-Startziel'
+            'SystemStatus.Differs' = 'Weicht vom Standard ab · zulässig'
+            'SystemStatus.Verified' = 'Zuletzt aus Firmware bestätigt'
+            'SystemStatus.Ready' = 'Bereit · Konfiguration geprüft'
+            'SystemStatus.Checking' = 'Einsatzbereitschaft wird geprüft …'
+            'SystemStatus.SetupRequired' = 'Einrichtung erforderlich'
+            'SystemStatus.RepairRequired' = 'Reparatur erforderlich'
+            'SystemStatus.ReinitializeRequired' = 'Neueinrichtung erforderlich'
+            'SystemStatus.Busy' = 'Systemfunktionen werden bearbeitet'
+            'SystemStatus.SetupHint' = 'Öffne „Weitere Einstellungen“, um die Systemfunktionen einzurichten.'
+            'SystemStatus.RepairHint' = 'Öffne „Weitere Einstellungen“, um die Systemfunktionen zu reparieren.'
+            'SystemStatus.ReinitializeHint' = 'Öffne „Weitere Einstellungen“, um die Systemfunktionen neu einzurichten.'
+            'SystemStatus.DriftNone' = 'Beim letzten Abgleich keine Änderungen erkannt'
+            'SystemStatus.DriftChanged' = 'Beim letzten Abgleich Änderungen erkannt'
+            'SystemStatus.RefreshFailed' = 'Letzte Aktualisierung fehlgeschlagen · frühere Nachweise'
+            'SystemStatus.RefreshRunning' = 'Aktualisierung läuft'
+            'SystemStatus.Pending' = 'Startziel wird geändert · noch nicht bestätigt'
+            'SystemStatus.ManagerTime' = 'Nächstes Startziel: {Time}'
+            'SystemStatus.EntriesTime' = 'Boot-Ziele: {Time}'
+            'SystemStatus.ReadinessTime' = 'Systemfunktionen: {Time}'
+            'SystemStatus.TimeUnknown' = 'unbekannt'
+            'SystemStatus.Age' = '{Time} · vor {Minutes} Min.'
             'Settings.More' = 'Weitere Einstellungen'
             'Settings.General' = 'ALLGEMEIN'
             'Settings.MoreSubtitle' = 'Anwendung und Systemfunktionen verwalten'
@@ -2799,6 +2873,59 @@ public static class LenovoSettingsInk
 }
 
 // LBS-252: the same glyph renderer and layout are used in every state.
+// Header icon ink is independent of native disabled text rendering.
+// Keep the native Button adapter, focus cues, and all input/admission semantics.
+public sealed class LenovoHeaderIconButton : Button
+{
+    public bool InfoIcon { get; set; }
+    public LenovoHeaderIconButton()
+    {
+        SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+    }
+
+    protected override void OnEnabledChanged(EventArgs e)
+    { base.OnEnabledChanged(e); Invalidate(); }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        Color ink = SystemInformation.HighContrast
+            ? (Enabled ? SystemColors.ControlText : SystemColors.GrayText)
+            : (Enabled ? ForeColor : Color.FromArgb(119,119,119));
+        if (SystemInformation.HighContrast) {
+            Rectangle center = ClientRectangle;
+            int inset = Math.Max(2, Math.Min(center.Width,center.Height)/7);
+            center.Inflate(-inset,-inset);
+            using (SolidBrush surface = new SolidBrush(SystemColors.Control))
+                if (center.Width > 0 && center.Height > 0) e.Graphics.FillRectangle(surface,center);
+        }
+        float size = Math.Min(ClientSize.Width,ClientSize.Height) * 0.60f;
+        if (size <= 0) return;
+        GraphicsState saved = e.Graphics.Save();
+        try {
+            e.Graphics.TranslateTransform((ClientSize.Width-size)/2f,(ClientSize.Height-size)/2f);
+            e.Graphics.ScaleTransform(size/24f,size/24f);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using (Pen p = new Pen(ink,2.4f)) {
+                p.StartCap = p.EndCap = LineCap.Round;
+                p.LineJoin = LineJoin.Round;
+                if (InfoIcon) {
+                    e.Graphics.DrawEllipse(p,2.5f,2.5f,19f,19f);
+                    e.Graphics.DrawLine(p,12f,11f,12f,17f);
+                    using (SolidBrush dot = new SolidBrush(ink))
+                        e.Graphics.FillEllipse(dot,10.7f,6.1f,2.6f,2.6f);
+                } else {
+                    e.Graphics.DrawArc(p,3f,3f,18f,18f,185f,153f);
+                    e.Graphics.DrawLines(p,new PointF[] { new PointF(16f,8f),new PointF(21f,8f),new PointF(21f,3f) });
+                    e.Graphics.DrawArc(p,3f,3f,18f,18f,5f,153f);
+                    e.Graphics.DrawLines(p,new PointF[] { new PointF(8f,16f),new PointF(3f,16f),new PointF(3f,21f) });
+                }
+            }
+        }
+        finally { e.Graphics.Restore(saved); }
+    }
+}
+
 // Button retains native input, accessibility, Enabled and Click semantics.
 public sealed class LenovoCustomizeButton : Button
 {
@@ -3322,7 +3449,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.9.3.0'
+$script:AppVersion = '1.10.0.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -3404,6 +3531,18 @@ $script:PreferencesImportMenuItem = $null
 $script:PreferencesUiActive = $false
 $script:TrayExitMenuItem = $null
 $script:RefreshButton = $null
+$script:SystemStatusButton = $null
+$script:SystemStatusCapabilities = $null
+$script:SystemStatusManagerObservedUtc = $null
+$script:SystemStatusManagerObservedHash = $null
+$script:SystemStatusEntriesObservedUtc = $null
+$script:SystemStatusEntriesObservedHash = $null
+$script:SystemStatusReadinessObservedUtc = $null
+$script:SystemStatusNextObservedUtc = $null
+$script:SystemStatusDefaultObservedUtc = $null
+$script:SystemStatusDefaultEvidence = 'unknown'
+$script:SystemStatusLastRefresh = 'unknown'
+$script:SystemStatusDriftFailed = $false
 $script:RefreshButtonHovered = $false
 $script:HeaderTitleLabel = $null
 $script:HeaderStatusLabel = $null
@@ -4503,6 +4642,7 @@ function Set-HeaderUpdateInteractionState {
 
 function Update-HeaderRefreshStatus {
     $capabilities = Get-CurrentSystemFunctionsCapabilities
+    $script:SystemStatusCapabilities = $capabilities
     if ([string]$capabilities.State -eq 'Busy') {
         if ($script:HeaderStatusLabel -and -not $script:HeaderStatusLabel.IsDisposed) {
             $script:HeaderStatusLabel.Text = Get-MaintenanceBusyStatusText
@@ -4560,7 +4700,9 @@ function Update-RefreshButtonVisual {
     try { $active = (Test-BackgroundRefreshActive -State $script:BackgroundRefreshState) } catch { }
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     $script:RefreshButton.Enabled = [bool]$capabilities.CanRefresh
+    $script:RefreshButton.Cursor = if ($script:RefreshButton.Enabled) { [Windows.Forms.Cursors]::Hand } else { [Windows.Forms.Cursors]::Default }
     $script:RefreshButton.ForeColor = if ($active -or $script:RefreshButtonHovered) { $script:ColorAccent } else { $script:ColorSecondary }
+    $script:RefreshButton.Invalidate()
     Update-HeaderRefreshStatus
 }
 
@@ -6912,6 +7054,12 @@ function Update-PopupLocalePresentation {
         foreach ($row in $script:Popup.Controls.Find('SettingsPanel',$true)) {
             $row.AccessibleName = Get-LocalizedString -Key 'Settings.More'
         }
+        if ($script:SystemStatusButton -and -not $script:SystemStatusButton.IsDisposed) {
+            $script:SystemStatusButton.AccessibleName = Get-LocalizedString -Key 'SystemStatus.Title'
+            $script:SystemStatusButton.AccessibleDescription = Get-LocalizedString -Key 'SystemStatus.Subtitle'
+            if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($script:SystemStatusButton,$script:SystemStatusButton.AccessibleName) }
+        }
+        if ($script:RefreshButton) { $script:RefreshButton.AccessibleName = Get-LocalizedString -Key 'Action.RefreshBootTargets' }
         if ($script:HeaderStatusLabel) { $script:HeaderStatusLabel.AccessibleDescription = Get-LocalizedString -Key 'Popup.HeaderUpdateAccessible' }
         if ($script:RestartUseDefaultButton) { $script:RestartUseDefaultButton.AccessibleName = $script:RestartUseDefaultButton.Text }
         if ($script:BootTypeToolTip) {
@@ -9450,11 +9598,13 @@ function Refresh-EffectiveNextBootState {
         $manager = ConvertFrom-FirmwareManagerText -Text ([string]$managerText)
         $script:SelectedGuid = if ($manager.SelectedGuid) { ([string]$manager.SelectedGuid).ToLowerInvariant() } else { $null }
         $script:NextBootFirmwareReadVerified = $true
+        $script:SystemStatusNextObservedUtc = $script:SystemStatusManagerObservedUtc
         Update-RestartTargetUi
         return $script:SelectedGuid
     }
     catch {
         $script:NextBootFirmwareReadVerified = $false
+        $script:SystemStatusNextObservedUtc = $null
         $script:SelectedGuid = $null
         Update-RestartTargetUi
         throw
@@ -9811,6 +9961,23 @@ function Read-TaskBrokerTextFile {
     return [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
 }
 
+# Bind status-only timestamps to the actual observed cache content.
+# Failure leaves provenance unknown; never changes the authorized read result.
+function Get-SystemStatusObservationHash {
+    param([AllowNull()][string]$Text)
+    if ([string]::IsNullOrEmpty($Text)) { return $null }
+    try {
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try { return [Convert]::ToBase64String($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Text))) }
+        finally { $sha.Dispose() }
+    } catch { return $null }
+}
+function Test-SystemStatusObservationMatch {
+    param([AllowNull()][string]$Text,[AllowNull()][string]$ExpectedHash)
+    if (-not $ExpectedHash) { return $false }
+    return ((Get-SystemStatusObservationHash $Text) -ceq $ExpectedHash)
+}
+
 function Refresh-ManagerCache {
     param([switch]$Force)
     $meta = Get-TaskBrokerMetadata
@@ -9825,6 +9992,8 @@ function Refresh-ManagerCache {
         Invoke-AuthorizedTask -Operation 'ManagerRefresh' | Out-Null
         $script:ManagerCacheText = Read-TaskBrokerTextFile -Path ([string]$meta.managerFile)
         $script:ManagerCacheUtc = [datetime]::UtcNow
+        $script:SystemStatusManagerObservedHash = Get-SystemStatusObservationHash $script:ManagerCacheText
+        $script:SystemStatusManagerObservedUtc = if ($script:SystemStatusManagerObservedHash) { $script:ManagerCacheUtc } else { $null }
         $sw.Stop()
         Write-RuntimeDiagnosticEvent -Event 'MANAGER_REFRESH' -Stage 'manager-refresh' -Success $true -DurationMs $sw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{ force = [bool]$Force; bytes = $script:ManagerCacheText.Length })
         return $script:ManagerCacheText
@@ -9850,6 +10019,8 @@ function Refresh-FirmwareCache {
         Invoke-AuthorizedTask -Operation 'FirmwareRefresh' | Out-Null
         $script:FirmwareCacheText = Read-TaskBrokerTextFile -Path ([string]$meta.firmwareFile)
         $script:FirmwareCacheUtc = [datetime]::UtcNow
+        $script:SystemStatusEntriesObservedHash = Get-SystemStatusObservationHash $script:FirmwareCacheText
+        $script:SystemStatusEntriesObservedUtc = if ($script:SystemStatusEntriesObservedHash) { $script:FirmwareCacheUtc } else { $null }
         $sw.Stop()
         Write-RuntimeDiagnosticEvent -Event 'FIRMWARE_REFRESH' -Stage 'firmware-refresh' -Success $true -DurationMs $sw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{ force = [bool]$Force; bytes = $script:FirmwareCacheText.Length })
         return $script:FirmwareCacheText
@@ -9881,6 +10052,7 @@ function Get-TaskBrokerInteractiveReady {
 function Reset-TaskBrokerReadyCache {
     $script:TaskBrokerReadyCached = $null
     $script:TaskBrokerReadyCachedUtc = [datetime]::MinValue
+    $script:SystemStatusReadinessObservedUtc = $null
 }
 
 
@@ -9933,6 +10105,7 @@ function Test-TaskBrokerReady {
     Write-RuntimeDiagnosticEvent -Event 'TASKBROKER_READY_CHECK' -Stage 'ready' -Success $ready -DurationMs $sw.ElapsedMilliseconds -ErrorRecord $failure -Data (New-RuntimeDiagnosticData @{ force = [bool]$Force; requiredTaskCount = $requiredCount; failedTask = $failedTask; brokerPresent = [bool](Test-TaskBrokerInstallationPresent) }) -Level $(if ($ready) { 'info' } else { 'error' })
     $script:TaskBrokerReadyCached = $ready
     $script:TaskBrokerReadyCachedUtc = [datetime]::UtcNow
+    $script:SystemStatusReadinessObservedUtc = $script:TaskBrokerReadyCachedUtc
     return $ready
 }
 function Test-TaskBrokerInstallationPresent {
@@ -9960,6 +10133,7 @@ function Get-TaskBrokerFirmwareManagerText {
         if (-not $meta) { throw 'TaskBroker-Metadaten fehlen.' }
         if (-not $script:ManagerCacheText) {
             $script:ManagerCacheText = Read-TaskBrokerTextFile -Path ([string]$meta.managerFile)
+            if (-not (Test-SystemStatusObservationMatch $script:ManagerCacheText $script:SystemStatusManagerObservedHash)) { $script:SystemStatusManagerObservedUtc = $null; $script:SystemStatusManagerObservedHash = $null }
             try { $script:ManagerCacheUtc = (Get-Item -LiteralPath ([string]$meta.managerFile)).LastWriteTimeUtc } catch { }
         }
         return $script:ManagerCacheText
@@ -9979,6 +10153,7 @@ function Get-TaskBrokerFirmwareEntriesText {
         if (-not $meta) { throw 'TaskBroker-Metadaten fehlen.' }
         if (-not $script:FirmwareCacheText) {
             $script:FirmwareCacheText = Read-TaskBrokerTextFile -Path ([string]$meta.firmwareFile)
+            if (-not (Test-SystemStatusObservationMatch $script:FirmwareCacheText $script:SystemStatusEntriesObservedHash)) { $script:SystemStatusEntriesObservedUtc = $null; $script:SystemStatusEntriesObservedHash = $null }
             try { $script:FirmwareCacheUtc = (Get-Item -LiteralPath ([string]$meta.firmwareFile)).LastWriteTimeUtc } catch { }
         }
         return $script:FirmwareCacheText
@@ -10004,15 +10179,31 @@ function Sync-TaskBrokerFirmwareCachesFromFiles {
 }
 
 function Get-TaskBrokerDefaultTargetGuid {
+    $script:SystemStatusDefaultEvidence = 'unknown'
+    $script:SystemStatusDefaultObservedUtc = $null
     $meta = Get-TaskBrokerMetadata
     if (-not $meta -or -not [string]$meta.defaultFile) { return $null }
 
     $path = [string]$meta.defaultFile
-    if (-not (Test-Path -LiteralPath $path)) { return $null }
+    if (-not (Test-Path -LiteralPath $path)) {
+        if (Test-TaskBrokerMetadataContract -Metadata $meta) {
+            $script:SystemStatusDefaultEvidence = 'none'
+            $script:SystemStatusDefaultObservedUtc = [datetime]::UtcNow
+        }
+        return $null
+    }
 
     $candidate = ([System.IO.File]::ReadAllText($path)).Trim().ToLowerInvariant()
     $target = Get-TaskBrokerTarget -Guid $candidate
-    if ($target) { return $candidate }
+    if ($target) {
+        $script:SystemStatusDefaultEvidence = 'configured'
+        $script:SystemStatusDefaultObservedUtc = [datetime]::UtcNow
+        return $candidate
+    }
+    if (-not $candidate) {
+        $script:SystemStatusDefaultEvidence = 'none'
+        $script:SystemStatusDefaultObservedUtc = [datetime]::UtcNow
+    } else { $script:SystemStatusDefaultEvidence = 'unavailable' }
     return $null
 }
 
@@ -10223,6 +10414,7 @@ function Update-BootTargetDriftState {
         $descriptions = ConvertFrom-FirmwareEntriesText -Text $firmwareText
         $drift = Compare-BootTargetDriftCore -InstalledTargets @($meta.targets) -Descriptions $descriptions -DisplayOrder @($manager.DisplayOrder)
         [void](Set-BootTargetDriftRuntimeState -State $script:BootTargetDriftState -Drift $drift)
+        $script:SystemStatusDriftFailed = $false
         Write-RuntimeDiagnosticEvent -Event 'BOOT_TARGET_DRIFT_CHECK' -Stage 'drift' -Success $true -Data (New-RuntimeDiagnosticData @{
             hasDrift = [bool]$drift.HasDrift
             hasNewTargets = [bool]$drift.HasNewTargets
@@ -10234,6 +10426,7 @@ function Update-BootTargetDriftState {
         return [bool]$drift.HasDrift
     }
     catch {
+        $script:SystemStatusDriftFailed = $true
         Write-RuntimeDiagnosticEvent -Event 'BOOT_TARGET_DRIFT_CHECK' -Stage 'drift' -Success $false -ErrorRecord $_ -Level warning
         return $false
     }
@@ -10468,6 +10661,15 @@ function Complete-TaskBrokerRemove {
         $script:TaskBrokerRemoveTimer = $null
     }
     $script:TaskBrokerRemoveProcess = $null
+    $script:SystemStatusManagerObservedUtc = $null
+    $script:SystemStatusManagerObservedHash = $null
+    $script:SystemStatusEntriesObservedUtc = $null
+    $script:SystemStatusEntriesObservedHash = $null
+    $script:SystemStatusReadinessObservedUtc = $null
+    $script:SystemStatusNextObservedUtc = $null
+    $script:SystemStatusDefaultObservedUtc = $null
+    $script:SystemStatusDefaultEvidence = 'unknown'
+    $script:SystemStatusLastRefresh = 'unknown'
     $script:TaskBrokerMetadata = $null
     $script:ManagerCacheText = $null
     $script:FirmwareCacheText = $null
@@ -11169,7 +11371,7 @@ function Invoke-BackgroundRefreshWorker {
 
     $total = [System.Diagnostics.Stopwatch]::StartNew()
     $timings = [ordered]@{ ReadyMs = 0; ManagerMs = 0; FirmwareMs = 0; StorageMs = 0; TotalMs = 0 }
-    $result = [ordered]@{ Success = $false; Error = $null; Stage = 'ready'; StorageContext = $null; Timings = $timings }
+    $result = [ordered]@{ Success = $false; Error = $null; Stage = 'ready'; StorageContext = $null; Timings = $timings; ManagerObservedUtc = $null; ManagerObservedHash = $null; EntriesObservedUtc = $null; EntriesObservedHash = $null; ReadinessObservedUtc = $null }
 
     try {
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -11195,6 +11397,11 @@ function Invoke-BackgroundRefreshWorker {
     }
     finally {
         $total.Stop(); $timings.TotalMs = $total.ElapsedMilliseconds
+        $result.ManagerObservedUtc = $script:SystemStatusManagerObservedUtc
+        $result.ManagerObservedHash = $script:SystemStatusManagerObservedHash
+        $result.EntriesObservedUtc = $script:SystemStatusEntriesObservedUtc
+        $result.EntriesObservedHash = $script:SystemStatusEntriesObservedHash
+        $result.ReadinessObservedUtc = $script:SystemStatusReadinessObservedUtc
         if ($ResultPath) {
             try {
                 $parent = Split-Path -Parent $ResultPath
@@ -11337,6 +11544,8 @@ function Invoke-DefaultTargetWorker {
         SavedGuid = ''
         NextGuid = ''
         NextVerified = $false
+        NextObservedUtc = $null
+        NextObservedHash = $null
         Stage = 'admission'
         Error = ''
     }
@@ -11357,6 +11566,8 @@ function Invoke-DefaultTargetWorker {
         $result.SavedGuid = [string]$script:DefaultGuid
         $result.NextGuid = [string]$script:SelectedGuid
         $result.NextVerified = [bool]$script:NextBootFirmwareReadVerified
+        $result.NextObservedUtc = $script:SystemStatusNextObservedUtc
+        $result.NextObservedHash = $script:SystemStatusManagerObservedHash
         $result.Stage = if ($result.NextVerified) { 'complete' } else { 'next-unverified' }
         $result.Success = $true
     }
@@ -11957,6 +12168,7 @@ function Complete-DefaultTargetChange {
             if ($workerNext -ne $readNext) { throw 'Worker firmware result mismatch.' }
             $script:SelectedGuid = if ($readNext) { $readNext.ToLowerInvariant() } else { $null }
             $script:NextBootFirmwareReadVerified = $true
+            $script:SystemStatusNextObservedUtc = if ($result.NextObservedHash -and (Test-SystemStatusObservationMatch $managerText $result.NextObservedHash)) { $result.NextObservedUtc } else { $null }
             $verifiedNext = $true
         }
         catch { $failure = $_ }
@@ -11966,6 +12178,7 @@ function Complete-DefaultTargetChange {
         # unreadable. Never keep an old "confirmed" next-boot checkmark.
         $script:SelectedGuid = $null
         $script:NextBootFirmwareReadVerified = $false
+        $script:SystemStatusNextObservedUtc = $null
     }
     $outcome = if ($workerSuccess -and $verifiedDefault -and $verifiedNext) { 'complete' }
                elseif ($verifiedDefault) { 'partial' }
@@ -12014,6 +12227,8 @@ function Apply-BackgroundRefreshResult {
             Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_RESULT_IGNORED' -Stage 'maintenance' -Success $true -DurationMs $Result.Timings.TotalMs -Data (New-RuntimeDiagnosticData @{ maintenanceMode = (Get-MaintenanceMode); workerStage = [string]$Result.Stage; workerError = [string]$Result.Error })
             return $false
         }
+        $script:SystemStatusLastRefresh = 'error'
+        if ($Result.ReadinessObservedUtc) { $script:SystemStatusReadinessObservedUtc = $Result.ReadinessObservedUtc }
         if ([string]$Result.Stage -eq 'ready') {
             $script:TaskBrokerReadyCached = $false
             $script:TaskBrokerReadyCachedUtc = [datetime]::UtcNow
@@ -12037,6 +12252,21 @@ function Apply-BackgroundRefreshResult {
     Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_COMPLETED' -Stage 'background-refresh' -Success $true -DurationMs $Result.Timings.TotalMs -Data (New-RuntimeDiagnosticData @{ requestedStorage = $requestedStorage; readyMs = $Result.Timings.ReadyMs; managerMs = $Result.Timings.ManagerMs; firmwareMs = $Result.Timings.FirmwareMs; storageMs = $Result.Timings.StorageMs })
 
     [void](Sync-TaskBrokerFirmwareCachesFromFiles)
+    if ($Result.ManagerObservedHash -and (Test-SystemStatusObservationMatch $script:ManagerCacheText $Result.ManagerObservedHash)) {
+        $script:SystemStatusManagerObservedUtc = $Result.ManagerObservedUtc
+        $script:SystemStatusManagerObservedHash = $Result.ManagerObservedHash
+    } else {
+        $script:SystemStatusManagerObservedUtc = $null
+        $script:SystemStatusManagerObservedHash = $null
+    }
+    if ($Result.EntriesObservedUtc -and $Result.EntriesObservedHash -and (Test-SystemStatusObservationMatch $script:FirmwareCacheText $Result.EntriesObservedHash)) {
+        $script:SystemStatusEntriesObservedUtc = $Result.EntriesObservedUtc
+        $script:SystemStatusEntriesObservedHash = $Result.EntriesObservedHash
+    } elseif (-not $script:SystemStatusEntriesObservedHash -or -not (Test-SystemStatusObservationMatch $script:FirmwareCacheText $script:SystemStatusEntriesObservedHash)) {
+        $script:SystemStatusEntriesObservedUtc = $null
+        $script:SystemStatusEntriesObservedHash = $null
+    }
+    $script:SystemStatusReadinessObservedUtc = $Result.ReadinessObservedUtc
     [void](Update-BootTargetDriftState)
 
     if ($requestedStorage -and $Result.StorageContext) {
@@ -12045,6 +12275,7 @@ function Apply-BackgroundRefreshResult {
 
     $state = Get-FirmwareBootState -UseExistingCache
     Apply-FirmwareBootState -State $state -VerifiedFresh
+    $script:SystemStatusLastRefresh = 'success'
     Update-TaskBrokerUiState -Fast | Out-Null
     Show-BootTargetDriftNotificationIfNeeded
     return $true
@@ -12104,6 +12335,7 @@ function Complete-BackgroundBootRefresh {
     }
     catch {
         Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_COMPLETED' -Stage 'background-refresh' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ requestedStorage = [bool]$context.Request.RefreshStorage }) -Level error
+        $script:SystemStatusLastRefresh = 'error'
         $script:LastStatusText = Get-LocalizedString -Key 'Status.BootTargetsRefreshFailed'
         if ($script:Popup -and -not $script:Popup.IsDisposed) { Update-PopupRows }
     }
@@ -12185,6 +12417,7 @@ function Start-BackgroundBootRefresh {
     }
     catch {
         Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_STARTED' -Stage 'background-refresh' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ refreshStorage = [bool]$request.RefreshStorage; refreshFirmware = [bool]$request.RefreshFirmware }) -Level error
+        $script:SystemStatusLastRefresh = 'error'
         $script:LastStatusText = Get-LocalizedString -Key 'Status.RefreshStartFailed'
         if ($script:Popup -and -not $script:Popup.IsDisposed) { Update-PopupRows }
     }
@@ -15470,6 +15703,7 @@ function Apply-FirmwareBootState {
     $script:CurrentEntries = @($State.Entries)
     $script:SelectedGuid = if ($State.SelectedGuid) { $State.SelectedGuid.ToLowerInvariant() } else { $null }
     $script:NextBootFirmwareReadVerified = [bool]$VerifiedFresh
+    $script:SystemStatusNextObservedUtc = if ($VerifiedFresh) { $script:SystemStatusManagerObservedUtc } else { $null }
 
     if ($script:SelectedGuid) {
         $selected = Get-EntryByGuid $script:SelectedGuid
@@ -15496,11 +15730,13 @@ function Refresh-BootState {
         $state = Get-FirmwareBootState -RefreshStorage:$RefreshStorage -ForceManagerRefresh
         [void](Update-BootTargetDriftState)
         Apply-FirmwareBootState -State $state -VerifiedFresh
+        $script:SystemStatusLastRefresh = 'success'
         $sw.Stop()
         Write-RuntimeDiagnosticEvent -Event 'BOOT_STATE_REFRESH' -Stage 'boot-state' -Success $true -DurationMs $sw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{ refreshStorage = [bool]$RefreshStorage; entryCount = @($state.Entries).Count; selectedGuid = $state.SelectedGuid })
     }
     catch {
         $script:NextBootFirmwareReadVerified = $false
+        $script:SystemStatusLastRefresh = 'error'
         $sw.Stop()
         Write-RuntimeDiagnosticEvent -Event 'BOOT_STATE_REFRESH' -Stage 'boot-state' -Success $false -DurationMs $sw.ElapsedMilliseconds -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ refreshStorage = [bool]$RefreshStorage }) -Level error
         $script:LastStatusText = Get-LocalizedString -Key 'Status.BootTargetsReadFailed'
@@ -15531,7 +15767,7 @@ function Load-BootStateFromExistingCache {
 # is presentation-only and exists only for the auxiliary modal lifetime.
 function Paint-ModalOwnerRefreshGlyph {
     param([Windows.Forms.Button]$Button,[Windows.Forms.PaintEventArgs]$EventArgs)
-    if (-not $script:ActiveAuxiliaryPopup) { return }
+    if (-not $script:ActiveAuxiliaryPopup -or [Windows.Forms.SystemInformation]::HighContrast) { return }
     $brush = [Drawing.SolidBrush]::new($Button.BackColor)
     try { $EventArgs.Graphics.FillRectangle($brush,$Button.ClientRectangle) }
     finally { $brush.Dispose() }
@@ -15551,7 +15787,7 @@ function Add-PopupHeaderSection {
     $header.BackColor = $script:ColorHeader
 
     $headerTitle = New-Label -Text 'Lenovo Boot Selector' -Font (New-Object Drawing.Font('Segoe UI', 11.5, [Drawing.FontStyle]::Bold)) `
-        -ForeColor $script:ColorAccent -X 16 -Y 8 -Width 285 -Height 25
+        -ForeColor $script:ColorAccent -X 16 -Y 8 -Width 278 -Height 25
     $headerTitle.Name = 'HeaderTitleLabel'
     $script:HeaderTitleLabel = $headerTitle
     $header.Controls.Add($headerTitle)
@@ -15571,7 +15807,7 @@ function Add-PopupHeaderSection {
     $headerSub.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
     $headerSub.Padding = New-Object System.Windows.Forms.Padding(0)
     $headerSub.Location = New-Object Drawing.Point(16, 35)
-    $headerSub.Size = New-Object Drawing.Size(300, 21)
+    $headerSub.Size = New-Object Drawing.Size(278, 21)
     $headerSub.TabStop = $false
     $headerSub.Cursor = [System.Windows.Forms.Cursors]::Default
     $headerSub.Name = 'HeaderStatusLabel'
@@ -15594,8 +15830,34 @@ function Add-PopupHeaderSection {
     $script:HeaderStatusLabel = $headerSub
     $header.Controls.Add($headerSub)
 
-    $refresh = New-Object System.Windows.Forms.Button
-    $refresh.Text = '↻'
+    $info = New-Object LenovoHeaderIconButton
+    $info.Name = 'HeaderSystemStatusButton'
+    $info.InfoIcon = $true
+    $info.Text = ''
+    $info.AccessibleName = Get-LocalizedString -Key 'SystemStatus.Title'
+    $info.AccessibleDescription = Get-LocalizedString -Key 'SystemStatus.Subtitle'
+    $info.ForeColor = $script:ColorSecondary
+    $info.BackColor = $script:ColorHeader
+    $info.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $info.FlatAppearance.BorderSize = 0
+    $info.FlatAppearance.MouseOverBackColor = $script:ColorHeader
+    $info.FlatAppearance.MouseDownBackColor = $script:ColorHeader
+    $info.UseVisualStyleBackColor = $false
+    $info.Location = [Drawing.Point]::new(302,12)
+    $info.Size = [Drawing.Size]::new(34,34)
+    $info.Cursor = [Windows.Forms.Cursors]::Hand
+    $info.Add_Paint({ param($sender,$eventArgs) Paint-ModalOwnerRefreshGlyph -Button $sender -EventArgs $eventArgs })
+    $info.Add_MouseEnter({ if ($this.Enabled) { $this.ForeColor = $script:ColorAccent; $this.Invalidate() } })
+    $info.Add_MouseLeave({ $this.ForeColor = $script:ColorSecondary; $this.Invalidate() })
+    $info.Add_Click({ Show-SystemStatusPopup -Owner $this })
+    $script:SystemStatusButton = $info
+    $header.Controls.Add($info)
+    if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($info,(Get-LocalizedString -Key 'SystemStatus.Title')) }
+
+    $refresh = New-Object LenovoHeaderIconButton
+    $refresh.Name = 'HeaderRefreshButton'
+    $refresh.AccessibleName = Get-LocalizedString -Key 'Action.RefreshBootTargets'
+    $refresh.Text = ''
     $refresh.Font = New-Object Drawing.Font('Segoe UI Symbol', 15.0, [Drawing.FontStyle]::Regular)
     $refresh.ForeColor = $script:ColorSecondary
     $refresh.BackColor = $script:ColorHeader
@@ -16134,7 +16396,7 @@ function New-AuxiliaryPopupForm {
     $close.Text = '×'
     $close.AccessibleName = Get-LocalizedString -Key 'Common.Close'
     $close.Cursor = [Windows.Forms.Cursors]::Hand
-    $closeHintKey = if ($Name -eq 'LenovoDefaultTargetPicker') { 'Tooltip.ClosePicker' } else { 'Tooltip.CloseSettings' }
+    $closeHintKey = if ($Name -eq 'LenovoDefaultTargetPicker') { 'Tooltip.ClosePicker' } elseif ($Name -eq 'LenovoSystemStatusPopup') { 'Common.Close' } else { 'Tooltip.CloseSettings' }
     $tip.SetToolTip($close,(Get-LocalizedString -Key $closeHintKey))
     $close.Font = $symbol
     $close.BackColor = $script:ColorHeader
@@ -16211,7 +16473,7 @@ function New-AuxiliaryPopupForm {
         Choice=$null; Scale=0.0; Header=$header; Title=$titleLabel; Subtitle=$subtitleLabel
         Close=$close; Body=$body; Viewport=$viewport; Scroll=$scroll; ContentHeight=$ContentHeight; Tip=$tip
         Regular=$regular; Bold=$bold; Heading=$heading; Symbol=$symbol
-        Fonts=@($regular,$bold,$heading,$large,$symbol); Timer=$null; DefaultSnapshot=$null; ActionInProgress=$false
+        Fonts=@($regular,$bold,$heading,$large,$symbol); Timer=$null; DefaultSnapshot=$null; ActionInProgress=$false; InitialModalActivationComplete=$false
     }
     $form.Add_Disposed({
         param($sender,$eventArgs)
@@ -16500,6 +16762,188 @@ function Show-ConfigurationPopup {
     Update-UpdateMenuState
     Update-LanguageMenuState
     [void](Show-OwnedAuxiliaryPopup -Form (New-ConfigurationPopup) -Owner $Owner)
+}
+
+# LBS-182: read-only status classification; no I/O, privileges or UI state.
+function Resolve-SystemStatusCore {
+    param($Capabilities,[string]$DefaultEvidence,[string]$DefaultName,[string]$DefaultGuid,
+          [bool]$DefaultUncertain,[bool]$NextVerified,[string]$NextName,[string]$NextGuid,
+          [bool]$NextTimeKnown,[bool]$Pending,[bool]$Refreshing,[string]$LastRefresh,
+          $Drift,[bool]$DriftFailed,[bool]$ReadinessTimeKnown,[bool]$EntriesTimeKnown)
+    $state = if ($Capabilities -and $Capabilities.State -in @('Ready','Checking','SetupRequired','RepairRequired','ReinitializeRequired','Busy','Unknown')) { [string]$Capabilities.State } else { 'Unknown' }
+    if ($state -eq 'Ready' -and -not $ReadinessTimeKnown) { $state = 'Unknown' }
+    $default = if ($DefaultUncertain -or $DefaultEvidence -notin @('configured','none','unavailable')) { 'Unknown' }
+        elseif ($DefaultEvidence -eq 'unavailable' -or ($DefaultEvidence -eq 'configured' -and (-not $DefaultGuid -or -not $DefaultName))) { 'Unavailable' }
+        elseif ($DefaultEvidence -eq 'none' -and -not $DefaultGuid) { 'NoDefault' }
+        elseif ($DefaultEvidence -eq 'configured' -and $DefaultGuid -and $DefaultName) { 'Value' } else { 'Unknown' }
+    $next = if ($Pending) { 'Pending' } elseif (-not $NextVerified -or -not $NextTimeKnown) { 'Unknown' }
+        elseif (-not $NextGuid) { 'FirmwareOrder' } elseif (-not $NextName) { 'Unavailable' } else { 'Value' }
+    $relation = if ($next -eq 'Value' -and $default -eq 'Value') {
+        if ($NextGuid -eq $DefaultGuid) { 'Matches' } else { 'Differs' }
+    } else { 'Verified' }
+    $driftKey = if (-not $Drift -or -not $Drift.Evaluated -or $DriftFailed -or -not $EntriesTimeKnown) { 'Unknown' } elseif ($Drift.HasDrift) { 'DriftChanged' } else { 'DriftNone' }
+    $hint = switch ($state) {
+        'SetupRequired' { 'SetupHint' }
+        'RepairRequired' { 'RepairHint' }
+        'ReinitializeRequired' { 'ReinitializeHint' }
+        default { '' }
+    }
+    $summary = if ($state -eq 'Busy' -or $Refreshing -or $Pending -or $state -eq 'Checking') { 'SummaryBusy' }
+        elseif ($state -in @('SetupRequired','RepairRequired','ReinitializeRequired') -or $driftKey -eq 'DriftChanged' -or $next -eq 'Unavailable' -or $default -eq 'Unavailable') { 'SummaryAttention' }
+        elseif ($state -ne 'Ready' -or -not $ReadinessTimeKnown -or $next -eq 'Unknown' -or $default -eq 'Unknown' -or $driftKey -eq 'Unknown' -or $LastRefresh -eq 'error') { 'SummaryUnknown' }
+        else { 'SummaryReady' }
+    [pscustomobject]@{ Summary=$summary; Readiness=$state; Default=$default; DefaultName=$DefaultName; Next=$next; NextName=$NextName;
+        Relation=$relation; Drift=$driftKey; Hint=$hint; Refresh=if ($Refreshing) {'RefreshRunning'} elseif ($LastRefresh -eq 'error') {'RefreshFailed'} else {''} }
+}
+
+# LBS-182: project only existing in-memory observations; no broker/firmware calls.
+function ConvertTo-SystemStatusObservedTime {
+    param($Value)
+    if ($null -eq $Value -or [string]::IsNullOrWhiteSpace([string]$Value)) { return $null }
+    try {
+        $utc = ([datetime]$Value).ToUniversalTime()
+        if ($utc.Year -lt 2000 -or $utc -gt [datetime]::UtcNow) { return $null }
+        return $utc
+    } catch { return $null }
+}
+
+function Format-SystemStatusObservedTime {
+    param($Value)
+    $utc = ConvertTo-SystemStatusObservedTime $Value
+    if (-not $utc) { return (Get-LocalizedString -Key 'SystemStatus.TimeUnknown') }
+    $minutes = [int][Math]::Floor(([datetime]::UtcNow-$utc).TotalMinutes)
+    return (Get-LocalizedString -Key 'SystemStatus.Age' -Values @{ Time=$utc.ToLocalTime().ToString('yyyy-MM-dd HH:mm:ss'); Minutes=$minutes })
+}
+
+function Get-SystemStatusPresentation {
+    $defaultEntry = if ($script:DefaultGuid) { Get-EntryByGuid $script:DefaultGuid }
+    $nextEntry = if ($script:SelectedGuid) { Get-EntryByGuid $script:SelectedGuid }
+    $defaultName = if ($defaultEntry) { Get-EntryDisplayTitle -Entry $defaultEntry } else { '' }
+    $nextName = if ($nextEntry) { Get-EntryDisplayTitle -Entry $nextEntry } else { '' }
+    $nextTime = ConvertTo-SystemStatusObservedTime $script:SystemStatusNextObservedUtc
+    $readinessTime = ConvertTo-SystemStatusObservedTime $script:SystemStatusReadinessObservedUtc
+    $entriesTime = ConvertTo-SystemStatusObservedTime $script:SystemStatusEntriesObservedUtc
+    $refreshing = [bool](Test-BackgroundRefreshActive -State $script:BackgroundRefreshState)
+    $pending = [bool]($script:BootNextPendingGuid -or $script:DefaultTargetChangePending)
+    $model = Resolve-SystemStatusCore -Capabilities $script:SystemStatusCapabilities -DefaultEvidence $script:SystemStatusDefaultEvidence -DefaultName $defaultName -DefaultGuid $script:DefaultGuid -DefaultUncertain ([bool]($script:DefaultTargetReadUncertain -or $script:DefaultTargetChangePending)) -NextVerified ([bool]$script:NextBootFirmwareReadVerified) -NextName $nextName -NextGuid $script:SelectedGuid -NextTimeKnown ([bool]$nextTime) -Pending $pending -Refreshing $refreshing -LastRefresh $script:SystemStatusLastRefresh -Drift $script:BootTargetDriftState -DriftFailed ([bool]$script:SystemStatusDriftFailed) -ReadinessTimeKnown ([bool]$readinessTime) -EntriesTimeKnown ([bool]$entriesTime)
+    return $model
+}
+
+function Update-SystemStatusPopupPresentation {
+    param([Windows.Forms.Form]$Form)
+    $model = Get-SystemStatusPresentation
+    $default = if ($model.Default -eq 'Value') { $model.DefaultName } else { Get-LocalizedString -Key ('SystemStatus.'+$model.Default) }
+    $next = if ($model.Next -eq 'Value') {
+        $model.NextName + [Environment]::NewLine + (Get-LocalizedString -Key ('SystemStatus.'+$model.Relation))
+    } else { Get-LocalizedString -Key ('SystemStatus.'+$model.Next) }
+    $ready = Get-LocalizedString -Key ('SystemStatus.'+$model.Readiness)
+    if ($model.Hint) { $ready += [Environment]::NewLine + (Get-LocalizedString -Key ('SystemStatus.'+$model.Hint)) }
+    $summary = Get-LocalizedString -Key ('SystemStatus.'+$model.Summary)
+    if ($model.Refresh) { $summary += [Environment]::NewLine + (Get-LocalizedString -Key ('SystemStatus.'+$model.Refresh)) }
+    $freshness = @(
+        (Get-LocalizedString -Key 'SystemStatus.ManagerTime' -Values @{Time=(Format-SystemStatusObservedTime $(if ($script:NextBootFirmwareReadVerified) { $script:SystemStatusNextObservedUtc } else { $null }))}),
+        (Get-LocalizedString -Key 'SystemStatus.EntriesTime' -Values @{Time=(Format-SystemStatusObservedTime $script:SystemStatusEntriesObservedUtc)}),
+        (Get-LocalizedString -Key 'SystemStatus.ReadinessTime' -Values @{Time=(Format-SystemStatusObservedTime $script:SystemStatusReadinessObservedUtc)})
+    ) -join [Environment]::NewLine
+    $values = @{Summary=$summary;Stored=$default;Next=$next;Readiness=$ready;Drift=(Get-LocalizedString -Key ('SystemStatus.'+$model.Drift));Freshness=$freshness}
+    foreach ($key in $values.Keys) {
+        $label = $Form.Tag.Body.Controls['SystemStatusValue-'+$key]
+        if ($label -and $label.Text -cne $values[$key]) {
+            $label.Text = $values[$key]
+            $label.AccessibleName = $label.Text
+            $label.AccessibleDescription = $label.Text
+            $Form.Tag.Tip.SetToolTip($label,$label.Text)
+        }
+    }
+    $label = $Form.Tag.Body.Controls['SystemStatusValue-Summary']
+    $label.ForeColor = if ([Windows.Forms.SystemInformation]::HighContrast) { [Drawing.SystemColors]::WindowText } elseif ($model.Summary -in @('SummaryAttention','SummaryUnknown')) { [Drawing.Color]::FromArgb(234,182,94) } else { $script:ColorPrimary }
+}
+
+function Set-SystemStatusPopupWidth {
+    param($Form,[double]$Scale)
+    $margin = [int][Math]::Round(16*$Scale)
+    foreach ($control in $Form.Tag.Body.Controls) {
+        $control.Left = $margin
+        $control.Width = [Math]::Max(1,$Form.Tag.Body.Width-2*$margin)
+    }
+}
+
+function New-SystemStatusPopup {
+    $form = New-AuxiliaryPopupForm -Name 'LenovoSystemStatusPopup' -Title (Get-LocalizedString -Key 'SystemStatus.Title') -Subtitle (Get-LocalizedString -Key 'SystemStatus.Subtitle') -ContentHeight 440
+    $y = 8
+    $highContrast = [Windows.Forms.SystemInformation]::HighContrast
+    $surface = if ($highContrast) { [Drawing.SystemColors]::Window } else { [Drawing.Color]::FromArgb(37,37,37) }
+    $valueInk = if ($highContrast) { [Drawing.SystemColors]::WindowText } else { $script:ColorPrimary }
+    $headingInk = if ($highContrast) { [Drawing.SystemColors]::WindowText } else { $script:ColorSecondary }
+    if ($highContrast) {
+        $form.BackColor = [Drawing.SystemColors]::Window
+        $form.Tag.Body.BackColor = [Drawing.SystemColors]::Window
+        $form.Tag.Viewport.BackColor = [Drawing.SystemColors]::Window
+        $form.Tag.Header.BackColor = [Drawing.SystemColors]::Control
+        $form.Tag.Title.ForeColor = [Drawing.SystemColors]::ControlText
+        $form.Tag.Subtitle.ForeColor = [Drawing.SystemColors]::ControlText
+        $form.Tag.Close.BackColor = [Drawing.SystemColors]::Control
+        $form.Tag.Close.ForeColor = [Drawing.SystemColors]::ControlText
+    }
+    foreach ($row in @(
+        @{Key='Summary';Height=52},
+        @{Key='Stored';Height=40},
+        @{Key='Next';Height=48},
+        @{Key='Readiness';Height=66},
+        @{Key='Drift';Height=34},
+        @{Key='Freshness';Height=64}
+    )) {
+        if ($row.Key -ne 'Summary') {
+            $heading = New-Label -Text (Get-LocalizedString -Key ('SystemStatus.'+$row.Key)) -Font $form.Tag.Heading -ForeColor $headingInk -X 16 -Y $y -Width 358 -Height 20
+            $heading.Name = 'SystemStatusHeading-'+$row.Key
+            $form.Tag.Body.Controls.Add($heading)
+            $y += 20
+        }
+        $label = New-Label -Text '' -Font $form.Tag.Regular -ForeColor $valueInk -X 16 -Y $y -Width 358 -Height $row.Height
+        $label.Name = 'SystemStatusValue-'+$row.Key
+        $label.BackColor = $surface
+        $label.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
+        $label.Padding = [Windows.Forms.Padding]::new(6,2,6,2)
+        $label.AutoEllipsis = $true
+        $label.AccessibleRole = [Windows.Forms.AccessibleRole]::StaticText
+        $form.Tag.Body.Controls.Add($label)
+        $y += $row.Height+4
+    }
+    Update-SystemStatusPopupPresentation -Form $form
+    # Reflect only in-memory state; no extra refresh, readiness probe or hardware polling.
+    $timer = New-Object Windows.Forms.Timer
+    $timer.Interval = 500
+    $timer.Add_Tick({
+        if ($script:ActiveAuxiliaryPopup -and $script:ActiveAuxiliaryPopup.Name -eq 'LenovoSystemStatusPopup') {
+            Update-SystemStatusPopupPresentation -Form $script:ActiveAuxiliaryPopup
+        }
+    })
+    $form.Tag.Timer = $timer
+    # The shared owned-surface lifecycle starts this timer only after its initial activation handler.
+    $form.Add_KeyDown({
+        param($sender,$eventArgs)
+        $scroll = $sender.Tag.Scroll
+        if (-not $scroll.Visible) { return }
+        $delta = switch ($eventArgs.KeyCode) {
+            'PageDown' { $scroll.LargeChange }
+            'PageUp' { -$scroll.LargeChange }
+            'Down' { $scroll.SmallChange }
+            'Up' { -$scroll.SmallChange }
+            default { 0 }
+        }
+        if ($delta) {
+            $scroll.Value = [Math]::Max(0,[Math]::Min($scroll.Maximum,$scroll.Value+$delta))
+            $eventArgs.Handled=$true
+            $eventArgs.SuppressKeyPress=$true
+        }
+    })
+    return $form
+}
+
+function Show-SystemStatusPopup {
+    param([Windows.Forms.Control]$Owner)
+    if ($script:ActiveAuxiliaryPopup -or $script:ActiveOwnedDialog -or -not $Owner -or -not $Owner.Enabled) { return }
+    [void](Show-OwnedAuxiliaryPopup -Form (New-SystemStatusPopup) -Owner $Owner)
 }
 
 # LBS-132: icon-relative placement is pure geometry; shell discovery is best effort.
@@ -16951,6 +17395,7 @@ function Set-AuxiliaryPopupLayout {
     $state.Scroll.LargeChange = $viewportHeight
     $state.Scroll.SmallChange = [Math]::Max(1,[int][Math]::Round(60*$Scale))
     if ($Form.Name -eq 'LenovoConfigurationPopup') { Set-ConfigurationPopupWidth -Form $Form -Scale $Scale }
+    if ($Form.Name -eq 'LenovoSystemStatusPopup') { Set-SystemStatusPopupWidth -Form $Form -Scale $Scale }
     $state.Scroll.Maximum = $range
     $state.Scroll.Value = 0
     $state.Scroll.Visible = ($range -gt 0 -and $gutter -gt 0)
@@ -17408,6 +17853,7 @@ function Show-OwnedAuxiliaryPopup {
     param([System.Windows.Forms.Form]$Form,[System.Windows.Forms.Control]$Owner)
     $dimmer = $null
     $ownerRefreshButton = $null
+    $ownerStatusButton = $null
     try {
         if ($script:ActiveAuxiliaryPopup -or -not $Owner -or $Owner.IsDisposed) { return $null }
         $parent = $Owner.FindForm()
@@ -17421,15 +17867,19 @@ function Show-OwnedAuxiliaryPopup {
             $ownerRefreshButton = $script:RefreshButton
             $ownerRefreshButton.Refresh()
         }
+        if ($script:SystemStatusButton -and -not $script:SystemStatusButton.IsDisposed -and [object]::ReferenceEquals($script:SystemStatusButton.FindForm(),$parent)) {
+            $ownerStatusButton = $script:SystemStatusButton
+            $ownerStatusButton.Refresh()
+        }
         Initialize-AuxiliaryOwnerDimmer
         $dimmer = [LenovoAuxiliaryOwnerDimmer]::new($parent,$Owner,$Form,[double]$scale,(Get-PopupNavigationHoverColor),$script:ColorAccent)
-        if ($Form.Name -in @('LenovoConfigurationPopup','LenovoDefaultTargetPicker')) { $dimmer.EnableOwnerClickDismissal() }
+        if ($Form.Name -in @('LenovoConfigurationPopup','LenovoDefaultTargetPicker','LenovoSystemStatusPopup')) { $dimmer.EnableOwnerClickDismissal() }
         # Show without activation before the child, which retains its normal
         # modal ownership, z-order and focus even on overlapping placement.
         $dimmer.Show($parent)
         # Both supported auxiliary surfaces receive keyboard focus once as
         # part of deliberate modal opening, after the dimmer's connector.
-        if ($Form.Name -in @('LenovoConfigurationPopup','LenovoDefaultTargetPicker')) {
+        if ($Form.Name -in @('LenovoConfigurationPopup','LenovoDefaultTargetPicker','LenovoSystemStatusPopup')) {
             $Form.Add_Shown({
                 param($sender,$eventArgs)
                 if ($sender.IsDisposed -or -not $sender.Visible -or
@@ -17443,6 +17893,10 @@ function Show-OwnedAuxiliaryPopup {
                     if ($target) { [void]$target.Focus() }
                     elseif ($sender.Tag.Close.CanFocus) { [void]$sender.Tag.Close.Focus() }
                 }
+                # This marks completion of the existing one-time Shown sequence, not a readiness or focus result.
+                # The dimmer's Shown handler has already run; no periodic activation or shield-dependent retries.
+                $sender.Tag.InitialModalActivationComplete = $true
+                if ($sender.Name -eq 'LenovoSystemStatusPopup' -and $sender.Tag.Timer) { $sender.Tag.Timer.Start() }
             })
         }
         $result = $Form.ShowDialog($parent)
@@ -17457,6 +17911,8 @@ function Show-OwnedAuxiliaryPopup {
             finally {
                 if ($dimmer -and $Owner -and -not $Owner.IsDisposed -and $Owner.Name -in @('SettingsPanel','DefaultPanel')) { Set-PopupNavigationRowHover -Control $Owner -Hover $false }
                 if ($ownerRefreshButton -and -not $ownerRefreshButton.IsDisposed) { $ownerRefreshButton.Refresh() }
+                if ($ownerStatusButton -and -not $ownerStatusButton.IsDisposed) { $ownerStatusButton.Refresh() }
+                if ($dimmer -and $Owner -and -not $Owner.IsDisposed -and $Owner.Name -eq 'HeaderSystemStatusButton' -and $Owner.CanFocus) { [void]$Owner.Focus() }
             }
         }
     }

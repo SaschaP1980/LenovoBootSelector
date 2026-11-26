@@ -5,7 +5,7 @@
 # is presentation-only and exists only for the auxiliary modal lifetime.
 function Paint-ModalOwnerRefreshGlyph {
     param([Windows.Forms.Button]$Button,[Windows.Forms.PaintEventArgs]$EventArgs)
-    if (-not $script:ActiveAuxiliaryPopup) { return }
+    if (-not $script:ActiveAuxiliaryPopup -or [Windows.Forms.SystemInformation]::HighContrast) { return }
     $brush = [Drawing.SolidBrush]::new($Button.BackColor)
     try { $EventArgs.Graphics.FillRectangle($brush,$Button.ClientRectangle) }
     finally { $brush.Dispose() }
@@ -25,7 +25,7 @@ function Add-PopupHeaderSection {
     $header.BackColor = $script:ColorHeader
 
     $headerTitle = New-Label -Text 'Lenovo Boot Selector' -Font (New-Object Drawing.Font('Segoe UI', 11.5, [Drawing.FontStyle]::Bold)) `
-        -ForeColor $script:ColorAccent -X 16 -Y 8 -Width 285 -Height 25
+        -ForeColor $script:ColorAccent -X 16 -Y 8 -Width 278 -Height 25
     $headerTitle.Name = 'HeaderTitleLabel'
     $script:HeaderTitleLabel = $headerTitle
     $header.Controls.Add($headerTitle)
@@ -45,7 +45,7 @@ function Add-PopupHeaderSection {
     $headerSub.TextAlign = [Drawing.ContentAlignment]::MiddleLeft
     $headerSub.Padding = New-Object System.Windows.Forms.Padding(0)
     $headerSub.Location = New-Object Drawing.Point(16, 35)
-    $headerSub.Size = New-Object Drawing.Size(300, 21)
+    $headerSub.Size = New-Object Drawing.Size(278, 21)
     $headerSub.TabStop = $false
     $headerSub.Cursor = [System.Windows.Forms.Cursors]::Default
     $headerSub.Name = 'HeaderStatusLabel'
@@ -68,8 +68,34 @@ function Add-PopupHeaderSection {
     $script:HeaderStatusLabel = $headerSub
     $header.Controls.Add($headerSub)
 
-    $refresh = New-Object System.Windows.Forms.Button
-    $refresh.Text = '↻'
+    $info = New-Object LenovoHeaderIconButton
+    $info.Name = 'HeaderSystemStatusButton'
+    $info.InfoIcon = $true
+    $info.Text = ''
+    $info.AccessibleName = Get-LocalizedString -Key 'SystemStatus.Title'
+    $info.AccessibleDescription = Get-LocalizedString -Key 'SystemStatus.Subtitle'
+    $info.ForeColor = $script:ColorSecondary
+    $info.BackColor = $script:ColorHeader
+    $info.FlatStyle = [Windows.Forms.FlatStyle]::Flat
+    $info.FlatAppearance.BorderSize = 0
+    $info.FlatAppearance.MouseOverBackColor = $script:ColorHeader
+    $info.FlatAppearance.MouseDownBackColor = $script:ColorHeader
+    $info.UseVisualStyleBackColor = $false
+    $info.Location = [Drawing.Point]::new(302,12)
+    $info.Size = [Drawing.Size]::new(34,34)
+    $info.Cursor = [Windows.Forms.Cursors]::Hand
+    $info.Add_Paint({ param($sender,$eventArgs) Paint-ModalOwnerRefreshGlyph -Button $sender -EventArgs $eventArgs })
+    $info.Add_MouseEnter({ if ($this.Enabled) { $this.ForeColor = $script:ColorAccent; $this.Invalidate() } })
+    $info.Add_MouseLeave({ $this.ForeColor = $script:ColorSecondary; $this.Invalidate() })
+    $info.Add_Click({ Show-SystemStatusPopup -Owner $this })
+    $script:SystemStatusButton = $info
+    $header.Controls.Add($info)
+    if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($info,(Get-LocalizedString -Key 'SystemStatus.Title')) }
+
+    $refresh = New-Object LenovoHeaderIconButton
+    $refresh.Name = 'HeaderRefreshButton'
+    $refresh.AccessibleName = Get-LocalizedString -Key 'Action.RefreshBootTargets'
+    $refresh.Text = ''
     $refresh.Font = New-Object Drawing.Font('Segoe UI Symbol', 15.0, [Drawing.FontStyle]::Regular)
     $refresh.ForeColor = $script:ColorSecondary
     $refresh.BackColor = $script:ColorHeader
@@ -608,7 +634,7 @@ function New-AuxiliaryPopupForm {
     $close.Text = '×'
     $close.AccessibleName = Get-LocalizedString -Key 'Common.Close'
     $close.Cursor = [Windows.Forms.Cursors]::Hand
-    $closeHintKey = if ($Name -eq 'LenovoDefaultTargetPicker') { 'Tooltip.ClosePicker' } else { 'Tooltip.CloseSettings' }
+    $closeHintKey = if ($Name -eq 'LenovoDefaultTargetPicker') { 'Tooltip.ClosePicker' } elseif ($Name -eq 'LenovoSystemStatusPopup') { 'Common.Close' } else { 'Tooltip.CloseSettings' }
     $tip.SetToolTip($close,(Get-LocalizedString -Key $closeHintKey))
     $close.Font = $symbol
     $close.BackColor = $script:ColorHeader
@@ -685,7 +711,7 @@ function New-AuxiliaryPopupForm {
         Choice=$null; Scale=0.0; Header=$header; Title=$titleLabel; Subtitle=$subtitleLabel
         Close=$close; Body=$body; Viewport=$viewport; Scroll=$scroll; ContentHeight=$ContentHeight; Tip=$tip
         Regular=$regular; Bold=$bold; Heading=$heading; Symbol=$symbol
-        Fonts=@($regular,$bold,$heading,$large,$symbol); Timer=$null; DefaultSnapshot=$null; ActionInProgress=$false
+        Fonts=@($regular,$bold,$heading,$large,$symbol); Timer=$null; DefaultSnapshot=$null; ActionInProgress=$false; InitialModalActivationComplete=$false
     }
     $form.Add_Disposed({
         param($sender,$eventArgs)
