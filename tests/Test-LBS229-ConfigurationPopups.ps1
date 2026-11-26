@@ -232,9 +232,25 @@ try {
                         Set-AuxiliaryPopupLayout -Form $form -Scale $scale -WorkingArea $area -OwnerBounds $anchor
                         $labels=@($form.Tag.Body.Controls | Where-Object Name -like 'SystemStatusValue-*')
                         Assert-Lbs229 "LBS182 $locale/$scale localized read-only labels and layout" ($labels.Count -eq 6 -and @($labels | Where-Object {$_.Width -le 0 -or $_.Right -gt $form.Tag.Body.Width -or $_.Bottom -gt $form.Tag.Body.Height -or $_.AccessibleName -ne $_.Text -or $_.Text -match '^SystemStatus\.'}).Count -eq 0 -and $form.Tag.Body.Controls['SystemStatusValue-Stored'].Text -eq 'Corporate' -and $form.Tag.Body.Controls['SystemStatusValue-Next'].Text -match 'Gaming' -and @($form.Tag.Body.Controls | Where-Object TabStop).Count -eq 0)
+                        $body=$form.Tag.Body
+                        $visibleText=@($body.Controls | Where-Object { $_ -is [Windows.Forms.Label] -and $_.Text })
+                        $bad=@($visibleText | Where-Object { $_.Width -le 0 -or $_.Height -le 0 -or $_.Right -gt $body.Width -or $_.Bottom -gt $body.Height -or $_.BackColor -ne $body.BackColor -or $_.AutoEllipsis })
+                        $overlaps=0
+                        for ($i=0;$i -lt $visibleText.Count;$i++) {
+                            for ($j=$i+1;$j -lt $visibleText.Count;$j++) {
+                                if ($visibleText[$i].Bounds.IntersectsWith($visibleText[$j].Bounds)) { $overlaps++ }
+                            }
+                        }
+                        Assert-Lbs229 "LBS182 $locale/$scale flat grouped labels no overlap or clipping" ($bad.Count -eq 0 -and $overlaps -eq 0 -and $body.Controls['SystemStatusValue-Stored'].Font.Bold -and -not $body.Controls['SystemStatusHeading-Stored'].Font.Bold -and @($body.Controls | Where-Object Name -like 'SystemStatusDivider-*').Count -eq 3)
                     } finally { $form.Dispose() }
                 }
             }
+            $now=[datetime]::UtcNow
+            $fresh=$now.AddSeconds(-5)
+            $same=Get-SystemStatusObservationPresentation $fresh $fresh $fresh $now
+            $mixed=Get-SystemStatusObservationPresentation $fresh $null $fresh.AddMinutes(-3) $now
+            Assert-Lbs229 'LBS182 same-second observations share date and just-now age only once' ($same.Values.Count -eq 3 -and @($same.Values | Where-Object { $_ -ne $fresh.ToLocalTime().ToString('HH:mm:ss') }).Count -eq 0 -and $same.Shared.Contains((Get-LocalizedString -Key 'SystemStatus.JustNow')))
+            Assert-Lbs229 'LBS182 independent/missing observations never share a timestamp' ($mixed.Values.Count -eq 3 -and -not $mixed.Shared -and $mixed.Values[1] -eq (Get-LocalizedString -Key 'SystemStatus.TimeUnknown') -and $mixed.Values[0].Contains((Get-LocalizedString -Key 'SystemStatus.JustNow')) -and $mixed.Values[2] -ne $mixed.Values[0])
             $script:Scale=1.0
             $script:Locale='de-DE'
             $script:Ready=$false
@@ -260,8 +276,8 @@ try {
             finally { $timer.Stop();$timer.Dispose() }
             if ($script:Lbs182ModalError) { throw $script:Lbs182ModalError }
             Assert-Lbs229 'LBS182 modal close restores owner and no action dispatch' ($script:Lbs182ModalSeen -and $info.Focused -and [Lbs229Native]::IsWindowEnabled($owner.Handle) -and -not $script:ActiveAuxiliaryPopup -and @($owner.OwnedForms | Where-Object Name -in @('AuxiliaryOwnerDimmer','AuxiliaryOwnerClickShield')).Count -eq 0 -and $script:Actions.Count -eq $savedActions -and $script:BootCalls -eq $savedCalls -and $script:DefaultCalls.Count -eq $savedDefaultCalls)
-            Write-Host "LBS182 STATUS TOTAL $($script:Checks-$startChecks)/28"
-            if ($script:Checks-$startChecks -ne 28) { throw 'LBS182 status count mismatch' }
+            Write-Host "LBS182 STATUS TOTAL $($script:Checks-$startChecks)/34"
+            if ($script:Checks-$startChecks -ne 34) { throw 'LBS182 status count mismatch' }
         } finally {
             $rootPanel.Dispose()
             $script:SystemStatusButton=$null

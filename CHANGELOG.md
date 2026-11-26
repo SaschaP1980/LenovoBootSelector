@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.10.1.0 – System Status visual refinement (LBS-182)
+
+- Align the status side popup with the main header and restore the native connector and undimmed red Info glyph throughout the modal lifetime.
+- Replace fixed gray status cards with compact grouped typography, semantic symbols, section dividers and measured text layout. Keep all existing read-only evidence and action boundaries.
+- Align individual observation times; share date and age only for matching observations and show just-now wording instead of zero minutes. Retain existing hover colors pending LBS-270.
+
 ## v1.10.0.0 – Read-only System Status overview (LBS-182)
 
 - Open a compact localized System Status side popup from the new header Info button, without changing the main popup footprint or triggering extra firmware/task/storage scans.

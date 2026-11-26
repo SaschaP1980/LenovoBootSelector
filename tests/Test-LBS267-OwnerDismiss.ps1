@@ -135,6 +135,38 @@ function Click-Lbs267([Drawing.Point]$Point,[switch]$Down,[switch]$Up) {
 function Center-Lbs267($Control) {
     return $Control.PointToScreen([Drawing.Point]::new([int]($Control.Width/2),[int]($Control.Height/2)))
 }
+# Actual pixels, not merely ForeColor. Reacquire only invalid background/state evidence.
+function Test-Lbs182ActiveInfoRaster($Button,$Child,[Drawing.Rectangle]$ExpectedBounds) {
+    if ([Windows.Forms.SystemInformation]::HighContrast) { throw 'LBS182 normal-theme raster fixture requires normal theme' }
+    for ($attempt=1;$attempt -le 5;$attempt++) {
+        if (-not $Child.ContainsFocus -or [Lbs267Native]::GetForegroundWindow() -ne $Child.Handle -or $Button.RectangleToScreen($Button.ClientRectangle) -ne $ExpectedBounds) { throw 'LBS182 active icon native state changed' }
+        $bitmap=[Drawing.Bitmap]::new($Button.ClientSize.Width,$Button.ClientSize.Height)
+        $graphics=[Drawing.Graphics]::FromImage($bitmap)
+        try {
+            $graphics.CopyFromScreen($ExpectedBounds.Location,[Drawing.Point]::Empty,$Button.ClientSize)
+            $corners=@($bitmap.GetPixel(1,1).ToArgb(),$bitmap.GetPixel($bitmap.Width-2,1).ToArgb(),$bitmap.GetPixel(1,$bitmap.Height-2).ToArgb(),$bitmap.GetPixel($bitmap.Width-2,$bitmap.Height-2).ToArgb())
+            $valid=@($corners | Where-Object {$_ -ne $Button.BackColor.ToArgb()}).Count -eq 0
+            $accent=0
+            $maxRed=[Drawing.Color]::Black
+            for ($y=4;$y -lt $bitmap.Height-4;$y++) {
+                for ($x=4;$x -lt $bitmap.Width-4;$x++) {
+                    $pixel=$bitmap.GetPixel($x,$y)
+                    if ($pixel.R -gt $maxRed.R) { $maxRed=$pixel }
+                    # The hit shield is black with alpha 1/255. Its composition
+                    # can reduce a channel by one code value; compare against
+                    # that exact compositing envelope, not an arbitrary red.
+                    if ([Math]::Abs([int]$pixel.R-$script:ColorAccent.R) -le 1 -and
+                        [Math]::Abs([int]$pixel.G-$script:ColorAccent.G) -le 1 -and
+                        [Math]::Abs([int]$pixel.B-$script:ColorAccent.B) -le 1) { $accent++ }
+                }
+            }
+            Write-Host "LBS182 INFO SCREEN attempt=$attempt valid=$valid corners=$($corners -join ',') accentPixels=$accent maxRed=$($maxRed.R),$($maxRed.G),$($maxRed.B) active=$($Button.ModalActive)"
+            if ($valid) { return ($accent -ge 8) }
+        } finally { $graphics.Dispose();$bitmap.Dispose() }
+        if ($attempt -lt 5) { Start-Sleep -Milliseconds 25; [Windows.Forms.Application]::DoEvents() }
+    }
+    throw 'LBS182 invalid active Info screen; no visual conclusion'
+}
 $script:DefaultInteractionEnabled=$true
 $script:DefaultTargetChangePending=$false
 $script:BootNextPendingGuid=$null
@@ -202,6 +234,16 @@ try {
                         $shield=@($main.OwnedForms | Where-Object Name -eq 'AuxiliaryOwnerClickShield')
                         Write-Host "LBS267 MODAL kind=$script:Kind case=$script:Case owned=$($main.OwnedForms | ForEach-Object {$_.Name}) count=$($shield.Count) shieldVisible=$($shield[0].Visible) shieldEnabled=$(if($shield.Count){[Lbs267Native]::IsWindowEnabled($shield[0].Handle)}) ownerEnabled=$([Lbs267Native]::IsWindowEnabled($main.Handle)) childEnabled=$([Lbs267Native]::IsWindowEnabled($child.Handle)) childFocus=$($child.ContainsFocus) foreground=$([Lbs267Native]::GetForegroundWindow()) childHandle=$($child.Handle) shieldHandle=$($shield[0].Handle)"
                         Assert-Lbs267 "$script:Kind/$script:Case one native hit shield and disabled owner" ($shield.Count -eq 1 -and $shield[0].Visible -and [Lbs267Native]::IsWindowEnabled($shield[0].Handle) -and -not [Lbs267Native]::IsWindowEnabled($main.Handle) -and [Lbs267Native]::IsWindowEnabled($child.Handle) -and $child.ContainsFocus -and [Lbs267Native]::GetForegroundWindow() -eq $child.Handle)
+                        if ($script:Kind -eq 'HeaderSystemStatusButton' -and $script:Case -eq 'content') {
+                            $bridge=@($child.OwnedForms | Where-Object Name -eq 'AuxiliaryConnector')
+                            $dimmer=@($main.OwnedForms | Where-Object Name -eq 'AuxiliaryOwnerDimmer')
+                            $iconBounds=$trigger.RectangleToScreen($trigger.ClientRectangle)
+                            Write-Host "LBS182 POLISH ownerTop=$($main.Top) childTop=$($child.Top) bridgeCount=$($bridge.Count) hole=$($dimmer[0].HighlightedRowBounds) icon=$iconBounds"
+                            Assert-Lbs267 'LBS182 header aligned native connector and isolated icon cutout' ($child.Top -eq $main.Top -and $bridge.Count -eq 1 -and $bridge[0].Visible -and $bridge[0].VisualBounds.Right -eq $main.Left -and $dimmer.Count -eq 1 -and $dimmer[0].HighlightedRowBounds -eq $iconBounds -and $trigger.ModalActive)
+                            [Windows.Forms.Cursor]::Position=Center-Lbs267 $child.Tag.Header
+                            [Windows.Forms.Application]::DoEvents()
+                            Assert-Lbs267 'LBS182 active Info actual screen accent while pointer outside' (Test-Lbs182ActiveInfoRaster $trigger $child $iconBounds)
+                        }
                         $script:ShieldProbe=$shield[0]
                         $s=$shield[0]
                         if ($script:Case -eq 'escape') {
@@ -285,7 +327,7 @@ try {
                     if ($kind -eq 'HeaderSystemStatusButton') { $trigger.PerformClick() } else { Invoke-PopupNavigationRow -Control $trigger }
                 } finally { $timer.Stop();$timer.Dispose() }
                 if ($script:ProbeError) { throw $script:ProbeError }
-                Assert-Lbs267 "$locale/$kind/$case owner and shield fully restored" ($script:Observed -and $script:ShieldProbe.IsDisposed -and -not $script:ActiveAuxiliaryPopup -and $owner.Visible -and $owner.ContainsFocus -and $trigger.Focused -and [Lbs267Native]::IsWindowEnabled($owner.Handle) -and @($owner.OwnedForms | Where-Object Name -in @('AuxiliaryOwnerClickShield','AuxiliaryOwnerDimmer')).Count -eq 0)
+                Assert-Lbs267 "$locale/$kind/$case owner and shield fully restored" ($script:Observed -and $script:ShieldProbe.IsDisposed -and -not $script:ActiveAuxiliaryPopup -and $owner.Visible -and $owner.ContainsFocus -and $trigger.Focused -and ($kind -ne 'HeaderSystemStatusButton' -or -not $trigger.ModalActive) -and [Lbs267Native]::IsWindowEnabled($owner.Handle) -and @($owner.OwnedForms | Where-Object Name -in @('AuxiliaryOwnerClickShield','AuxiliaryOwnerDimmer')).Count -eq 0)
                 $expectedDefault=if ($case -eq 'normal-child' -and $kind -eq 'DefaultPanel') {1} else {0}
                 $expectedActions=if ($case -eq 'normal-child' -and $kind -eq 'SettingsPanel') {1} else {0}
                 Assert-Lbs267 "$locale/$kind/$case only intended action count" ($script:BootCalls -eq $script:BeforeBoot -and $script:DefaultCalls.Count -eq $script:BeforeDefault+$expectedDefault -and $script:Actions.Count -eq $script:BeforeActions+$expectedActions)
@@ -307,5 +349,5 @@ try {
     [Windows.Forms.Cursor]::Position=$cursor
     $owner.Dispose();$tray.Dispose()
 }
-Write-Host "LBS267 OWNER DISMISS TOTAL $script:Checks/233"
-if ($script:Checks -ne 233) { throw "Unexpected LBS267 total $script:Checks" }
+Write-Host "LBS267 OWNER DISMISS TOTAL $script:Checks/237"
+if ($script:Checks -ne 237) { throw "Unexpected LBS267 total $script:Checks" }

@@ -14,3 +14,7 @@ The read-only side popup is opened using the header Info button, immediately lef
 | Action guidance | Existing SetupRequired, RepairRequired, ReinitializeRequired capability states | Text only, directs to existing Further settings; never invokes repair or writes automatically. |
 
 Status is explicitly historical observation, not a continuous health guarantee. The app-wide pale-red hover migration is deferred to LBS-270. The startup Refresh glyph uses a visible muted disabled ink; both header actions retain existing red hover.
+
+## Owner-native visual refinement (v1.10.1.0)
+
+The header Info control remains undimmed and accent red while its modal is active; it resets at close. The side popup aligns with the main header where the work area permits, and uses the shared connector at the Info row height without extending the scrim cutout to the whole header. No bridge is drawn for overlapping or invalid placement. The status body groups saved and observed targets, uses semantic text/symbols and measured flat rows, and aligns independent read/check times. A common date and age are displayed only if all three confirmed observations agree at displayed-second precision and age; missing or different times stay distinct. No new system checks are made. The application-wide hover migration remains deferred to LBS-270.
