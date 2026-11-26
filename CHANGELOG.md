@@ -1,5 +1,9 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.9.0.1 – Initial Customize focus (LBS-262)
+
+- Focus the primary entry list immediately when Customize is opened. Keep the row cue hidden on pointer activation and visible on keyboard activation; no initial Tab press is required.
+
 ## v1.9.0.0 – Extended keyboard navigation and mixed-input focus (LBS-262)
 
 - Add Page Up/Down navigation, Ctrl+Page Up/Down and Ctrl+Home/End atomic draft reordering, and one Customize list Tab zone.

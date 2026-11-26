@@ -251,6 +251,7 @@ function Update-ManageEntriesUiState {
 }
 
 function Start-ManageEntriesMode {
+    param([switch]$PointerActivation)
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     if (-not $capabilities.CanManageEntries) { return }
     if ($script:IsManageEntriesMode) { return }
@@ -271,6 +272,14 @@ function Start-ManageEntriesMode {
     Update-ManageEntriesUiState
     Update-PopupRows -Reason 'manage-enter'
     Update-ManageSaveButtonState
+    # Only explicit mode entry acquires the primary list focus. Ordinary
+    # reconciliation remains responsible for preserving the current owner.
+    if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) {
+        $anchor = $script:Popup.Controls.Find('BootRow',$true) | Where-Object {
+            $_.TabStop -and $_.CanFocus -and $_.PSObject.Properties['ManageKeyboardMode'] -and $_.ManageKeyboardMode
+        } | Sort-Object Top | Select-Object -First 1
+        if ($anchor) { Restore-ManageRowFocus -Guid ([string]$anchor.Tag) -KeyboardCue:(-not $PointerActivation.IsPresent) }
+    }
 }
 
 function Stop-ManageEntriesMode {

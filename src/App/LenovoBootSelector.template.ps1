@@ -942,6 +942,17 @@ public static class LenovoSettingsInk
 public sealed class LenovoCustomizeButton : Button
 {
     private bool hovering, mousePressed, keyPressed;
+    public bool PointerActivation { get; private set; }
+
+    // Scope provenance to the native mouse-up dispatch, not hover or a stale press.
+    // Keyboard/PerformClick activation retains the ordinary keyboard cue.
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg != 0x0202) { base.WndProc(ref m); return; } // WM_LBUTTONUP
+        PointerActivation = true;
+        try { base.WndProc(ref m); }
+        finally { PointerActivation = false; }
+    }
 
     public LenovoCustomizeButton()
     {
