@@ -463,6 +463,9 @@ function Get-LocalizationCatalogCore {
             'Update.Later' = 'Later'
             'Update.CheckNoResult' = 'The update check did not return a result.'
             'Update.AvailableStatus' = 'New app version available: v{Version}'
+            'Update.KnownChecking' = 'Update available - checking...'
+            'Update.KnownCheckFailed' = 'Update known - check failed'
+            'Update.KnownAvailableMessage' = 'This update was previously verified. The latest check failed. The package will still be validated before installation.'
             'Update.CurrentStatus' = 'Lenovo Boot Selector is up to date · v{Version}'
             'Update.NoNewTitle' = 'No new version'
             'Update.CurrentHeading' = 'Lenovo Boot Selector v{Version} is up to date.'
@@ -969,6 +972,9 @@ function Get-LocalizationCatalogCore {
             'Update.Later' = 'Später'
             'Update.CheckNoResult' = 'Die Update-Prüfung hat kein Ergebnis geliefert.'
             'Update.AvailableStatus' = 'Neue App-Version verfügbar: v{Version}'
+            'Update.KnownChecking' = 'Update verfügbar - prüfe ...'
+            'Update.KnownCheckFailed' = 'Update bekannt - Prüfung fehlgeschlagen'
+            'Update.KnownAvailableMessage' = 'Dieses Update wurde zuvor geprüft. Die letzte Abfrage ist fehlgeschlagen. Das Paket wird vor der Installation weiterhin validiert.'
             'Update.CurrentStatus' = 'Lenovo Boot Selector ist aktuell · v{Version}'
             'Update.NoNewTitle' = 'Keine neue Version'
             'Update.CurrentHeading' = 'Lenovo Boot Selector v{Version} ist aktuell.'
@@ -3700,7 +3706,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.10.2.1'
+$script:AppVersion = '1.10.3.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -4178,6 +4184,12 @@ function New-UpdateRuntimeState {
         CheckTimer = $null
         CheckResultPath = $null
         CheckMode = ''
+        CheckClock = $null
+        CheckTerminationReason = ''
+        CheckCleanupProcess = $null
+        CheckCleanupResultPath = $null
+        CheckCooldownClock = $null
+        LastCheckSucceeded = $null
         PrepareProcess = $null
         PrepareTimer = $null
         PrepareResultPath = $null
@@ -4188,7 +4200,6 @@ function New-UpdateRuntimeState {
 function Set-UpdateRuntimeChecking {
     param([Parameter(Mandatory=$true)]$State)
     $State.Status = 'Checking'
-    $State.AvailableManifest = $null
     $State.LastError = ''
     return $State
 }
@@ -4199,12 +4210,34 @@ function Set-UpdateRuntimeIdle {
     return $State
 }
 
+# A failed read-only check must not invalidate a previously validated manifest.
+function Restore-UpdateRuntimeAfterCheckFailure {
+    param([Parameter(Mandatory=$true)]$State)
+    $State.Status = if ($null -ne $State.AvailableManifest) { 'UpdateAvailable' } else { 'Idle' }
+    return $State
+}
+
 function Set-UpdateRuntimeAvailable {
     param([Parameter(Mandatory=$true)]$State,[Parameter(Mandatory=$true)]$Manifest)
     $State.Status = 'UpdateAvailable'
     $State.AvailableManifest = $Manifest
     $State.LastError = ''
     return $State
+}
+
+# Monotonic freshness avoids repeated network work when a popup is reopened.
+# Manual checks bypass this policy, never the single-flight gate.
+function Set-UpdateRuntimeCheckOutcome {
+    param([Parameter(Mandatory=$true)]$State,[Parameter(Mandatory=$true)][bool]$Success)
+    $State.LastCheckSucceeded = $Success
+    $State.CheckCooldownClock = [System.Diagnostics.Stopwatch]::StartNew()
+}
+
+function Test-UpdateRuntimePopupCheckFresh {
+    param([Parameter(Mandatory=$true)]$State)
+    if (-not $State.CheckCooldownClock) { return $false }
+    $intervalMs = if ($State.LastCheckSucceeded) { 300000 } else { 30000 }
+    return ($State.CheckCooldownClock.ElapsedMilliseconds -lt $intervalMs)
 }
 
 function Set-UpdateRuntimePreparing {
@@ -4906,8 +4939,12 @@ function Update-HeaderRefreshStatus {
     $active = $false
     try { $active = (Test-BackgroundRefreshActive -State $script:BackgroundRefreshState) } catch { }
     $updateAvailable = $false
+    $knownRecheck = $false
+    $checkFailed = $false
     try {
-        $updateAvailable = ($script:UpdateState -and [string]$script:UpdateState.Status -eq 'UpdateAvailable' -and $null -ne $script:UpdateState.AvailableManifest)
+        $updateAvailable = ($script:UpdateState -and @('UpdateAvailable','Checking') -contains [string]$script:UpdateState.Status -and $null -ne $script:UpdateState.AvailableManifest)
+        $knownRecheck = ($updateAvailable -and [string]$script:UpdateState.Status -eq 'Checking')
+        $checkFailed = ($script:UpdateState -and $script:UpdateState.LastCheckSucceeded -eq $false -and [string]$script:UpdateState.Status -in @('Idle','UpdateAvailable') -and -not [string]::IsNullOrWhiteSpace($script:UpdateState.LastError))
     } catch { }
     # Active request provenance affects presentation only, never worker admission.
     # Initial readiness wins until it ends; a deliberate manual refresh wins
@@ -4917,11 +4954,11 @@ function Update-HeaderRefreshStatus {
     $popupUpdateActive = ($script:UpdateState -and $script:UpdateState.CheckProcess -and [string]$script:UpdateState.CheckMode -eq 'Popup')
     $refreshKey = if ($active -and $origin -eq 'Startup') { 'Header.InitializingApplication' }
         elseif ($active -and ($origin -eq 'Manual' -or $pendingOrigin -eq 'Manual')) { 'Header.Refreshing' }
-        elseif (($active -and ($origin -eq 'Popup' -or $pendingOrigin -eq 'Popup')) -or $popupUpdateActive) { 'Header.RefreshingApplication' }
+        elseif (($active -and ($origin -eq 'Popup' -or $pendingOrigin -eq 'Popup')) -or ($popupUpdateActive -and -not $knownRecheck)) { 'Header.RefreshingApplication' }
         elseif ($active) { 'Header.Refreshing' }
         else { '' }
     $refreshVisible = -not [string]::IsNullOrEmpty($refreshKey)
-    $showStatus = ($refreshVisible -or $updateAvailable)
+    $showStatus = ($refreshVisible -or $updateAvailable -or $checkFailed)
 
     # LBS-174: status may appear/disappear, but title geometry belongs only
     # to Add-PopupHeaderSection and must not be mutated by refresh state.
@@ -4932,14 +4969,17 @@ function Update-HeaderRefreshStatus {
             else { Get-LocalizedString -Key $refreshKey }
         }
         elseif ($updateAvailable) {
-            Get-LocalizedString -Key 'Update.Available'
+            if ($knownRecheck) { Get-LocalizedString -Key 'Update.KnownChecking' }
+            elseif ($checkFailed) { Get-LocalizedString -Key 'Update.KnownCheckFailed' }
+            else { Get-LocalizedString -Key 'Update.Available' }
         }
+        elseif ($checkFailed) { Get-LocalizedString -Key 'Update.CheckFailedStatus' }
         else {
             ''
         }
         $script:HeaderStatusLabel.Visible = $showStatus
     }
-    Set-HeaderUpdateInteractionState -Enabled (-not $refreshVisible -and $updateAvailable)
+    Set-HeaderUpdateInteractionState -Enabled (-not $refreshVisible -and $updateAvailable -and -not $knownRecheck)
 }
 
 function Update-RefreshButtonVisual {
@@ -5512,12 +5552,224 @@ function Get-LenovoUpdateFailureInfo {
     return [pscustomobject][ordered]@{ Category=$category; Stage=$stage; ErrorClass=$errorClass; NetworkStatus=$networkStatus; Message=$message }
 }
 
-function Invoke-LenovoUpdateTextDownload {
+function New-LenovoUpdateManifestRequest {
     param([Parameter(Mandatory=$true)][uri]$Uri)
-    $client = New-LenovoWebClient
-    try { return $client.DownloadString($Uri) }
-    catch { throw (New-LenovoUpdateFailureException -Category 'network' -Stage 'manifest-download' -Message ('Update-Manifest konnte nicht geladen werden: ' + $_.Exception.Message) -InnerException $_.Exception) }
-    finally { $client.Dispose() }
+    Enable-LenovoUpdateTls12
+    $request = [System.Net.HttpWebRequest][System.Net.WebRequest]::Create($Uri)
+    $request.Method = 'GET'
+    $request.AllowAutoRedirect = $false
+    $request.UserAgent = 'LenovoBootSelector/' + $script:AppVersion
+    $request.Headers['Cache-Control'] = 'no-cache'
+    # Keep configured system proxy and certificate validation. The initial
+    # response budget deliberately preserves the observed slow successful path
+    # until native phase evidence supports a tighter limit.
+    $request.Timeout = 100000
+    $request.ReadWriteTimeout = 15000
+    return $request
+}
+
+function Invoke-LenovoUpdateDotNetManifestDownload {
+    param([Parameter(Mandatory=$true)][uri]$Uri,[hashtable]$Timings=@{})
+    $phase = 'request-setup'
+    $clock = [System.Diagnostics.Stopwatch]::StartNew()
+    $response = $null
+    $reader = $null
+    try {
+        Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_TRANSPORT_PHASE' -Stage $phase
+        $clock.Restart()
+        $request = New-LenovoUpdateManifestRequest -Uri $Uri
+        $Timings.transportSetupMs = $clock.ElapsedMilliseconds
+        $phase = 'response-wait'
+        Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_TRANSPORT_PHASE' -Stage $phase -Data (New-RuntimeDiagnosticData @{ requestTimeoutMs=$request.Timeout; readTimeoutMs=$request.ReadWriteTimeout; setupMs=$Timings.transportSetupMs })
+        $clock.Restart()
+        $response = $request.GetResponse()
+        if ([int]$response.StatusCode -ne 200) { throw [System.Net.WebException]::new('Unexpected manifest HTTP status.',[System.Net.WebExceptionStatus]::ProtocolError) }
+        $Timings.responseWaitMs = $clock.ElapsedMilliseconds
+        $phase = 'response-read'
+        Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_TRANSPORT_PHASE' -Stage $phase -Data (New-RuntimeDiagnosticData @{ responseWaitMs=$Timings.responseWaitMs })
+        $clock.Restart()
+        $reader = [System.IO.StreamReader]::new($response.GetResponseStream(),[System.Text.Encoding]::UTF8,$true)
+        $text = $reader.ReadToEnd()
+        $Timings.responseReadMs = $clock.ElapsedMilliseconds
+        return $text
+    }
+    catch {
+        $Timings.transportFailurePhase = $phase
+        $Timings.transportFailurePhaseMs = $clock.ElapsedMilliseconds
+        throw (New-LenovoUpdateFailureException -Category 'network' -Stage 'manifest-download' -Message ('Update-Manifest konnte nicht geladen werden: ' + $_.Exception.Message) -InnerException $_.Exception)
+    }
+    finally {
+        if ($reader) { try { $reader.Dispose() } catch { } }
+        if ($response) { try { $response.Dispose() } catch { } }
+    }
+}
+
+function Get-LenovoManifestCurlPath {
+    # Never resolve an executable from PATH or the application directory.
+    $directory = [Environment]::GetFolderPath([Environment+SpecialFolder]::System)
+    if (-not $directory) { return $null }
+    $path = Join-Path $directory 'curl.exe'
+    if (Test-Path -LiteralPath $path -PathType Leaf) { return $path }
+    return $null
+}
+
+function Test-LenovoManifestCustomCurlEnvironment {
+    # Do not silently substitute curl for a configured proxy or alternate
+    # certificate environment. The existing .NET route owns those cases.
+    foreach ($name in @('HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','NO_PROXY','CURL_CA_BUNDLE','SSL_CERT_FILE','SSL_CERT_DIR','SSLKEYLOGFILE')) {
+        if (-not [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) { return $true }
+    }
+    return $false
+}
+
+function Get-LenovoManifestTransportChoice {
+    param([Parameter(Mandatory=$true)][uri]$Uri,[AllowNull()][string]$CurlPath,[AllowNull()]$Proxy,[bool]$CustomEnvironment)
+    if (-not $CurlPath) { return 'dotnet-curl-unavailable' }
+    if ($CustomEnvironment) { return 'dotnet-custom-environment' }
+    if ($Proxy) {
+        $resolved = $Proxy.GetProxy($Uri)
+        if ($null -eq $resolved -or -not $resolved.Equals($Uri)) { return 'dotnet-configured-proxy' }
+    }
+    return 'curl'
+}
+
+function Assert-LenovoManifestRequestUri {
+    param([Parameter(Mandatory=$true)][uri]$Uri)
+    $pattern = '\A' + [regex]::Escape((Get-LenovoUpdateManifestBaseUri)) + '\?cb=[0-9a-f]{32}\z'
+    if ($Uri.AbsoluteUri -cnotmatch $pattern) { throw 'Unexpected update manifest URI.' }
+}
+
+function New-LenovoManifestCurlStartInfo {
+    param([Parameter(Mandatory=$true)][string]$CurlPath,[Parameter(Mandatory=$true)][uri]$Uri)
+    Assert-LenovoManifestRequestUri -Uri $Uri
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $CurlPath
+    $psi.WorkingDirectory = Split-Path -Parent $CurlPath
+    # --disable must be the first option. No redirect, config file, shell,
+    # forced IP family, certificate override or proxy bypass is allowed.
+    $psi.Arguments = ('--disable --proto "=https" --http1.1 --tlsv1.2 --silent --show-error --fail --connect-timeout 5 --max-time 10 --max-filesize 65536 --header "Cache-Control: no-cache" --user-agent "LenovoBootSelector" --output - --write-out "\nLBS277_CURL|%{http_code}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_starttransfer}|%{time_total}\n" "' + $Uri.AbsoluteUri + '"')
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    return $psi
+}
+
+function New-LenovoManifestCurlTimeout {
+    return [System.Net.WebException]::new('Manifest transport exceeded its process deadline.',[System.Net.WebExceptionStatus]::Timeout)
+}
+
+function Invoke-LenovoManifestCurlProcess {
+    param([Parameter(Mandatory=$true)][System.Diagnostics.ProcessStartInfo]$StartInfo,[ValidateRange(1,60000)][int]$DeadlineMs=12000)
+    $clock = [System.Diagnostics.Stopwatch]::StartNew()
+    $process = [System.Diagnostics.Process]::Start($StartInfo)
+    if (-not $process) { throw 'Manifest transport process could not be started.' }
+    $memory = [System.IO.MemoryStream]::new()
+    try {
+        # Drain stderr concurrently to avoid a pipe deadlock. Do not retain or
+        # report the text, which could contain local network details.
+        $errorRead = $process.StandardError.ReadToEndAsync()
+        $stream = $process.StandardOutput.BaseStream
+        $buffer = New-Object byte[] 4096
+        while ($true) {
+            $remaining = $DeadlineMs - [int]$clock.ElapsedMilliseconds
+            if ($remaining -le 0) { throw (New-LenovoManifestCurlTimeout) }
+            $read = $stream.ReadAsync($buffer,0,$buffer.Length)
+            if (-not $read.Wait($remaining)) { throw (New-LenovoManifestCurlTimeout) }
+            $count = $read.Result
+            if ($count -eq 0) { break }
+            # Bound actual output, including on older curl releases for which
+            # max-filesize cannot stop an unknown-length response in flight.
+            if ($memory.Length + $count -gt 66560) { throw 'Manifest transport output exceeded its size limit.' }
+            $memory.Write($buffer,0,$count)
+        }
+        $remaining = $DeadlineMs - [int]$clock.ElapsedMilliseconds
+        if ($remaining -le 0 -or -not $process.WaitForExit($remaining)) { throw (New-LenovoManifestCurlTimeout) }
+        $remaining = $DeadlineMs - [int]$clock.ElapsedMilliseconds
+        if ($remaining -le 0 -or -not $errorRead.Wait($remaining)) { throw (New-LenovoManifestCurlTimeout) }
+        $encoding = [System.Text.UTF8Encoding]::new($false,$true)
+        return [pscustomobject]@{ ExitCode=$process.ExitCode; Output=$encoding.GetString($memory.ToArray()) }
+    }
+    finally {
+        try {
+            if (-not $process.HasExited) {
+                $process.Kill()
+                if (-not $process.WaitForExit(500)) { throw 'Manifest transport termination not confirmed.' }
+            }
+        }
+        catch {
+            Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_CURL_CLEANUP_FAILED' -Stage 'curl-cleanup' -Success $false -ErrorRecord $_ -Level warning
+        }
+        finally {
+            $memory.Dispose()
+            $process.Dispose()
+        }
+    }
+}
+
+function ConvertFrom-LenovoManifestCurlResponse {
+    param([Parameter(Mandatory=$true)]$Result,[Parameter(Mandatory=$true)][hashtable]$Timings)
+    $code = [int]$Result.ExitCode
+    $Timings.curlExitCode = $code
+    if ($code -ne 0) {
+        $status = switch ($code) {
+            5 { [System.Net.WebExceptionStatus]::ProxyNameResolutionFailure }
+            6 { [System.Net.WebExceptionStatus]::NameResolutionFailure }
+            7 { [System.Net.WebExceptionStatus]::ConnectFailure }
+            22 { [System.Net.WebExceptionStatus]::ProtocolError }
+            28 { [System.Net.WebExceptionStatus]::Timeout }
+            35 { [System.Net.WebExceptionStatus]::SecureChannelFailure }
+            60 { [System.Net.WebExceptionStatus]::TrustFailure }
+            default { [System.Net.WebExceptionStatus]::UnknownError }
+        }
+        throw [System.Net.WebException]::new(('Manifest curl transport failed (exit {0}).' -f $code),$status)
+    }
+    $match = [regex]::Match([string]$Result.Output,'(?s)\A(?<body>.*)\r?\nLBS277_CURL\|(?<http>[0-9]{3})\|(?<dns>[0-9.]+)\|(?<tcp>[0-9.]+)\|(?<tls>[0-9.]+)\|(?<first>[0-9.]+)\|(?<total>[0-9.]+)\r?\n\z')
+    if (-not $match.Success) { throw 'Manifest curl response has no valid completion record.' }
+    $Timings.httpStatus = [int]$match.Groups['http'].Value
+    foreach ($name in @('dns','tcp','tls','first','total')) {
+        $seconds = [double]::Parse($match.Groups[$name].Value,[Globalization.CultureInfo]::InvariantCulture)
+        if ([double]::IsNaN($seconds) -or [double]::IsInfinity($seconds) -or $seconds -lt 0 -or $seconds -gt 60) { throw 'Manifest curl timing is invalid.' }
+        $Timings[('curl' + $name + 'Ms')] = [int64][Math]::Round($seconds * 1000)
+    }
+    if ($Timings.httpStatus -ne 200) { throw [System.Net.WebException]::new('Unexpected manifest HTTP status.',[System.Net.WebExceptionStatus]::ProtocolError) }
+    $body = $match.Groups['body'].Value
+    if ([System.Text.Encoding]::UTF8.GetByteCount($body) -gt 65536) { throw 'Manifest response exceeded its size limit.' }
+    return $body
+}
+
+function Invoke-LenovoUpdateTextDownload {
+    param([Parameter(Mandatory=$true)][uri]$Uri,[hashtable]$Timings=@{})
+    $clock = [System.Diagnostics.Stopwatch]::StartNew()
+    $phase = 'transport-selection'
+    try {
+        Assert-LenovoManifestRequestUri -Uri $Uri
+        $curlPath = Get-LenovoManifestCurlPath
+        $choice = if ($curlPath) { Get-LenovoManifestTransportChoice -Uri $Uri -CurlPath $curlPath -Proxy ([System.Net.WebRequest]::DefaultWebProxy) -CustomEnvironment (Test-LenovoManifestCustomCurlEnvironment) } else { 'dotnet-curl-unavailable' }
+        $Timings.transport = $choice
+        $Timings.transportSelectionMs = $clock.ElapsedMilliseconds
+        if ($choice -ne 'curl') {
+            # No fallback after an attempted curl request: especially not on
+            # certificate, HTTP or other network failures.
+            return (Invoke-LenovoUpdateDotNetManifestDownload -Uri $Uri -Timings $Timings)
+        }
+        $phase = 'curl-process'
+        Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_TRANSPORT_PHASE' -Stage $phase -Data (New-RuntimeDiagnosticData @{ transport='curl'; connectTimeoutMs=5000; transferTimeoutMs=10000; processDeadlineMs=12000 })
+        $clock.Restart()
+        $psi = New-LenovoManifestCurlStartInfo -CurlPath $curlPath -Uri $Uri
+        $result = Invoke-LenovoManifestCurlProcess -StartInfo $psi
+        $Timings.curlProcessMs = $clock.ElapsedMilliseconds
+        $phase = 'curl-response'
+        $clock.Restart()
+        return (ConvertFrom-LenovoManifestCurlResponse -Result $result -Timings $Timings)
+    }
+    catch {
+        if (-not $Timings.transportFailurePhase) {
+            $Timings.transportFailurePhase = $phase
+            $Timings.transportFailurePhaseMs = $clock.ElapsedMilliseconds
+        }
+        throw (New-LenovoUpdateFailureException -Category 'network' -Stage 'manifest-download' -Message ('Update-Manifest konnte nicht geladen werden: ' + $_.Exception.Message) -InnerException $_.Exception)
+    }
 }
 
 function Invoke-LenovoUpdateFileDownload {
@@ -5602,10 +5854,15 @@ function New-LenovoUpdatePrepareInput {
 
 
 function Get-LenovoUpdateManifestRemote {
-    $json = Invoke-LenovoUpdateTextDownload -Uri (Get-LenovoUpdateManifestUri)
+    param([hashtable]$Timings=@{})
+    $clock = [System.Diagnostics.Stopwatch]::StartNew()
+    try { $json = Invoke-LenovoUpdateTextDownload -Uri (Get-LenovoUpdateManifestUri) -Timings $Timings }
+    finally { $Timings.manifestFetchMs = $clock.ElapsedMilliseconds }
     if ([string]::IsNullOrWhiteSpace($json)) { throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-content' -Message 'Update-Manifest ist leer.') }
-    try { return ($json | ConvertFrom-Json) }
+    $clock.Restart()
+    try { return ($json | ConvertFrom-Json -ErrorAction Stop) }
     catch { throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-parse' -Message ('Update-Manifest ist kein gültiges JSON: ' + $_.Exception.Message) -InnerException $_.Exception) }
+    finally { $Timings.manifestParseMs = $clock.ElapsedMilliseconds }
 }
 function Get-LenovoSha256Hex {
     param([Parameter(Mandatory=$true)][string]$Path)
@@ -5632,21 +5889,40 @@ function Invoke-UpdateCheckWorker {
     $result = [ordered]@{ Success=$false; UpdateAvailable=$false; Manifest=$null; Error=''; ErrorCategory=''; FailureStage=''; ErrorClass=''; NetworkStatus='' }
     $manifestVersion = ''
     $manifestPublishedUtc = ''
+    $timings = @{}
+    $workerClock = [System.Diagnostics.Stopwatch]::StartNew()
+    $phaseClock = [System.Diagnostics.Stopwatch]::new()
     try {
-        $raw = Get-LenovoUpdateManifestRemote
+        $raw = Get-LenovoUpdateManifestRemote -Timings $timings
         $manifestVersion = ([string]$raw.version).Trim()
         $manifestPublishedUtc = ([string]$raw.publishedUtc).Trim()
-        $validated = Test-LenovoUpdateManifestCore -Manifest $raw
-        if (-not $validated.IsValid) { throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-validation' -Message $validated.Error) }
-        $comparison = Compare-LenovoAppVersionCore -Current $script:AppVersion -Candidate $validated.Version
+        $phaseClock.Restart()
+        try {
+            $validated = Test-LenovoUpdateManifestCore -Manifest $raw
+            if (-not $validated.IsValid) { throw (New-LenovoUpdateFailureException -Category 'manifest' -Stage 'manifest-validation' -Message $validated.Error) }
+        }
+        finally { $timings.manifestValidationMs = $phaseClock.ElapsedMilliseconds }
+        $phaseClock.Restart()
+        try { $comparison = Compare-LenovoAppVersionCore -Current $script:AppVersion -Candidate $validated.Version }
+        finally { $timings.versionCompareMs = $phaseClock.ElapsedMilliseconds }
         $result.Success = $true; $result.UpdateAvailable = ($comparison -gt 0); $result.Manifest = $validated
     }
     catch {
         $failure = Get-LenovoUpdateFailureInfo -ErrorRecord $_ -DefaultCategory 'runtime' -DefaultStage 'update-check'
         $result.Error=$failure.Message; $result.ErrorCategory=$failure.Category; $result.FailureStage=$failure.Stage; $result.ErrorClass=$failure.ErrorClass; $result.NetworkStatus=$failure.NetworkStatus
     }
-    Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_WORKER_COMPLETED' -Stage $(if ($result.FailureStage) { [string]$result.FailureStage } else { 'update-check' }) -Success ([bool]$result.Success) -Data (New-RuntimeDiagnosticData @{ runningVersion=[string]$script:AppVersion; manifestVersion=[string]$manifestVersion; manifestPublishedUtc=[string]$manifestPublishedUtc; updateAvailable=[bool]$result.UpdateAvailable; errorCategory=[string]$result.ErrorCategory; failureStage=[string]$result.FailureStage; errorClass=[string]$result.ErrorClass; networkStatus=[string]$result.NetworkStatus; workerError=[string]$result.Error }) -Level $(if ($result.Success) { 'info' } else { 'warning' })
-    if ($UpdateResultPath) { Write-LenovoUpdateWorkerResult -Path $UpdateResultPath -Value ([pscustomobject]$result) }
+    if ($UpdateResultPath) {
+        $phaseClock.Restart()
+        try { Write-LenovoUpdateWorkerResult -Path $UpdateResultPath -Value ([pscustomobject]$result) }
+        catch {
+            $failure = Get-LenovoUpdateFailureInfo -ErrorRecord $_ -DefaultCategory 'runtime' -DefaultStage 'check-result-write'
+            $result.Success=$false; $result.UpdateAvailable=$false; $result.Manifest=$null
+            $result.Error=$failure.Message; $result.ErrorCategory=$failure.Category; $result.FailureStage=$failure.Stage; $result.ErrorClass=$failure.ErrorClass; $result.NetworkStatus=$failure.NetworkStatus
+            Remove-LenovoUpdateWorkflowFile -Path $UpdateResultPath
+        }
+        finally { $timings.resultWriteMs = $phaseClock.ElapsedMilliseconds }
+    }
+    Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_WORKER_COMPLETED' -Stage $(if ($result.FailureStage) { [string]$result.FailureStage } else { 'update-check' }) -Success ([bool]$result.Success) -Data (New-RuntimeDiagnosticData @{ runningVersion=[string]$script:AppVersion; manifestVersion=[string]$manifestVersion; manifestPublishedUtc=[string]$manifestPublishedUtc; updateAvailable=[bool]$result.UpdateAvailable; errorCategory=[string]$result.ErrorCategory; failureStage=[string]$result.FailureStage; errorClass=[string]$result.ErrorClass; networkStatus=[string]$result.NetworkStatus; workerError=[string]$result.Error; workerElapsedMs=$workerClock.ElapsedMilliseconds; timings=$timings }) -Level $(if ($result.Success) { 'info' } else { 'warning' })
     return $(if ($result.Success) { 0 } else { 1 })
 }
 function Start-UpdateCheckWorkerProcess {
@@ -5929,16 +6205,54 @@ function Start-LenovoUpdateInstallerHelper {
 # UI owns presentation and user commands; Infrastructure owns transport/process/filesystem/install mechanics.
 
 function Stop-UpdateCheckWorkflow {
-    param([Parameter(Mandatory=$true)]$State)
+    param([Parameter(Mandatory=$true)]$State,[switch]$Terminate)
 
     if ($State.CheckTimer) {
         try { $State.CheckTimer.Stop() } catch { }
         try { $State.CheckTimer.Dispose() } catch { }
         $State.CheckTimer = $null
     }
-    if ($State.CheckProcess) {
-        try { $State.CheckProcess.Dispose() } catch { }
-        $State.CheckProcess = $null
+    $process = $State.CheckProcess
+    $State.CheckProcess = $null
+    if (-not $process) { return }
+    if ($Terminate) {
+        try {
+            $process.Refresh()
+            if (-not $process.HasExited) {
+                $process.Kill()
+                [void]$process.WaitForExit(250)
+            }
+            $process.Refresh()
+            if (-not $process.HasExited) { throw 'Update check worker did not exit after termination.' }
+        }
+        catch {
+            # Retain the exact owned handle until exit. Never start a competing
+            # operation or trust a late result while cleanup is unresolved.
+            $State.CheckCleanupProcess = $process
+            $State.CheckCleanupResultPath = $State.CheckResultPath
+            Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_CLEANUP_PENDING' -Stage 'check-cleanup' -Success $false -ErrorRecord $_ -Level warning
+            return
+        }
+    }
+    try { $process.Dispose() } catch { }
+}
+
+function Test-UpdateCheckCleanupReady {
+    param([Parameter(Mandatory=$true)]$State)
+    $process = $State.CheckCleanupProcess
+    if (-not $process) { return $true }
+    try {
+        $process.Refresh()
+        if (-not $process.HasExited) { return $false }
+        $process.Dispose()
+        Remove-LenovoUpdateWorkflowFile -Path $State.CheckCleanupResultPath
+        $State.CheckCleanupProcess = $null
+        $State.CheckCleanupResultPath = $null
+        return $true
+    }
+    catch {
+        Write-RuntimeDiagnosticEvent -Event 'UPDATE_CHECK_CLEANUP_PENDING' -Stage 'check-cleanup' -Success $false -ErrorRecord $_ -Level warning
+        return $false
     }
 }
 
@@ -5949,34 +6263,55 @@ function Start-UpdateCheckWorkflow {
         [AllowNull()][string]$RuntimeSessionId,
         [Parameter(Mandatory=$true)][scriptblock]$CompletionAction,
         [Parameter(Mandatory=$true)][scriptblock]$TimerFactory,
-        [Parameter(Mandatory=$true)][string]$StartFailureMessage
+        [Parameter(Mandatory=$true)][string]$StartFailureMessage,
+        [ValidateRange(1,600000)][int]$DeadlineMs = 115000
     )
 
     if (Test-UpdateRuntimeBusy -State $State) {
         return [pscustomobject]@{ Started=$false; Reason='Busy'; Error='' }
     }
+    if (-not (Test-UpdateCheckCleanupReady -State $State)) {
+        return [pscustomobject]@{ Started=$false; Reason='StartFailed'; Error=$StartFailureMessage }
+    }
+    if ($Mode -eq 'Popup' -and (Test-UpdateRuntimePopupCheckFresh -State $State)) {
+        Write-RuntimeDiagnosticEvent -Event 'POPUP_UPDATE_CHECK_SKIPPED' -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ reason='cooldown'; lastCheckSucceeded=$State.LastCheckSucceeded; ageMs=$State.CheckCooldownClock.ElapsedMilliseconds })
+        return [pscustomobject]@{ Started=$false; Reason='FreshnessCooldown'; Error='' }
+    }
 
     [void](Set-UpdateRuntimeChecking -State $State)
     $State.CheckMode = $Mode
-    $resultPath = New-LenovoUpdateCheckResultPath
-    $State.CheckResultPath = $resultPath
+    $State.CheckClock = [System.Diagnostics.Stopwatch]::StartNew()
+    $State.CheckTerminationReason = ''
+    $resultPath = $null
 
     try {
+        $resultPath = New-LenovoUpdateCheckResultPath
+        $State.CheckResultPath = $resultPath
         $process = Start-UpdateCheckWorkerProcess -ResultPath $resultPath -RuntimeSessionId $RuntimeSessionId
         if (-not $process) { throw $StartFailureMessage }
         $State.CheckProcess = $process
 
         $stateForTick = $State
         $completionForTick = $CompletionAction
+        $processForTick = $process
+        $pathForTick = $resultPath
+        $deadlineForTick = $DeadlineMs
         $tickAction = {
+            if (-not [object]::ReferenceEquals($stateForTick.CheckProcess,$processForTick) -or $stateForTick.CheckResultPath -ne $pathForTick) { return }
+            $complete = $false
             try {
-                if (-not $stateForTick.CheckProcess) { return }
-                $stateForTick.CheckProcess.Refresh()
-                if ($stateForTick.CheckProcess.HasExited) { & $completionForTick }
+                $processForTick.Refresh()
+                if ($processForTick.HasExited) { $complete = $true }
+                elseif ($stateForTick.CheckClock.ElapsedMilliseconds -ge $deadlineForTick) {
+                    $stateForTick.CheckTerminationReason = 'deadline'
+                    $complete = $true
+                }
             }
             catch {
-                & $completionForTick
+                $stateForTick.CheckTerminationReason = 'process-monitor'
+                $complete = $true
             }
+            if ($complete) { & $completionForTick }
         }.GetNewClosure()
 
         $timer = & $TimerFactory $tickAction
@@ -5984,17 +6319,20 @@ function Start-UpdateCheckWorkflow {
         $State.CheckTimer = $timer
         $timer.Start()
 
-        Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_STARTED' } else { 'UPDATE_CHECK_STARTED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ mode=$Mode })
+        Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_STARTED' } else { 'UPDATE_CHECK_STARTED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ mode=$Mode; deadlineMs=$DeadlineMs; processId=$process.Id; workerLaunchMs=$State.CheckClock.ElapsedMilliseconds })
         return [pscustomobject]@{ Started=$true; Reason='Started'; Error='' }
     }
     catch {
         $errorMessage = $_.Exception.Message
         [void](Set-UpdateRuntimeFailed -State $State -Message $errorMessage)
-        Stop-UpdateCheckWorkflow -State $State
+        Stop-UpdateCheckWorkflow -State $State -Terminate
         Remove-LenovoUpdateWorkflowFile -Path $resultPath
         $State.CheckResultPath = $null
         $State.CheckMode = ''
-        [void](Set-UpdateRuntimeIdle -State $State)
+        $State.CheckClock = $null
+        $State.CheckTerminationReason = ''
+        Set-UpdateRuntimeCheckOutcome -State $State -Success $false
+        [void](Restore-UpdateRuntimeAfterCheckFailure -State $State)
         Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_STARTED' } else { 'UPDATE_CHECK_STARTED' }) -Stage 'update-check' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode=$Mode }) -Level warning
         return [pscustomobject]@{ Started=$false; Reason='StartFailed'; Error=$errorMessage }
     }
@@ -6007,8 +6345,14 @@ function Complete-UpdateCheckWorkflow {
         [Parameter(Mandatory=$true)][string]$NoResultMessage
     )
 
-    Stop-UpdateCheckWorkflow -State $State
     $path = [string]$State.CheckResultPath
+    if ($State.Status -ne 'Checking' -or $State.CheckMode -ne $Mode -or -not $path) {
+        return [pscustomobject]@{ Success=$false; Mode=$Mode; UpdateAvailable=$false; Manifest=$null; Error=''; ErrorCategory='runtime'; FailureStage='stale-completion'; ErrorClass=''; NetworkStatus='' }
+    }
+    $reason = [string]$State.CheckTerminationReason
+    $elapsedMs = if ($State.CheckClock) { [int64]$State.CheckClock.ElapsedMilliseconds } else { 0 }
+    Stop-UpdateCheckWorkflow -State $State -Terminate:([bool]$reason)
+    $consumeClock = [System.Diagnostics.Stopwatch]::StartNew()
     $failureCategory = ''
     $failureStage = ''
     $errorClass = ''
@@ -6026,6 +6370,12 @@ function Complete-UpdateCheckWorkflow {
     }
 
     try {
+        if ($reason) {
+            $failureCategory = 'runtime'
+            $failureStage = if ($reason -eq 'deadline') { 'check-watchdog' } else { 'check-process-monitor' }
+            $errorClass = if ($reason -eq 'deadline') { 'System.TimeoutException' } else { 'System.InvalidOperationException' }
+            throw $NoResultMessage
+        }
         $result = Read-LenovoUpdateWorkerResult -Path $path
         if ($null -eq $result) {
             $failureCategory = 'runtime'
@@ -6051,13 +6401,13 @@ function Complete-UpdateCheckWorkflow {
             $outcome.Success = $true
             $outcome.UpdateAvailable = $true
             $outcome.Manifest = $validated
-            Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$true; availableVersion=$validated.Version; mode=$Mode })
+            Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$true; availableVersion=$validated.Version; mode=$Mode; workerElapsedMs=$elapsedMs; resultConsumeMs=$consumeClock.ElapsedMilliseconds })
         }
         else {
             $State.AvailableManifest = $null
             [void](Set-UpdateRuntimeIdle -State $State)
             $outcome.Success = $true
-            Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$false; mode=$Mode })
+            Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage 'update-check' -Success $true -Data (New-RuntimeDiagnosticData @{ updateAvailable=$false; mode=$Mode; workerElapsedMs=$elapsedMs; resultConsumeMs=$consumeClock.ElapsedMilliseconds })
         }
     }
     catch {
@@ -6068,13 +6418,16 @@ function Complete-UpdateCheckWorkflow {
         $outcome.FailureStage = $failureStage
         $outcome.ErrorClass = $errorClass
         $outcome.NetworkStatus = $networkStatus
-        Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage $(if ($failureStage) { $failureStage } else { 'update-check' }) -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode=$Mode; errorCategory=$failureCategory; failureStage=$failureStage; errorClass=$errorClass; networkStatus=$networkStatus }) -Level warning
+        Write-RuntimeDiagnosticEvent -Event $(if ($Mode -eq 'Popup') { 'POPUP_UPDATE_CHECK_COMPLETED' } else { 'UPDATE_CHECK_COMPLETED' }) -Stage $(if ($failureStage) { $failureStage } else { 'update-check' }) -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ mode=$Mode; errorCategory=$failureCategory; failureStage=$failureStage; errorClass=$errorClass; networkStatus=$networkStatus; terminationReason=$reason; workerElapsedMs=$elapsedMs; resultConsumeMs=$consumeClock.ElapsedMilliseconds; retainedAvailability=($null -ne $State.AvailableManifest) }) -Level warning
     }
     finally {
         Remove-LenovoUpdateWorkflowFile -Path $path
         $State.CheckResultPath = $null
         $State.CheckMode = ''
-        if ($State.Status -eq 'Failed') { [void](Set-UpdateRuntimeIdle -State $State) }
+        $State.CheckClock = $null
+        $State.CheckTerminationReason = ''
+        Set-UpdateRuntimeCheckOutcome -State $State -Success ([bool]$outcome.Success)
+        if ($State.Status -eq 'Failed') { [void](Restore-UpdateRuntimeAfterCheckFailure -State $State) }
     }
 
     return [pscustomobject]$outcome
@@ -6106,6 +6459,9 @@ function Start-UpdatePrepareWorkflow {
 
     if (Test-UpdateRuntimeBusy -State $State) {
         return [pscustomobject]@{ Started=$false; Reason='Busy'; Error=''; Version='' }
+    }
+    if (-not (Test-UpdateCheckCleanupReady -State $State)) {
+        return [pscustomobject]@{ Started=$false; Reason='StartFailed'; Error=$StartFailureMessage; Version='' }
     }
     if ($null -eq $Manifest) {
         return [pscustomobject]@{ Started=$false; Reason='NoManifest'; Error=''; Version='' }
@@ -6422,7 +6778,8 @@ function Show-AvailableUpdateDialog {
         return $false
     }
     $manifest = $script:UpdateState.AvailableManifest
-    Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.Available') -Heading (Get-LocalizedString -Key 'Update.AvailableHeading' -Values @{ Version=$manifest.Version }) -Message (Get-LocalizedString -Key 'Update.AvailableMessage') -Kind Info -SecondaryButtonText (Get-LocalizedString -Key 'Update.InstallNow') -SecondaryAction { Start-ManualAppUpdate } -PromoteSecondaryAction -DismissButtonText (Get-LocalizedString -Key 'Update.Later')
+    $message = if ($script:UpdateState.LastCheckSucceeded -eq $false) { Get-LocalizedString -Key 'Update.KnownAvailableMessage' } else { Get-LocalizedString -Key 'Update.AvailableMessage' }
+    Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Update.Available') -Heading (Get-LocalizedString -Key 'Update.AvailableHeading' -Values @{ Version=$manifest.Version }) -Message $message -Kind Info -SecondaryButtonText (Get-LocalizedString -Key 'Update.InstallNow') -SecondaryAction { Start-ManualAppUpdate } -PromoteSecondaryAction -DismissButtonText (Get-LocalizedString -Key 'Update.Later')
     return $true
 }
 

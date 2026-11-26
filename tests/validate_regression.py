@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from pathlib import Path
 import argparse,hashlib,json,re,subprocess,sys,zipfile
+from lbs277_state_contract import validate_lbs277_state_contract, validate_lbs277_transport_contract
 ROOT_DEFAULT=Path(__file__).resolve().parents[1]
 def sha(p): return hashlib.sha256(Path(p).read_bytes()).hexdigest()
 def txt(p): return Path(p).read_text(encoding='utf-8-sig')
@@ -91,6 +92,8 @@ def main():
     s.has('LBS-22 template preserves inherited diagnostics session input',app_template,'$script:InheritedRuntimeSessionId = [string]$RuntimeSessionId')
     s.has('LBS-22 diagnostics initialization uses captured inherited ID',diagnostics_init,'$candidate = ([string]$script:InheritedRuntimeSessionId).Trim()')
     s.has('LBS-22 parentSession reports inherited state only',diagnostics_init,'parentSession = $hasParentSession')
+    validate_lbs277_state_contract(s, update_runtime)
+    validate_lbs277_transport_contract(s, transport)
     s.has('LBS-17 update action remains manual and localized',ui,"-SecondaryButtonText (Get-LocalizedString -Key 'Update.InstallNow') -SecondaryAction { Start-ManualAppUpdate }")
     s.has('LBS-5 transport module owns WebClient creation',transport,'function New-LenovoWebClient')
     s.no('LBS-5 UpdateClient no longer creates WebClient directly',infra,'function New-LenovoWebClient')
