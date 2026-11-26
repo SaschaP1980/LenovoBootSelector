@@ -79,6 +79,13 @@ function Add-DefaultPickerRow {
         $controlHint = $hint
         if ($control -eq $icon -and $Entry -and $Entry.TypeTooltip) { $controlHint = [string]$Entry.TypeTooltip + [Environment]::NewLine + $hint }
         $Form.Tag.Tip.SetToolTip($control,$controlHint)
+        $control.Add_MouseDown({
+            param($sender,$eventArgs)
+            if ($eventArgs.Button -ne [Windows.Forms.MouseButtons]::Left -or -not (Test-DefaultPickerInteraction)) { return }
+            $target = $sender
+            while ($target -and $target.Name -ne 'DefaultPickerRow') { $target = $target.Parent }
+            Set-LenovoPointerFocus -Control $target
+        })
         $control.Add_Click({ param($sender,$eventArgs) Invoke-DefaultPickerRow -Control $sender })
         $control.Add_MouseEnter({ param($sender,$eventArgs) Set-DefaultPickerHover -Control $sender -Hover $true })
         $control.Add_MouseLeave({ param($sender,$eventArgs) Set-DefaultPickerHover -Control $sender -Hover $false })

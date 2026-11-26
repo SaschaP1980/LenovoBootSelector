@@ -186,6 +186,7 @@ jobs:
               manageViewport = Get-TestTotal $logText '^LBS157 VIEWPORT TOTAL\s+(\d+)/(\d+)\s*$'
               manageUndo = Get-TestTotal $logText '^LBS179 UNDO TOTAL\s+(\d+)/(\d+)\s*$'
               manageKeyboard = Get-TestTotal $logText '^LBS178 KEYBOARD TOTAL\s+(\d+)/(\d+)\s*$'
+              manageMixedFocus = Get-TestTotal $logText '^LBS262 MIXED FOCUS TOTAL\s+(\d+)/(\d+)\s*$'
               localizationRuntime = Get-TestTotal $logText '^LOCALIZATION TOTAL\s+(\d+)/(\d+)\s*$'
               liveLocalization = Get-TestTotal $logText '^LBS191 LIVE LOCALIZATION TOTAL\s+(\d+)/(\d+)\s*$'
               refreshRuntime = Get-TestTotal $logText '^REFRESH TOTAL\s+(\d+)/(\d+)\s*$'
@@ -230,6 +231,7 @@ jobs:
               'manageViewport',
               'manageUndo',
               'manageKeyboard',
+              'manageMixedFocus',
               'localizationRuntime',
               'liveLocalization',
               'refreshRuntime',
@@ -280,6 +282,7 @@ jobs:
               $totals.manageViewport.passed +
               $totals.manageUndo.passed +
               $totals.manageKeyboard.passed +
+              $totals.manageMixedFocus.passed +
               $totals.localizationRuntime.passed +
               $totals.liveLocalization.passed +
               $totals.refreshRuntime.passed +
@@ -321,6 +324,7 @@ jobs:
               $totals.manageViewport.expected +
               $totals.manageUndo.expected +
               $totals.manageKeyboard.expected +
+              $totals.manageMixedFocus.expected +
               $totals.localizationRuntime.expected +
               $totals.liveLocalization.expected +
               $totals.refreshRuntime.expected +
