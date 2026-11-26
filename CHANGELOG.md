@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.10.0.0 – Read-only System Status overview (LBS-182)
+
+- Open a compact localized System Status side popup from the new header Info button, without changing the main popup footprint or triggering extra firmware/task/storage scans.
+- Distinguish the stored default, confirmed one-time firmware target, readiness and target comparison; display observation age and unknown/error/pending states without inferring successful firmware writes.
+- Replace the elongated Refresh glyph with a DPI-aware double-arrow icon that remains visible while disabled during initialization. Keep native action admission and the existing red hover convention; application-wide hover migration remains separate.
+
 ## v1.9.3.0 – Native focus-raster evidence validity (LBS-260)
 
 - Distinguish invalid actual-screen captures from valid missing or unexpected focus outlines in native Windows tests. Reacquire only invalid frames within a fixed bound, retain the existing pixel threshold and fail closed on focus or geometry drift.

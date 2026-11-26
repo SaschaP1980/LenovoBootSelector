@@ -203,6 +203,23 @@ function Read-TaskBrokerTextFile {
     return [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
 }
 
+# Bind status-only timestamps to the actual observed cache content.
+# Failure leaves provenance unknown; never changes the authorized read result.
+function Get-SystemStatusObservationHash {
+    param([AllowNull()][string]$Text)
+    if ([string]::IsNullOrEmpty($Text)) { return $null }
+    try {
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try { return [Convert]::ToBase64String($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Text))) }
+        finally { $sha.Dispose() }
+    } catch { return $null }
+}
+function Test-SystemStatusObservationMatch {
+    param([AllowNull()][string]$Text,[AllowNull()][string]$ExpectedHash)
+    if (-not $ExpectedHash) { return $false }
+    return ((Get-SystemStatusObservationHash $Text) -ceq $ExpectedHash)
+}
+
 function Refresh-ManagerCache {
     param([switch]$Force)
     $meta = Get-TaskBrokerMetadata
@@ -217,6 +234,8 @@ function Refresh-ManagerCache {
         Invoke-AuthorizedTask -Operation 'ManagerRefresh' | Out-Null
         $script:ManagerCacheText = Read-TaskBrokerTextFile -Path ([string]$meta.managerFile)
         $script:ManagerCacheUtc = [datetime]::UtcNow
+        $script:SystemStatusManagerObservedHash = Get-SystemStatusObservationHash $script:ManagerCacheText
+        $script:SystemStatusManagerObservedUtc = if ($script:SystemStatusManagerObservedHash) { $script:ManagerCacheUtc } else { $null }
         $sw.Stop()
         Write-RuntimeDiagnosticEvent -Event 'MANAGER_REFRESH' -Stage 'manager-refresh' -Success $true -DurationMs $sw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{ force = [bool]$Force; bytes = $script:ManagerCacheText.Length })
         return $script:ManagerCacheText
@@ -242,6 +261,8 @@ function Refresh-FirmwareCache {
         Invoke-AuthorizedTask -Operation 'FirmwareRefresh' | Out-Null
         $script:FirmwareCacheText = Read-TaskBrokerTextFile -Path ([string]$meta.firmwareFile)
         $script:FirmwareCacheUtc = [datetime]::UtcNow
+        $script:SystemStatusEntriesObservedHash = Get-SystemStatusObservationHash $script:FirmwareCacheText
+        $script:SystemStatusEntriesObservedUtc = if ($script:SystemStatusEntriesObservedHash) { $script:FirmwareCacheUtc } else { $null }
         $sw.Stop()
         Write-RuntimeDiagnosticEvent -Event 'FIRMWARE_REFRESH' -Stage 'firmware-refresh' -Success $true -DurationMs $sw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{ force = [bool]$Force; bytes = $script:FirmwareCacheText.Length })
         return $script:FirmwareCacheText
@@ -273,6 +294,7 @@ function Get-TaskBrokerInteractiveReady {
 function Reset-TaskBrokerReadyCache {
     $script:TaskBrokerReadyCached = $null
     $script:TaskBrokerReadyCachedUtc = [datetime]::MinValue
+    $script:SystemStatusReadinessObservedUtc = $null
 }
 
 
@@ -325,6 +347,7 @@ function Test-TaskBrokerReady {
     Write-RuntimeDiagnosticEvent -Event 'TASKBROKER_READY_CHECK' -Stage 'ready' -Success $ready -DurationMs $sw.ElapsedMilliseconds -ErrorRecord $failure -Data (New-RuntimeDiagnosticData @{ force = [bool]$Force; requiredTaskCount = $requiredCount; failedTask = $failedTask; brokerPresent = [bool](Test-TaskBrokerInstallationPresent) }) -Level $(if ($ready) { 'info' } else { 'error' })
     $script:TaskBrokerReadyCached = $ready
     $script:TaskBrokerReadyCachedUtc = [datetime]::UtcNow
+    $script:SystemStatusReadinessObservedUtc = $script:TaskBrokerReadyCachedUtc
     return $ready
 }
 function Test-TaskBrokerInstallationPresent {
@@ -352,6 +375,7 @@ function Get-TaskBrokerFirmwareManagerText {
         if (-not $meta) { throw 'TaskBroker-Metadaten fehlen.' }
         if (-not $script:ManagerCacheText) {
             $script:ManagerCacheText = Read-TaskBrokerTextFile -Path ([string]$meta.managerFile)
+            if (-not (Test-SystemStatusObservationMatch $script:ManagerCacheText $script:SystemStatusManagerObservedHash)) { $script:SystemStatusManagerObservedUtc = $null; $script:SystemStatusManagerObservedHash = $null }
             try { $script:ManagerCacheUtc = (Get-Item -LiteralPath ([string]$meta.managerFile)).LastWriteTimeUtc } catch { }
         }
         return $script:ManagerCacheText
@@ -371,6 +395,7 @@ function Get-TaskBrokerFirmwareEntriesText {
         if (-not $meta) { throw 'TaskBroker-Metadaten fehlen.' }
         if (-not $script:FirmwareCacheText) {
             $script:FirmwareCacheText = Read-TaskBrokerTextFile -Path ([string]$meta.firmwareFile)
+            if (-not (Test-SystemStatusObservationMatch $script:FirmwareCacheText $script:SystemStatusEntriesObservedHash)) { $script:SystemStatusEntriesObservedUtc = $null; $script:SystemStatusEntriesObservedHash = $null }
             try { $script:FirmwareCacheUtc = (Get-Item -LiteralPath ([string]$meta.firmwareFile)).LastWriteTimeUtc } catch { }
         }
         return $script:FirmwareCacheText
@@ -396,15 +421,31 @@ function Sync-TaskBrokerFirmwareCachesFromFiles {
 }
 
 function Get-TaskBrokerDefaultTargetGuid {
+    $script:SystemStatusDefaultEvidence = 'unknown'
+    $script:SystemStatusDefaultObservedUtc = $null
     $meta = Get-TaskBrokerMetadata
     if (-not $meta -or -not [string]$meta.defaultFile) { return $null }
 
     $path = [string]$meta.defaultFile
-    if (-not (Test-Path -LiteralPath $path)) { return $null }
+    if (-not (Test-Path -LiteralPath $path)) {
+        if (Test-TaskBrokerMetadataContract -Metadata $meta) {
+            $script:SystemStatusDefaultEvidence = 'none'
+            $script:SystemStatusDefaultObservedUtc = [datetime]::UtcNow
+        }
+        return $null
+    }
 
     $candidate = ([System.IO.File]::ReadAllText($path)).Trim().ToLowerInvariant()
     $target = Get-TaskBrokerTarget -Guid $candidate
-    if ($target) { return $candidate }
+    if ($target) {
+        $script:SystemStatusDefaultEvidence = 'configured'
+        $script:SystemStatusDefaultObservedUtc = [datetime]::UtcNow
+        return $candidate
+    }
+    if (-not $candidate) {
+        $script:SystemStatusDefaultEvidence = 'none'
+        $script:SystemStatusDefaultObservedUtc = [datetime]::UtcNow
+    } else { $script:SystemStatusDefaultEvidence = 'unavailable' }
     return $null
 }
 

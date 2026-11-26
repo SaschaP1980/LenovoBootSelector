@@ -53,7 +53,7 @@ function Invoke-BackgroundRefreshWorker {
 
     $total = [System.Diagnostics.Stopwatch]::StartNew()
     $timings = [ordered]@{ ReadyMs = 0; ManagerMs = 0; FirmwareMs = 0; StorageMs = 0; TotalMs = 0 }
-    $result = [ordered]@{ Success = $false; Error = $null; Stage = 'ready'; StorageContext = $null; Timings = $timings }
+    $result = [ordered]@{ Success = $false; Error = $null; Stage = 'ready'; StorageContext = $null; Timings = $timings; ManagerObservedUtc = $null; ManagerObservedHash = $null; EntriesObservedUtc = $null; EntriesObservedHash = $null; ReadinessObservedUtc = $null }
 
     try {
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -79,6 +79,11 @@ function Invoke-BackgroundRefreshWorker {
     }
     finally {
         $total.Stop(); $timings.TotalMs = $total.ElapsedMilliseconds
+        $result.ManagerObservedUtc = $script:SystemStatusManagerObservedUtc
+        $result.ManagerObservedHash = $script:SystemStatusManagerObservedHash
+        $result.EntriesObservedUtc = $script:SystemStatusEntriesObservedUtc
+        $result.EntriesObservedHash = $script:SystemStatusEntriesObservedHash
+        $result.ReadinessObservedUtc = $script:SystemStatusReadinessObservedUtc
         if ($ResultPath) {
             try {
                 $parent = Split-Path -Parent $ResultPath

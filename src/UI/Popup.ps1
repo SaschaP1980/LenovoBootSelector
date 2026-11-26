@@ -292,6 +292,7 @@ function Set-AuxiliaryPopupLayout {
     $state.Scroll.LargeChange = $viewportHeight
     $state.Scroll.SmallChange = [Math]::Max(1,[int][Math]::Round(60*$Scale))
     if ($Form.Name -eq 'LenovoConfigurationPopup') { Set-ConfigurationPopupWidth -Form $Form -Scale $Scale }
+    if ($Form.Name -eq 'LenovoSystemStatusPopup') { Set-SystemStatusPopupWidth -Form $Form -Scale $Scale }
     $state.Scroll.Maximum = $range
     $state.Scroll.Value = 0
     $state.Scroll.Visible = ($range -gt 0 -and $gutter -gt 0)
@@ -749,6 +750,7 @@ function Show-OwnedAuxiliaryPopup {
     param([System.Windows.Forms.Form]$Form,[System.Windows.Forms.Control]$Owner)
     $dimmer = $null
     $ownerRefreshButton = $null
+    $ownerStatusButton = $null
     try {
         if ($script:ActiveAuxiliaryPopup -or -not $Owner -or $Owner.IsDisposed) { return $null }
         $parent = $Owner.FindForm()
@@ -762,15 +764,19 @@ function Show-OwnedAuxiliaryPopup {
             $ownerRefreshButton = $script:RefreshButton
             $ownerRefreshButton.Refresh()
         }
+        if ($script:SystemStatusButton -and -not $script:SystemStatusButton.IsDisposed -and [object]::ReferenceEquals($script:SystemStatusButton.FindForm(),$parent)) {
+            $ownerStatusButton = $script:SystemStatusButton
+            $ownerStatusButton.Refresh()
+        }
         Initialize-AuxiliaryOwnerDimmer
         $dimmer = [LenovoAuxiliaryOwnerDimmer]::new($parent,$Owner,$Form,[double]$scale,(Get-PopupNavigationHoverColor),$script:ColorAccent)
-        if ($Form.Name -in @('LenovoConfigurationPopup','LenovoDefaultTargetPicker')) { $dimmer.EnableOwnerClickDismissal() }
+        if ($Form.Name -in @('LenovoConfigurationPopup','LenovoDefaultTargetPicker','LenovoSystemStatusPopup')) { $dimmer.EnableOwnerClickDismissal() }
         # Show without activation before the child, which retains its normal
         # modal ownership, z-order and focus even on overlapping placement.
         $dimmer.Show($parent)
         # Both supported auxiliary surfaces receive keyboard focus once as
         # part of deliberate modal opening, after the dimmer's connector.
-        if ($Form.Name -in @('LenovoConfigurationPopup','LenovoDefaultTargetPicker')) {
+        if ($Form.Name -in @('LenovoConfigurationPopup','LenovoDefaultTargetPicker','LenovoSystemStatusPopup')) {
             $Form.Add_Shown({
                 param($sender,$eventArgs)
                 if ($sender.IsDisposed -or -not $sender.Visible -or
@@ -784,6 +790,10 @@ function Show-OwnedAuxiliaryPopup {
                     if ($target) { [void]$target.Focus() }
                     elseif ($sender.Tag.Close.CanFocus) { [void]$sender.Tag.Close.Focus() }
                 }
+                # This marks completion of the existing one-time Shown sequence, not a readiness or focus result.
+                # The dimmer's Shown handler has already run; no periodic activation or shield-dependent retries.
+                $sender.Tag.InitialModalActivationComplete = $true
+                if ($sender.Name -eq 'LenovoSystemStatusPopup' -and $sender.Tag.Timer) { $sender.Tag.Timer.Start() }
             })
         }
         $result = $Form.ShowDialog($parent)
@@ -798,6 +808,8 @@ function Show-OwnedAuxiliaryPopup {
             finally {
                 if ($dimmer -and $Owner -and -not $Owner.IsDisposed -and $Owner.Name -in @('SettingsPanel','DefaultPanel')) { Set-PopupNavigationRowHover -Control $Owner -Hover $false }
                 if ($ownerRefreshButton -and -not $ownerRefreshButton.IsDisposed) { $ownerRefreshButton.Refresh() }
+                if ($ownerStatusButton -and -not $ownerStatusButton.IsDisposed) { $ownerStatusButton.Refresh() }
+                if ($dimmer -and $Owner -and -not $Owner.IsDisposed -and $Owner.Name -eq 'HeaderSystemStatusButton' -and $Owner.CanFocus) { [void]$Owner.Focus() }
             }
         }
     }

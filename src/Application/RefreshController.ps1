@@ -19,6 +19,8 @@ function Apply-BackgroundRefreshResult {
             Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_RESULT_IGNORED' -Stage 'maintenance' -Success $true -DurationMs $Result.Timings.TotalMs -Data (New-RuntimeDiagnosticData @{ maintenanceMode = (Get-MaintenanceMode); workerStage = [string]$Result.Stage; workerError = [string]$Result.Error })
             return $false
         }
+        $script:SystemStatusLastRefresh = 'error'
+        if ($Result.ReadinessObservedUtc) { $script:SystemStatusReadinessObservedUtc = $Result.ReadinessObservedUtc }
         if ([string]$Result.Stage -eq 'ready') {
             $script:TaskBrokerReadyCached = $false
             $script:TaskBrokerReadyCachedUtc = [datetime]::UtcNow
@@ -42,6 +44,21 @@ function Apply-BackgroundRefreshResult {
     Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_COMPLETED' -Stage 'background-refresh' -Success $true -DurationMs $Result.Timings.TotalMs -Data (New-RuntimeDiagnosticData @{ requestedStorage = $requestedStorage; readyMs = $Result.Timings.ReadyMs; managerMs = $Result.Timings.ManagerMs; firmwareMs = $Result.Timings.FirmwareMs; storageMs = $Result.Timings.StorageMs })
 
     [void](Sync-TaskBrokerFirmwareCachesFromFiles)
+    if ($Result.ManagerObservedHash -and (Test-SystemStatusObservationMatch $script:ManagerCacheText $Result.ManagerObservedHash)) {
+        $script:SystemStatusManagerObservedUtc = $Result.ManagerObservedUtc
+        $script:SystemStatusManagerObservedHash = $Result.ManagerObservedHash
+    } else {
+        $script:SystemStatusManagerObservedUtc = $null
+        $script:SystemStatusManagerObservedHash = $null
+    }
+    if ($Result.EntriesObservedUtc -and $Result.EntriesObservedHash -and (Test-SystemStatusObservationMatch $script:FirmwareCacheText $Result.EntriesObservedHash)) {
+        $script:SystemStatusEntriesObservedUtc = $Result.EntriesObservedUtc
+        $script:SystemStatusEntriesObservedHash = $Result.EntriesObservedHash
+    } elseif (-not $script:SystemStatusEntriesObservedHash -or -not (Test-SystemStatusObservationMatch $script:FirmwareCacheText $script:SystemStatusEntriesObservedHash)) {
+        $script:SystemStatusEntriesObservedUtc = $null
+        $script:SystemStatusEntriesObservedHash = $null
+    }
+    $script:SystemStatusReadinessObservedUtc = $Result.ReadinessObservedUtc
     [void](Update-BootTargetDriftState)
 
     if ($requestedStorage -and $Result.StorageContext) {
@@ -50,6 +67,7 @@ function Apply-BackgroundRefreshResult {
 
     $state = Get-FirmwareBootState -UseExistingCache
     Apply-FirmwareBootState -State $state -VerifiedFresh
+    $script:SystemStatusLastRefresh = 'success'
     Update-TaskBrokerUiState -Fast | Out-Null
     Show-BootTargetDriftNotificationIfNeeded
     return $true
@@ -109,6 +127,7 @@ function Complete-BackgroundBootRefresh {
     }
     catch {
         Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_COMPLETED' -Stage 'background-refresh' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ requestedStorage = [bool]$context.Request.RefreshStorage }) -Level error
+        $script:SystemStatusLastRefresh = 'error'
         $script:LastStatusText = Get-LocalizedString -Key 'Status.BootTargetsRefreshFailed'
         if ($script:Popup -and -not $script:Popup.IsDisposed) { Update-PopupRows }
     }
@@ -190,6 +209,7 @@ function Start-BackgroundBootRefresh {
     }
     catch {
         Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_STARTED' -Stage 'background-refresh' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ refreshStorage = [bool]$request.RefreshStorage; refreshFirmware = [bool]$request.RefreshFirmware }) -Level error
+        $script:SystemStatusLastRefresh = 'error'
         $script:LastStatusText = Get-LocalizedString -Key 'Status.RefreshStartFailed'
         if ($script:Popup -and -not $script:Popup.IsDisposed) { Update-PopupRows }
     }
