@@ -247,7 +247,12 @@ try {
                             $expectedFill=if ([Windows.Forms.SystemInformation]::HighContrast) { $child.Tag.Header.BackColor } else { $script:ColorAccent }
                             $actualFill=[Drawing.Color]$fillField.GetValue($bridge[0])
                             Write-Host "LBS182 CONNECTOR FILL expected=$($expectedFill.ToArgb()) actual=$($actualFill.ToArgb())"
-                            Assert-Lbs267 'LBS182 status connector uses active accent fill (High Contrast retains surface)' ($actualFill.ToArgb() -eq $expectedFill.ToArgb())
+                            $bitmap=[Drawing.Bitmap]::new($bridge[0].Width,$bridge[0].Height)
+                            try {
+                                $bridge[0].DrawToBitmap($bitmap,$bridge[0].ClientRectangle)
+                                $paintedFill=$bitmap.GetPixel(1,[int][Math]::Floor($bridge[0].VisualBounds.Height/2)).ToArgb()
+                                Assert-Lbs267 'LBS182 status connector uses active accent fill (High Contrast retains surface)' ($actualFill.ToArgb() -eq $expectedFill.ToArgb() -and $paintedFill -eq $expectedFill.ToArgb())
+                            } finally { $bitmap.Dispose() }
                             [Windows.Forms.Cursor]::Position=Center-Lbs267 $child.Tag.Header
                             [Windows.Forms.Application]::DoEvents()
                             Assert-Lbs267 'LBS182 active Info actual screen accent while pointer outside' (Test-Lbs182ActiveInfoRaster $trigger $child $iconBounds)

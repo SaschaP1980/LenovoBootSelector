@@ -140,7 +140,7 @@ function New-PreferencesTextControl {
 
 function New-PreferencesViewButton {
     param($Form,[string]$Name,[string]$Text,[string]$Action,$Value,[switch]$Selected)
-    $button=[Windows.Forms.Button]::new()
+    $button=[LenovoActionButton]::new()
     $button.Name=$Name;$button.Text=$Text;$button.AccessibleName=$Text
     $button.UseMnemonic=$false;$button.UseVisualStyleBackColor=$false
     $button.FlatStyle='Flat';$button.Font=$Form.Tag.Fonts.Body
@@ -462,15 +462,15 @@ function New-PreferencesConfirmationForm {
     $fonts=@{Title=[Drawing.Font]::new('Segoe UI',11,[Drawing.FontStyle]::Bold);Heading=[Drawing.Font]::new('Segoe UI',10,[Drawing.FontStyle]::Bold);Body=[Drawing.Font]::new('Segoe UI',9.5);Caption=[Drawing.Font]::new('Segoe UI',9);Metric=[Drawing.Font]::new('Segoe UI',19,[Drawing.FontStyle]::Bold)}
     $heading=[Windows.Forms.Label]::new();$heading.Text=$Title;$heading.Font=$fonts.Title;$heading.ForeColor=$script:ColorPrimary
     $divider=[Windows.Forms.Panel]::new();$divider.BackColor=$script:ColorAccent
-    $cancel=[Windows.Forms.Button]::new();$cancel.Name='PreferencesCancel';$cancel.Text=Get-LocalizedString -Key 'Common.Cancel';$cancel.DialogResult='Cancel'
-    $confirm=[Windows.Forms.Button]::new();$confirm.Name='PreferencesConfirm';$confirm.Text=$ConfirmText;$confirm.DialogResult='OK'
+    $cancel=[LenovoActionButton]::new();$cancel.Name='PreferencesCancel';$cancel.Text=Get-LocalizedString -Key 'Common.Cancel';$cancel.DialogResult='Cancel'
+    $confirm=[LenovoActionButton]::new();$confirm.Name='PreferencesConfirm';$confirm.Text=$ConfirmText;$confirm.DialogResult='OK'
     foreach ($button in @($cancel,$confirm)) {
         $button.AccessibleName=$button.Text;$button.Font=$fonts.Body;$button.FlatStyle='Flat'
         $button.UseVisualStyleBackColor=$false;$button.UseMnemonic=$false;$button.Cursor=[Windows.Forms.Cursors]::Hand
         $button.ForeColor=$script:ColorPrimary
         $button.BackColor=if ($button -eq $confirm) {$script:ColorAccent} else {$script:ColorSurface}
         $button.FlatAppearance.BorderColor=[Drawing.Color]::FromArgb(72,72,72)
-        $button.FlatAppearance.MouseOverBackColor=if ($button -eq $confirm) {[Drawing.Color]::FromArgb(242,59,49)} else {[Drawing.Color]::FromArgb(45,45,45)}
+        $button.FlatAppearance.MouseOverBackColor=if ($button -eq $confirm) {$script:ColorAccent} else {[Drawing.Color]::FromArgb(45,45,45)}
     }
     $cancel.TabIndex=0;$confirm.TabIndex=1
     $form.AcceptButton=$cancel;$form.CancelButton=$cancel

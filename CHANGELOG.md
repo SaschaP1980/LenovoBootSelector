@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.10.2.0 - Consistent action hover and side-popup connectors (LBS-270)
+
+- Apply the approved pale-red hover accent across application action surfaces, preserving disabled, selected, pressed, keyboard focus, checked and semantic status states.
+- Use Lenovo red for all three active auxiliary popup connectors while retaining existing geometry, ownership, dimming and High Contrast behavior.
+- Extend native interaction, focus-raster, startup recovery and presentation regression coverage without changing boot, firmware, task or persistence admission.
+
 ## v1.10.1.1 - System Status connector accent (LBS-182)
 
 - Use the existing Lenovo red accent for the normal-theme System Status connector fill to match the active Info icon. Preserve geometry, outline, opacity, High Contrast and all other popup behavior.

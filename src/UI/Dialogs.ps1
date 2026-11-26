@@ -101,7 +101,7 @@ function Initialize-LenovoRegularDialog {
         $scroll.Name='DialogScroll'
         $scroll.TrackColor=[Drawing.Color]::FromArgb(23,23,23)
         $scroll.ThumbColor=$script:ColorAccent
-        $scroll.ThumbHoverColor=[Drawing.Color]::FromArgb(242,59,49)
+        $scroll.ThumbHoverColor=[LenovoInteractionPalette]::Hover
         $scroll.Visible=$false
         $viewport.Controls.Add($scroll)
         $scroll.Add_ValueChanged({ $body.Top=-$scroll.Value }.GetNewClosure())
@@ -455,7 +455,7 @@ function Show-LenovoNoticeDialog {
     $secondary=$null
 
     if (-not [string]::IsNullOrWhiteSpace($SecondaryButtonText) -and $SecondaryAction) {
-        $secondary = New-Object System.Windows.Forms.Button
+        $secondary = New-Object LenovoActionButton
         $secondary.Text = $SecondaryButtonText
         $secondary.Font = if ($PromoteSecondaryAction) {
             New-Object Drawing.Font('Segoe UI', 9.5, [Drawing.FontStyle]::Bold)
@@ -465,7 +465,7 @@ function Show-LenovoNoticeDialog {
         $secondary.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
         $secondary.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(70,70,70)
         $secondary.FlatAppearance.BorderSize = if ($PromoteSecondaryAction) { 0 } else { 1 }
-        $secondary.FlatAppearance.MouseOverBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(242,59,49) } else { [Drawing.Color]::FromArgb(46,46,46) }
+        $secondary.FlatAppearance.MouseOverBackColor = if ($PromoteSecondaryAction) { $script:ColorAccent } else { [Drawing.Color]::FromArgb(46,46,46) }
         $secondary.FlatAppearance.MouseDownBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(185,30,22) } else { [Drawing.Color]::FromArgb(38,38,38) }
         $secondary.Location = if ($PromoteSecondaryAction) { New-Object Drawing.Point(306,190) } else { New-Object Drawing.Point(184,190) }
         $secondary.Size = New-Object Drawing.Size(146,34)
@@ -521,7 +521,7 @@ function Show-LenovoNoticeDialog {
         $root.Controls.Add($secondary)
     }
 
-    $ok = New-Object System.Windows.Forms.Button
+    $ok = New-Object LenovoActionButton
     $ok.Text = if ($PromoteSecondaryAction) { $DismissButtonText } else { Get-LocalizedString -Key 'Common.OK' }
     $ok.Font = if ($PromoteSecondaryAction) {
         New-Object Drawing.Font('Segoe UI', 9.5, [Drawing.FontStyle]::Regular)
@@ -531,7 +531,7 @@ function Show-LenovoNoticeDialog {
     $ok.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $ok.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(70,70,70)
     $ok.FlatAppearance.BorderSize = if ($PromoteSecondaryAction) { 1 } else { 0 }
-    $ok.FlatAppearance.MouseOverBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(46,46,46) } else { [Drawing.Color]::FromArgb(242,59,49) }
+    $ok.FlatAppearance.MouseOverBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(46,46,46) } else { $script:ColorAccent }
     $ok.FlatAppearance.MouseDownBackColor = if ($PromoteSecondaryAction) { [Drawing.Color]::FromArgb(38,38,38) } else { [Drawing.Color]::FromArgb(185,30,22) }
     $ok.Location = if ($PromoteSecondaryAction) { New-Object Drawing.Point(184,190) } else { New-Object Drawing.Point(342,190) }
     $ok.Size = New-Object Drawing.Size(110,34)
@@ -593,7 +593,7 @@ function Show-LocaleMigrationDialog {
     $message.TextAlign = [Drawing.ContentAlignment]::TopLeft
     $root.Controls.Add($message)
 
-    $german = New-Object System.Windows.Forms.Button
+    $german = New-Object LenovoActionButton
     $german.Text = Get-LocalizedString -Key 'Language.MigrationKeepGerman'
     $german.Font = New-Object Drawing.Font('Segoe UI',9.5,[Drawing.FontStyle]::Regular)
     $german.ForeColor = $script:ColorPrimary
@@ -607,7 +607,7 @@ function Show-LocaleMigrationDialog {
     $german.Add_Click({ $form.Tag = 'de-DE'; $form.Close() })
     $root.Controls.Add($german)
 
-    $english = New-Object System.Windows.Forms.Button
+    $english = New-Object LenovoActionButton
     $english.Text = Get-LocalizedString -Key 'Language.MigrationUseEnglish'
     $english.Font = New-Object Drawing.Font('Segoe UI',9.5,[Drawing.FontStyle]::Bold)
     $english.ForeColor = [Drawing.Color]::White
@@ -711,7 +711,7 @@ function Show-LenovoSystemFunctionsDialog {
     $root.Controls.Add($body)
 
     $buttonY = $height - 54
-    $cancel = New-Object System.Windows.Forms.Button
+    $cancel = New-Object LenovoActionButton
     $cancel.Text = Get-LocalizedString -Key 'Common.Cancel'
     $cancel.Font = New-Object Drawing.Font('Segoe UI',9.5,[Drawing.FontStyle]::Regular)
     $cancel.ForeColor = $script:ColorPrimary
@@ -726,14 +726,14 @@ function Show-LenovoSystemFunctionsDialog {
     $cancel.DialogResult = [System.Windows.Forms.DialogResult]::No
     $root.Controls.Add($cancel)
 
-    $primary = New-Object System.Windows.Forms.Button
+    $primary = New-Object LenovoActionButton
     $primary.Text = $primaryText
     $primary.Font = New-Object Drawing.Font('Segoe UI',9.5,[Drawing.FontStyle]::Bold)
     $primary.ForeColor = [Drawing.Color]::White
     $primary.BackColor = $script:ColorAccent
     $primary.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $primary.FlatAppearance.BorderSize = 0
-    $primary.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(242,59,49)
+    $primary.FlatAppearance.MouseOverBackColor = $script:ColorAccent
     $primary.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(185,30,22)
     $primary.Location = New-Object Drawing.Point(382,$buttonY)
     $primary.Size = New-Object Drawing.Size(100,34)
@@ -818,7 +818,7 @@ function Show-LenovoRestartDialog {
     $target.AutoEllipsis = $true
     $root.Controls.Add($target)
 
-    $cancel = New-Object System.Windows.Forms.Button
+    $cancel = New-Object LenovoActionButton
     $cancel.Text = Get-LocalizedString -Key 'Common.Cancel'
     $cancel.Font = New-Object Drawing.Font('Segoe UI', 9.5, [Drawing.FontStyle]::Regular)
     $cancel.ForeColor = $script:ColorPrimary
@@ -834,7 +834,7 @@ function Show-LenovoRestartDialog {
     $cancel.DialogResult = [System.Windows.Forms.DialogResult]::No
     $root.Controls.Add($cancel)
 
-    $restart = New-Object System.Windows.Forms.Button
+    $restart = New-Object LenovoActionButton
     $restart.Text = Get-LocalizedString -Key 'Restart.Action'
     $restart.Font = New-Object Drawing.Font('Segoe UI', 9.5, [Drawing.FontStyle]::Bold)
     $restart.ForeColor = [Drawing.Color]::White
@@ -842,7 +842,7 @@ function Show-LenovoRestartDialog {
     $restart.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $restart.FlatAppearance.BorderColor = $script:ColorAccent
     $restart.FlatAppearance.BorderSize = 1
-    $restart.FlatAppearance.MouseOverBackColor = [Drawing.Color]::FromArgb(242,59,49)
+    $restart.FlatAppearance.MouseOverBackColor = $script:ColorAccent
     $restart.FlatAppearance.MouseDownBackColor = [Drawing.Color]::FromArgb(185,30,22)
     $restart.Location = New-Object Drawing.Point(312, 180)
     $restart.Size = New-Object Drawing.Size(96, 34)

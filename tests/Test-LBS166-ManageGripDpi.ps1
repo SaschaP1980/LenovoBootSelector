@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+. (Join-Path $PSScriptRoot 'Import-LenovoInteractionTestTypes.ps1')
 . (Join-Path $root 'src\UI\BootEntryRows.ps1')
 . (Join-Path $root 'src\UI\PopupDpiLayout.ps1')
 $script:checks = 0

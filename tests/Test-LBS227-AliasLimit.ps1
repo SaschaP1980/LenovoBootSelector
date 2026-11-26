@@ -5,6 +5,7 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [Windows.Forms.Application]::EnableVisualStyles()
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+. (Join-Path $PSScriptRoot 'Import-LenovoInteractionTestTypes.ps1')
 . (Join-Path $root 'src\Core\Localization.ps1')
 . (Join-Path $root 'src\Core\EntryPreferences.ps1')
 . (Join-Path $root 'src\Infrastructure\SettingsRepository.ps1')

@@ -184,7 +184,7 @@ def main():
     ui_presentation_path=root/'tests/Test-UIPresentation.ps1'
     s.c('LBS-29 native UI presentation test exists',ui_presentation_path.is_file())
     ui_presentation=txt(ui_presentation_path) if ui_presentation_path.is_file() else ''
-    s.has('LBS-132 UI presentation suite keeps fixed total 46',ui_presentation,'Write-Host "UI PRESENTATION TOTAL $script:checks/46"')
+    s.has('LBS-132 UI presentation suite keeps fixed total 49',ui_presentation,'Write-Host "UI PRESENTATION TOTAL $script:checks/49"')
     s.has('LBS-29 native aggregate runner invokes UI presentation suite',windows_wrapper,"Test-UIPresentation.ps1")
     mutex_test=txt(root/'tests/Test-SingleInstanceMutex.ps1')
     activation_test=txt(root/'tests/Test-InstanceActivation.ps1')
@@ -648,7 +648,13 @@ def main():
     s.c('LBS-17 localization is included before startup recovery',template.find('# @include src/Core/Localization.ps1') < template.find('# @include src/UI/StartupRecoveryDialog.ps1'))
     s.has('LBS-14 interactive header uses hand cursor',header_visual,'[System.Windows.Forms.Cursors]::Hand')
     s.has('LBS-14 interactive header participates in tab navigation',header_visual,'$script:HeaderStatusLabel.TabStop = $interactive')
-    s.has('LBS-14 keyboard focus uses Lenovo accent',header_visual,'$script:HeaderStatusLabel.Focused')
+    s.c('LBS-270 header native focus is independent of pointer hover',
+        '$headerSub = New-Object System.Windows.Forms.Button' in popup_surface and
+        '$headerSub.Add_Enter({ Update-HeaderStatusInteractionVisual })' in popup_surface and
+        '$headerSub.Add_Leave({ Update-HeaderStatusInteractionVisual })' in popup_surface and
+        '$highlight = ($interactive -and [bool]$script:HeaderStatusHovered)' in header_visual and
+        '[LenovoInteractionPalette]::Hover' in header_visual and
+        '$script:HeaderStatusLabel.Focused' not in header_visual)
     s.c('LBS-14 active boot or popup refresh disables header update interaction',
         '$refreshVisible = -not [string]::IsNullOrEmpty($refreshKey)' in refresh_ui and
         '$popupUpdateActive = ($script:UpdateState -and $script:UpdateState.CheckProcess' in refresh_ui and

@@ -50,7 +50,12 @@ function Get-ScreenState([Windows.Forms.Button]$Button) {
         $surface=$bm.GetPixel(1,1).ToArgb()
         $frame=0
         for ($x=4; $x -lt $bm.Width-4; $x++) { if ($bm.GetPixel($x,3).ToArgb() -ne $surface) { $frame++ } }
-        return [pscustomobject]@{Surface=$surface;Frame=$frame}
+        $hoverPixels=0
+        $hoverInk=[Drawing.Color]::FromArgb(255,110,102).ToArgb()
+        for ($y=4;$y -lt $bm.Height-4;$y++) {
+            for ($x=4;$x -lt $bm.Width-4;$x++) { if ($bm.GetPixel($x,$y).ToArgb() -eq $hoverInk) { $hoverPixels++ } }
+        }
+        return [pscustomobject]@{Surface=$surface;Frame=$frame;HoverPixels=$hoverPixels}
     } finally { $g.Dispose(); $bm.Dispose() }
 }
 function Move-TestPointer($Control,[int]$X,[int]$Y) {
@@ -59,13 +64,32 @@ function Move-TestPointer($Control,[int]$X,[int]$Y) {
     while ($sw.ElapsedMilliseconds -lt 120) { [Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 10 }
 }
 function Get-VisibleInk([Windows.Forms.Button]$Button) {
-    $Button.Refresh()
-    [Windows.Forms.Application]::DoEvents()
+    $form = $Button.FindForm()
+    $bounds = $Button.RectangleToScreen($Button.ClientRectangle)
     $bm=[Drawing.Bitmap]::new($Button.Width,$Button.Height)
     $g=[Drawing.Graphics]::FromImage($bm)
     try {
-        $g.CopyFromScreen($Button.PointToScreen([Drawing.Point]::Empty),[Drawing.Point]::Empty,$Button.ClientSize)
-        if ($bm.GetPixel(2,2).ToArgb() -ne $Button.BackColor.ToArgb()) { throw 'LBS252 fixture background not visible' }
+        # A newly shown/scaled HWND may not yet be present in the compositor.
+        # Retry only acquisition validity, never a measured contrast or ink failure.
+        $valid=$false
+        for ($attempt=1;$attempt -le 5;$attempt++) {
+            [Windows.Forms.Application]::DoEvents()
+            $Button.Refresh()
+            [Windows.Forms.Application]::DoEvents()
+            $g.CopyFromScreen($bounds.Location,[Drawing.Point]::Empty,$Button.ClientSize)
+            $actual=$bm.GetPixel(2,2).ToArgb()
+            $expected=$Button.BackColor.ToArgb()
+            $center=[Drawing.Point]::new($bounds.Left+[int]($bounds.Width/2),$bounds.Top+[int]($bounds.Height/2))
+            $hit=[Lbs252Native]::WindowFromPoint($center)
+            $rootHit=[Lbs252Native]::GetAncestor($hit,2)
+            $sameBounds=$Button.RectangleToScreen($Button.ClientRectangle) -eq $bounds
+            $pointerOutside=-not $bounds.Contains([Windows.Forms.Cursor]::Position)
+            $valid=$form.Visible -and $Button.Visible -and $form.ContainsFocus -and $sameBounds -and $pointerOutside -and ($rootHit -eq $form.Handle) -and ($actual -eq $expected)
+            Write-Host "LBS252 INK FRAME locale=$script:Locale scale=$scale enabled=$($Button.Enabled) attempt=$attempt valid=$valid actual=$actual expected=$expected focus=$($form.ContainsFocus) bounds=$bounds sameBounds=$sameBounds pointerOutside=$pointerOutside hitRoot=$rootHit expectedRoot=$($form.Handle)"
+            if ($valid) { break }
+            if ($attempt -lt 5) { Start-Sleep -Milliseconds 50 }
+        }
+        if (-not $valid) { throw 'LBS252 fixture background not visible or screen ownership invalid after 5 acquisitions; no visual conclusion' }
         $peak=0; $bright=0
         $levels=[Collections.Generic.Dictionary[int,int]]::new()
         $background=$Button.BackColor.R
@@ -102,8 +126,10 @@ using System;
 using System.Runtime.InteropServices;
 public static class Lbs252Native {
     [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(System.Drawing.Point point);
+    [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
 }
-'@
+'@ -ReferencedAssemblies System.Drawing
 $savedCursor=[Windows.Forms.Cursor]::Position
 foreach ($locale in @('de-DE','en-US')) {
     foreach ($scale in @(1.0,2.5)) {
@@ -197,7 +223,8 @@ foreach ($locale in @('de-DE','en-US')) {
             $blocked=($script:ManageCalls -eq $before+2 -and -not $button.CanSelect)
             Move-TestPointer $form 5 5
             Write-Host "LBS252 INTERACTION locale=$locale scale=$scale hover=$($hover.Surface) idle=$($idle.Surface) focus=$hadFocus frame=$($focused.Frame) unfocused=$($unfocused.Frame) keyboard=$keyboardDispatch disabledBlocked=$blocked"
-            if ($hover.Surface -eq $button.FlatAppearance.MouseOverBackColor.ToArgb() -and $idle.Surface -eq $button.BackColor.ToArgb() -and $hadFocus -and $focused.Frame -ge 4 -and $unfocused.Frame -eq 0 -and $keyboardDispatch -and $blocked -and $disabledHover.Surface -eq $button.BackColor.ToArgb()) {
+            $hoverInkValid=$idle.HoverPixels -eq 0 -and $disabledHover.HoverPixels -eq 0 -and $(if ([Windows.Forms.SystemInformation]::HighContrast) {$hover.HoverPixels -eq 0} else {$hover.HoverPixels -gt 0})
+            if ($hoverInkValid -and $hover.Surface -eq $button.FlatAppearance.MouseOverBackColor.ToArgb() -and $idle.Surface -eq $button.BackColor.ToArgb() -and $hadFocus -and $focused.Frame -ge 4 -and $unfocused.Frame -eq 0 -and $keyboardDispatch -and $blocked -and $disabledHover.Surface -eq $button.BackColor.ToArgb()) {
                 $checks++
                 Write-Host "PASS LBS252 $locale $scale hover focus keyboard and disabled admission retained"
             } else { $interactionFailures.Add("$locale $scale") }

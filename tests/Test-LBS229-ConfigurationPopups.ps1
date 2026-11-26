@@ -656,6 +656,20 @@ try {
                             Move-Lbs247Pointer $step.C $step.X $step.Y
                             $expect=if ($step.Hot) { $hot } else { $normal }
                             if ((Get-Lbs247Background $label) -ne $expect -or (Get-Lbs247Background $toggle) -ne $expect) { $pointerOk=$false }
+                            if (-not [Windows.Forms.SystemInformation]::HighContrast) {
+                                $hoverBitmap=[Drawing.Bitmap]::new($toggle.Width,$toggle.Height)
+                                try {
+                                    $toggle.DrawToBitmap($hoverBitmap,$toggle.ClientRectangle)
+                                    $hoverInk=[Drawing.Color]::FromArgb(255,110,102).ToArgb()
+                                    $found=$false
+                                    for ($x=4;$x -lt $hoverBitmap.Width-4 -and -not $found;$x++) {
+                                        for ($y=4;$y -lt $hoverBitmap.Height-4;$y++) {
+                                            if ($hoverBitmap.GetPixel($x,$y).ToArgb() -eq $hoverInk) { $found=$true; break }
+                                        }
+                                    }
+                                    if ($found -ne $step.Hot) { $pointerOk=$false }
+                                } finally { $hoverBitmap.Dispose() }
+                            }
                         }
                         $script:F03Pointer=$pointerOk
                         if ($initial) {
@@ -992,7 +1006,7 @@ try {
                 $close = $surface.Tag.Close
                 $idle = $close.ForeColor
                 Invoke-Lbs229MouseEvent $close 'OnMouseEnter'
-                Require-Lbs229Correction ($close.ForeColor -eq $script:ColorAccent -and $close.FlatAppearance.MouseOverBackColor -eq $close.BackColor -and $close.FlatAppearance.MouseDownBackColor -eq $close.BackColor) 'Close must turn red with unchanged background'
+                Require-Lbs229Correction ($close.ForeColor -eq $(if ([Windows.Forms.SystemInformation]::HighContrast) { $idle } else { [Drawing.Color]::FromArgb(255,110,102) }) -and $close.FlatAppearance.MouseOverBackColor -eq $close.BackColor -and $close.FlatAppearance.MouseDownBackColor -eq $close.BackColor) 'Close must use approved hover ink with unchanged background'
                 Invoke-Lbs229MouseEvent $close 'OnMouseLeave'
                 Require-Lbs229Correction ($close.ForeColor -eq $idle) 'Close restores idle glyph'
             }
@@ -1035,7 +1049,7 @@ try {
             $refresh = $script:RefreshButton
             Require-Lbs229Correction ($refresh.FlatAppearance.MouseOverBackColor -eq $refresh.BackColor -and $refresh.FlatAppearance.MouseDownBackColor -eq $refresh.BackColor) 'Refresh hover and press must preserve header background'
             Invoke-Lbs229MouseEvent $refresh 'OnMouseEnter'
-            Require-Lbs229Correction ($refresh.ForeColor -eq $script:ColorAccent) 'Refresh hover glyph must use existing accent'
+            Require-Lbs229Correction ($refresh.ForeColor -eq $(if ([Windows.Forms.SystemInformation]::HighContrast) { [Drawing.Color]::FromArgb(184,184,184) } else { [Drawing.Color]::FromArgb(255,110,102) })) 'Refresh hover glyph must use approved hover accent'
             Invoke-Lbs229MouseEvent $refresh 'OnMouseLeave'
             Require-Lbs229Correction ($refresh.ForeColor -eq $script:ColorSecondary) 'Refresh idle glyph restores'
         } finally { $rootPanel.Dispose(); $script:RefreshButton = $null; $script:HeaderStatusLabel = $null }
@@ -1163,7 +1177,17 @@ try {
         $pos = Get-AuxiliaryPopupLocation $wa $main $childSize $row $factor
         $childBounds = [Drawing.Rectangle]::new($pos,$childSize)
         $bridge = [LenovoAuxiliaryConnector]::GetConnectorBounds($wa,$main,$row,$childBounds,$factor)
-        Assert-Lbs229 "LBS233 scale $factor left-only aligned bridge" ($childBounds.Right -eq $main.Left-$gap -and $bridge.Left -eq $childBounds.Right -and $bridge.Right -eq $row.Left -and $bridge.Top+[int][Math]::Floor($bridge.Height/2) -eq $row.Top+[int][Math]::Floor($row.Height/2))
+        $connectorRaster=New-Object LenovoAuxiliaryConnector
+        $connectorPaintValid=$false
+        try {
+            $connectorRaster.SetGeometry($bridge,[Drawing.Color]::FromArgb(225,37,27))
+            $bitmap=[Drawing.Bitmap]::new($connectorRaster.Width,$connectorRaster.Height)
+            try {
+                $connectorRaster.DrawToBitmap($bitmap,$connectorRaster.ClientRectangle)
+                $connectorPaintValid=$bitmap.GetPixel(1,[int][Math]::Floor($bridge.Height/2)).ToArgb() -eq [Drawing.Color]::FromArgb(225,37,27).ToArgb()
+            } finally { $bitmap.Dispose() }
+        } finally { $connectorRaster.Dispose() }
+        Assert-Lbs229 "LBS233 scale $factor left-only aligned bridge with actual active fill" ($connectorPaintValid -and $childBounds.Right -eq $main.Left-$gap -and $bridge.Left -eq $childBounds.Right -and $bridge.Right -eq $row.Left -and $bridge.Top+[int][Math]::Floor($bridge.Height/2) -eq $row.Top+[int][Math]::Floor($row.Height/2))
         $overlap = [Drawing.Rectangle]::new($main.Left,0,975,600)
         Assert-Lbs229 "LBS233 scale $factor overlap omits bridge" ([LenovoAuxiliaryConnector]::GetConnectorBounds($wa,$main,$row,$overlap,$factor).IsEmpty)
         $rightOnly = [Drawing.Rectangle]::new($main.Left-5,0,2300,1400)
@@ -1487,6 +1511,14 @@ try {
                         if (-not $expected.IsEmpty) {
                             Require-Lbs229Correction ($connectors.Count -eq 1 -and $connectors[0].Visible -and $connectors[0].VisualBounds -eq $expected -and $connectors[0].Location -eq $expected.Location -and -not $connectors[0].ShowInTaskbar) ("Real bridge follows screen-coordinate geometry: expected=$expected count=$($connectors.Count) actual=$($connectors | ForEach-Object { 'bounds='+$_.Bounds+' visible='+$_.Visible+' taskbar='+$_.ShowInTaskbar }) child=$($child.Bounds) row=$bounds owner=$($parent.Bounds)")
                             $script:Lbs233Connector = $connectors[0]
+                            if (-not [Windows.Forms.SystemInformation]::HighContrast) {
+                                $bridgeBitmap = [Drawing.Bitmap]::new($connectors[0].Width,$connectors[0].Height)
+                                try {
+                                    $connectors[0].DrawToBitmap($bridgeBitmap,$connectors[0].ClientRectangle)
+                                    $fillX=1; $fillY=[int][Math]::Floor($expected.Height/2)
+                                    Require-Lbs229Correction ($bridgeBitmap.GetPixel($fillX,$fillY).ToArgb() -eq [Drawing.Color]::FromArgb(225,37,27).ToArgb()) 'LBS270 active navigation connector paints Lenovo red independent of pointer hover'
+                                } finally { $bridgeBitmap.Dispose() }
+                            }
                             Require-Lbs229Correction ($connectors[0].Region.IsVisible(1,[int][Math]::Floor($expected.Height/2)) -and -not $connectors[0].Region.IsVisible($expected.Width,[int][Math]::Floor($expected.Height/2)) -and -not $connectors[0].Region.IsVisible(1,$expected.Height)) 'Visible bridge must be clipped to approved geometry even if WinForms enlarges the backing window'
                             $style = [Lbs229Native]::GetWindowLong($connectors[0].Handle,-20)
                             Require-Lbs229Correction (($style -band 0x08000020) -eq 0x08000020) 'Bridge is non-activating and input-transparent'
