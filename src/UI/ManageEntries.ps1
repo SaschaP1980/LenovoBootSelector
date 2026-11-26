@@ -164,10 +164,23 @@ function Move-ManageEntry {
         if (-not (Test-GuidInList -Guid $moved -List $script:ManageUndoInventory) -or
             -not (Test-GuidInList -Guid $target -List $script:ManageUndoInventory)) { return }
     }
+    $liveOrder = @(Get-OrderedEntriesForUi -IncludeHidden -UseManageDraft | ForEach-Object { ([string]$_.Guid).ToLowerInvariant() })
+    $movedIndex = [Array]::IndexOf($liveOrder,$moved)
+    $targetIndexLive = [Array]::IndexOf($liveOrder,$target)
+    if ($movedIndex -ge 0 -and $targetIndexLive -ge 0 -and
+        (($After -and $movedIndex -eq ($targetIndexLive+1)) -or
+        (-not $After -and $movedIndex -eq ($targetIndexLive-1)))) { return }
     $before = Get-ManageUndoBefore
 
+    # A newly discovered current entry may be displayed before it is explicit
+    # in the draft order. Materialize the displayed order for either input path,
+    # retaining existing unavailable GUIDs and recording only the actual move.
+    $order = @($script:ManageEntryOrder)
+    foreach ($entry in @(Get-OrderedEntriesForUi -IncludeHidden -UseManageDraft)) {
+        if (-not (Test-GuidInList -Guid ([string]$entry.Guid) -List $order)) { $order += [string]$entry.Guid }
+    }
     $list = New-Object System.Collections.ArrayList
-    foreach ($guid in @($script:ManageEntryOrder)) {
+    foreach ($guid in $order) {
         if ([string]$guid -and ([string]$guid).ToLowerInvariant() -ne $moved) {
             [void]$list.Add(([string]$guid).ToLowerInvariant())
         }
@@ -214,6 +227,11 @@ function Update-ManageEntriesUiState {
     }
 
     if ($sectionLabel) { $sectionLabel.Text = if ($script:IsManageEntriesMode) { Get-LocalizedString -Key 'Manage.Section' } else { Get-LocalizedString -Key 'Popup.NextBootSection' } }
+    $keyboardHint = $script:Popup.Controls.Find('ManageKeyboardHint',$true) | Select-Object -First 1
+    if ($keyboardHint) {
+        $keyboardHint.Visible = $script:IsManageEntriesMode
+        $keyboardHint.Text = Get-LocalizedString -Key 'Manage.KeyboardHint'
+    }
     if ($manageButton) {
         $manageButton.Visible = -not $script:IsManageEntriesMode
         $manageButton.Enabled = (-not $script:IsManageEntriesMode -and [bool]$capabilities.CanManageEntries)

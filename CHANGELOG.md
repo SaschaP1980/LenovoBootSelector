@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.8.0.0 – Keyboard-accessible boot-target management (LBS-178)
+
+- Navigate focused Customize rows using Tab, arrows, Home and End with GUID-stable focus and automatic scroll reveal.
+- Reorder with Ctrl+Up/Down, toggle visibility with Space and edit the display name with Ctrl+E. Share existing draft owners and Undo history; show localized shortcut and position feedback.
+- Preserve explicit Save/Cancel, native alias input, mouse drag, and firmware/privilege boundaries.
+
 ## v1.7.0.0 – Undo individual unsaved boot-target edits (LBS-179)
 
 - Add one localized Undo button to Customize without a visible history or counter.

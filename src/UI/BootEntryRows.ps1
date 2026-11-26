@@ -716,10 +716,7 @@ function New-BootEntryInteractionHandlers {
 
         if ($script:IsManageEntriesMode) {
             if (([datetime]::UtcNow - $script:ManageLastDragUtc).TotalMilliseconds -lt 350) { return }
-            if ($script:ManageAliasEditGuid -and -not (Commit-ActiveManageAliasEditor)) { return }
-            Toggle-ManageEntryVisibility -Guid $guid
-            $script:LastStatusText = if (Test-ManageEntryHidden -Guid $guid) { Get-LocalizedString -Key 'Manage.EntryHiddenStatus' } else { Get-LocalizedString -Key 'Manage.EntryVisibleStatus' }
-            Update-PopupRows
+            Invoke-ManageRowVisibility -Guid $guid
             return
         }
 
@@ -768,6 +765,7 @@ function New-BootEntryInteractionHandlers {
         # LBS-221: close action help before capturing the row or entering OLE drag.
         try { Hide-DarkActionTooltip } catch { }
         $sourceRow = Get-BootRowFromControl $sender
+        if ($sourceRow -and $sourceRow.PSObject.Properties['ManageSpaceArmed']) { $sourceRow.ManageSpaceArmed = $false }
         if ($sourceRow) { Start-ManageDragReflow -SourceRow $sourceRow }
         try { [void]$sender.DoDragDrop($guid, [System.Windows.Forms.DragDropEffects]::Move) }
         catch { }
@@ -1092,15 +1090,19 @@ function Add-BootEntryAliasEditor {
                 Show-ManageAliasLimitFeedback -Editor $sender
                 return
             }
+            $closedGuid = [string]$sender.Tag
             $script:ManageAliasEditGuid = $null
             $script:LastStatusText = if ([string]::IsNullOrWhiteSpace([string]$sender.Text)) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
             Update-PopupRows
+            Restore-ManageRowFocus -Guid $closedGuid
         }
         elseif ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Escape) {
+            $closedGuid = [string]$sender.Tag
             $script:ManageAliasEditGuid = $null
             $script:LastStatusText = Get-LocalizedString -Key 'Manage.AliasDiscarded'
             $eventArgs.SuppressKeyPress = $true
             Update-PopupRows
+            Restore-ManageRowFocus -Guid $closedGuid
         }
     })
     $editorFrame.Controls.Add($aliasEditor)
@@ -1133,15 +1135,18 @@ function Add-BootEntryAliasEditor {
                 return
             }
             $empty = [string]::IsNullOrWhiteSpace([string]$editor.Text)
+            $closedGuid = [string]$editor.Tag
             $script:ManageAliasEditGuid = $null
             $script:LastStatusText = if ($empty) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
             Update-PopupRows
+            Restore-ManageRowFocus -Guid $closedGuid
         }
     })
     $row.Controls.Add($applyAlias)
 
     $cancelAlias = New-Object System.Windows.Forms.Button
     $cancelAlias.Name = 'AliasCancelButton'
+    $cancelAlias.Tag = $entry.Guid
     $cancelAlias.Text = Get-LocalizedString -Key 'Common.Cancel'
     $cancelAlias.Font = New-Object Drawing.Font('Segoe UI', 9.0, [Drawing.FontStyle]::Regular)
     $cancelAlias.ForeColor = $script:ColorSecondary
@@ -1154,9 +1159,12 @@ function Add-BootEntryAliasEditor {
     $cancelAlias.Size = New-Object Drawing.Size(80, 24)
     $cancelAlias.Cursor = [System.Windows.Forms.Cursors]::Hand
     $cancelAlias.Add_Click({
+        param($sender,$eventArgs)
+        $closedGuid = [string]$sender.Tag
         $script:ManageAliasEditGuid = $null
         $script:LastStatusText = Get-LocalizedString -Key 'Manage.AliasDiscarded'
         Update-PopupRows
+        Restore-ManageRowFocus -Guid $closedGuid
     })
     $row.Controls.Add($cancelAlias)
 
@@ -1274,6 +1282,50 @@ function Paint-LenovoManageGripGlyph {
     }
 }
 
+# Shared action owners for mouse and focused-row keyboard interaction.
+function Invoke-ManageRowVisibility {
+    param([string]$Guid)
+    if (-not $script:IsManageEntriesMode -or -not $Guid) { return }
+    if ($script:ManageAliasEditGuid -and -not (Commit-ActiveManageAliasEditor)) { return }
+    Toggle-ManageEntryVisibility -Guid $Guid
+    $script:LastStatusText = if (Test-ManageEntryHidden -Guid $Guid) { Get-LocalizedString -Key 'Manage.EntryHiddenStatus' } else { Get-LocalizedString -Key 'Manage.EntryVisibleStatus' }
+    Update-PopupRows
+}
+
+function Start-ManageRowAliasEdit {
+    param([string]$Guid)
+    if (-not $script:IsManageEntriesMode -or -not $Guid -or $script:ManageActiveDragGuid) { return }
+    $guid = $Guid.ToLowerInvariant()
+    if ($script:ManageAliasEditGuid -and $script:ManageAliasEditGuid -ne $guid) {
+        if (-not (Commit-ActiveManageAliasEditor)) { return }
+    }
+    $script:ManageAliasEditGuid = $guid
+    $script:LastStatusText = Get-LocalizedString -Key 'Manage.EditAliasStatus'
+    Update-PopupRows
+    $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
+    if ($editor) {
+        [void]$editor.Focus()
+        $editor.SelectAll()
+        Set-NormalBootRowVisible -Row (Get-BootRowFromControl $editor)
+    }
+}
+
+function Restore-ManageRowFocus {
+    param([string]$Guid,[int]$FallbackIndex = -1)
+    if (-not $script:IsManageEntriesMode -or -not $script:Popup -or $script:Popup.IsDisposed) { return }
+    $rows = @($script:Popup.Controls.Find('BootRow',$true) | Where-Object {
+        -not $_.IsDisposed -and $_.TabStop -and $_.CanFocus
+    } | Sort-Object Top)
+    $target = $rows | Where-Object { [string]$_.Tag -eq $Guid } | Select-Object -First 1
+    if (-not $target -and $FallbackIndex -ge 0 -and $rows.Count -gt 0) {
+        $target = $rows[[Math]::Min($FallbackIndex,$rows.Count-1)]
+    }
+    if ($target) {
+        [void]$target.Focus()
+        Set-NormalBootRowVisible -Row $target
+    }
+}
+
 function Add-ManageBootEntryControls {
     param(
         [Parameter(Mandatory=$true)]$Row,
@@ -1361,18 +1413,7 @@ $editAlias.Add_MouseLeave({
 $editAlias.Add_Click({
     param($sender,$eventArgs)
     try { Hide-DarkActionTooltip } catch { }
-    $guid = ([string]$sender.Tag).ToLowerInvariant()
-    if ($script:ManageAliasEditGuid -and $script:ManageAliasEditGuid -ne $guid) {
-        if (-not (Commit-ActiveManageAliasEditor)) { return }
-    }
-    $script:ManageAliasEditGuid = $guid
-    $script:LastStatusText = Get-LocalizedString -Key 'Manage.EditAliasStatus'
-    Update-PopupRows
-    $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
-    if ($editor) {
-        $editor.Focus()
-        $editor.SelectAll()
-    }
+    Start-ManageRowAliasEdit -Guid ([string]$sender.Tag)
 })
 $row.Controls.Add($editAlias)
 
@@ -1540,7 +1581,7 @@ function Update-BootEntryRowText {
     if ([string]$title.Text -cne [string]$text.Title) {
         $title.Text = [string]$text.Title
         $title.AccessibleDescription = [string]$text.Title
-        if (-not $script:IsManageEntriesMode) { $Row.AccessibleName = [string]$text.Title }
+        if (-not $script:IsManageEntriesMode -or $Row.TabStop) { $Row.AccessibleName = [string]$text.Title }
         if ($script:IsManageEntriesMode -and $script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($title,[string]$text.Title) }
         $changed = $true
     }
@@ -1568,6 +1609,9 @@ using System.Windows.Forms;
 
 public sealed class LenovoNormalBootKeyboardRow : Panel
 {
+    public bool ManageKeyboardMode { get; set; }
+    public bool ManageSpaceArmed { get; set; }
+
     public LenovoNormalBootKeyboardRow()
     {
         SetStyle(ControlStyles.Selectable, true);
@@ -1578,6 +1622,8 @@ public sealed class LenovoNormalBootKeyboardRow : Panel
     protected override bool IsInputKey(Keys keyData)
     {
         Keys key = keyData & Keys.KeyCode;
+        if (ManageKeyboardMode && key == Keys.E && (keyData & Keys.Modifiers) == Keys.Control)
+            return true;
         if (key == Keys.Up || key == Keys.Down || key == Keys.Home ||
             key == Keys.End || key == Keys.Return || key == Keys.Space)
             return true;
@@ -1592,6 +1638,7 @@ public sealed class LenovoNormalBootKeyboardRow : Panel
 
     protected override void OnLostFocus(EventArgs e)
     {
+        ManageSpaceArmed = false;
         base.OnLostFocus(e);
         Invalidate();
     }
@@ -1677,6 +1724,115 @@ function Move-NormalBootKeyboardFocus {
     Set-NormalBootRowVisible -Row $target
 }
 
+# LBS-178: focused Manage rows own their shortcuts; the native TextBox
+# and OLE drag retain independent input and cancellation semantics.
+function Test-ManageRowKeyboardAdmission {
+    param($Row)
+    return ($script:IsManageEntriesMode -and $Row -and -not $Row.IsDisposed -and $Row.Focused -and
+        $Row.Parent -and $Row.Parent.Name -eq 'EntryContent' -and
+        -not $script:ManageAliasEditGuid -and -not $script:ManageActiveDragGuid -and
+        (Test-GuidInList -Guid ([string]$Row.Tag) -List @($script:CurrentEntries | ForEach-Object { $_.Guid })) -and
+        [bool](Get-CurrentSystemFunctionsCapabilities).CanManageEntries)
+}
+
+function Update-ManageKeyboardRowPresentation {
+    param($Row)
+    if (-not $Row -or $Row.IsDisposed -or -not $Row.TabStop -or -not $Row.Parent) { return }
+    $entries = @($Row.Parent.Controls | Where-Object { $_.Name -eq 'BootRow' -and -not $_.IsDisposed } | Sort-Object Top)
+    $position = 0
+    for ($i=0; $i -lt $entries.Count; $i++) {
+        if ([object]::ReferenceEquals($entries[$i],$Row)) { $position=$i+1; break }
+    }
+    if (-not $position) { return }
+    $title = $Row.Controls['BootTitleLabel']
+    if ($title) { $Row.AccessibleName = [string]$title.Text }
+    $state = if (Test-ManageEntryHidden -Guid ([string]$Row.Tag)) { Get-LocalizedString -Key 'Manage.HiddenAccessible' } else { Get-LocalizedString -Key 'Manage.VisibleAccessible' }
+    $values = @{ Position=$position; Count=$entries.Count }
+    $Row.AccessibleDescription = ('{0}. {1}. {2}' -f (Get-LocalizedString -Key 'Manage.KeyboardPosition' -Values $values),$state,(Get-LocalizedString -Key 'Manage.KeyboardInstructions'))
+    if ($Row.Focused -and $script:Popup) {
+        $hint = $script:Popup.Controls.Find('ManageKeyboardHint',$true) | Select-Object -First 1
+        if ($hint) { $hint.Text = Get-LocalizedString -Key 'Manage.KeyboardPositionHint' -Values $values }
+    }
+}
+
+function Invoke-ManageRowKeyboardMove {
+    param($Row,[System.Windows.Forms.Keys]$Key,[bool]$Reorder)
+    $entries = @(Get-OrderedEntriesForUi -IncludeHidden -UseManageDraft)
+    $index = -1
+    for ($i=0; $i -lt $entries.Count; $i++) {
+        if ([string]$entries[$i].Guid -eq [string]$Row.Tag) { $index=$i; break }
+    }
+    if ($index -lt 0) { return }
+    $target = switch ($Key) {
+        ([System.Windows.Forms.Keys]::Up) { [Math]::Max(0,$index-1); break }
+        ([System.Windows.Forms.Keys]::Down) { [Math]::Min($entries.Count-1,$index+1); break }
+        ([System.Windows.Forms.Keys]::Home) { 0; break }
+        ([System.Windows.Forms.Keys]::End) { $entries.Count-1; break }
+        default { $index }
+    }
+    if ($target -eq $index) { return }
+    if ($Reorder) {
+        $guid = [string]$Row.Tag
+        Move-ManageEntry -MovedGuid $guid -TargetGuid ([string]$entries[$target].Guid) -After:($target -gt $index)
+        $script:LastStatusText = Get-LocalizedString -Key 'Manage.KeyboardPosition' -Values @{Position=($target+1);Count=$entries.Count}
+        Update-PopupRows -Reason 'manage-keyboard-reorder'
+        Restore-ManageRowFocus -Guid $guid
+    }
+    else { Restore-ManageRowFocus -Guid ([string]$entries[$target].Guid) }
+}
+
+function Connect-ManageRowKeyboard {
+    param($Row)
+    $Row.Add_GotFocus({
+        param($sender,$eventArgs)
+        Set-NormalBootRowVisible -Row $sender
+        Update-ManageKeyboardRowPresentation -Row $sender
+    })
+    $Row.Add_LostFocus({
+        if ($script:Popup -and -not $script:Popup.IsDisposed) {
+            $hint = $script:Popup.Controls.Find('ManageKeyboardHint',$true) | Select-Object -First 1
+            if ($hint) { $hint.Text = Get-LocalizedString -Key 'Manage.KeyboardHint' }
+        }
+    })
+    $Row.Add_KeyDown({
+        param($sender,$eventArgs)
+        if (-not (Test-ManageRowKeyboardAdmission -Row $sender)) { return }
+        $key=$eventArgs.KeyCode
+        $modifiers=$eventArgs.Modifiers
+        if ($modifiers -eq [Windows.Forms.Keys]::None -and $key -in @([Windows.Forms.Keys]::Up,[Windows.Forms.Keys]::Down,[Windows.Forms.Keys]::Home,[Windows.Forms.Keys]::End)) {
+            $eventArgs.SuppressKeyPress=$true
+            Invoke-ManageRowKeyboardMove -Row $sender -Key $key -Reorder:$false
+        }
+        elseif ($modifiers -eq [Windows.Forms.Keys]::Control -and $key -in @([Windows.Forms.Keys]::Up,[Windows.Forms.Keys]::Down)) {
+            $eventArgs.SuppressKeyPress=$true
+            Invoke-ManageRowKeyboardMove -Row $sender -Key $key -Reorder:$true
+        }
+        elseif ($modifiers -eq [Windows.Forms.Keys]::None -and $key -eq [Windows.Forms.Keys]::Space) {
+            # SuppressKeyPress would also suppress KeyUp. Arm once until release.
+            $eventArgs.Handled=$true
+            $sender.ManageSpaceArmed=$true
+        }
+        elseif ($modifiers -eq [Windows.Forms.Keys]::Control -and $key -eq [Windows.Forms.Keys]::E) {
+            $eventArgs.SuppressKeyPress=$true
+            Start-ManageRowAliasEdit -Guid ([string]$sender.Tag)
+        }
+        elseif ($modifiers -eq [Windows.Forms.Keys]::None -and $key -eq [Windows.Forms.Keys]::Enter) {
+            $eventArgs.SuppressKeyPress=$true
+        }
+    })
+    $Row.Add_KeyUp({
+        param($sender,$eventArgs)
+        if ($eventArgs.KeyCode -ne [Windows.Forms.Keys]::Space) { return }
+        $armed=$sender.ManageSpaceArmed
+        $sender.ManageSpaceArmed=$false
+        if (-not $armed -or $eventArgs.Modifiers -ne [Windows.Forms.Keys]::None -or -not (Test-ManageRowKeyboardAdmission -Row $sender)) { return }
+        $eventArgs.Handled=$true
+        $guid=[string]$sender.Tag
+        Invoke-ManageRowVisibility -Guid $guid
+        Restore-ManageRowFocus -Guid $guid
+    })
+}
+
 function New-BootEntryRow {
     param(
         [Parameter(Mandatory=$true)]$Entry,
@@ -1689,12 +1845,14 @@ $guidNormalized = ([string]$entry.Guid).ToLowerInvariant()
 $aliasEditActive = $script:IsManageEntriesMode -and $script:ManageAliasEditGuid -and ($guidNormalized -eq $script:ManageAliasEditGuid)
 $rowHeight = if ($aliasEditActive) { 92 } else { $baseRowHeight }
 
-if ($script:IsManageEntriesMode) {
+if ($aliasEditActive) {
     $row = New-Object System.Windows.Forms.Panel
+    $row.TabStop = $false
 }
 else {
     Initialize-NormalBootKeyboardRow
     $row = New-Object LenovoNormalBootKeyboardRow
+    $row.ManageKeyboardMode = [bool]$script:IsManageEntriesMode
 }
 $row.Name = 'BootRow'
 $row.Tag = $entry.Guid
@@ -1767,6 +1925,11 @@ if (-not $script:IsManageEntriesMode) {
     $row.AccessibleName = [string]$rowText.Title
     $row.AccessibleDescription = [string]$rowText.Subtitle
 }
+elseif (-not $aliasEditActive) {
+    $row.AccessibleRole = [System.Windows.Forms.AccessibleRole]::ListItem
+    $row.AccessibleName = [string]$rowText.Title
+    $row.AccessibleDescription = Get-LocalizedString -Key 'Manage.KeyboardInstructions'
+}
 $title = New-Label -Text $titleText -Font (New-Object Drawing.Font('Segoe UI', 10.0, [Drawing.FontStyle]::Bold)) `
     -ForeColor $titleColor -X 58 -Y 6 -Width $titleWidth -Height 21
 $title.Name = 'BootTitleLabel'
@@ -1815,6 +1978,9 @@ if (-not $aliasEditActive) {
         Connect-BootEntryRowInteractions -RowControls $rowControls -Handlers $Handlers
     }
 
+    if ($script:IsManageEntriesMode -and -not $aliasEditActive) {
+        Connect-ManageRowKeyboard -Row $row
+    }
     if (-not $script:IsManageEntriesMode) {
         # Input keys are supplied by LenovoNormalBootKeyboardRow, not by
         # intercepting global Form shortcuts or the Manage Entries editor.
