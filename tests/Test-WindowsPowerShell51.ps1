@@ -116,6 +116,11 @@ $updateNoticeProbe = Join-Path $root 'tests\Test-LBS202-UpdateNotice.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $updateNoticeProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-202 native update-available dialog regression failed' }
 
+# LBS-274: native six-state semantic status family, synthetic DPI and system colors.
+$statusIconProbe = Join-Path $root 'tests\Test-LBS274-StatusIcons.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $statusIconProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-274 native status icon regression failed' }
+
 # LBS-242: native shared regular dialog composition and copy feedback.
 $dialogProbe = Join-Path $root 'tests\Test-LBS242-DialogComposition.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $dialogProbe

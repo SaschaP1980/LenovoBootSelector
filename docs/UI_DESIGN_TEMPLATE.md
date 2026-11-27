@@ -66,3 +66,39 @@ The owner observed that the shared lower edge in v1.10.2.0 is awkward on neutral
 | Startup recovery | Native framed tint with independent fallback tokens, even if embedded WinForms types cannot initialize. |
 
 Pressed states, actual focus cues, action guards, status dots, existing active side-popup connectors (#E1251B), native ownership and all product safety boundaries are retained. The corrected visual contract requires native qualification and physical owner acceptance before Issue closure.
+
+## Owner-approved semantic status family (LBS-274, 2026-11-27)
+
+The owner approved the six-symbol visual proposal and explicitly authorized implementation. This semantic palette is separate from LBS-270 action, selection and connector ink.
+
+| State | Ink | Geometry (32-unit reference) |
+| --- | --- | --- |
+| Success | `#81B895` | Circle centered at (16,16), radius 13; check (9.5,16), (14,20.5), (22.5,11.5). |
+| Warning | `#EAB65E` | Rounded outlined triangle; vertical exclamation and round dot. |
+| Error | `#F05D55` | Same circle; diagonal cross (11,11) to (21,21) and converse. |
+| Information | `#78A9E3` | Same circle; lowercase i, vertical stem and round dot. |
+| Busy | `#B8C2CE` | Same circle, 22% alpha track and 270-degree open arc with round caps; static, no animation/timer. |
+| Unknown | `#999999` | Same circle; curved question mark and round dot. |
+
+Size classes at 96 DPI: Small 16 x 16 / 1.5 px stroke, Medium 24 x 24 / 2 px, Large 40 x 40 / 3 px. Scale once with the layout owner's physical bounds; never multiply font points by DPI. Use anti-aliased GDI+ geometry, rounded caps/joins, centered square, proportional strokes and bounded drawing. In High Contrast use system WindowText on Window, omit the low-opacity Busy track, and retain every distinct shape. The accompanying localized status text and accessible name/description remain authoritative. No new status claims or active operations are inferred from the icon.
+
+Design approval is not native rendering acceptance. Qualification and complete rollout remain separate from this reference.
+
+### Status-symbol inventory and migration boundaries
+
+| Owner / surface | Previous symbol / state | LBS-274 mapping |
+| --- | --- | --- |
+| Dialogs: regular notice, including update, diagnostics, preference and maintenance results | check, X, exclamation, i | Success, Error, Warning, Info according to existing Kind; Medium. Never infer success from a button or title. |
+| Dialogs: inline diagnostic copy feedback | Localized Copied check and colored success/failure text | Small Success or Warning within the existing native copy button; reserve the icon slot in dialog layout, retain repeat-copy action and existing two-second restoration timer. No new timer or image cache. |
+| Dialogs: restart confirmation and removal | exclamation | Warning, Medium; decisions unchanged. |
+| Dialogs: setup, repair, migration, reinitialize confirmation | i or plus | Info, Medium; preserve confirmation severity and admission. |
+| System Status: summary, readiness, drift | check, exclamation, ellipsis, question mark | Success / Warning / Busy / Unknown according to existing state projection; Small. Unknown is neutral gray, not confirmed attention or error. Align to first value line, not wrapped secondary details. Other target/time rows remain text. |
+| Maintenance state panel | gear, exclamation, plus, ellipsis | SetupRequired and RepairRequired Warning; Unknown Unknown; ReinitializeRequired Info; ongoing maintenance Busy. Large. Existing visibility/readiness and button decisions remain unchanged. |
+| Normal boot row | pending ellipsis, selected check, idle empty | Pending Busy Small, existing pending caption, marker and accessible hint retained. Selected check remains a selection mark (not verified global success), idle remains empty. |
+| Startup recovery | red exclamation badge | Error or Info for already-running notice, Medium, when native assembly available. If assembly initialization failed, retain independent legacy native badge and final Windows MessageBox fallback: recovery cannot depend on the failing assembly. |
+| Main header refresh/info/update, tray navigation, management eye/grip/pencil/clear, close, switches | action/interaction marks | Excluded. Refresh animation/operation ink belongs to action control, header Info is not the semantic Info icon, update link and status captions retain their existing behavior. |
+| Boot type dots, default picker selection/clear, normal and Manage selection/visibility marks, language flags, OS window/application icons | identity, selection, navigation, application branding | Excluded. Keep existing color, selection and tooltips. |
+| Plain localized status text (header, footer, pending/default/readiness captions, diagnostics/update/refresh, timestamps) | text without a status symbol | Retain authoritative text; no fabricated status or new icon-dependent action. |
+| Native file choosers, OS error dialogs and shell notifications | OS-controlled | Excluded from custom rendering; preserve system accessibility and recovery. |
+
+Implementation uses one non-selectable Label-derived native status control. Existing localized message, value, heading and tooltip content supplies accessible semantics. The opt-in copy action draws the same Small renderer in a reserved right-hand slot without replacing its native Button. No polling, animation, firmware reads/writes or new dependencies. This source inventory is subject to final ownership/contract sweep and native qualification.
