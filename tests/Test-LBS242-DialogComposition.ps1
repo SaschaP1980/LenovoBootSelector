@@ -106,6 +106,27 @@ function Get-Lbs270DialogHoverPixels([Windows.Forms.Button]$Button,[int]$Ink,[in
         return [pscustomobject]@{ Any=($top+$bottom+$left+$right -gt 0); All=($top -gt 0 -and $bottom -gt 0 -and $left -gt 0 -and $right -gt 0); Fill=($fill -ge $bmp.Width/2) }
     } finally { $bmp.Dispose() }
 }
+# Inspect the actual copy button's opt-in Small status raster in its reserved
+# right-hand slot; the rest of the action remains native.
+function Test-Lbs274FeedbackRaster([LenovoActionButton]$Button,[LenovoStatusKind]$Kind) {
+    if (-not $Button.HasStatusFeedback -or $Button.StatusFeedbackKind -ne $Kind -or $Button.Padding.Right -le 0) { return $false }
+    $ink=[LenovoStatusIconRenderer]::Ink($Kind,[Windows.Forms.SystemInformation]::HighContrast)
+    $bmp=[Drawing.Bitmap]::new($Button.Width,$Button.Height)
+    try {
+        $Button.DrawToBitmap($bmp,$Button.ClientRectangle)
+        $matches=0
+        $start=[Math]::Max(2,$bmp.Width-$Button.Padding.Right+2)
+        for ($x=$start;$x -lt $bmp.Width-2;$x++) {
+            for ($y=2;$y -lt $bmp.Height-2;$y++) {
+                $pixel=$bmp.GetPixel($x,$y)
+                # Small antialiased strokes need not contain fully opaque pixels.
+                if ([Math]::Abs([int]$pixel.R-[int]$ink.R) -le 40 -and [Math]::Abs([int]$pixel.G-[int]$ink.G) -le 40 -and [Math]::Abs([int]$pixel.B-[int]$ink.B) -le 40) { $matches++ }
+            }
+        }
+        Write-Host "LBS274 inline $Kind raster: $matches matching pixels, $($Button.Size), reserved=$($Button.Padding.Right)"
+        return ($matches -gt 3)
+    } finally { $bmp.Dispose() }
+}
 # Real controls and mocked side effects. Actual modal lifecycle is covered by LBS202/229.
 function Show-LenovoOwnedDialog {
     param([Windows.Forms.Form]$Form,$Owner)
@@ -120,15 +141,22 @@ function Show-LenovoOwnedDialog {
         if ($script:Case -eq 'copy') {
             $b=$s.Buttons[0]
             $handle=$Form.Handle
-            Assert-Dialog 'verified success icon and full value' ($s.Glyph.Text -eq '✓' -and $s.Glyph.ForeColor.G -eq 206 -and $s.Body.Controls['DialogValue'].Text -eq $script:Value)
+            $idleText=$b.Text; $idleInk=$b.ForeColor; $idlePadding=$b.Padding
+            Assert-Dialog 'verified success icon and full value' ($s.Glyph -is [LenovoStatusIcon] -and $s.Glyph.Kind -eq [LenovoStatusKind]::Success -and $s.Glyph.DesignSize -eq 24 -and $s.Glyph.ForeColor -eq [LenovoStatusIconRenderer]::Ink([LenovoStatusKind]::Success,[Windows.Forms.SystemInformation]::HighContrast) -and $s.Glyph.AccessibleName -eq $s.Body.Controls['DialogHeading'].Text -and $s.Body.Controls['DialogValue'].Text -eq $script:Value)
             Assert-Dialog 'copy notice preserves OK accept and cancel' ($Form.AcceptButton -eq $s.Buttons[1] -and $Form.CancelButton -eq $s.Buttons[1])
             $b.PerformClick()
-            Assert-Dialog 'copy success stays open with localized feedback' ($Form.Visible -and $Form.Handle -eq $handle -and $Form.DialogResult -eq [Windows.Forms.DialogResult]::None -and $b.Text -eq (Get-LocalizedString -Key 'Diagnostics.Copied') -and $script:Copies -eq 1)
+            Assert-Dialog 'copy success stays open with localized feedback' ($Form.Visible -and $Form.Handle -eq $handle -and $Form.DialogResult -eq [Windows.Forms.DialogResult]::None -and $b.Text -eq (Get-LocalizedString -Key 'Diagnostics.Copied') -and (Test-Lbs274FeedbackRaster $b ([LenovoStatusKind]::Success)) -and $script:Copies -eq 1)
             $b.PerformClick()
-            Assert-Dialog 'repeat copy works without upload or close' ($script:Copies -eq 2 -and $Form.Visible)
+            Assert-Dialog 'repeat copy works without upload or close' ($script:Copies -eq 2 -and $Form.Visible -and $b.HasStatusFeedback -and $b.StatusFeedbackKind -eq [LenovoStatusKind]::Success)
             $script:FailCopy=$true
             $b.PerformClick()
-            Assert-Dialog 'failed copy cannot retain false success' ($b.Text -eq (Get-LocalizedString -Key 'Diagnostics.CopyFailed') -and $Form.Visible -and $script:Copies -eq 2)
+            $failedState=($b.Text -eq (Get-LocalizedString -Key 'Diagnostics.CopyFailed') -and $Form.Visible -and $script:Copies -eq 2 -and (Test-Lbs274FeedbackRaster $b ([LenovoStatusKind]::Warning)))
+            $clock=[Diagnostics.Stopwatch]::StartNew()
+            while ($b.HasStatusFeedback -and $clock.ElapsedMilliseconds -lt 3500) {
+                [Windows.Forms.Application]::DoEvents()
+                Start-Sleep -Milliseconds 25
+            }
+            Assert-Dialog 'failed copy replaces success and timer restores native idle action' ($failedState -and -not $b.HasStatusFeedback -and $b.Text -eq $idleText -and $b.ForeColor -eq $idleInk -and $b.Padding -eq $idlePadding -and -not $b.AccessibleDescription -and $Form.Visible)
             Assert-Dialog 'scroll overflow is confined to body' ($s.Scroll.Maximum -eq [Math]::Max(0,$s.Body.Height-$s.Viewport.Height))
             if ($s.Scroll.Maximum -gt 0) {
                 $key=[Windows.Forms.KeyEventArgs]::new([Windows.Forms.Keys]::End -bor [Windows.Forms.Keys]::Control)
@@ -136,14 +164,15 @@ function Show-LenovoOwnedDialog {
                 Assert-Dialog 'keyboard end reaches body end while actions stay fixed' ($s.Body.Bottom -eq $s.Viewport.Height -and $s.Scroll.ThumbColor -eq $script:ColorAccent -and $s.Footer.Top -eq $s.Viewport.Bottom)
             } else { Assert-Dialog 'no overflow hides scrollbar' (-not $s.Scroll.Visible) }
         } elseif ($script:Case -in @('Info','Warning','Error')) {
-            $expected=if ($script:Case -eq 'Info') { 'i' } elseif ($script:Case -eq 'Warning') { '!' } else { '×' }
-            Assert-Dialog 'semantic notice glyph and single OK default' ($s.Glyph.Text -eq $expected -and $s.Buttons.Count -eq 1 -and $Form.AcceptButton -eq $s.Buttons[0] -and $Form.CancelButton -eq $s.Buttons[0])
+            $expected=[LenovoStatusKind]$script:Case
+            Assert-Dialog 'semantic notice glyph and single OK default' ($s.Glyph -is [LenovoStatusIcon] -and $s.Glyph.Kind -eq $expected -and $s.Glyph.AccessibleName -eq $s.Body.Controls['DialogHeading'].Text -and $s.Buttons.Count -eq 1 -and $Form.AcceptButton -eq $s.Buttons[0] -and $Form.CancelButton -eq $s.Buttons[0])
         } elseif ($script:Case -eq 'restart') {
-            Assert-Dialog 'restart shows complete target and preserves Yes/No' ($s.Body.Controls['DialogValue'].Text -eq $script:Value -and -not $s.Body.Controls['DialogValue'].AutoEllipsis -and $Form.AcceptButton.DialogResult -eq [Windows.Forms.DialogResult]::Yes -and $Form.CancelButton.DialogResult -eq [Windows.Forms.DialogResult]::No)
+            Assert-Dialog 'restart shows complete target and preserves Yes/No' ($s.Glyph -is [LenovoStatusIcon] -and $s.Glyph.Kind -eq [LenovoStatusKind]::Warning -and $s.Body.Controls['DialogValue'].Text -eq $script:Value -and -not $s.Body.Controls['DialogValue'].AutoEllipsis -and $Form.AcceptButton.DialogResult -eq [Windows.Forms.DialogResult]::Yes -and $Form.CancelButton.DialogResult -eq [Windows.Forms.DialogResult]::No)
         } elseif ($script:Case -eq 'migration') {
             Assert-Dialog 'migration preserves English default and no new cancel action' ($Form.AcceptButton -eq $s.Buttons[1] -and -not $Form.CancelButton)
         } else {
-            Assert-Dialog 'maintenance preserves primary Yes and Cancel No' ($Form.AcceptButton -eq $s.Buttons[1] -and $Form.AcceptButton.DialogResult -eq [Windows.Forms.DialogResult]::Yes -and $Form.CancelButton -eq $s.Buttons[0] -and $Form.CancelButton.DialogResult -eq [Windows.Forms.DialogResult]::No)
+            $expected=if ($script:Case -eq 'Remove') { [LenovoStatusKind]::Warning } else { [LenovoStatusKind]::Info }
+            Assert-Dialog 'maintenance preserves primary Yes and Cancel No' ($s.Glyph -is [LenovoStatusIcon] -and $s.Glyph.Kind -eq $expected -and $s.Glyph.AccessibleName -and $Form.AcceptButton -eq $s.Buttons[1] -and $Form.AcceptButton.DialogResult -eq [Windows.Forms.DialogResult]::Yes -and $Form.CancelButton -eq $s.Buttons[0] -and $Form.CancelButton.DialogResult -eq [Windows.Forms.DialogResult]::No)
             if ($script:Case -eq 'Remove') {
                 $all=($s.Content | ForEach-Object Text) -join ' '
                 $paragraphs=(Get-LocalizedString -Key 'Maintenance.Dialog.RemoveBody') -split '\r?\n\r?\n'

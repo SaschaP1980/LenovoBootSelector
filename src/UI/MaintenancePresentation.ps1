@@ -27,10 +27,9 @@ function New-MaintenanceStatePanel {
     $caption.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $panel.Controls.Add($caption)
 
-    $glyph = New-Label -Text '⚙' -Font (New-Object Drawing.Font('Segoe UI Symbol', 24.0, [Drawing.FontStyle]::Regular)) `
-        -ForeColor $script:ColorAccent -X 166 -Y 134 -Width 58 -Height 58
+    $glyph = [LenovoStatusIcon]::new([LenovoStatusKind]::Warning,40,58)
+    $glyph.Bounds = [Drawing.Rectangle]::new(166,134,58,58)
     $glyph.Name = 'MaintenanceGlyph'
-    $glyph.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $panel.Controls.Add($glyph)
 
     $heading = New-Label -Text '' -Font (New-Object Drawing.Font('Segoe UI', 11.0, [Drawing.FontStyle]::Bold)) `
@@ -102,8 +101,7 @@ function Update-MaintenanceUi {
             $panel.Visible = $true
             $panel.BringToFront()
             if ($state -eq 'SetupRequired') {
-                $glyph.Text = '⚙'
-                $glyph.ForeColor = $script:ColorAccent
+                $glyph.Kind = [LenovoStatusKind]::Warning
                 $heading.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHeading'
                 $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupMessage'
                 $action.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHeading'
@@ -112,8 +110,7 @@ function Update-MaintenanceUi {
                 $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHint'
             }
             elseif ($state -eq 'RepairRequired' -or $state -eq 'Unknown') {
-                $glyph.Text = '!'
-                $glyph.ForeColor = $script:ColorWarning
+                $glyph.Kind = if ($state -eq 'Unknown') { [LenovoStatusKind]::Unknown } else { [LenovoStatusKind]::Warning }
                 $heading.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHeading'
                 $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairMessage'
                 $action.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHeading'
@@ -122,8 +119,7 @@ function Update-MaintenanceUi {
                 $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHint'
             }
             elseif ($state -eq 'ReinitializeRequired') {
-                $glyph.Text = '+'
-                $glyph.ForeColor = $script:ColorCyan
+                $glyph.Kind = [LenovoStatusKind]::Info
                 if (Test-BootTargetDriftHasNewTargets) {
                     $heading.Text = Get-LocalizedString -Key 'Maintenance.Panel.NewTargetHeading'
                     $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.NewTargetMessage'
@@ -139,14 +135,15 @@ function Update-MaintenanceUi {
             }
             else {
                 $mode = Get-MaintenanceMode
-                $glyph.Text = '…'
-                $glyph.ForeColor = $script:ColorCyan
+                $glyph.Kind = [LenovoStatusKind]::Busy
                 $heading.Text = Get-MaintenanceBusyStatusText
                 $message.Text = if ($mode -eq 'Remove') { Get-LocalizedString -Key 'Maintenance.Panel.BusyRemoveMessage' } elseif ($mode -eq 'Reinitialize') { Get-LocalizedString -Key 'Maintenance.Panel.BusyReinitializeMessage' } else { Get-LocalizedString -Key 'Maintenance.Panel.BusySetupMessage' }
                 $action.Visible = $false
                 $action.Enabled = $false
                 $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.BusyHint'
             }
+            $glyph.AccessibleName = if ($state -eq 'Unknown') { Get-LocalizedString -Key 'SystemStatus.Unknown' } else { $heading.Text }
+            $glyph.AccessibleDescription = $message.Text
         }
     }
 

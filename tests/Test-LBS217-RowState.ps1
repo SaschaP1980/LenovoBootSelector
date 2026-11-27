@@ -4,6 +4,7 @@
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+. (Join-Path $PSScriptRoot 'Import-LenovoInteractionTestTypes.ps1')
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 . (Join-Path $root 'src\Core\Localization.ps1')
 . (Join-Path $root 'src\Core\BootNextSelectionState.ps1')
@@ -66,7 +67,7 @@ try {
             foreach ($status in @('selected','pending','idle')) {
                 $script:SelectedGuid = if ($status -eq 'idle') { '' } else { $entry.Guid }
                 $script:BootNextPendingGuid = if ($status -eq 'pending') { $entry.Guid } else { '' }
-                $expectedGlyph = if ($status -eq 'pending') { [string][char]0x2026 } elseif ($status -eq 'selected') { [string][char]0x2713 } else { '' }
+                $expectedGlyph = if ($status -eq 'selected') { [string][char]0x2713 } else { '' }
                 $key = if ($status -eq 'pending') { 'BootNext.RowPendingHint' } elseif ($status -eq 'selected') { 'BootNext.RowSelectedHint' } else { '' }
                 $expectedHint = if ($key) { Get-LocalizedString -Key $key } else { '' }
                 $expectedSubtitle = if ($status -eq 'pending') { Get-LocalizedString -Key 'BootNext.SelectionPending' } else { [string]$entry.Subtitle }
@@ -76,9 +77,10 @@ try {
                     [void](Set-PopupBootRowDpiLayout -Row $row -Scale $factor -Y 0)
                     $glyph = $row.Controls['BootSelectionStatusGlyph']
                     $prefix = "$locale $dpi DPI $status"
-                    Assert-Lbs217 "$prefix original visual glyph and distinct control identity" (
+                    Assert-Lbs217 "$prefix status geometry or selection marker and distinct control identity" (
                         $null -ne $glyph -and $glyph.Text -eq $expectedGlyph -and
-                        $glyph.Name -eq 'BootSelectionStatusGlyph')
+                        $glyph.Name -eq 'BootSelectionStatusGlyph' -and
+                        $(if ($status -eq 'pending') { $glyph -is [LenovoStatusIcon] -and $glyph.Kind -eq [LenovoStatusKind]::Busy -and $glyph.DesignSize -eq 16 } else { $glyph -isnot [LenovoStatusIcon] }))
                     Assert-Lbs217 "$prefix localized hint resolves without fallback" (
                         ($status -eq 'idle' -and $expectedHint -eq '') -or
                         ($status -ne 'idle' -and -not [string]::IsNullOrWhiteSpace($expectedHint) -and

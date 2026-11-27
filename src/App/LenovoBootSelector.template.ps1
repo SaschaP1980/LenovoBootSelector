@@ -271,6 +271,150 @@ public static class LenovoInteractionPalette
     }
 }
 
+// LBS-274: semantic status ink is independent of interaction and selection.
+public enum LenovoStatusKind { Success, Warning, Error, Info, Busy, Unknown }
+
+public static class LenovoStatusIconRenderer
+{
+    public static Color Ink(LenovoStatusKind kind, bool highContrast)
+    {
+        if (highContrast) return SystemColors.WindowText;
+        switch (kind) {
+            case LenovoStatusKind.Success: return Color.FromArgb(129,184,149);
+            case LenovoStatusKind.Warning: return Color.FromArgb(234,182,94);
+            case LenovoStatusKind.Error: return Color.FromArgb(240,93,85);
+            case LenovoStatusKind.Info: return Color.FromArgb(120,169,227);
+            case LenovoStatusKind.Busy: return Color.FromArgb(184,194,206);
+            case LenovoStatusKind.Unknown: return Color.FromArgb(153,153,153);
+            default: throw new ArgumentOutOfRangeException("kind");
+        }
+    }
+
+    // All coordinates use the approved 32-unit optical reference.
+    // The host supplies its actual layout scale, not a second font/DPI multiplier.
+    public static void Draw(Graphics g, Rectangle bounds, int designSize,
+                            float scale, LenovoStatusKind kind, bool highContrast)
+    {
+        float stroke;
+        switch (designSize) {
+            case 16: stroke=1.5f; break;
+            case 24: stroke=2f; break;
+            case 40: stroke=3f; break;
+            default: throw new ArgumentOutOfRangeException("designSize");
+        }
+        float side=Math.Min(designSize*scale,Math.Min(bounds.Width,bounds.Height));
+        if (side < 2f) return;
+        Color ink=Ink(kind,highContrast);
+        var saved=g.Save();
+        try {
+            g.SetClip(bounds,System.Drawing.Drawing2D.CombineMode.Intersect);
+            g.TranslateTransform(bounds.Left+(bounds.Width-side)/2f,bounds.Top+(bounds.Height-side)/2f);
+            g.ScaleTransform(side/32f,side/32f);
+            g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using (Pen p=new Pen(ink,stroke*32f/designSize)) {
+                p.StartCap=p.EndCap=System.Drawing.Drawing2D.LineCap.Round;
+                p.LineJoin=System.Drawing.Drawing2D.LineJoin.Round;
+                if (kind==LenovoStatusKind.Warning) {
+                    using (var triangle=new System.Drawing.Drawing2D.GraphicsPath()) {
+                        triangle.StartFigure();
+                        triangle.AddLine(14.4f,4.1f,3f,24.5f);
+                        triangle.AddBezier(3f,24.5f,1.5f,27.5f,2.5f,28f,5f,28f);
+                        triangle.AddLine(5f,28f,27f,28f);
+                        triangle.AddBezier(27f,28f,29.5f,28f,30.5f,27.5f,29f,24.5f);
+                        triangle.AddLine(29f,24.5f,17.6f,4.1f);
+                        triangle.AddBezier(17.6f,4.1f,16.7f,2.4f,15.3f,2.4f,14.4f,4.1f);
+                        triangle.CloseFigure();
+                        g.DrawPath(p,triangle);
+                    }
+                    g.DrawLine(p,16f,11f,16f,19f);
+                    Dot(g,p,16f,23f);
+                } else if (kind==LenovoStatusKind.Busy) {
+                    if (!highContrast) {
+                        using (Pen track=new Pen(Color.FromArgb(56,ink),p.Width))
+                            g.DrawEllipse(track,3f,3f,26f,26f);
+                    }
+                    g.DrawArc(p,3f,3f,26f,26f,-90f,270f);
+                } else {
+                    g.DrawEllipse(p,3f,3f,26f,26f);
+                    switch (kind) {
+                        case LenovoStatusKind.Success:
+                            g.DrawLines(p,new PointF[] {new PointF(9.5f,16f),new PointF(14f,20.5f),new PointF(22.5f,11.5f)});
+                            break;
+                        case LenovoStatusKind.Error:
+                            g.DrawLine(p,11f,11f,21f,21f);
+                            g.DrawLine(p,21f,11f,11f,21f);
+                            break;
+                        case LenovoStatusKind.Info:
+                            g.DrawLine(p,16f,14f,16f,22f);
+                            Dot(g,p,16f,9.5f);
+                            break;
+                        case LenovoStatusKind.Unknown:
+                            using (var question=new System.Drawing.Drawing2D.GraphicsPath()) {
+                                question.AddBezier(11.5f,11f,11.5f,5f,20.5f,5f,20.5f,11f);
+                                question.AddBezier(20.5f,11f,20.5f,15f,16f,15f,16f,19f);
+                                g.DrawPath(p,question);
+                            }
+                            Dot(g,p,16f,23f);
+                            break;
+                    }
+                }
+            }
+        } finally { g.Restore(saved); }
+    }
+
+    private static void Dot(Graphics g, Pen p, float x, float y)
+    {
+        using (Brush b=new SolidBrush(p.Color))
+            g.FillEllipse(b,x-p.Width/2f,y-p.Width/2f,p.Width,p.Width);
+    }
+}
+
+// A native non-selectable Label: no action, timer, font glyph or image cache.
+// Existing layout owners retain control of the physical bounds.
+public sealed class LenovoStatusIcon : Label
+{
+    private LenovoStatusKind kind;
+    private readonly int designSize;
+    private readonly int designHostWidth;
+    public LenovoStatusIcon(LenovoStatusKind value, int size, int hostWidth)
+    {
+        if (size!=16 && size!=24 && size!=40) throw new ArgumentOutOfRangeException("size");
+        if (hostWidth<=0) throw new ArgumentOutOfRangeException("hostWidth");
+        designSize=size; designHostWidth=hostWidth;
+        AutoSize=false; TabStop=false; UseMnemonic=false;
+        AccessibleRole=AccessibleRole.StaticText;
+        BackColor=Color.Transparent;
+        kind=value;
+        ForeColor=LenovoStatusIconRenderer.Ink(kind,SystemInformation.HighContrast);
+        SetStyle(ControlStyles.ResizeRedraw,true);
+    }
+    public LenovoStatusKind Kind {
+        get { return kind; }
+        set {
+            if (kind==value) return;
+            kind=value;
+            ForeColor=LenovoStatusIconRenderer.Ink(kind,SystemInformation.HighContrast);
+            Invalidate();
+        }
+    }
+    public int DesignSize { get { return designSize; } }
+    protected override void OnSystemColorsChanged(EventArgs e) {
+        base.OnSystemColorsChanged(e);
+        ForeColor=LenovoStatusIconRenderer.Ink(kind,SystemInformation.HighContrast);
+        Invalidate();
+    }
+    protected override void OnPaintBackground(PaintEventArgs e) {
+        if (SystemInformation.HighContrast) {
+            using (Brush b=new SolidBrush(SystemColors.Window)) e.Graphics.FillRectangle(b,ClientRectangle);
+        } else base.OnPaintBackground(e);
+    }
+    protected override void OnPaint(PaintEventArgs e) {
+        base.OnPaint(e);
+        LenovoStatusIconRenderer.Draw(e.Graphics,ClientRectangle,designSize,
+            ClientSize.Width/(float)designHostWidth,kind,SystemInformation.HighContrast);
+    }
+}
+
 // Native Button retains input, accessibility, DialogResult, default and focus
 // painting. Only pointer-owned appearance is changed and restored on exit.
 public sealed class LenovoActionButton : Button
@@ -279,6 +423,49 @@ public sealed class LenovoActionButton : Button
     public bool PreserveSelection { get; set; }
     private bool hovered, styled, keyPressed, mousePressed;
     private Color oldSurface, oldInk;
+    // LBS-274: opt-in status feedback on the copy action only. Keep the
+    // native button's text, focus, hit target and hover/pressed behavior.
+    private LenovoStatusKind? feedbackKind;
+    private Padding feedbackIdlePadding;
+    public bool HasStatusFeedback { get { return feedbackKind.HasValue; } }
+    public LenovoStatusKind StatusFeedbackKind { get { return feedbackKind.GetValueOrDefault(); } }
+    private float FeedbackScale { get { return ClientSize.Height/34f; } }
+    private int FeedbackReserve { get { return Math.Max(1,(int)Math.Round(24f*FeedbackScale)); } }
+    public void SetStatusFeedback(LenovoStatusKind value) {
+        if (!feedbackKind.HasValue) feedbackIdlePadding=Padding;
+        feedbackKind=value;
+        UpdateFeedbackPadding();
+        ForeColor=LenovoStatusIconRenderer.Ink(value,SystemInformation.HighContrast);
+        Invalidate();
+    }
+    public void ClearStatusFeedback() {
+        if (!feedbackKind.HasValue) return;
+        feedbackKind=null;
+        Padding=feedbackIdlePadding;
+        Invalidate();
+    }
+    private void UpdateFeedbackPadding() {
+        if (!feedbackKind.HasValue) return;
+        Padding=new Padding(feedbackIdlePadding.Left,feedbackIdlePadding.Top,
+            feedbackIdlePadding.Right+FeedbackReserve,feedbackIdlePadding.Bottom);
+    }
+    protected override void OnSizeChanged(EventArgs e) {
+        base.OnSizeChanged(e);
+        UpdateFeedbackPadding();
+    }
+    private void DrawStatusFeedback(Graphics g) {
+        if (!feedbackKind.HasValue) return;
+        int reserve=FeedbackReserve;
+        int right=ClientSize.Width-feedbackIdlePadding.Right;
+        Rectangle bounds=new Rectangle(right-reserve,0,reserve,ClientSize.Height);
+        bool highContrast=SystemInformation.HighContrast;
+        if (highContrast) {
+            int side=Math.Min(reserve,Math.Max(1,(int)Math.Round(16f*FeedbackScale)));
+            using (Brush b=new SolidBrush(SystemColors.Window))
+                g.FillRectangle(b,bounds.Left+(bounds.Width-side)/2,bounds.Top+(bounds.Height-side)/2,side,side);
+        }
+        LenovoStatusIconRenderer.Draw(g,bounds,16,FeedbackScale,feedbackKind.Value,highContrast);
+    }
     private void ApplyPointerStyle()
     {
         bool hot=Enabled && hovered && !SystemInformation.HighContrast;
@@ -313,7 +500,9 @@ public sealed class LenovoActionButton : Button
         if (hovered) ApplyPointerStyle();
     }
     protected override void OnSystemColorsChanged(EventArgs e) {
-        base.OnSystemColorsChanged(e); ApplyPointerStyle(); Invalidate();
+        base.OnSystemColorsChanged(e);
+        if (feedbackKind.HasValue) ForeColor=LenovoStatusIconRenderer.Ink(feedbackKind.Value,SystemInformation.HighContrast);
+        ApplyPointerStyle(); Invalidate();
     }
     protected override void OnVisibleChanged(EventArgs e) {
         if (!Visible) { hovered=false; mousePressed=keyPressed=false; ApplyPointerStyle(); }
@@ -339,6 +528,7 @@ public sealed class LenovoActionButton : Button
     }
     protected override void OnPaint(PaintEventArgs e) {
         base.OnPaint(e);
+        DrawStatusFeedback(e.Graphics);
         if (!Enabled || !hovered || SystemInformation.HighContrast || keyPressed || mousePressed ||
             (Control.MouseButtons & System.Windows.Forms.MouseButtons.Left) != 0) return;
         if (InlineAction) LenovoInteractionPalette.DrawInlineUnderline(e.Graphics,ClientRectangle,Text,Font);

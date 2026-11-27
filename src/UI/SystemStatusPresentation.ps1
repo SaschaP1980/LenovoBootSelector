@@ -65,11 +65,16 @@ function Set-SystemStatusLabelContent {
 function Set-SystemStatusSymbol {
     param($Form,[string]$Name,[string]$State)
     $label = $Form.Tag.Body.Controls['SystemStatusSymbol-'+$Name]
-    $label.Text = switch ($State) { 'good' {'✓'} 'attention' {'!'} 'busy' {'…'} default {'?'} }
-    $label.ForeColor = if ([Windows.Forms.SystemInformation]::HighContrast) { [Drawing.SystemColors]::WindowText }
-        elseif ($State -eq 'good') { [Drawing.Color]::FromArgb(129,184,149) }
-        elseif ($State -in @('attention','unknown')) { [Drawing.Color]::FromArgb(234,182,94) }
-        else { $script:ColorSecondary }
+    $label.Kind = switch ($State) {
+        'good' { [LenovoStatusKind]::Success }
+        'attention' { [LenovoStatusKind]::Warning }
+        'busy' { [LenovoStatusKind]::Busy }
+        default { [LenovoStatusKind]::Unknown }
+    }
+    $value = $Form.Tag.Body.Controls['SystemStatusValue-'+$Name]
+    $detail = $Form.Tag.Body.Controls['SystemStatusDetail-'+$Name]
+    $label.AccessibleName = $value.Text
+    $label.AccessibleDescription = $detail.Text
 }
 
 function Update-SystemStatusPopupPresentation {
@@ -143,7 +148,7 @@ function Set-SystemStatusContentLayout {
         $detail=$controls['SystemStatusDetail-'+$key]
         if ($detail) { $y+=Set-SystemStatusTextBounds $detail ($margin+$offset) $y ($available-$offset) $Scale }
         if ($symbol) {
-            $symbol.Bounds=[Drawing.Rectangle]::new($margin,$top,[Math]::Max(1,$offset-$gap),[Math]::Max(1,$y-$top))
+            $symbol.Bounds=[Drawing.Rectangle]::new($margin,$top,[Math]::Max(1,$offset-$gap),[Math]::Max(1,$value.Height))
         }
         $y+=$gap
     }
@@ -240,7 +245,10 @@ function New-SystemStatusPopup {
         Add-SystemStatusLabel $form ('SystemStatusDetail-'+$key) '' $form.Tag.Regular $secondaryInk
     }
     foreach ($key in @('Summary','Readiness','Drift')) {
-        Add-SystemStatusLabel $form ('SystemStatusSymbol-'+$key) '' $form.Tag.Bold $secondaryInk
+        $symbol = [LenovoStatusIcon]::new([LenovoStatusKind]::Unknown,16,26)
+        $symbol.Name = 'SystemStatusSymbol-'+$key
+        $symbol.BackColor = $form.Tag.Body.BackColor
+        $form.Tag.Body.Controls.Add($symbol)
     }
     foreach ($key in @('Manager','Entries','Readiness')) {
         Add-SystemStatusLabel $form ('SystemStatusTimeLabel-'+$key) (Get-LocalizedString -Key ('SystemStatus.'+$key+'Caption')) $form.Tag.Regular $secondaryInk

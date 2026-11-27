@@ -1,9 +1,9 @@
 {
-  "version": "1.10.4.3",
+  "version": "1.10.5.0",
   "runtime": {
-    "lines": 19467,
+    "lines": 19673,
     "functions": 526,
-    "scriptReferences": 2287,
+    "scriptReferences": 2269,
     "scriptVariables": 216,
     "catchBlocks": 286,
     "inlineSilentCatches": 146
@@ -28,12 +28,12 @@
   },
   "ui": {
     "files": 22,
-    "lines": 9365,
+    "lines": 9381,
     "functions": 253,
-    "scriptReferences": 1326
+    "scriptReferences": 1308
   },
   "appTemplate": {
-    "lines": 3450,
+    "lines": 3640,
     "functions": 32,
     "scriptReferences": 513
   }
