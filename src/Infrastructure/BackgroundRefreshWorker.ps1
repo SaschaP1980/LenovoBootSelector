@@ -4,7 +4,8 @@
         [Parameter(Mandatory=$true)][string]$ResultPath,
         [bool]$RefreshStorage,
         [bool]$RefreshFirmware,
-        [AllowNull()][string]$RuntimeSessionId
+        [AllowNull()][string]$RuntimeSessionId,
+        [switch]$VerifyRestart
     )
 
     $powershellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
@@ -16,6 +17,7 @@
     )
     if ($RefreshStorage) { $args += '-BackgroundRefreshStorage' }
     if ($RefreshFirmware) { $args += '-BackgroundRefreshFirmware' }
+    if ($VerifyRestart) { $args += '-BackgroundRestartVerification' }
     if ($RuntimeSessionId) { $args += @('-RuntimeSessionId', ('"{0}"' -f $RuntimeSessionId)) }
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
@@ -48,26 +50,43 @@ function Invoke-BackgroundRefreshWorker {
     param(
         [bool]$RefreshStorage,
         [bool]$RefreshFirmware,
-        [AllowNull()][string]$ResultPath
+        [AllowNull()][string]$ResultPath,
+        [switch]$VerifyRestart
     )
 
     $total = [System.Diagnostics.Stopwatch]::StartNew()
     $timings = [ordered]@{ ReadyMs = 0; ManagerMs = 0; FirmwareMs = 0; StorageMs = 0; TotalMs = 0 }
-    $result = [ordered]@{ Success = $false; Error = $null; Stage = 'ready'; StorageContext = $null; Timings = $timings; ManagerObservedUtc = $null; ManagerObservedHash = $null; EntriesObservedUtc = $null; EntriesObservedHash = $null; ReadinessObservedUtc = $null }
+    $result = [ordered]@{ Success = $false; Error = $null; Stage = 'ready'; StorageContext = $null; Timings = $timings; ManagerObservedUtc = $null; ManagerObservedHash = $null; EntriesObservedUtc = $null; EntriesObservedHash = $null; ReadinessObservedUtc = $null; RestartVerified = $false; RestartOriginStamp = $null }
 
     try {
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
         if (-not (Test-TaskBrokerReady -Force)) { throw 'Die Systemfunktionen sind nicht vollständig verfügbar.' }
         $sw.Stop(); $timings.ReadyMs = $sw.ElapsedMilliseconds
 
-        $result.Stage = 'manager'
-        $sw.Restart(); [void](Get-TaskBrokerFirmwareManagerText -Force); $sw.Stop(); $timings.ManagerMs = $sw.ElapsedMilliseconds
-        if ($RefreshFirmware) {
+        if ($VerifyRestart) {
+            # Fresh inventory first; the manager read is the final firmware
+            # operation. Reject observable installed-writer activity.
+            $result.Stage = 'restart-writers'
+            $before=Get-RestartWriterFingerprint
             $result.Stage = 'firmware'
             $sw.Restart(); [void](Get-TaskBrokerFirmwareEntriesText -Force); $sw.Stop(); $timings.FirmwareMs = $sw.ElapsedMilliseconds
+            $result.Stage = 'manager'
+            $sw.Restart(); [void](Get-TaskBrokerFirmwareManagerText -Force); $sw.Stop(); $timings.ManagerMs = $sw.ElapsedMilliseconds
+            $result.Stage = 'restart-writers'
+            $after=Get-RestartWriterFingerprint
+            if ($before.Fingerprint -cne $after.Fingerprint -or $before.Origin -cne $after.Origin) { throw 'Installed boot writer changed during restart readback.' }
+            $result.RestartOriginStamp=$after.Origin
+            $result.RestartVerified=$true
+        } else {
+            $result.Stage = 'manager'
+            $sw.Restart(); [void](Get-TaskBrokerFirmwareManagerText -Force); $sw.Stop(); $timings.ManagerMs = $sw.ElapsedMilliseconds
+            if ($RefreshFirmware) {
+                $result.Stage = 'firmware'
+                $sw.Restart(); [void](Get-TaskBrokerFirmwareEntriesText -Force); $sw.Stop(); $timings.FirmwareMs = $sw.ElapsedMilliseconds
+            }
         }
 
-        if ($RefreshStorage) {
+        if ($RefreshStorage -and -not $VerifyRestart) {
             $result.Stage = 'storage'
             $sw.Restart(); $result.StorageContext = Get-StorageContext; $sw.Stop(); $timings.StorageMs = $sw.ElapsedMilliseconds
         }
@@ -84,6 +103,15 @@ function Invoke-BackgroundRefreshWorker {
         $result.EntriesObservedUtc = $script:SystemStatusEntriesObservedUtc
         $result.EntriesObservedHash = $script:SystemStatusEntriesObservedHash
         $result.ReadinessObservedUtc = $script:SystemStatusReadinessObservedUtc
+        if ($VerifyRestart) {
+            # Windows PowerShell 5.1 serializes DateTime to millisecond JSON.
+            # Preserve the full file timestamp precision for strict freshness.
+            foreach ($key in @('ManagerObservedUtc','EntriesObservedUtc')) {
+                if ($result[$key]) {
+                    $result[$key] = ([datetime]$result[$key]).ToUniversalTime().ToString('o',[Globalization.CultureInfo]::InvariantCulture)
+                }
+            }
+        }
         if ($ResultPath) {
             try {
                 $parent = Split-Path -Parent $ResultPath

@@ -1628,7 +1628,9 @@ function Update-NormalBootEntryTooltips {
     param($Row,$Entry)
     if ($script:IsManageEntriesMode -or -not $script:BootTypeToolTip -or -not $Row -or $Row.IsDisposed) { return }
     $text = Get-BootEntryRowText -Entry $Entry
-    $action = if ($script:BootNextPendingGuid -or $script:DefaultTargetChangePending) {
+    $action = if ($script:RestartVerification) {
+        Get-LocalizedString -Key 'Restart.VerifyingStatus'
+    } elseif ($script:BootNextPendingGuid -or $script:DefaultTargetChangePending) {
         Get-LocalizedString -Key 'Tooltip.NextBootPending'
     } elseif ($script:NextBootFirmwareReadVerified -and $script:SelectedGuid -eq $Entry.Guid) {
         Get-LocalizedString -Key 'Tooltip.NextBootSelected'

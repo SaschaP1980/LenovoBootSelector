@@ -148,14 +148,14 @@ function Update-MaintenanceUi {
     }
 
     if ($script:RefreshButton -and -not $script:RefreshButton.IsDisposed) {
-        $script:RefreshButton.Enabled = [bool]$capabilities.CanRefresh
+        $script:RefreshButton.Enabled = [bool]($capabilities.CanRefresh -and -not $script:RestartVerification)
         $script:RefreshButton.Cursor = if ($script:RefreshButton.Enabled) { [System.Windows.Forms.Cursors]::Hand } else { [System.Windows.Forms.Cursors]::Default }
     }
     if ($script:ManageEntriesButton -and -not $script:ManageEntriesButton.IsDisposed) {
-        $script:ManageEntriesButton.Enabled = [bool]$capabilities.CanManageEntries
+        $script:ManageEntriesButton.Enabled = [bool]($capabilities.CanManageEntries -and -not $script:RestartVerification)
     }
-    if ($script:DefaultContextRoot) { $script:DefaultContextRoot.Enabled = [bool]$capabilities.CanUseDefaultTarget }
-    if ($script:RestartMenuItem) { $script:RestartMenuItem.Enabled = [bool]$capabilities.CanRestart }
+    if ($script:DefaultContextRoot) { $script:DefaultContextRoot.Enabled = [bool]($capabilities.CanUseDefaultTarget -and -not $script:RestartVerification) }
+    if ($script:RestartMenuItem) { $script:RestartMenuItem.Enabled = [bool]($capabilities.CanRestart -and -not $script:RestartVerification) }
 
     Update-HeaderRefreshStatus
 }

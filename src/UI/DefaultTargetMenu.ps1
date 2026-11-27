@@ -1,7 +1,7 @@
 ﻿# LBS-229: persistent-default selection deliberately uses a separate
 # presentation row, never the normal BootNext row's action handler.
 function Test-DefaultPickerInteraction {
-    if ($script:IsManageEntriesMode -or $script:DefaultTargetChangePending -or $script:BootNextPendingGuid -or (Test-MaintenanceBusy) -or (Test-BootTargetDriftDetected)) { return $false }
+    if ($script:RestartVerification -or $script:IsManageEntriesMode -or $script:DefaultTargetChangePending -or $script:BootNextPendingGuid -or (Test-MaintenanceBusy) -or (Test-BootTargetDriftDetected)) { return $false }
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     return [bool]([string]$capabilities.State -eq 'Ready' -and $capabilities.CanSetDefaultTarget)
 }
@@ -17,7 +17,7 @@ function Set-DefaultPickerHover {
     while ($row -and $row.Name -ne 'DefaultPickerRow') { $row = $row.Parent }
     if (-not $row) { return }
     if (-not $Hover -and $row.ClientRectangle.Contains($row.PointToClient([Windows.Forms.Cursor]::Position))) { return }
-    $hot = $Hover -and $row.Enabled -and -not $script:DefaultTargetChangePending -and -not $script:BootNextPendingGuid
+    $hot = $Hover -and $row.Enabled -and -not $script:DefaultTargetChangePending -and -not $script:BootNextPendingGuid -and -not $script:RestartVerification
     $hoverSurface = if ([Windows.Forms.SystemInformation]::HighContrast) { $script:ColorHover } else { [LenovoInteractionPalette]::Tint($script:ColorRow) }
     $row.BackColor = if ($row.Tag.Selected) { $script:ColorSelectedRow } elseif ($hot) { $hoverSurface } else { $script:ColorRow }
     $title=$row.Controls['DefaultPickerTitle']

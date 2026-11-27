@@ -44,7 +44,7 @@ function Get-SystemStatusPresentation {
     $nextTime = ConvertTo-SystemStatusObservedTime $script:SystemStatusNextObservedUtc
     $readinessTime = ConvertTo-SystemStatusObservedTime $script:SystemStatusReadinessObservedUtc
     $entriesTime = ConvertTo-SystemStatusObservedTime $script:SystemStatusEntriesObservedUtc
-    $refreshing = [bool](Test-BackgroundRefreshActive -State $script:BackgroundRefreshState)
+    $refreshing = [bool]($script:RestartVerification -or (Test-BackgroundRefreshActive -State $script:BackgroundRefreshState))
     $pending = [bool]($script:BootNextPendingGuid -or $script:DefaultTargetChangePending)
     $model = Resolve-SystemStatusCore -Capabilities $script:SystemStatusCapabilities -DefaultEvidence $script:SystemStatusDefaultEvidence -DefaultName $defaultName -DefaultGuid $script:DefaultGuid -DefaultUncertain ([bool]($script:DefaultTargetReadUncertain -or $script:DefaultTargetChangePending)) -NextVerified ([bool]$script:NextBootFirmwareReadVerified) -NextName $nextName -NextGuid $script:SelectedGuid -NextTimeKnown ([bool]$nextTime) -Pending $pending -Refreshing $refreshing -LastRefresh $script:SystemStatusLastRefresh -Drift $script:BootTargetDriftState -DriftFailed ([bool]$script:SystemStatusDriftFailed) -ReadinessTimeKnown ([bool]$readinessTime) -EntriesTimeKnown ([bool]$entriesTime)
     return $model

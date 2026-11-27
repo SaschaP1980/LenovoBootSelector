@@ -2,6 +2,10 @@
 
 `tests/` contains only the **active canonical tests** and the baseline data they require. Version-specific historical validators are stored separately under [`../tests-history/`](../tests-history/).
 
+## Verified restart admission (LBS-287)
+
+`Test-LBS287-RestartVerification.ps1` is a mandatory native Windows PowerShell 5.1 suite (82 assertions). It invokes the canonical restart entry point, controller, background worker, strict parser and protected snapshot binding with native WinForms timers and controls. Firmware reads, scheduled-task observations and restart dispatch are intercepted; temporary files model protected snapshots, not the live SYSTEM ACL. Tests cover the original mismatch RED, two forced readbacks, valid absence, German and English, stale/changed evidence, writer activity, unknown/malformed targets, cancellation, concurrent actions, timeouts and dispatch failures. Physical firmware and actual reboot acceptance remain owner checks.
+
 ## Pre-Candidate changelog language guard (v1.1.6.2)
 
 The read-only `tools/pre_candidate_language_check.py` is mandatory on the final intended release tree **before** exposing a Candidate branch. It validates the exact current version in the first changelog heading, nonempty current release notes and English-looking prose throughout the repository. Run `python3 -B tools/pre_candidate_language_check.py --root .` and require `PRE_CANDIDATE_LANGUAGE_RESULT=PASS`.

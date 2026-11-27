@@ -116,6 +116,11 @@ $updateNoticeProbe = Join-Path $root 'tests\Test-LBS202-UpdateNotice.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $updateNoticeProbe
 if ($LASTEXITCODE -ne 0) { throw 'LBS-202 native update-available dialog regression failed' }
 
+# LBS-287: verified restart admission and independent protected readbacks.
+$restartProbe = Join-Path $root 'tests\Test-LBS287-RestartVerification.ps1'
+& (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $restartProbe
+if ($LASTEXITCODE -ne 0) { throw 'LBS-287 native restart verification failed' }
+
 # LBS-274: native six-state semantic status family, synthetic DPI and system colors.
 $statusIconProbe = Join-Path $root 'tests\Test-LBS274-StatusIcons.ps1'
 & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File $statusIconProbe

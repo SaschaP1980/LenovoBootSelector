@@ -1,9 +1,9 @@
 {
   "schemaVersion": 2,
-  "version": "1.10.5.0",
+  "version": "1.10.6.0",
   "releaseProfile": "patch",
   "protectedFragmentIntent": [
-    "ps:Show-LenovoNoticeDialog"
+    "ps:Start-BackgroundBootRefresh"
   ],
   "repositoryDeleteIntent": []
 }

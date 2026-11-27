@@ -513,3 +513,105 @@ function Clear-TaskBrokerDefaultTarget {
     if (-not (Test-TaskBrokerMetadataCompatible)) { throw 'TaskBroker-Metadaten verletzen den festen Boundary-Vertrag.' }
     Invoke-AuthorizedTask -Operation 'DefaultClear' -TimeoutMs 30000 | Out-Null
 }
+
+
+# LBS-287: observational checks only. The protected SYSTEM writer lock is
+# deliberately not acquired by the tray. Exact registered writer identities
+# come from the already-validated metadata contract, never scene/UI input.
+function Get-RestartOriginStamp {
+    $meta=Get-TaskBrokerMetadata
+    if (-not $meta -or -not (Test-TaskBrokerMetadataCompatible)) { throw 'Restart metadata unavailable.' }
+    $path=[string]$meta.bootNextOriginFile
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return 'absent' }
+    $before=(Get-Item -LiteralPath $path -ErrorAction Stop).LastWriteTimeUtc
+    $hash=Get-SystemStatusObservationHash (Read-TaskBrokerTextFile -Path $path)
+    $after=(Get-Item -LiteralPath $path -ErrorAction Stop).LastWriteTimeUtc
+    if (-not $hash -or $before -ne $after) { throw 'Boot writer provenance changed during observation.' }
+    return ('{0}:{1}' -f $after.Ticks,$hash)
+}
+
+function Get-RestartWriterFingerprint {
+    $meta=Get-TaskBrokerMetadata
+    if (-not $meta -or -not (Test-TaskBrokerMetadataCompatible)) { throw 'Restart metadata unavailable.' }
+    $names=@('LenovoBootSelector-Default-Clear','LenovoBootSelector-Default-Restore')
+    foreach ($target in @($meta.targets)) {
+        $names+=Get-TaskBrokerExpectedTargetTaskName -Guid ([string]$target.guid)
+        $names+=Get-TaskBrokerExpectedTargetTaskName -Guid ([string]$target.guid) -DefaultTarget
+    }
+    $service=$null; $folder=$null
+    $stamps=@()
+    try {
+        $service=New-Object -ComObject 'Schedule.Service'
+        $service.Connect()
+        $folder=$service.GetFolder('\')
+        foreach ($name in @($names)+@('LenovoBootSelector-RefreshManager','LenovoBootSelector-RefreshFirmware')) {
+            if (-not $name) { throw 'Invalid installed boot writer identity.' }
+            $task=$null
+            try {
+                $task=$folder.GetTask("\$name")
+                # TASK_STATE_READY = 3. Queued/running/disabled/unknown all
+                # invalidate restart admission. No task is started here.
+                if (-not $task -or [int]$task.State -ne 3) { throw 'An installed boot reader or writer is not idle.' }
+                if ($names -contains $name) { $stamps+=('{0}:{1}:{2}' -f $name,([datetime]$task.LastRunTime).Ticks,[int64]$task.LastTaskResult) }
+            }
+            finally {
+                if ($task -and [Runtime.InteropServices.Marshal]::IsComObject($task)) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($task) }
+            }
+        }
+        $origin=Get-RestartOriginStamp
+        return [pscustomobject]@{Fingerprint=($stamps -join '|');Origin=$origin}
+    }
+    finally {
+        if ($folder -and [Runtime.InteropServices.Marshal]::IsComObject($folder)) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($folder) }
+        if ($service -and [Runtime.InteropServices.Marshal]::IsComObject($service)) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($service) }
+    }
+}
+
+# A successful worker exit and its local JSON alone are insufficient. Bind
+# the observations to protected ProgramData snapshots newly written during
+# this particular phase, and reject changes between file reads.
+function Read-RestartFreshSnapshot {
+    param([string]$Path,[datetime]$PreviousWriteUtc,[datetime]$StartedUtc,$ObservedUtc,[string]$ObservedHash)
+    if (-not $ObservedUtc -or -not $ObservedHash) { throw 'Missing fresh observation.' }
+    $observed=[datetime]::ParseExact([string]$ObservedUtc,'o',[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+    $now=[datetime]::UtcNow
+    if ($observed -lt $StartedUtc -or $observed -gt $now) { throw 'Observation does not belong to this restart verification.' }
+    $before=(Get-Item -LiteralPath $Path -ErrorAction Stop).LastWriteTimeUtc
+    if ($before -le $PreviousWriteUtc -or $before -lt $StartedUtc -or $before -gt $observed) { throw ('Protected snapshot is not fresh (previous={0:o}; start={1:o}; write={2:o}; observed={3:o}).' -f $PreviousWriteUtc,$StartedUtc,$before,$observed) }
+    $text=Read-TaskBrokerTextFile -Path $Path
+    $after=(Get-Item -LiteralPath $Path -ErrorAction Stop).LastWriteTimeUtc
+    if ($after -ne $before -or -not (Test-SystemStatusObservationMatch $text $ObservedHash)) { throw 'Protected snapshot changed or does not match worker evidence.' }
+    return $text
+}
+
+function Get-RestartReadbackBaseline {
+    $meta=Get-TaskBrokerMetadata
+    if (-not $meta -or -not (Test-TaskBrokerMetadataCompatible)) { throw 'Restart metadata unavailable.' }
+    [pscustomobject]@{
+        ManagerWriteUtc=(Get-Item -LiteralPath ([string]$meta.managerFile) -ErrorAction Stop).LastWriteTimeUtc
+        EntriesWriteUtc=(Get-Item -LiteralPath ([string]$meta.firmwareFile) -ErrorAction Stop).LastWriteTimeUtc
+    }
+}
+
+function Get-RestartReadbackEvidence {
+    param($Context,$Result)
+    if ($Result.Success -isnot [bool] -or -not $Result.Success -or $Result.RestartVerified -isnot [bool] -or -not $Result.RestartVerified -or [string]$Result.Stage -ne 'complete') {
+        throw 'Restart verification worker did not confirm fresh evidence.'
+    }
+    $meta=Get-TaskBrokerMetadata
+    if (-not $meta -or -not (Test-TaskBrokerMetadataCompatible)) { throw 'Restart metadata unavailable.' }
+    $entries=Read-RestartFreshSnapshot -Path ([string]$meta.firmwareFile) -PreviousWriteUtc $Context.Baseline.EntriesWriteUtc -StartedUtc $Context.StartedUtc -ObservedUtc $Result.EntriesObservedUtc -ObservedHash ([string]$Result.EntriesObservedHash)
+    $manager=Read-RestartFreshSnapshot -Path ([string]$meta.managerFile) -PreviousWriteUtc $Context.Baseline.ManagerWriteUtc -StartedUtc $Context.StartedUtc -ObservedUtc $Result.ManagerObservedUtc -ObservedHash ([string]$Result.ManagerObservedHash)
+    if (-not $Result.RestartOriginStamp -or (Get-RestartOriginStamp) -cne [string]$Result.RestartOriginStamp) { throw 'Boot writer provenance changed after readback.' }
+    $state=ConvertFrom-RestartFirmwareEvidence -Text $manager
+    $descriptions=ConvertFrom-FirmwareEntriesText -Text $entries
+    if ($state.ExplicitTarget) {
+        if (-not $descriptions.ContainsKey([string]$state.SelectedGuid) -or -not (Get-TaskBrokerTarget -Guid ([string]$state.SelectedGuid))) { throw 'Observed boot target unavailable or not allowlisted.' }
+    } elseif (-not $descriptions.ContainsKey([string]$state.DisplayOrder[0])) {
+        throw 'Normal firmware order cannot be confirmed.'
+    }
+    # Bound age of the final read, including worker exit and STA scheduling.
+    $utc=[datetime]::ParseExact([string]$Result.ManagerObservedUtc,'o',[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+    if (([datetime]::UtcNow-$utc).TotalSeconds -gt 5) { throw 'Restart readback is too old.' }
+    [pscustomobject]@{Guid=$state.SelectedGuid;DisplayOrder=@($state.DisplayOrder);OriginStamp=[string]$Result.RestartOriginStamp;ObservedUtc=$utc;ManagerText=$manager;EntriesText=$entries;ManagerHash=[string]$Result.ManagerObservedHash;EntriesHash=[string]$Result.EntriesObservedHash;EntriesUtc=[datetime]::ParseExact([string]$Result.EntriesObservedUtc,'o',[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()}
+}
