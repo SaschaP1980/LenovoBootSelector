@@ -29,6 +29,8 @@ The repository and durable GitHub prose remain **English**; the interactive user
 
 ## Interactive owner-acceptance checklist
 
+Owner-machine native, physical or visual acceptance is performed after the version has been published and made available through the normal updater. Do not withhold a technically qualified Major, Minor, Patch or Hotfix for this acceptance, including corrective releases. Report the automated Windows gate separately from the owner acceptance status; the latter affects Issue closure only.
+
 Whenever an Issue requires outstanding owner/native/physical acceptance, present the remaining practical checks at the end of the user-facing report as a compact **interactive acceptance checklist** when the chat client supports it. Use the owner-approved UX-05 Hotfix v1.5.12.1 checklist ([Issue #221](https://github.com/SaschaP1980/LenovoBootSelector/issues/221#issuecomment-7122800936)) as the reference pattern. This applies to Major, Minor, Patch and Hotfix work with such acceptance requirements, not only visual changes. Do not impose new physical tests on Issues that do not require them.
 
 - Identify the exact version and Issue to be accepted. Derive the checklist from the actual remaining acceptance criteria, the delivered scope and already documented owner evidence. Avoid repeating checks the owner has already accepted unless the new change invalidates that evidence.
