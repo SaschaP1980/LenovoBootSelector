@@ -1,4 +1,45 @@
-﻿function New-Label {
+﻿# LBS-279: a short synchronous visual transaction owns no business state.
+# Hidden/isolated fixtures, modal and OLE-drag paths retain ordinary rendering.
+function Start-PopupVisualCommit {
+    param([string]$Reason)
+    if (-not $script:Popup -or $script:Popup.IsDisposed -or -not $script:Popup.Visible -or
+        $script:ActiveAuxiliaryPopup -or $script:ActiveOwnedDialog -or
+        $script:ManageActiveDragGuid -or $script:ManageDragLayout) { return }
+    if (-not ('LenovoPopupVisualCommit' -as [type])) { return }
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        $commit = [LenovoPopupVisualCommit]::Begin($script:Popup)
+        if ($commit) {
+            $commit.Tag = [pscustomobject]@{ Reason=$Reason; Clock=$clock; CaptureMs=$clock.ElapsedMilliseconds }
+            return $commit
+        }
+    }
+    catch {
+        # Cosmetic fallback only; Begin disposes any partially created cover.
+        Write-Verbose ('Popup visual commit unavailable: ' + $Reason + ' (' + $_.Exception.Message + ')')
+        try {
+            Write-RuntimeDiagnosticEvent -Event 'POPUP_VISUAL_COMMIT_FALLBACK' -Stage 'presentation' -Success $false -Data (New-RuntimeDiagnosticData @{ reason=$Reason; elapsedMs=$clock.ElapsedMilliseconds }) -Level warning
+        }
+        catch { Write-Verbose 'Popup visual commit diagnostic unavailable.' }
+    }
+}
+
+function Stop-PopupVisualCommit {
+    param($Commit)
+    if ($null -eq $Commit) { return }
+    $info = $Commit.Tag
+    $success = $false
+    try { $Commit.Complete(); $success = $true }
+    catch { Write-Verbose 'Popup visual commit final repaint unavailable.' }
+    if ($info) {
+        try {
+            Write-RuntimeDiagnosticEvent -Event 'POPUP_VISUAL_COMMIT' -Stage 'presentation' -Success $success -Data (New-RuntimeDiagnosticData @{ reason=$info.Reason; captureMs=$info.CaptureMs; elapsedMs=$info.Clock.ElapsedMilliseconds; framePaintCount=$Commit.FramePaintCount })
+        }
+        catch { Write-Verbose 'Popup visual commit diagnostic unavailable.' }
+    }
+}
+
+function New-Label {
     param(
         [string]$Text,
         [Drawing.Font]$Font,

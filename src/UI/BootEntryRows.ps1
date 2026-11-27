@@ -1990,12 +1990,16 @@ function Invoke-ManageRowKeyboardMove {
     }
     if ($target -eq $index) { return }
     if ($Reorder) {
-        $guid = [string]$Row.Tag
-        $editCue = [bool]$Row.ManageEditCueActive
-        Move-ManageEntry -MovedGuid $guid -TargetGuid ([string]$entries[$target].Guid) -After:($target -gt $index)
-        $script:LastStatusText = Get-LocalizedString -Key 'Manage.KeyboardPosition' -Values @{Position=($target+1);Count=$entries.Count}
-        Update-PopupRows -Reason 'manage-keyboard-reorder'
-        Restore-ManageRowFocus -Guid $guid -EditCue:$editCue
+        $visualCommit = Start-PopupVisualCommit -Reason 'manage-keyboard-reorder'
+        try {
+            $guid = [string]$Row.Tag
+            $editCue = [bool]$Row.ManageEditCueActive
+            Move-ManageEntry -MovedGuid $guid -TargetGuid ([string]$entries[$target].Guid) -After:($target -gt $index)
+            $script:LastStatusText = Get-LocalizedString -Key 'Manage.KeyboardPosition' -Values @{Position=($target+1);Count=$entries.Count}
+            Update-PopupRows -Reason 'manage-keyboard-reorder'
+            Restore-ManageRowFocus -Guid $guid -EditCue:$editCue
+        }
+        finally { Stop-PopupVisualCommit -Commit $visualCommit }
     }
     else {
         if ($Key -in @([Windows.Forms.Keys]::PageUp,[Windows.Forms.Keys]::PageDown)) {
