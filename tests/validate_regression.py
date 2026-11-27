@@ -2,6 +2,7 @@
 from pathlib import Path
 import argparse,hashlib,json,re,subprocess,sys,zipfile
 from lbs277_state_contract import validate_lbs277_state_contract, validate_lbs277_transport_contract
+from lbs279_render_contract import validate_lbs279_render_contract
 ROOT_DEFAULT=Path(__file__).resolve().parents[1]
 def sha(p): return hashlib.sha256(Path(p).read_bytes()).hexdigest()
 def txt(p): return Path(p).read_text(encoding='utf-8-sig')
@@ -126,6 +127,7 @@ def main():
     boot_entry_ui=txt(root/'src/UI/BootEntryList.ps1')
     boot_entry_rows=txt(root/'src/UI/BootEntryRows.ps1') if (root/'src/UI/BootEntryRows.ps1').is_file() else ''
     boot_entry_surface=boot_entry_ui+'\n'+boot_entry_rows
+    validate_lbs279_render_contract(s, txt(root/'src/UI/ManageEntries.ps1'), boot_entry_rows)
     default_target_ui=txt(root/'src/UI/DefaultTargetPresentation.ps1')
     maintenance_capability_ui=txt(root/'src/UI/MaintenancePresentation.ps1')
     system_capabilities=txt(root/'src/Application/SystemCapabilities.ps1') if (root/'src/Application/SystemCapabilities.ps1').is_file() else ''

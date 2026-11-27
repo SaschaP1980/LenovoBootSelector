@@ -2382,6 +2382,134 @@ public sealed class LenovoHoverGlyphButton : Button
     }
 }
 
+// LBS-279: keep one coherent client frame visible while the real HWND tree
+// is synchronously reconciled. This is not a second interactive popup.
+public sealed class LenovoPopupVisualCommit : Form
+{
+    private readonly Form parent;
+    private readonly Control source;
+    private Bitmap frame;
+    private Point frameOffset;
+    public int FramePaintCount { get; private set; }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool RedrawWindow(IntPtr hwnd, IntPtr rect, IntPtr region, uint flags);
+
+    private LenovoPopupVisualCommit(Form owner, Control client)
+    {
+        parent = owner;
+        source = client;
+        Name = "LenovoPopupVisualCommit";
+        AutoScaleMode = AutoScaleMode.None;
+        FormBorderStyle = FormBorderStyle.None;
+        ShowInTaskbar = false;
+        StartPosition = FormStartPosition.Manual;
+        // A layered, transparent-to-input surface lets the real owner retain
+        // its native visibility, focus, accessibility and child HWND state.
+        AllowTransparency = true;
+        TopMost = owner.TopMost;
+        TabStop = false;
+        SetStyle(ControlStyles.Selectable, false);
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
+            ControlStyles.OptimizedDoubleBuffer, true);
+    }
+
+    protected override bool ShowWithoutActivation { get { return true; } }
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            CreateParams cp = base.CreateParams;
+            cp.ExStyle |= 0x00000080 | 0x08000000 | 0x00000020; // TOOLWINDOW, NOACTIVATE, TRANSPARENT
+            return cp;
+        }
+    }
+
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == 0x0084) { m.Result = new IntPtr(-1); return; } // HTTRANSPARENT
+        if (m.Msg == 0x0021) { m.Result = new IntPtr(3); return; } // MA_NOACTIVATE
+        base.WndProc(ref m);
+    }
+
+    public static LenovoPopupVisualCommit Begin(Form owner)
+    {
+        if (owner == null || owner.IsDisposed || owner.Disposing ||
+            !owner.Visible || !owner.IsHandleCreated) return null;
+        Control root = owner.Controls["PopupRoot"];
+        if (root == null || root.IsDisposed || !root.Visible ||
+            !root.IsHandleCreated || root.ClientSize.Width <= 0 || root.ClientSize.Height <= 0) return null;
+        foreach (Form owned in owner.OwnedForms)
+            if (owned is LenovoPopupVisualCommit && !owned.IsDisposed) return null;
+
+        // At high DPI the design root can exceed the actual client viewport.
+        // Cover only pixels that can belong to this visible owner on screen.
+        Rectangle rootBounds = root.RectangleToScreen(root.ClientRectangle);
+        Rectangle visibleBounds = Rectangle.Intersect(rootBounds,
+            owner.RectangleToScreen(owner.ClientRectangle));
+        visibleBounds = Rectangle.Intersect(visibleBounds, SystemInformation.VirtualScreen);
+        if (visibleBounds.Width <= 0 || visibleBounds.Height <= 0) return null;
+
+        var cover = new LenovoPopupVisualCommit(owner, root);
+        try
+        {
+            // Capture only the owner's client controls, never desktop pixels.
+            cover.frame = new Bitmap(root.ClientSize.Width, root.ClientSize.Height);
+            root.DrawToBitmap(cover.frame, root.ClientRectangle);
+            cover.frameOffset = new Point(rootBounds.Left - visibleBounds.Left,
+                rootBounds.Top - visibleBounds.Top);
+            cover.Bounds = visibleBounds;
+            cover.Show(owner);
+            cover.Invalidate();
+            cover.Update();
+            if (!cover.Visible || cover.FramePaintCount == 0 || cover.Bounds != visibleBounds)
+                throw new InvalidOperationException("Visual commit frame was not presented at the visible client bounds.");
+            return cover;
+        }
+        catch
+        {
+            cover.Dispose();
+            throw;
+        }
+    }
+
+    protected override void OnPaintBackground(PaintEventArgs e) { }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        if (frame != null)
+        {
+            e.Graphics.DrawImageUnscaled(frame, frameOffset.X, frameOffset.Y);
+            FramePaintCount++;
+        }
+    }
+
+    public void Complete()
+    {
+        try
+        {
+            // Finish owner/child painting while the old frame still covers it.
+            // RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW.
+            if (!parent.IsDisposed && !parent.Disposing && parent.Visible &&
+                parent.IsHandleCreated && !source.IsDisposed && source.IsHandleCreated)
+            {
+                if (!RedrawWindow(parent.Handle, IntPtr.Zero, IntPtr.Zero, 0x0185))
+                    parent.Invalidate(true);
+            }
+        }
+        finally { Dispose(); }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing && frame != null)
+        {
+            frame.Dispose();
+            frame = null;
+        }
+        base.Dispose(disposing);
+    }
+}
+
 public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
 {
     private readonly Color accent = Color.FromArgb(225, 37, 27);
@@ -3706,7 +3834,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.10.3.0'
+$script:AppVersion = '1.10.4.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -8005,30 +8133,34 @@ function Start-ManageEntriesMode {
     if (-not $capabilities.CanManageEntries) { return }
     if ($script:IsManageEntriesMode) { return }
 
-    $script:ManageEntryOrder = @((Get-OrderedEntriesForUi -IncludeHidden) | ForEach-Object { $_.Guid })
-    $script:ManageHiddenEntryGuids = @($script:HiddenEntryGuids)
-    $script:ManageEntryAliases = Copy-EntryAliasMap $script:EntryAliases
-    $script:ManageBaselineEntryOrder = @($script:ManageEntryOrder)
-    $script:ManageBaselineHiddenEntryGuids = @($script:ManageHiddenEntryGuids)
-    $script:ManageBaselineEntryAliases = Copy-EntryAliasMap $script:ManageEntryAliases
-    $script:ManageAliasEditGuid = $null
-    $script:ManageDropPreview = $null
-    $script:ManageActiveDragGuid = $null
-    $script:IsManageEntriesMode = $true
-    $script:ManageUndoHistory = [System.Collections.Generic.List[object]]::new()
-    $script:ManageUndoInventory = @($script:CurrentEntries | ForEach-Object { $_.Guid })
-    $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusEditing'
-    Update-ManageEntriesUiState
-    Update-PopupRows -Reason 'manage-enter'
-    Update-ManageSaveButtonState
-    # Only explicit mode entry acquires the primary list focus. Ordinary
-    # reconciliation remains responsible for preserving the current owner.
-    if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) {
-        $anchor = $script:Popup.Controls.Find('BootRow',$true) | Where-Object {
-            $_.TabStop -and $_.CanFocus -and $_.PSObject.Properties['ManageKeyboardMode'] -and $_.ManageKeyboardMode
-        } | Sort-Object Top | Select-Object -First 1
-        if ($anchor) { Restore-ManageRowFocus -Guid ([string]$anchor.Tag) -KeyboardCue:(-not $PointerActivation.IsPresent) }
+    $visualCommit = Start-PopupVisualCommit -Reason 'manage-enter'
+    try {
+        $script:ManageEntryOrder = @((Get-OrderedEntriesForUi -IncludeHidden) | ForEach-Object { $_.Guid })
+        $script:ManageHiddenEntryGuids = @($script:HiddenEntryGuids)
+        $script:ManageEntryAliases = Copy-EntryAliasMap $script:EntryAliases
+        $script:ManageBaselineEntryOrder = @($script:ManageEntryOrder)
+        $script:ManageBaselineHiddenEntryGuids = @($script:ManageHiddenEntryGuids)
+        $script:ManageBaselineEntryAliases = Copy-EntryAliasMap $script:ManageEntryAliases
+        $script:ManageAliasEditGuid = $null
+        $script:ManageDropPreview = $null
+        $script:ManageActiveDragGuid = $null
+        $script:IsManageEntriesMode = $true
+        $script:ManageUndoHistory = [System.Collections.Generic.List[object]]::new()
+        $script:ManageUndoInventory = @($script:CurrentEntries | ForEach-Object { $_.Guid })
+        $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusEditing'
+        Update-ManageEntriesUiState
+        Update-PopupRows -Reason 'manage-enter'
+        Update-ManageSaveButtonState
+        # Only explicit mode entry acquires the primary list focus. Ordinary
+        # reconciliation remains responsible for preserving the current owner.
+        if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) {
+            $anchor = $script:Popup.Controls.Find('BootRow',$true) | Where-Object {
+                $_.TabStop -and $_.CanFocus -and $_.PSObject.Properties['ManageKeyboardMode'] -and $_.ManageKeyboardMode
+            } | Sort-Object Top | Select-Object -First 1
+            if ($anchor) { Restore-ManageRowFocus -Guid ([string]$anchor.Tag) -KeyboardCue:(-not $PointerActivation.IsPresent) }
+        }
     }
+    finally { Stop-PopupVisualCommit -Commit $visualCommit }
 }
 
 function Stop-ManageEntriesMode {
@@ -8050,18 +8182,22 @@ function Stop-ManageEntriesMode {
         $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusDiscarded'
     }
 
-    $script:IsManageEntriesMode = $false
-    $script:ManageUndoHistory = $null
-    $script:ManageUndoInventory = @()
-    $script:ManageEntryOrder = @()
-    $script:ManageHiddenEntryGuids = @()
-    $script:ManageEntryAliases = @{}
-    $script:ManageBaselineEntryOrder = @()
-    $script:ManageBaselineHiddenEntryGuids = @()
-    $script:ManageBaselineEntryAliases = @{}
-    $script:ManageAliasEditGuid = $null
-    Update-ManageEntriesUiState
-    Update-PopupRows -Reason 'manage-exit'
+    $visualCommit = Start-PopupVisualCommit -Reason 'manage-exit'
+    try {
+        $script:IsManageEntriesMode = $false
+        $script:ManageUndoHistory = $null
+        $script:ManageUndoInventory = @()
+        $script:ManageEntryOrder = @()
+        $script:ManageHiddenEntryGuids = @()
+        $script:ManageEntryAliases = @{}
+        $script:ManageBaselineEntryOrder = @()
+        $script:ManageBaselineHiddenEntryGuids = @()
+        $script:ManageBaselineEntryAliases = @{}
+        $script:ManageAliasEditGuid = $null
+        Update-ManageEntriesUiState
+        Update-PopupRows -Reason 'manage-exit'
+    }
+    finally { Stop-PopupVisualCommit -Commit $visualCommit }
 }
 
 
@@ -15502,12 +15638,16 @@ function Invoke-ManageRowKeyboardMove {
     }
     if ($target -eq $index) { return }
     if ($Reorder) {
-        $guid = [string]$Row.Tag
-        $editCue = [bool]$Row.ManageEditCueActive
-        Move-ManageEntry -MovedGuid $guid -TargetGuid ([string]$entries[$target].Guid) -After:($target -gt $index)
-        $script:LastStatusText = Get-LocalizedString -Key 'Manage.KeyboardPosition' -Values @{Position=($target+1);Count=$entries.Count}
-        Update-PopupRows -Reason 'manage-keyboard-reorder'
-        Restore-ManageRowFocus -Guid $guid -EditCue:$editCue
+        $visualCommit = Start-PopupVisualCommit -Reason 'manage-keyboard-reorder'
+        try {
+            $guid = [string]$Row.Tag
+            $editCue = [bool]$Row.ManageEditCueActive
+            Move-ManageEntry -MovedGuid $guid -TargetGuid ([string]$entries[$target].Guid) -After:($target -gt $index)
+            $script:LastStatusText = Get-LocalizedString -Key 'Manage.KeyboardPosition' -Values @{Position=($target+1);Count=$entries.Count}
+            Update-PopupRows -Reason 'manage-keyboard-reorder'
+            Restore-ManageRowFocus -Guid $guid -EditCue:$editCue
+        }
+        finally { Stop-PopupVisualCommit -Commit $visualCommit }
     }
     else {
         if ($Key -in @([Windows.Forms.Keys]::PageUp,[Windows.Forms.Keys]::PageDown)) {
@@ -15818,6 +15958,47 @@ if ($ScrollBar) {
     elseif ($ScrollBar.Value -gt $maxScroll) { $ScrollBar.Value = $maxScroll }
     $ContentPanel.Top = -1 * $ScrollBar.Value
 }
+}
+
+# LBS-279: a short synchronous visual transaction owns no business state.
+# Hidden/isolated fixtures, modal and OLE-drag paths retain ordinary rendering.
+function Start-PopupVisualCommit {
+    param([string]$Reason)
+    if (-not $script:Popup -or $script:Popup.IsDisposed -or -not $script:Popup.Visible -or
+        $script:ActiveAuxiliaryPopup -or $script:ActiveOwnedDialog -or
+        $script:ManageActiveDragGuid -or $script:ManageDragLayout) { return }
+    if (-not ('LenovoPopupVisualCommit' -as [type])) { return }
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        $commit = [LenovoPopupVisualCommit]::Begin($script:Popup)
+        if ($commit) {
+            $commit.Tag = [pscustomobject]@{ Reason=$Reason; Clock=$clock; CaptureMs=$clock.ElapsedMilliseconds }
+            return $commit
+        }
+    }
+    catch {
+        # Cosmetic fallback only; Begin disposes any partially created cover.
+        Write-Verbose ('Popup visual commit unavailable: ' + $Reason + ' (' + $_.Exception.Message + ')')
+        try {
+            Write-RuntimeDiagnosticEvent -Event 'POPUP_VISUAL_COMMIT_FALLBACK' -Stage 'presentation' -Success $false -Data (New-RuntimeDiagnosticData @{ reason=$Reason; elapsedMs=$clock.ElapsedMilliseconds }) -Level warning
+        }
+        catch { Write-Verbose 'Popup visual commit diagnostic unavailable.' }
+    }
+}
+
+function Stop-PopupVisualCommit {
+    param($Commit)
+    if ($null -eq $Commit) { return }
+    $info = $Commit.Tag
+    $success = $false
+    try { $Commit.Complete(); $success = $true }
+    catch { Write-Verbose 'Popup visual commit final repaint unavailable.' }
+    if ($info) {
+        try {
+            Write-RuntimeDiagnosticEvent -Event 'POPUP_VISUAL_COMMIT' -Stage 'presentation' -Success $success -Data (New-RuntimeDiagnosticData @{ reason=$info.Reason; captureMs=$info.CaptureMs; elapsedMs=$info.Clock.ElapsedMilliseconds; framePaintCount=$Commit.FramePaintCount })
+        }
+        catch { Write-Verbose 'Popup visual commit diagnostic unavailable.' }
+    }
 }
 
 function New-Label {

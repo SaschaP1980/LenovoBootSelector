@@ -1,6 +1,7 @@
 ﻿#requires -version 5.1
 # LBS-178: actual WinForms row controls and keyed reconciliation; no real writes.
 $ErrorActionPreference='Stop'
+$VerbosePreference='Continue'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root=Split-Path -Parent $PSScriptRoot
@@ -54,6 +55,34 @@ function Test-RowOrder([string]$Expected) {
     $rendered=@($script:Popup.Controls.Find('BootRow',$true) | Sort-Object Top)
     return (($rendered.Tag -join ',') -ceq $Expected -and ($script:ManageEntryOrder -join ',') -ceq $Expected)
 }
+# LBS-279: observe the actual native cover during real control mutations,
+# not a mocked transaction or test-side redraw suppression.
+function Get-VisualCommitCover {
+    return ($script:Popup.OwnedForms | Where-Object { $_.Name -eq 'LenovoPopupVisualCommit' -and -not $_.IsDisposed } | Select-Object -First 1)
+}
+function Reset-VisualCommitProbe {
+    $script:visualRowEvents=0
+    $script:visualFooterEvents=0
+    $script:visualUncoveredEvents=0
+}
+function Observe-VisualCommitMutation([string]$Kind) {
+    if (-not $script:visualProbeActive) { return }
+    if ($Kind -eq 'row') { $script:visualRowEvents++ }
+    else { $script:visualFooterEvents++ }
+    $cover=Get-VisualCommitCover
+    $client=$script:Popup.Controls['PopupRoot']
+    $expectedBounds=[Drawing.Rectangle]::Intersect($client.RectangleToScreen($client.ClientRectangle),$script:Popup.RectangleToScreen($script:Popup.ClientRectangle))
+    $expectedBounds=[Drawing.Rectangle]::Intersect($expectedBounds,[Windows.Forms.SystemInformation]::VirtualScreen)
+    if (-not $cover -or -not $cover.Visible -or $cover.FramePaintCount -le 0 -or
+        $cover.ContainsFocus -or [object]::ReferenceEquals([Windows.Forms.Form]::ActiveForm,$cover) -or
+        -not $client.Visible -or -not $script:Popup.Visible -or
+        $cover.Bounds -ne $expectedBounds) {
+        if ($script:visualUncoveredEvents -eq 0) {
+            Write-Host "LBS279 COVER FAILURE kind=$Kind root=$($client.RectangleToScreen($client.ClientRectangle)) owner=$($script:Popup.RectangleToScreen($script:Popup.ClientRectangle)) expected=$expectedBounds actual=$($cover.Bounds) visible=$($cover.Visible) paints=$($cover.FramePaintCount) focus=$($cover.ContainsFocus) active=$([object]::ReferenceEquals([Windows.Forms.Form]::ActiveForm,$cover)) ownerVisible=$($script:Popup.Visible) rootVisible=$($client.Visible)"
+        }
+        $script:visualUncoveredEvents++
+    }
+}
 $script:ColorRow=[Drawing.Color]::FromArgb(31,31,31)
 $script:ColorHeader=[Drawing.Color]::FromArgb(24,24,24)
 $script:ColorSurface=[Drawing.Color]::FromArgb(32,32,32)
@@ -98,7 +127,22 @@ foreach ($locale in @('de-DE','en-US')) {
             Complete-PopupDpiLayout -Form $form -Scale $scale
             $form.Show()
             [Windows.Forms.Application]::DoEvents()
-            Start-ManageEntriesMode
+            $script:visualProbeActive=$false
+            Update-PopupRows -Reason 'LBS279-normal-fixture'
+            [Windows.Forms.Application]::DoEvents()
+            $content=$form.Controls.Find('EntryContent',$true)[0]
+            $managePanel=$form.Controls.Find('ManageEntriesPanel',$true)[0]
+            $content.Add_ControlAdded({
+                param($sender,$eventArgs)
+                if ($eventArgs.Control.Name -eq 'BootRow') { Observe-VisualCommitMutation 'row' }
+            })
+            $managePanel.Add_VisibleChanged({ Observe-VisualCommitMutation 'footer' })
+            Reset-VisualCommitProbe
+            $script:visualProbeActive=$true
+            try { Start-ManageEntriesMode }
+            finally { $script:visualProbeActive=$false }
+            Check "$locale/$scale LBS279 mode entry covers actual row additions and footer visibility" ($script:visualRowEvents -gt 0 -and $script:visualFooterEvents -gt 0 -and $script:visualUncoveredEvents -eq 0)
+            Check "$locale/$scale LBS279 entry cover disposed and normal owner remains visible" (-not (Get-VisualCommitCover) -and $form.Visible -and $panel.Visible)
             $first=Get-Row 'boot-0'
             $second=Get-Row 'boot-1'
             $hint=$form.Controls.Find('ManageKeyboardHint',$true)[0]
@@ -135,7 +179,19 @@ foreach ($locale in @('de-DE','en-US')) {
             Check "$locale/$scale Home scrolls to first" ($first.Focused -and $bar.Value -eq 0)
             Press-Key $first $ctrlUp
             Check "$locale/$scale first boundary no-op" ($first.Focused -and $script:ManageUndoHistory.Count -eq 0)
-            Press-Key $first $ctrlDown
+            $firstActions=@('VisibilityGlyph','AliasEditButton','ManageReorderGrip' | ForEach-Object { $first.Controls[$_] })
+            $first.Add_LocationChanged({ Observe-VisualCommitMutation 'row' })
+            $second.Add_LocationChanged({ Observe-VisualCommitMutation 'row' })
+            $save.Add_EnabledChanged({ Observe-VisualCommitMutation 'footer' })
+            $undo.Add_EnabledChanged({ Observe-VisualCommitMutation 'footer' })
+            Reset-VisualCommitProbe
+            $script:visualProbeActive=$true
+            try { Press-Key $first $ctrlDown }
+            finally { $script:visualProbeActive=$false }
+            Check "$locale/$scale LBS279 keyboard exchange covers actual row movement and action-state changes" ($script:visualRowEvents -ge 2 -and $script:visualFooterEvents -ge 1 -and $script:visualUncoveredEvents -eq 0)
+            $currentFirst=Get-Row 'boot-0'
+            Check "$locale/$scale LBS279 keyboard move retains row and all action identities" ([object]::ReferenceEquals($first,$currentFirst) -and [object]::ReferenceEquals($second,(Get-Row 'boot-1')) -and $firstActions.Count -eq 3 -and $null -ne $firstActions[0] -and $null -ne $firstActions[1] -and $null -ne $firstActions[2] -and [object]::ReferenceEquals($firstActions[0],$currentFirst.Controls['VisibilityGlyph']) -and [object]::ReferenceEquals($firstActions[1],$currentFirst.Controls['AliasEditButton']) -and [object]::ReferenceEquals($firstActions[2],$currentFirst.Controls['ManageReorderGrip']))
+            Check "$locale/$scale LBS279 reorder releases cover before next input" (-not (Get-VisualCommitCover) -and $currentFirst.Focused -and $form.Visible)
             $movedOrder='boot-1,boot-0,boot-2,boot-3,boot-4,boot-5,boot-6,boot-7,boot-8,boot-9'
             Check "$locale/$scale Ctrl Down reorders and retains focus" ((Test-RowOrder $movedOrder) -and (Get-Row 'boot-0').Focused -and (Get-Row 'boot-0').TabIndex -eq 1 -and $script:ManageUndoHistory.Count -eq 1)
             $undo.PerformClick()
@@ -201,15 +257,48 @@ foreach ($locale in @('de-DE','en-US')) {
             Check "$locale/$scale stale focused target cannot open editor" (-not $script:ManageAliasEditGuid -and $script:ManageUndoHistory.Count -eq 1)
             Update-PopupRows -Reason 'inventory'
             Check "$locale/$scale removed GUID falls back without stale history" (-not (Get-Row 'new') -and (Get-Row 'boot-9').Focused -and $script:ManageUndoHistory.Count -eq 0)
-            $cancel.PerformClick()
+            Reset-VisualCommitProbe
+            $script:visualProbeActive=$true
+            try { $cancel.PerformClick() }
+            finally { $script:visualProbeActive=$false }
+            Check "$locale/$scale LBS279 reverse transition covered and released" ($script:visualRowEvents -gt 0 -and $script:visualFooterEvents -gt 0 -and $script:visualUncoveredEvents -eq 0 -and -not (Get-VisualCommitCover))
             Check "$locale/$scale Cancel preserves persisted order" (-not $script:IsManageEntriesMode -and ($script:EntryOrder -join ',') -eq $originalOrder -and $script:saveCalls -eq 0)
             Start-ManageEntriesMode
             [void](Get-Row 'boot-0').Focus()
             Press-Key (Get-Row 'boot-0') $ctrlDown
             $save.PerformClick()
             Check "$locale/$scale Save commits once through existing owner" (-not $script:IsManageEntriesMode -and $script:saveCalls -eq 1 -and $script:EntryOrder[0] -eq 'boot-1')
+            # Exercise multi-position and rapid repeated moves, boundary no-op,
+            # scroll visibility, stable focus and exceptional cover disposal.
+            Start-ManageEntriesMode
+            $row=Get-Row 'boot-1';[void]$row.Focus()
+            $savedOrder=$script:EntryOrder -join ','
+            $ctrlEnd=[Windows.Forms.Keys]::Control -bor [Windows.Forms.Keys]::End
+            $ctrlHome=[Windows.Forms.Keys]::Control -bor [Windows.Forms.Keys]::Home
+            $ctrlPageDown=[Windows.Forms.Keys]::Control -bor [Windows.Forms.Keys]::PageDown
+            Press-Key $row $ctrlEnd
+            Check "$locale/$scale LBS279 multi-position move scrolls and retains focus" ($script:ManageEntryOrder[-1] -eq 'boot-1' -and $row.Focused -and $bar.Value -gt 0 -and -not (Get-VisualCommitCover))
+            $history=$script:ManageUndoHistory.Count
+            Press-Key $row $ctrlDown
+            Check "$locale/$scale LBS279 boundary no-op neither moves nor leaks cover" ($script:ManageUndoHistory.Count -eq $history -and -not (Get-VisualCommitCover))
+            Press-Key $row $ctrlHome
+            Press-Key $row $ctrlPageDown
+            Press-Key $row $ctrlHome
+            Check "$locale/$scale LBS279 consecutive moves keep row identity draft and focus" ((Test-RowOrder $savedOrder) -and [object]::ReferenceEquals($row,(Get-Row 'boot-1')) -and $row.Focused -and $script:saveCalls -eq 1 -and -not (Get-VisualCommitCover))
+            $fixtureCommit=Start-PopupVisualCommit -Reason 'LBS279-exception-fixture'
+            try {
+                Check "$locale/$scale LBS279 native cover is nonactivating and nested scope is no-op" ($fixtureCommit -and $fixtureCommit.Visible -and $fixtureCommit.FramePaintCount -gt 0 -and $row.Focused -and -not (Start-PopupVisualCommit -Reason 'LBS279-nested-fixture'))
+                throw 'LBS279 controlled exception'
+            }
+            catch {
+                if ($_.Exception.Message -ne 'LBS279 controlled exception') { throw }
+            }
+            finally { Stop-PopupVisualCommit -Commit $fixtureCommit }
+            Check "$locale/$scale LBS279 exceptional cleanup releases snapshot and keeps native focus" ($fixtureCommit.IsDisposed -and -not (Get-VisualCommitCover) -and $row.Focused -and $form.Visible)
+            $cancel.PerformClick()
+            Check "$locale/$scale LBS279 subsequent exit retains persisted order and no cover" (-not $script:IsManageEntriesMode -and ($script:EntryOrder -join ',') -eq $savedOrder -and $script:saveCalls -eq 1 -and -not (Get-VisualCommitCover))
         } finally {$form.Dispose();$script:Popup=$null}
     }
 }
-Write-Host "LBS178 KEYBOARD TOTAL $script:checks/124"
-if ($script:checks -ne 124) {throw "LBS178 total mismatch: $script:checks"}
+Write-Host "LBS178 KEYBOARD TOTAL $script:checks/172"
+if ($script:checks -ne 172) {throw "LBS178 total mismatch: $script:checks"}

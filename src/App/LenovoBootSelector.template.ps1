@@ -373,6 +373,134 @@ public sealed class LenovoHoverGlyphButton : Button
     }
 }
 
+// LBS-279: keep one coherent client frame visible while the real HWND tree
+// is synchronously reconciled. This is not a second interactive popup.
+public sealed class LenovoPopupVisualCommit : Form
+{
+    private readonly Form parent;
+    private readonly Control source;
+    private Bitmap frame;
+    private Point frameOffset;
+    public int FramePaintCount { get; private set; }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool RedrawWindow(IntPtr hwnd, IntPtr rect, IntPtr region, uint flags);
+
+    private LenovoPopupVisualCommit(Form owner, Control client)
+    {
+        parent = owner;
+        source = client;
+        Name = "LenovoPopupVisualCommit";
+        AutoScaleMode = AutoScaleMode.None;
+        FormBorderStyle = FormBorderStyle.None;
+        ShowInTaskbar = false;
+        StartPosition = FormStartPosition.Manual;
+        // A layered, transparent-to-input surface lets the real owner retain
+        // its native visibility, focus, accessibility and child HWND state.
+        AllowTransparency = true;
+        TopMost = owner.TopMost;
+        TabStop = false;
+        SetStyle(ControlStyles.Selectable, false);
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
+            ControlStyles.OptimizedDoubleBuffer, true);
+    }
+
+    protected override bool ShowWithoutActivation { get { return true; } }
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            CreateParams cp = base.CreateParams;
+            cp.ExStyle |= 0x00000080 | 0x08000000 | 0x00000020; // TOOLWINDOW, NOACTIVATE, TRANSPARENT
+            return cp;
+        }
+    }
+
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == 0x0084) { m.Result = new IntPtr(-1); return; } // HTTRANSPARENT
+        if (m.Msg == 0x0021) { m.Result = new IntPtr(3); return; } // MA_NOACTIVATE
+        base.WndProc(ref m);
+    }
+
+    public static LenovoPopupVisualCommit Begin(Form owner)
+    {
+        if (owner == null || owner.IsDisposed || owner.Disposing ||
+            !owner.Visible || !owner.IsHandleCreated) return null;
+        Control root = owner.Controls["PopupRoot"];
+        if (root == null || root.IsDisposed || !root.Visible ||
+            !root.IsHandleCreated || root.ClientSize.Width <= 0 || root.ClientSize.Height <= 0) return null;
+        foreach (Form owned in owner.OwnedForms)
+            if (owned is LenovoPopupVisualCommit && !owned.IsDisposed) return null;
+
+        // At high DPI the design root can exceed the actual client viewport.
+        // Cover only pixels that can belong to this visible owner on screen.
+        Rectangle rootBounds = root.RectangleToScreen(root.ClientRectangle);
+        Rectangle visibleBounds = Rectangle.Intersect(rootBounds,
+            owner.RectangleToScreen(owner.ClientRectangle));
+        visibleBounds = Rectangle.Intersect(visibleBounds, SystemInformation.VirtualScreen);
+        if (visibleBounds.Width <= 0 || visibleBounds.Height <= 0) return null;
+
+        var cover = new LenovoPopupVisualCommit(owner, root);
+        try
+        {
+            // Capture only the owner's client controls, never desktop pixels.
+            cover.frame = new Bitmap(root.ClientSize.Width, root.ClientSize.Height);
+            root.DrawToBitmap(cover.frame, root.ClientRectangle);
+            cover.frameOffset = new Point(rootBounds.Left - visibleBounds.Left,
+                rootBounds.Top - visibleBounds.Top);
+            cover.Bounds = visibleBounds;
+            cover.Show(owner);
+            cover.Invalidate();
+            cover.Update();
+            if (!cover.Visible || cover.FramePaintCount == 0 || cover.Bounds != visibleBounds)
+                throw new InvalidOperationException("Visual commit frame was not presented at the visible client bounds.");
+            return cover;
+        }
+        catch
+        {
+            cover.Dispose();
+            throw;
+        }
+    }
+
+    protected override void OnPaintBackground(PaintEventArgs e) { }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        if (frame != null)
+        {
+            e.Graphics.DrawImageUnscaled(frame, frameOffset.X, frameOffset.Y);
+            FramePaintCount++;
+        }
+    }
+
+    public void Complete()
+    {
+        try
+        {
+            // Finish owner/child painting while the old frame still covers it.
+            // RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW.
+            if (!parent.IsDisposed && !parent.Disposing && parent.Visible &&
+                parent.IsHandleCreated && !source.IsDisposed && source.IsHandleCreated)
+            {
+                if (!RedrawWindow(parent.Handle, IntPtr.Zero, IntPtr.Zero, 0x0185))
+                    parent.Invalidate(true);
+            }
+        }
+        finally { Dispose(); }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing && frame != null)
+        {
+            frame.Dispose();
+            frame = null;
+        }
+        base.Dispose(disposing);
+    }
+}
+
 public sealed class LenovoMenuRenderer : ToolStripProfessionalRenderer
 {
     private readonly Color accent = Color.FromArgb(225, 37, 27);
