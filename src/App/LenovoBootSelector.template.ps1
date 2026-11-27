@@ -14,6 +14,7 @@ param(
     [string]$BackgroundResultPath,
     [switch]$BackgroundRefreshStorage,
     [switch]$BackgroundRefreshFirmware,
+    [switch]$BackgroundRestartVerification,
     [switch]$UpdateCheck,
     [switch]$UpdatePrepare,
     [string]$UpdateResultPath,
@@ -2137,6 +2138,7 @@ $script:BootNextSelectionResultPath = $null
 $script:BootNextSelectionProcess = $null
 $script:BootNextSelectionTimer = $null
 $script:RestartButton = $null
+$script:RestartVerification = $null
 $script:NextBootFirmwareReadVerified = $false
 $script:LastStatusText = ''
 $script:ExitRequested = $false
@@ -2388,6 +2390,7 @@ function Complete-LegacyDefaultMigration {
 
 function Set-DefaultGuid {
     param([AllowNull()][string]$Guid, [AllowNull()][string]$ProgressPath)
+    if ($script:RestartVerification) { throw 'Restart verification is active.' }
     if ($script:DefaultTargetChangePending) { throw 'Ein Standardzielwechsel wird noch überprüft.' }
     if ($script:BootNextPendingGuid) { throw 'Eine manuelle BootNext-Auswahl wird noch verifiziert.' }
     $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
@@ -2492,7 +2495,7 @@ function Use-DefaultForNextRestart {
     # as a manual row activation. Do not call the synchronous firmware writer
     # here: the controller paints pending immediately, interlocks Restart,
     # and only confirms the new target after independent firmware readback.
-    if ($script:BootNextPendingGuid -or $script:DefaultTargetChangePending -or $script:IsManageEntriesMode) { return }
+    if ($script:RestartVerification -or $script:BootNextPendingGuid -or $script:DefaultTargetChangePending -or $script:IsManageEntriesMode) { return }
     $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
     if (-not $capabilities.CanSetBootNext -or -not $script:DefaultGuid -or
         -not $script:NextBootFirmwareReadVerified -or -not $script:SelectedGuid -or
@@ -2507,6 +2510,16 @@ function Update-RestartTargetUi {
     # The persistent default is saved off-thread; no prior firmware value
     # may be presented as newly confirmed until both readbacks complete.
     if (-not $script:RestartTargetLabel -or $script:RestartTargetLabel.IsDisposed) { return }
+    if ($script:RestartVerification) {
+        $label=Get-LocalizedString -Key $(if ($script:RestartVerification.Stage -in @('dispatching','requested')) { 'Restart.RequestedStatus' } else { 'Restart.VerifyingStatus' })
+        $script:RestartTargetLabel.Text=$label
+        $script:RestartTargetLabel.ForeColor=$script:ColorSecondary
+        $script:RestartTargetLabel.AccessibleName=$label
+        $script:RestartTargetLabel.AccessibleDescription=$label
+        if ($script:BootTypeToolTip) { $script:BootTypeToolTip.SetToolTip($script:RestartTargetLabel,$label) }
+        Update-BootNextRestartInterlock
+        return
+    }
     if ($script:DefaultTargetChangePending) {
         $entry = if ($script:DefaultTargetChangeRequestedGuid) { Get-EntryByGuid ([string]$script:DefaultTargetChangeRequestedGuid) } else { $null }
         $target = if ($entry) { Get-EntryDisplayTitle -Entry $entry } else { Get-LocalizedString -Key 'Settings.NoDefaultTarget' }
@@ -2589,38 +2602,10 @@ function Update-RestartTargetUi {
 function Restart-Windows {
     if ($script:BootNextPendingGuid) { return }
     if ($script:DefaultTargetChangePending) { return }
-    $capabilities = Get-CurrentSystemFunctionsCapabilities
-    if (-not $capabilities.CanRestart) { return }
-    # A cached SelectedGuid must never be the sole evidence in a restart dialog.
-    try { [void](Refresh-EffectiveNextBootState) }
-    catch {
-        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Restart.FailedTitle') -Heading (Get-LocalizedString -Key 'BootNext.Unknown') -Message (Get-LocalizedString -Key 'BootNext.CheckFailed') -Kind Error
-        return
-    }
-    $targetName = Get-NextBootTargetDisplayName
-    $choice = Show-LenovoRestartDialog -TargetName $targetName
-    if ($choice -ne [System.Windows.Forms.DialogResult]::Yes) {
-        Write-RuntimeDiagnosticEvent -Event 'RESTART_REQUEST' -Stage 'restart' -Success $true -Data (New-RuntimeDiagnosticData @{ confirmed = $false; targetGuid = $script:SelectedGuid })
-        return
-    }
-
-    $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    try {
-        $psi = New-Object System.Diagnostics.ProcessStartInfo
-        $psi.FileName = (Join-Path $env:SystemRoot 'System32\shutdown.exe')
-        $psi.Arguments = '/r /t 0'
-        $psi.UseShellExecute = $false
-        $psi.CreateNoWindow = $true
-        [void][System.Diagnostics.Process]::Start($psi)
-        $sw.Stop()
-        Write-RuntimeDiagnosticEvent -Event 'RESTART_REQUEST' -Stage 'restart' -Success $true -DurationMs $sw.ElapsedMilliseconds -Data (New-RuntimeDiagnosticData @{ confirmed = $true; targetGuid = $script:SelectedGuid })
-    }
-    catch {
-        $sw.Stop()
-        Write-RuntimeDiagnosticEvent -Event 'RESTART_REQUEST' -Stage 'restart' -Success $false -DurationMs $sw.ElapsedMilliseconds -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ confirmed = $true; targetGuid = $script:SelectedGuid }) -Level error
-        Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Restart.FailedTitle') -Heading (Get-LocalizedString -Key 'Restart.FailedHeading') -Message (Get-LocalizedString -Key 'Restart.FailedMessage') -Kind Error
-    }
+    Start-VerifiedRestart -ExpectedGuid $script:SelectedGuid -ExpectedVerified ([bool]$script:NextBootFirmwareReadVerified)
 }
+
+# @include src/Application/RestartController.ps1
 
 # @include src/Infrastructure/TaskBroker.ps1
 # @include src/Application/SystemCapabilities.ps1
@@ -2687,7 +2672,7 @@ function Update-TaskBrokerUiState {
     $state = [string]$capabilities.State
 
     if ($script:TaskBrokerSetupMenuItem) {
-        $script:TaskBrokerSetupMenuItem.Enabled = [bool]$capabilities.CanConfigureSystemFunctions
+        $script:TaskBrokerSetupMenuItem.Enabled = [bool]($capabilities.CanConfigureSystemFunctions -and -not $script:RestartVerification)
         if ($state -eq 'Busy') {
             $mode = [string]$capabilities.MaintenanceMode
             $script:TaskBrokerSetupMenuItem.Text = if ($mode -eq 'Remove') { Get-LocalizedString -Key 'Maintenance.Menu.Generic' } elseif ($mode -eq 'Reinitialize') { Get-LocalizedString -Key 'Maintenance.Menu.Reinitializing' } elseif ($mode -eq 'Repair' -or $mode -eq 'Migrate') { Get-LocalizedString -Key 'Maintenance.Menu.Repairing' } else { Get-LocalizedString -Key 'Maintenance.Menu.SettingUp' }
@@ -2706,10 +2691,10 @@ function Update-TaskBrokerUiState {
     if ($script:TaskBrokerRemoveMenuItem) {
         # Cleanup is intentionally available even when metadata is already gone;
         # it also knows historical/probe task names from pre-TaskBroker builds.
-        $script:TaskBrokerRemoveMenuItem.Enabled = [bool]$capabilities.CanRemoveSystemFunctions
+        $script:TaskBrokerRemoveMenuItem.Enabled = [bool]($capabilities.CanRemoveSystemFunctions -and -not $script:RestartVerification)
     }
-    if ($script:DefaultContextRoot) { $script:DefaultContextRoot.Enabled = [bool]$capabilities.CanUseDefaultTarget }
-    if ($script:RestartMenuItem) { $script:RestartMenuItem.Enabled = [bool]$capabilities.CanRestart }
+    if ($script:DefaultContextRoot) { $script:DefaultContextRoot.Enabled = [bool]($capabilities.CanUseDefaultTarget -and -not $script:RestartVerification) }
+    if ($script:RestartMenuItem) { $script:RestartMenuItem.Enabled = [bool]($capabilities.CanRestart -and -not $script:RestartVerification) }
     Update-MaintenanceUi
     return [bool]$capabilities.IsReady
 }
@@ -2788,7 +2773,7 @@ function Complete-TaskBrokerInstall {
 
 function Start-TaskBrokerInstall {
     param([ValidateSet('Setup','Repair','Migrate','Reinitialize')][string]$Mode = 'Setup')
-    if ($script:DefaultTargetChangePending -or $script:TaskBrokerInstallInProgress -or $script:TaskBrokerRemoveInProgress -or (Test-MaintenanceBusy)) { return }
+    if ($script:RestartVerification -or $script:DefaultTargetChangePending -or $script:TaskBrokerInstallInProgress -or $script:TaskBrokerRemoveInProgress -or (Test-MaintenanceBusy)) { return }
     $script:TaskBrokerInstallDiagnosticStartedUtc = [datetime]::UtcNow
     Write-RuntimeDiagnosticEvent -Event 'SYSTEM_FUNCTIONS_SETUP_STARTED' -Stage 'maintenance' -Success $true -Data (New-RuntimeDiagnosticData @{ mode = $Mode })
     if (-not (Test-Path -LiteralPath $script:TaskBrokerInstallScript)) {
@@ -2856,6 +2841,7 @@ function Start-TaskBrokerInstall {
 }
 
 function Prompt-TaskBrokerInstall {
+    if ($script:RestartVerification) { return }
     $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
     if ([string]$capabilities.State -eq 'Busy') { return }
     $mode = if ([string]$capabilities.State -eq 'ReinitializeRequired') {
@@ -2878,6 +2864,7 @@ function Prompt-TaskBrokerInstall {
 }
 
 function Prompt-TaskBrokerReinitialize {
+    if ($script:RestartVerification) { return }
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     if ([string]$capabilities.State -ne 'ReinitializeRequired') { return }
     $choice = Show-LenovoSystemFunctionsDialog -Mode 'Reinitialize'
@@ -2946,7 +2933,7 @@ function Complete-TaskBrokerRemove {
 }
 
 function Start-TaskBrokerRemove {
-    if ($script:DefaultTargetChangePending -or $script:TaskBrokerInstallInProgress -or $script:TaskBrokerRemoveInProgress -or (Test-MaintenanceBusy)) { return }
+    if ($script:RestartVerification -or $script:DefaultTargetChangePending -or $script:TaskBrokerInstallInProgress -or $script:TaskBrokerRemoveInProgress -or (Test-MaintenanceBusy)) { return }
     $script:TaskBrokerRemoveDiagnosticStartedUtc = [datetime]::UtcNow
     Write-RuntimeDiagnosticEvent -Event 'SYSTEM_FUNCTIONS_REMOVE_STARTED' -Stage 'maintenance' -Success $true
     if (-not (Test-Path -LiteralPath $script:TaskBrokerUninstallScript)) {
@@ -2996,6 +2983,7 @@ function Start-TaskBrokerRemove {
 }
 
 function Prompt-TaskBrokerRemove {
+    if ($script:RestartVerification) { return }
     if (Test-MaintenanceBusy) { return }
     $choice = Show-LenovoSystemFunctionsDialog -Mode 'Remove'
     if ($choice -eq [System.Windows.Forms.DialogResult]::Yes) { Start-TaskBrokerRemove }
@@ -3110,6 +3098,7 @@ function Get-FirmwareBootState {
 
 function Set-BootNextTarget {
     param([Parameter(Mandatory=$true)][string]$Guid)
+    if ($script:RestartVerification) { throw 'Restart verification is active.' }
     $capabilities = Get-CurrentSystemFunctionsCapabilities -ProbeReadiness
     if (-not $capabilities.CanSetBootNext) { throw 'Das Startziel ist derzeit nicht verfügbar.' }
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -3164,6 +3153,7 @@ function Apply-FirmwareBootState {
 
 function Refresh-BootState {
     param([switch]$RefreshStorage)
+    if ($script:RestartVerification) { return }
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     if ($RefreshStorage) {
         $script:ManagerCacheText = $null
@@ -3232,7 +3222,7 @@ if ($DefaultTargetWorker) {
     exit $exitCode
 }
 if ($BackgroundRefresh) {
-    $exitCode = Invoke-BackgroundRefreshWorker -RefreshStorage ([bool]$BackgroundRefreshStorage) -RefreshFirmware ([bool]$BackgroundRefreshFirmware) -ResultPath $BackgroundResultPath
+    $exitCode = Invoke-BackgroundRefreshWorker -RefreshStorage ([bool]$BackgroundRefreshStorage) -RefreshFirmware ([bool]$BackgroundRefreshFirmware) -ResultPath $BackgroundResultPath -VerifyRestart:$BackgroundRestartVerification
     exit $exitCode
 }
 if ($UpdateCheck) {
@@ -3581,6 +3571,7 @@ finally {
         try { Stop-UpdateCheckWorkflow -State $script:UpdateState } catch { }
         try { Stop-UpdatePrepareWorkflow -State $script:UpdateState } catch { }
     }
+    Stop-RestartVerification -Shutdown
     Stop-BootNextSelectionWorker -Reason 'shutdown'
     Stop-DefaultTargetChangeWorker -Reason 'shutdown'
     $backgroundRefreshContext = $null

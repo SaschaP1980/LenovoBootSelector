@@ -17,6 +17,7 @@ function Update-DefaultUi {
         # rejected by Set-DefaultGuid; do not misleadingly advertise it as active.
         $pendingDefault = [bool]$script:DefaultTargetChangePending
         $interactive = ($enabled -and -not [bool]$script:BootNextPendingGuid -and -not $pendingDefault)
+        $interactive = ($interactive -and -not $script:RestartVerification)
         $mutedInk = [Drawing.Color]::FromArgb(146,146,146)
         $script:DefaultInteractionEnabled = $interactive
         if (-not $interactive) { $script:DefaultButton.BackColor = $script:ColorSurface }

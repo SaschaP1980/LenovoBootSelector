@@ -149,6 +149,10 @@ function Complete-BackgroundBootRefresh {
 function Start-BackgroundBootRefresh {
     param([switch]$RefreshStorage,[ValidateSet('Background','Startup','Popup','Manual')][string]$Origin = 'Background')
 
+    if ($script:RestartVerification) {
+        Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_SUPPRESSED' -Stage 'restart' -Success $true -Data (New-RuntimeDiagnosticData @{ reason='restart-verification' })
+        return
+    }
     if ($script:DefaultTargetChangePending) {
         Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_SUPPRESSED' -Stage 'default' -Success $true -Data (New-RuntimeDiagnosticData @{ reason='default-target-changing' })
         return

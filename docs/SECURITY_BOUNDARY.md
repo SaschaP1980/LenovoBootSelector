@@ -26,6 +26,12 @@ No runtime API accepts a free Scheduled Task name.
 
 Since v0.10.0.0, the canonical privileged installation uses the `LenovoBootSelector-*` task family and `%ProgramData%\Lenovo Boot Selector\TaskBroker`. Exact pre-v0.10 `LenovoBootMenu-*` tasks and `%ProgramData%\Lenovo Boot Menu\TaskBroker` are recognized only by the elevated migration/cleanup path and are never accepted as runtime authorization. See [IDENTIFIER_COMPATIBILITY.md](IDENTIFIER_COMPATIBILITY.md).
 
+## Verified restart admission (LBS-287)
+
+The existing unelevated Windows restart route uses an immutable expected next-boot intent and two independent forced readbacks: before confirmation and after consent. Explicit targets require exact normalized GUID equality and availability in fresh firmware entries and the installed allowlist. Normal firmware order requires confirmed absence of a one-shot target, valid manager evidence and identical observed order in both phases. Unknown or ambiguous evidence cannot authorize restart.
+
+The read-only worker binds its observations to newly written protected snapshots using exact UTC timestamps and content hashes. It observes the existing exact installed reader/writer task states and writer provenance before and after the read; the parent rechecks provenance and bounded evidence age before dispatch. The existing SYSTEM-only writer lock and privileged operations are unchanged. The tray interlock rejects competing LBS actions; independent external writers and a late startup trigger cannot be made atomic with the unelevated restart request. A successful shutdown request is not proof of subsequent firmware or OS boot success.
+
 ## Fixed task naming
 
 Static tasks have exact names:
