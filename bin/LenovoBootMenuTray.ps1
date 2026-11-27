@@ -2382,6 +2382,23 @@ public sealed class LenovoHoverGlyphButton : Button
     }
 }
 
+// LBS-279: compose the main popup's native child HWNDs together, including
+// the temporary cover's final reveal. Do not apply this style to dialogs,
+// menus or other windows. Establish it at construction, not by recreating
+// or modifying an active window's handle.
+public sealed class LenovoCompositedPopup : Form
+{
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            CreateParams cp = base.CreateParams;
+            cp.ExStyle |= 0x02000000; // WS_EX_COMPOSITED
+            return cp;
+        }
+    }
+}
+
 // LBS-279: keep one coherent client frame visible while the real HWND tree
 // is synchronously reconciled. This is not a second interactive popup.
 public sealed class LenovoPopupVisualCommit : Control
@@ -2394,6 +2411,9 @@ public sealed class LenovoPopupVisualCommit : Control
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool RedrawWindow(IntPtr hwnd, IntPtr rect, IntPtr region, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool PrintWindow(IntPtr hwnd, IntPtr dc, uint flags);
 
     private LenovoPopupVisualCommit(Form owner, Control client)
     {
@@ -2436,11 +2456,25 @@ public sealed class LenovoPopupVisualCommit : Control
         var cover = new LenovoPopupVisualCommit(owner, root);
         try
         {
-            // Capture only the owner's client controls, never desktop pixels.
-            cover.frame = new Bitmap(root.ClientSize.Width, root.ClientSize.Height);
-            root.DrawToBitmap(cover.frame, root.ClientRectangle);
-            cover.frameOffset = new Point(rootBounds.Left - visibleBounds.Left,
-                rootBounds.Top - visibleBounds.Top);
+            // DrawToBitmap replays overlapping WinForms children in an order
+            // that can differ from the visible native surface. Request the
+            // composed client of this exact HWND instead; never read the desktop.
+            // PW_CLIENTONLY | PW_RENDERFULLCONTENT; RGB avoids GDI alpha artifacts.
+            cover.frame = new Bitmap(owner.ClientSize.Width, owner.ClientSize.Height,
+                System.Drawing.Imaging.PixelFormat.Format32bppRgb);
+            using (Graphics graphics = Graphics.FromImage(cover.frame))
+            {
+                IntPtr dc = graphics.GetHdc();
+                try
+                {
+                    if (!PrintWindow(owner.Handle, dc, 0x00000003))
+                        throw new InvalidOperationException("Native owner client capture unavailable.");
+                }
+                finally { graphics.ReleaseHdc(dc); }
+            }
+            Rectangle clientBounds = owner.RectangleToScreen(owner.ClientRectangle);
+            cover.frameOffset = new Point(clientBounds.Left - visibleBounds.Left,
+                clientBounds.Top - visibleBounds.Top);
             cover.Bounds = owner.RectangleToClient(visibleBounds);
             owner.Controls.Add(cover);
             cover.BringToFront();
@@ -2472,27 +2506,18 @@ public sealed class LenovoPopupVisualCommit : Control
 
     public void Complete()
     {
-        try
-        {
-            // Request the underlying final paint while the snapshot is present.
-            // RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW.
-            if (!parent.IsDisposed && !parent.Disposing && parent.Visible &&
-                parent.IsHandleCreated && !source.IsDisposed && source.IsHandleCreated)
-            {
-                if (!RedrawWindow(source.Handle, IntPtr.Zero, IntPtr.Zero, 0x0185))
-                    source.Invalidate(true);
-            }
-        }
+        // Do not request a redundant clipped source repaint behind the cover.
+        // Release the child and compose the entire exposed owner subtree in one
+        // native redraw. The owner is never hidden or activated by this scope.
+        try { Dispose(); }
         finally
         {
-            Dispose();
-            // The child can clip underlying sibling painting. Finish exposed
-            // pixels synchronously, without activation or reopening a hidden owner.
             if (!parent.IsDisposed && !parent.Disposing && parent.Visible &&
                 parent.IsHandleCreated && !source.IsDisposed && source.IsHandleCreated)
             {
-                if (!RedrawWindow(source.Handle, IntPtr.Zero, IntPtr.Zero, 0x0185))
-                    source.Refresh();
+                // RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW.
+                if (!RedrawWindow(parent.Handle, IntPtr.Zero, IntPtr.Zero, 0x0185))
+                    parent.Refresh();
             }
         }
     }
@@ -3832,7 +3857,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.10.4.1'
+$script:AppVersion = '1.10.4.2'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -7931,22 +7956,26 @@ function Undo-ManageEntryDraft {
         Update-PopupRows -Reason 'manage-undo-empty'
         return
     }
-    $index = $script:ManageUndoHistory.Count - 1
-    $previous = $script:ManageUndoHistory[$index]
-    $script:ManageUndoHistory.RemoveAt($index)
-    # Copy again so subsequent edits cannot mutate retained snapshots.
-    $restored = New-ManageDraftSnapshotCore -Order $previous.Order -Hidden $previous.Hidden -Aliases $previous.Aliases
-    $script:ManageEntryOrder = @($restored.Order)
-    $script:ManageHiddenEntryGuids = @($restored.Hidden)
-    $script:ManageEntryAliases = $restored.Aliases
-    $script:LastStatusText = Get-LocalizedString -Key 'Manage.UndoDone'
-    $undo = if ($script:Popup -and -not $script:Popup.IsDisposed) { $script:Popup.Controls.Find('ManageUndoButton',$true) | Select-Object -First 1 }
-    $hadFocus = $undo -and $undo.Focused
-    Update-PopupRows -Reason 'manage-undo'
-    if ($hadFocus -and -not $undo.Enabled) {
-        $cancel = $script:Popup.Controls.Find('ManageCancelButton',$true) | Select-Object -First 1
-        if ($cancel -and $cancel.CanFocus) { [void]$cancel.Focus() }
+    $visualCommit = Start-PopupVisualCommit -Reason 'manage-undo'
+    try {
+        $index = $script:ManageUndoHistory.Count - 1
+        $previous = $script:ManageUndoHistory[$index]
+        $script:ManageUndoHistory.RemoveAt($index)
+        # Copy again so subsequent edits cannot mutate retained snapshots.
+        $restored = New-ManageDraftSnapshotCore -Order $previous.Order -Hidden $previous.Hidden -Aliases $previous.Aliases
+        $script:ManageEntryOrder = @($restored.Order)
+        $script:ManageHiddenEntryGuids = @($restored.Hidden)
+        $script:ManageEntryAliases = $restored.Aliases
+        $script:LastStatusText = Get-LocalizedString -Key 'Manage.UndoDone'
+        $undo = if ($script:Popup -and -not $script:Popup.IsDisposed) { $script:Popup.Controls.Find('ManageUndoButton',$true) | Select-Object -First 1 }
+        $hadFocus = $undo -and $undo.Focused
+        Update-PopupRows -Reason 'manage-undo'
+        if ($hadFocus -and -not $undo.Enabled) {
+            $cancel = $script:Popup.Controls.Find('ManageCancelButton',$true) | Select-Object -First 1
+            if ($cancel -and $cancel.CanFocus) { [void]$cancel.Focus() }
+        }
     }
+    finally { Stop-PopupVisualCommit -Commit $visualCommit }
 }
 
 function Set-ManageEntryAliasDraft {
@@ -14758,23 +14787,11 @@ function Add-BootEntryAliasEditor {
         Hide-ManageAliasFieldTooltip -Owner $sender
         if ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
             $eventArgs.SuppressKeyPress = $true
-            if (-not (Set-ManageEntryAliasDraft -Guid ([string]$sender.Tag) -Alias ([string]$sender.Text))) {
-                Show-ManageAliasLimitFeedback -Editor $sender
-                return
-            }
-            $closedGuid = [string]$sender.Tag
-            $script:ManageAliasEditGuid = $null
-            $script:LastStatusText = if ([string]::IsNullOrWhiteSpace([string]$sender.Text)) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
-            Update-PopupRows
-            Restore-ManageRowFocus -Guid $closedGuid
+            Stop-ManageRowAliasEdit -Guid ([string]$sender.Tag) -Editor $sender -Apply
         }
         elseif ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Escape) {
-            $closedGuid = [string]$sender.Tag
-            $script:ManageAliasEditGuid = $null
-            $script:LastStatusText = Get-LocalizedString -Key 'Manage.AliasDiscarded'
             $eventArgs.SuppressKeyPress = $true
-            Update-PopupRows
-            Restore-ManageRowFocus -Guid $closedGuid
+            Stop-ManageRowAliasEdit -Guid ([string]$sender.Tag)
         }
     })
     $editorFrame.Controls.Add($aliasEditor)
@@ -14806,16 +14823,7 @@ function Add-BootEntryAliasEditor {
         $sender.LenovoPointerPress = $false
         $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
         if ($editor) {
-            if (-not (Set-ManageEntryAliasDraft -Guid ([string]$editor.Tag) -Alias ([string]$editor.Text))) {
-                Show-ManageAliasLimitFeedback -Editor $editor
-                return
-            }
-            $empty = [string]::IsNullOrWhiteSpace([string]$editor.Text)
-            $closedGuid = [string]$editor.Tag
-            $script:ManageAliasEditGuid = $null
-            $script:LastStatusText = if ($empty) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
-            Update-PopupRows
-            Restore-ManageRowFocus -Guid $closedGuid -KeyboardCue:$keyboardCue
+            Stop-ManageRowAliasEdit -Guid ([string]$editor.Tag) -Editor $editor -Apply -KeyboardCue:$keyboardCue
         }
     })
     $row.Controls.Add($applyAlias)
@@ -14840,11 +14848,7 @@ function Add-BootEntryAliasEditor {
         param($sender,$eventArgs)
         $keyboardCue = -not $sender.LenovoPointerPress
         $sender.LenovoPointerPress = $false
-        $closedGuid = [string]$sender.Tag
-        $script:ManageAliasEditGuid = $null
-        $script:LastStatusText = Get-LocalizedString -Key 'Manage.AliasDiscarded'
-        Update-PopupRows
-        Restore-ManageRowFocus -Guid $closedGuid -KeyboardCue:$keyboardCue
+        Stop-ManageRowAliasEdit -Guid ([string]$sender.Tag) -KeyboardCue:$keyboardCue
     })
     $row.Controls.Add($cancelAlias)
 
@@ -14966,28 +14970,61 @@ function Paint-LenovoManageGripGlyph {
 function Invoke-ManageRowVisibility {
     param([string]$Guid)
     if (-not $script:IsManageEntriesMode -or -not $Guid) { return }
-    if ($script:ManageAliasEditGuid -and -not (Commit-ActiveManageAliasEditor)) { return }
-    Toggle-ManageEntryVisibility -Guid $Guid
-    $script:LastStatusText = if (Test-ManageEntryHidden -Guid $Guid) { Get-LocalizedString -Key 'Manage.EntryHiddenStatus' } else { Get-LocalizedString -Key 'Manage.EntryVisibleStatus' }
-    Update-PopupRows
+    $visualCommit = Start-PopupVisualCommit -Reason 'manage-visibility'
+    try {
+        if ($script:ManageAliasEditGuid -and -not (Commit-ActiveManageAliasEditor)) { return }
+        Toggle-ManageEntryVisibility -Guid $Guid
+        $script:LastStatusText = if (Test-ManageEntryHidden -Guid $Guid) { Get-LocalizedString -Key 'Manage.EntryHiddenStatus' } else { Get-LocalizedString -Key 'Manage.EntryVisibleStatus' }
+        Update-PopupRows -Reason 'manage-visibility'
+    }
+    finally { Stop-PopupVisualCommit -Commit $visualCommit }
 }
 
 function Start-ManageRowAliasEdit {
     param([string]$Guid)
     if (-not $script:IsManageEntriesMode -or -not $Guid -or $script:ManageActiveDragGuid) { return }
     $guid = $Guid.ToLowerInvariant()
-    if ($script:ManageAliasEditGuid -and $script:ManageAliasEditGuid -ne $guid) {
-        if (-not (Commit-ActiveManageAliasEditor)) { return }
+    $visualCommit = Start-PopupVisualCommit -Reason 'manage-alias-enter'
+    try {
+        if ($script:ManageAliasEditGuid -and $script:ManageAliasEditGuid -ne $guid) {
+            if (-not (Commit-ActiveManageAliasEditor)) { return }
+        }
+        $script:ManageAliasEditGuid = $guid
+        $script:LastStatusText = Get-LocalizedString -Key 'Manage.EditAliasStatus'
+        Update-PopupRows -Reason 'manage-alias-enter'
+        $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
+        if ($editor) {
+            [void]$editor.Focus()
+            $editor.SelectAll()
+            Set-NormalBootRowVisible -Row (Get-BootRowFromControl $editor)
+        }
     }
-    $script:ManageAliasEditGuid = $guid
-    $script:LastStatusText = Get-LocalizedString -Key 'Manage.EditAliasStatus'
-    Update-PopupRows
-    $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
-    if ($editor) {
-        [void]$editor.Focus()
-        $editor.SelectAll()
-        Set-NormalBootRowVisible -Row (Get-BootRowFromControl $editor)
+    finally { Stop-PopupVisualCommit -Commit $visualCommit }
+}
+
+# One close owner for Enter, Escape, Apply and Cancel. Keep validation,
+# draft ownership and pointer/keyboard focus semantics of the original routes.
+function Stop-ManageRowAliasEdit {
+    param([string]$Guid,$Editor,[switch]$Apply,[Nullable[bool]]$KeyboardCue)
+    if (-not $script:IsManageEntriesMode -or -not $Guid -or
+        $script:ManageAliasEditGuid -ne $Guid) { return }
+    if ($Apply -and (-not $Editor -or $Editor.IsDisposed -or [string]$Editor.Tag -ne $Guid)) { return }
+    $visualCommit = Start-PopupVisualCommit -Reason 'manage-alias-exit'
+    try {
+        if ($Apply) {
+            if (-not (Set-ManageEntryAliasDraft -Guid $Guid -Alias ([string]$Editor.Text))) {
+                Show-ManageAliasLimitFeedback -Editor $Editor
+                return
+            }
+            $status = if ([string]::IsNullOrWhiteSpace([string]$Editor.Text)) { 'Manage.AliasRemoved' } else { 'Manage.AliasChanged' }
+        }
+        else { $status = 'Manage.AliasDiscarded' }
+        $script:ManageAliasEditGuid = $null
+        $script:LastStatusText = Get-LocalizedString -Key $status
+        Update-PopupRows -Reason 'manage-alias-exit'
+        Restore-ManageRowFocus -Guid $Guid -KeyboardCue:$KeyboardCue
     }
+    finally { Stop-PopupVisualCommit -Commit $visualCommit }
 }
 
 function Restore-ManageRowFocus {
@@ -18115,7 +18152,7 @@ function Invoke-PopupEscapeDismissal {
 
 function New-PopupForm {
     param([double]$TargetScale = 1.0, [string]$ScaleSource = 'initial')
-    $form = New-Object System.Windows.Forms.Form
+    $form = New-Object LenovoCompositedPopup
     if (-not $script:BootTypeToolTip) {
         $script:BootTypeToolTip = New-LenovoDarkTooltip -Animate
         $form.Add_Disposed({

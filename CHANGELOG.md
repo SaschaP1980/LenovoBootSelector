@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.10.4.2 - Coherent popup composition and inline alias transitions (LBS-279)
+
+- Use native descendant composition only for the main popup, retaining the nonselectable in-owner visual cover and existing dismissal policy. Capture the native owner client rather than replaying overlapping child controls via DrawToBitmap; use an owner-wide final redraw.
+- Share the visual transaction across inline alias entry, editor switching and all four exit actions, plus visibility and Undo changes. Preserve keyed row reuse, draft validation, focus, explicit persistence and drag ownership.
+- Extend native checks for alias presentation boundaries, owner composition, controlled visible pixel retention/reveal and editor switching. Physical visual acceptance follows publication.
+
 ## v1.10.4.1 - Preserve popup visibility during Manage Entries transitions (LBS-279)
 
 - Replace the temporary top-level visual cover with a nonselectable child control within the existing main popup. Preserve the normal Deactivate dismissal rule and avoid forced reactivation or a global dismissal bypass.

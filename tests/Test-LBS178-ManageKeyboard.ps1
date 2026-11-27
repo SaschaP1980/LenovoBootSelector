@@ -113,7 +113,7 @@ foreach ($locale in @('de-DE','en-US')) {
         $script:CurrentEntries=@(0..9 | ForEach-Object {
             [pscustomobject]@{Guid="boot-$_";Title="Target $_";Subtitle="Description $_";RawDescription="Target $_";Symbol='*';Accent=[Drawing.Color]::Red;TypeTooltip=''}
         })
-        $form=[Windows.Forms.Form]::new()
+        $form=[LenovoCompositedPopup]::new()
         try {
             $script:Popup=$form
             $form.StartPosition=[Windows.Forms.FormStartPosition]::Manual
@@ -216,7 +216,12 @@ foreach ($locale in @('de-DE','en-US')) {
             Press-Key (Get-Row 'boot-0') $ctrlE
             Check "$locale/$scale active drag rejects all row actions" ((Test-RowOrder $movedOrder) -and (Test-ManageEntryHidden 'boot-0') -and -not $script:ManageAliasEditGuid -and $script:ManageUndoHistory.Count -eq 2)
             $script:ManageActiveDragGuid=$null
-            Press-Key (Get-Row 'boot-0') $ctrlE
+            $unaffected=Get-Row 'boot-2'
+            Reset-VisualCommitProbe
+            $script:visualProbeActive=$true
+            try { Press-Key (Get-Row 'boot-0') $ctrlE }
+            finally { $script:visualProbeActive=$false }
+            Check "$locale/$scale LBS279 alias entry covers actual replacement and preserves unchanged row identity" ($script:visualRowEvents -gt 0 -and $script:visualUncoveredEvents -eq 0 -and [object]::ReferenceEquals($unaffected,(Get-Row 'boot-2')) -and -not (Get-VisualCommitCover))
             $editor=$form.Controls.Find('AliasEditor',$true)[0]
             Check "$locale/$scale Ctrl E opens native editor without history" ($editor -and $editor.Focused -and $script:ManageAliasEditGuid -eq 'boot-0' -and $script:ManageUndoHistory.Count -eq 2 -and -not $undo.Enabled)
             $editor.Text='Temporary'
@@ -224,19 +229,35 @@ foreach ($locale in @('de-DE','en-US')) {
             Press-Key $editor $ctrlUp
             Press-Key $editor $ctrlE
             Check "$locale/$scale editor retains native input scope" ($editor.Focused -and $script:ManageAliasEditGuid -eq 'boot-0' -and (Test-RowOrder $movedOrder) -and $script:ManageUndoHistory.Count -eq 2)
-            Press-Key $editor ([Windows.Forms.Keys]::Escape)
+            Reset-VisualCommitProbe
+            $script:visualProbeActive=$true
+            try { Press-Key $editor ([Windows.Forms.Keys]::Escape) }
+            finally { $script:visualProbeActive=$false }
+            Check "$locale/$scale LBS279 alias Escape covers replacement and releases cover" ($script:visualRowEvents -gt 0 -and $script:visualUncoveredEvents -eq 0 -and -not (Get-VisualCommitCover))
             Check "$locale/$scale Escape discards alias and restores GUID focus" (-not $script:ManageAliasEditGuid -and (Get-Row 'boot-0').Focused -and $script:ManageUndoHistory.Count -eq 2)
             Press-Key (Get-Row 'boot-0') $ctrlE
             $editor=$form.Controls.Find('AliasEditor',$true)[0];$editor.Text='Renamed'
-            Press-Key $editor ([Windows.Forms.Keys]::Enter)
+            Reset-VisualCommitProbe
+            $script:visualProbeActive=$true
+            try { Press-Key $editor ([Windows.Forms.Keys]::Enter) }
+            finally { $script:visualProbeActive=$false }
+            Check "$locale/$scale LBS279 alias Enter covers replacement and releases cover" ($script:visualRowEvents -gt 0 -and $script:visualUncoveredEvents -eq 0 -and -not (Get-VisualCommitCover))
             Check "$locale/$scale Enter commits one alias and restores focus" ($script:ManageEntryAliases['boot-0'] -ceq 'Renamed' -and (Get-Row 'boot-0').Focused -and $script:ManageUndoHistory.Count -eq 3)
             Press-Key (Get-Row 'boot-0') $ctrlE
             $editor=$form.Controls.Find('AliasEditor',$true)[0];$editor.Text='Applied'
-            $form.Controls.Find('AliasApplyButton',$true)[0].PerformClick()
+            Reset-VisualCommitProbe
+            $script:visualProbeActive=$true
+            try { $form.Controls.Find('AliasApplyButton',$true)[0].PerformClick() }
+            finally { $script:visualProbeActive=$false }
+            Check "$locale/$scale LBS279 alias Apply covers replacement and releases cover" ($script:visualRowEvents -gt 0 -and $script:visualUncoveredEvents -eq 0 -and -not (Get-VisualCommitCover))
             Check "$locale/$scale Apply commits and restores row focus" ($script:ManageEntryAliases['boot-0'] -ceq 'Applied' -and (Get-Row 'boot-0').Focused -and $script:ManageUndoHistory.Count -eq 4)
             Press-Key (Get-Row 'boot-0') $ctrlE
             $editor=$form.Controls.Find('AliasEditor',$true)[0];$editor.Text='Discarded'
-            $form.Controls.Find('AliasCancelButton',$true)[0].PerformClick()
+            Reset-VisualCommitProbe
+            $script:visualProbeActive=$true
+            try { $form.Controls.Find('AliasCancelButton',$true)[0].PerformClick() }
+            finally { $script:visualProbeActive=$false }
+            Check "$locale/$scale LBS279 alias Cancel covers replacement and releases cover" ($script:visualRowEvents -gt 0 -and $script:visualUncoveredEvents -eq 0 -and -not (Get-VisualCommitCover))
             Check "$locale/$scale Cancel alias retains committed value and focus" ($script:ManageEntryAliases['boot-0'] -ceq 'Applied' -and (Get-Row 'boot-0').Focused -and $script:ManageUndoHistory.Count -eq 4)
             $undo.PerformClick();$undo.PerformClick();$undo.PerformClick();$undo.PerformClick()
             Check "$locale/$scale mixed history undo restores baseline" ((Test-RowOrder $originalOrder) -and -not (Test-ManageEntryHidden 'boot-0') -and -not $script:ManageEntryAliases.ContainsKey('boot-0') -and $script:saveCalls -eq 0)
@@ -301,5 +322,5 @@ foreach ($locale in @('de-DE','en-US')) {
         } finally {$form.Dispose();$script:Popup=$null}
     }
 }
-Write-Host "LBS178 KEYBOARD TOTAL $script:checks/172"
-if ($script:checks -ne 172) {throw "LBS178 total mismatch: $script:checks"}
+Write-Host "LBS178 KEYBOARD TOTAL $script:checks/192"
+if ($script:checks -ne 192) {throw "LBS178 total mismatch: $script:checks"}
