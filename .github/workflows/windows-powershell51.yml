@@ -175,6 +175,7 @@ jobs:
               tooltipNative = Get-TestTotal $logText '^LBS244 TOOLTIP TOTAL\s+(\d+)/(\d+)\s*$'
               tooltipCoverage = Get-TestTotal $logText '^LBS244 COVERAGE TOTAL\s+(\d+)/(\d+)\s*$'
               tooltipAction = Get-TestTotal $logText '^LBS244 ACTION TOTAL\s+(\d+)/(\d+)\s*$'
+              restartVerification = Get-TestTotal $logText '^LBS287 RESTART TOTAL\s+(\d+)/(\d+)\s*$'
               statusIcons = Get-TestTotal $logText '^LBS274 STATUS ICONS TOTAL\s+(\d+)/(\d+)\s*$'
               settingsPolish = Get-TestTotal $logText '^LBS247 SETTINGS TOTAL\s+(\d+)/(\d+)\s*$'
               ownerDismiss = Get-TestTotal $logText '^LBS267 OWNER DISMISS TOTAL\s+(\d+)/(\d+)\s*$'
@@ -224,6 +225,7 @@ jobs:
               'tooltipNative',
               'tooltipCoverage',
               'tooltipAction',
+              'restartVerification',
               'statusIcons',
               'settingsPolish',
               'ownerDismiss',
@@ -279,6 +281,7 @@ jobs:
               $totals.tooltipNative.passed +
               $totals.tooltipCoverage.passed +
               $totals.tooltipAction.passed +
+              $totals.restartVerification.passed +
               $totals.statusIcons.passed +
               $totals.settingsPolish.passed +
               $totals.ownerDismiss.passed +
@@ -325,6 +328,7 @@ jobs:
               $totals.tooltipNative.expected +
               $totals.tooltipCoverage.expected +
               $totals.tooltipAction.expected +
+              $totals.restartVerification.expected +
               $totals.statusIcons.expected +
               $totals.settingsPolish.expected +
               $totals.ownerDismiss.expected +

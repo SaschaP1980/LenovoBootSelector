@@ -82,7 +82,7 @@ function Set-RowHoverState($Control, [bool]$Hover) {
     if ($script:IsManageEntriesMode) {
         if ($observed -and -not $observed.CanManageEntries) { $hot = $false }
     } else {
-        if ($script:BootNextPendingGuid -or $script:DefaultTargetChangePending) { $hot = $false }
+        if ($script:BootNextPendingGuid -or $script:DefaultTargetChangePending -or $script:RestartVerification) { $hot = $false }
         if ($observed -and -not $observed.CanSetBootNext -and -not ($observed.State -eq 'Checking' -and $observed.CanUseCachedBootState)) { $hot = $false }
     }
     $hc = [Windows.Forms.SystemInformation]::HighContrast

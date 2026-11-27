@@ -2,7 +2,7 @@
 # BootNext task and authoritative firmware verification execute off-thread.
 # All UI state changes occur on the original WinForms message-loop thread.
 function Update-BootNextRestartInterlock {
-    $pending = [bool]($script:BootNextPendingGuid -or $script:DefaultTargetChangePending)
+    $pending = [bool]($script:BootNextPendingGuid -or $script:DefaultTargetChangePending -or $script:RestartVerification)
     if ($script:RestartButton -and -not $script:RestartButton.IsDisposed) {
         $script:RestartButton.Enabled = -not $pending
     }
@@ -95,6 +95,7 @@ function Fail-DeferredBootNextSelection {
 
 function Start-BootNextSelection {
     param([Parameter(Mandatory=$true)][string]$Guid)
+    if ($script:RestartVerification) { return }
     if ($script:DefaultTargetChangePending) {
         Write-RuntimeDiagnosticEvent -Event 'BOOTNEXT_CLICK_REJECTED' -Stage 'bootnext' -Success $false -Data (New-RuntimeDiagnosticData @{ reason='default-target-changing' })
         return

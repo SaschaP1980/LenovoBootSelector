@@ -1,5 +1,12 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.10.6.0 - Verified restart admission (LBS-287)
+
+- Capture the confirmed next-boot intent before reading firmware. Require a fresh, matching readback before confirmation and a second independent readback after consent immediately before requesting Windows restart.
+- Reject changed, unknown, stale, malformed, missing or ambiguous targets, conflicting LBS operations and observable installed task/provenance changes. Permit normal firmware order only for verified absence of BootNext and the same confirmed order at both checks.
+- Reuse the existing read-only TaskBroker and asynchronous worker infrastructure. No new privileged operation, firmware write, automatic default change, permanent boot order change or automatic repair. Report restart request acceptance separately from actual boot success.
+- Add 82 native Windows PowerShell 5.1 assertions with simulated firmware evidence and intercepted restart dispatch, including German and English, cancellation, timeout, competing operations and fail-closed paths. Physical owner acceptance remains separate.
+
 ## v1.10.5.0 - Unified native semantic status symbols (LBS-274)
 
 - Introduce the approved six-state outlined status family with exact semantic colors, DPI-scaled GDI+ geometry and system-color High Contrast rendering. Use one non-action status control and three optical sizes; Busy is static and needs no timer.

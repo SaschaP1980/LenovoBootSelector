@@ -36,7 +36,7 @@ function Start-DefaultTargetChange {
     param([AllowNull()][string]$Guid)
     # A pending save is a single immutable intent. No superseding click
     # may create a second SYSTEM task or overlap a one-shot BootNext writer.
-    if ($script:DefaultTargetChangePending -or $script:BootNextPendingGuid -or
+    if ($script:RestartVerification -or $script:DefaultTargetChangePending -or $script:BootNextPendingGuid -or
         $script:IsManageEntriesMode -or (Test-MaintenanceBusy)) { return }
     $capabilities = Get-CurrentSystemFunctionsCapabilities
     if ([string]$capabilities.State -ne 'Ready' -or -not $capabilities.CanSetDefaultTarget) { return }
