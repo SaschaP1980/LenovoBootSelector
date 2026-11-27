@@ -448,7 +448,7 @@ function Get-LocalizationCatalogCore {
             'Diagnostics.UploadedMessage' = 'The ZIP was stored privately for troubleshooting.'
             'Diagnostics.UploadedWithId' = "The ZIP was stored privately.`r`nDiagnosis ID: {DiagnosisId}`r`nUse this ID in ChatGPT for analysis."
             'Diagnostics.CopyId' = 'Copy Diagnosis ID'
-            'Diagnostics.Copied' = 'Copied ✓'
+            'Diagnostics.Copied' = 'Copied'
             'Diagnostics.CopyFailed' = 'Copy failed'
             'Diagnostics.UploadNoLocalPackageMessage' = 'The upload could not be started. A locally saved package could not be confirmed. Save diagnostics again before retrying.'
             'Diagnostics.IdCaption' = 'DIAGNOSIS ID'
@@ -957,7 +957,7 @@ function Get-LocalizationCatalogCore {
             'Diagnostics.UploadedMessage' = 'Das ZIP wurde privat zur Fehleranalyse gespeichert.'
             'Diagnostics.UploadedWithId' = "Das ZIP wurde privat gespeichert.`r`nDiagnose-ID: {DiagnosisId}`r`nDiese ID für die Analyse in ChatGPT verwenden."
             'Diagnostics.CopyId' = 'Diagnose-ID kopieren'
-            'Diagnostics.Copied' = 'Kopiert ✓'
+            'Diagnostics.Copied' = 'Kopiert'
             'Diagnostics.CopyFailed' = 'Kopieren fehlgeschlagen'
             'Diagnostics.UploadNoLocalPackageMessage' = 'Der Upload konnte nicht gestartet werden. Ein lokal gespeichertes Paket konnte nicht bestätigt werden. Speichere die Diagnose vor einem erneuten Versuch.'
             'Diagnostics.IdCaption' = 'DIAGNOSE-ID'

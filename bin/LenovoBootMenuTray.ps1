@@ -494,7 +494,7 @@ function Get-LocalizationCatalogCore {
             'Diagnostics.UploadedMessage' = 'The ZIP was stored privately for troubleshooting.'
             'Diagnostics.UploadedWithId' = "The ZIP was stored privately.`r`nDiagnosis ID: {DiagnosisId}`r`nUse this ID in ChatGPT for analysis."
             'Diagnostics.CopyId' = 'Copy Diagnosis ID'
-            'Diagnostics.Copied' = 'Copied ✓'
+            'Diagnostics.Copied' = 'Copied'
             'Diagnostics.CopyFailed' = 'Copy failed'
             'Diagnostics.UploadNoLocalPackageMessage' = 'The upload could not be started. A locally saved package could not be confirmed. Save diagnostics again before retrying.'
             'Diagnostics.IdCaption' = 'DIAGNOSIS ID'
@@ -1003,7 +1003,7 @@ function Get-LocalizationCatalogCore {
             'Diagnostics.UploadedMessage' = 'Das ZIP wurde privat zur Fehleranalyse gespeichert.'
             'Diagnostics.UploadedWithId' = "Das ZIP wurde privat gespeichert.`r`nDiagnose-ID: {DiagnosisId}`r`nDiese ID für die Analyse in ChatGPT verwenden."
             'Diagnostics.CopyId' = 'Diagnose-ID kopieren'
-            'Diagnostics.Copied' = 'Kopiert ✓'
+            'Diagnostics.Copied' = 'Kopiert'
             'Diagnostics.CopyFailed' = 'Kopieren fehlgeschlagen'
             'Diagnostics.UploadNoLocalPackageMessage' = 'Der Upload konnte nicht gestartet werden. Ein lokal gespeichertes Paket konnte nicht bestätigt werden. Speichere die Diagnose vor einem erneuten Versuch.'
             'Diagnostics.IdCaption' = 'DIAGNOSE-ID'
@@ -1816,13 +1816,19 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
         $accent.BackColor = [System.Drawing.Color]::FromArgb(225, 37, 27)
         $form.Controls.Add($accent)
 
-        $badge = New-Object System.Windows.Forms.Label
-        $badge.Text = '!'
+        if ('LenovoStatusIcon' -as [type]) {
+            $badgeKind = if ($isAlreadyRunning) { [LenovoStatusKind]::Info } else { [LenovoStatusKind]::Error }
+            $badge = [LenovoStatusIcon]::new($badgeKind,24,38)
+        } else {
+            # Emergency fallback: the embedded native assembly may itself have failed.
+            $badge = New-Object System.Windows.Forms.Label
+            $badge.Text = '!'
+            $badge.Font = New-Object System.Drawing.Font('Segoe UI Semibold',18.0,[Drawing.FontStyle]::Bold)
+            $badge.ForeColor = [System.Drawing.Color]::FromArgb(225,37,27)
+        }
         $badge.Location = New-Object System.Drawing.Point(24, 28)
         $badge.Size = New-Object System.Drawing.Size(38, 38)
         $badge.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
-        $badge.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 18.0, [System.Drawing.FontStyle]::Bold)
-        $badge.ForeColor = [System.Drawing.Color]::FromArgb(225, 37, 27)
         $badge.BackColor = [System.Drawing.Color]::FromArgb(40, 40, 40)
         $form.Controls.Add($badge)
 
@@ -1832,6 +1838,8 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
         $title.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 11.0, [System.Drawing.FontStyle]::Bold)
         $title.ForeColor = [System.Drawing.Color]::White
         $title.Text = $(if ($isAlreadyRunning) { Get-LocalizedStringCore -Key 'Startup.AlreadyRunningTitle' -Locale $locale } else { Get-LocalizedStringCore -Key 'Startup.FailedTitle' -Locale $locale })
+        $badge.AccessibleRole = [Windows.Forms.AccessibleRole]::StaticText
+        $badge.AccessibleName = $title.Text
         $form.Controls.Add($title)
 
         $body = New-Object System.Windows.Forms.Label
@@ -2280,6 +2288,150 @@ public static class LenovoInteractionPalette
     }
 }
 
+// LBS-274: semantic status ink is independent of interaction and selection.
+public enum LenovoStatusKind { Success, Warning, Error, Info, Busy, Unknown }
+
+public static class LenovoStatusIconRenderer
+{
+    public static Color Ink(LenovoStatusKind kind, bool highContrast)
+    {
+        if (highContrast) return SystemColors.WindowText;
+        switch (kind) {
+            case LenovoStatusKind.Success: return Color.FromArgb(129,184,149);
+            case LenovoStatusKind.Warning: return Color.FromArgb(234,182,94);
+            case LenovoStatusKind.Error: return Color.FromArgb(240,93,85);
+            case LenovoStatusKind.Info: return Color.FromArgb(120,169,227);
+            case LenovoStatusKind.Busy: return Color.FromArgb(184,194,206);
+            case LenovoStatusKind.Unknown: return Color.FromArgb(153,153,153);
+            default: throw new ArgumentOutOfRangeException("kind");
+        }
+    }
+
+    // All coordinates use the approved 32-unit optical reference.
+    // The host supplies its actual layout scale, not a second font/DPI multiplier.
+    public static void Draw(Graphics g, Rectangle bounds, int designSize,
+                            float scale, LenovoStatusKind kind, bool highContrast)
+    {
+        float stroke;
+        switch (designSize) {
+            case 16: stroke=1.5f; break;
+            case 24: stroke=2f; break;
+            case 40: stroke=3f; break;
+            default: throw new ArgumentOutOfRangeException("designSize");
+        }
+        float side=Math.Min(designSize*scale,Math.Min(bounds.Width,bounds.Height));
+        if (side < 2f) return;
+        Color ink=Ink(kind,highContrast);
+        var saved=g.Save();
+        try {
+            g.SetClip(bounds,System.Drawing.Drawing2D.CombineMode.Intersect);
+            g.TranslateTransform(bounds.Left+(bounds.Width-side)/2f,bounds.Top+(bounds.Height-side)/2f);
+            g.ScaleTransform(side/32f,side/32f);
+            g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using (Pen p=new Pen(ink,stroke*32f/designSize)) {
+                p.StartCap=p.EndCap=System.Drawing.Drawing2D.LineCap.Round;
+                p.LineJoin=System.Drawing.Drawing2D.LineJoin.Round;
+                if (kind==LenovoStatusKind.Warning) {
+                    using (var triangle=new System.Drawing.Drawing2D.GraphicsPath()) {
+                        triangle.StartFigure();
+                        triangle.AddLine(14.4f,4.1f,3f,24.5f);
+                        triangle.AddBezier(3f,24.5f,1.5f,27.5f,2.5f,28f,5f,28f);
+                        triangle.AddLine(5f,28f,27f,28f);
+                        triangle.AddBezier(27f,28f,29.5f,28f,30.5f,27.5f,29f,24.5f);
+                        triangle.AddLine(29f,24.5f,17.6f,4.1f);
+                        triangle.AddBezier(17.6f,4.1f,16.7f,2.4f,15.3f,2.4f,14.4f,4.1f);
+                        triangle.CloseFigure();
+                        g.DrawPath(p,triangle);
+                    }
+                    g.DrawLine(p,16f,11f,16f,19f);
+                    Dot(g,p,16f,23f);
+                } else if (kind==LenovoStatusKind.Busy) {
+                    if (!highContrast) {
+                        using (Pen track=new Pen(Color.FromArgb(56,ink),p.Width))
+                            g.DrawEllipse(track,3f,3f,26f,26f);
+                    }
+                    g.DrawArc(p,3f,3f,26f,26f,-90f,270f);
+                } else {
+                    g.DrawEllipse(p,3f,3f,26f,26f);
+                    switch (kind) {
+                        case LenovoStatusKind.Success:
+                            g.DrawLines(p,new PointF[] {new PointF(9.5f,16f),new PointF(14f,20.5f),new PointF(22.5f,11.5f)});
+                            break;
+                        case LenovoStatusKind.Error:
+                            g.DrawLine(p,11f,11f,21f,21f);
+                            g.DrawLine(p,21f,11f,11f,21f);
+                            break;
+                        case LenovoStatusKind.Info:
+                            g.DrawLine(p,16f,14f,16f,22f);
+                            Dot(g,p,16f,9.5f);
+                            break;
+                        case LenovoStatusKind.Unknown:
+                            using (var question=new System.Drawing.Drawing2D.GraphicsPath()) {
+                                question.AddBezier(11.5f,11f,11.5f,5f,20.5f,5f,20.5f,11f);
+                                question.AddBezier(20.5f,11f,20.5f,15f,16f,15f,16f,19f);
+                                g.DrawPath(p,question);
+                            }
+                            Dot(g,p,16f,23f);
+                            break;
+                    }
+                }
+            }
+        } finally { g.Restore(saved); }
+    }
+
+    private static void Dot(Graphics g, Pen p, float x, float y)
+    {
+        using (Brush b=new SolidBrush(p.Color))
+            g.FillEllipse(b,x-p.Width/2f,y-p.Width/2f,p.Width,p.Width);
+    }
+}
+
+// A native non-selectable Label: no action, timer, font glyph or image cache.
+// Existing layout owners retain control of the physical bounds.
+public sealed class LenovoStatusIcon : Label
+{
+    private LenovoStatusKind kind;
+    private readonly int designSize;
+    private readonly int designHostWidth;
+    public LenovoStatusIcon(LenovoStatusKind value, int size, int hostWidth)
+    {
+        if (size!=16 && size!=24 && size!=40) throw new ArgumentOutOfRangeException("size");
+        if (hostWidth<=0) throw new ArgumentOutOfRangeException("hostWidth");
+        designSize=size; designHostWidth=hostWidth;
+        AutoSize=false; TabStop=false; UseMnemonic=false;
+        AccessibleRole=AccessibleRole.StaticText;
+        BackColor=Color.Transparent;
+        kind=value;
+        ForeColor=LenovoStatusIconRenderer.Ink(kind,SystemInformation.HighContrast);
+        SetStyle(ControlStyles.ResizeRedraw,true);
+    }
+    public LenovoStatusKind Kind {
+        get { return kind; }
+        set {
+            if (kind==value) return;
+            kind=value;
+            ForeColor=LenovoStatusIconRenderer.Ink(kind,SystemInformation.HighContrast);
+            Invalidate();
+        }
+    }
+    public int DesignSize { get { return designSize; } }
+    protected override void OnSystemColorsChanged(EventArgs e) {
+        base.OnSystemColorsChanged(e);
+        ForeColor=LenovoStatusIconRenderer.Ink(kind,SystemInformation.HighContrast);
+        Invalidate();
+    }
+    protected override void OnPaintBackground(PaintEventArgs e) {
+        if (SystemInformation.HighContrast) {
+            using (Brush b=new SolidBrush(SystemColors.Window)) e.Graphics.FillRectangle(b,ClientRectangle);
+        } else base.OnPaintBackground(e);
+    }
+    protected override void OnPaint(PaintEventArgs e) {
+        base.OnPaint(e);
+        LenovoStatusIconRenderer.Draw(e.Graphics,ClientRectangle,designSize,
+            ClientSize.Width/(float)designHostWidth,kind,SystemInformation.HighContrast);
+    }
+}
+
 // Native Button retains input, accessibility, DialogResult, default and focus
 // painting. Only pointer-owned appearance is changed and restored on exit.
 public sealed class LenovoActionButton : Button
@@ -2288,6 +2440,49 @@ public sealed class LenovoActionButton : Button
     public bool PreserveSelection { get; set; }
     private bool hovered, styled, keyPressed, mousePressed;
     private Color oldSurface, oldInk;
+    // LBS-274: opt-in status feedback on the copy action only. Keep the
+    // native button's text, focus, hit target and hover/pressed behavior.
+    private LenovoStatusKind? feedbackKind;
+    private Padding feedbackIdlePadding;
+    public bool HasStatusFeedback { get { return feedbackKind.HasValue; } }
+    public LenovoStatusKind StatusFeedbackKind { get { return feedbackKind.GetValueOrDefault(); } }
+    private float FeedbackScale { get { return ClientSize.Height/34f; } }
+    private int FeedbackReserve { get { return Math.Max(1,(int)Math.Round(24f*FeedbackScale)); } }
+    public void SetStatusFeedback(LenovoStatusKind value) {
+        if (!feedbackKind.HasValue) feedbackIdlePadding=Padding;
+        feedbackKind=value;
+        UpdateFeedbackPadding();
+        ForeColor=LenovoStatusIconRenderer.Ink(value,SystemInformation.HighContrast);
+        Invalidate();
+    }
+    public void ClearStatusFeedback() {
+        if (!feedbackKind.HasValue) return;
+        feedbackKind=null;
+        Padding=feedbackIdlePadding;
+        Invalidate();
+    }
+    private void UpdateFeedbackPadding() {
+        if (!feedbackKind.HasValue) return;
+        Padding=new Padding(feedbackIdlePadding.Left,feedbackIdlePadding.Top,
+            feedbackIdlePadding.Right+FeedbackReserve,feedbackIdlePadding.Bottom);
+    }
+    protected override void OnSizeChanged(EventArgs e) {
+        base.OnSizeChanged(e);
+        UpdateFeedbackPadding();
+    }
+    private void DrawStatusFeedback(Graphics g) {
+        if (!feedbackKind.HasValue) return;
+        int reserve=FeedbackReserve;
+        int right=ClientSize.Width-feedbackIdlePadding.Right;
+        Rectangle bounds=new Rectangle(right-reserve,0,reserve,ClientSize.Height);
+        bool highContrast=SystemInformation.HighContrast;
+        if (highContrast) {
+            int side=Math.Min(reserve,Math.Max(1,(int)Math.Round(16f*FeedbackScale)));
+            using (Brush b=new SolidBrush(SystemColors.Window))
+                g.FillRectangle(b,bounds.Left+(bounds.Width-side)/2,bounds.Top+(bounds.Height-side)/2,side,side);
+        }
+        LenovoStatusIconRenderer.Draw(g,bounds,16,FeedbackScale,feedbackKind.Value,highContrast);
+    }
     private void ApplyPointerStyle()
     {
         bool hot=Enabled && hovered && !SystemInformation.HighContrast;
@@ -2322,7 +2517,9 @@ public sealed class LenovoActionButton : Button
         if (hovered) ApplyPointerStyle();
     }
     protected override void OnSystemColorsChanged(EventArgs e) {
-        base.OnSystemColorsChanged(e); ApplyPointerStyle(); Invalidate();
+        base.OnSystemColorsChanged(e);
+        if (feedbackKind.HasValue) ForeColor=LenovoStatusIconRenderer.Ink(feedbackKind.Value,SystemInformation.HighContrast);
+        ApplyPointerStyle(); Invalidate();
     }
     protected override void OnVisibleChanged(EventArgs e) {
         if (!Visible) { hovered=false; mousePressed=keyPressed=false; ApplyPointerStyle(); }
@@ -2348,6 +2545,7 @@ public sealed class LenovoActionButton : Button
     }
     protected override void OnPaint(PaintEventArgs e) {
         base.OnPaint(e);
+        DrawStatusFeedback(e.Graphics);
         if (!Enabled || !hovered || SystemInformation.HighContrast || keyPressed || mousePressed ||
             (Control.MouseButtons & System.Windows.Forms.MouseButtons.Left) != 0) return;
         if (InlineAction) LenovoInteractionPalette.DrawInlineUnderline(e.Graphics,ClientRectangle,Text,Font);
@@ -3944,7 +4142,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.10.4.3'
+$script:AppVersion = '1.10.5.0'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -8804,7 +9002,8 @@ function Set-LenovoRegularDialogDpiLayout {
                 if ($button.Tag -is [string[]]) { $labels+=@($button.Tag) }
                 $maxText=0
                 foreach ($label in $labels) { $maxText=[Math]::Max($maxText,[int][Math]::Ceiling($graphics.MeasureString($label,$button.Font).Width)) }
-                $buttonWidths+= [Math]::Min(($width-2*$pad),[Math]::Max((Px 110),($maxText+(Px 24))))
+                $feedbackReserve=if ($button.Tag -is [string[]]) { Px 24 } else { 0 }
+                $buttonWidths+= [Math]::Min(($width-2*$pad),[Math]::Max((Px 110),($maxText+(Px 24)+$feedbackReserve)))
             }
             $total=0
             foreach ($w in $buttonWidths) { $total+=$w }
@@ -9065,10 +9264,10 @@ function Show-LenovoNoticeDialog {
     $divider.BackColor = $script:ColorAccent
     $root.Controls.Add($divider)
 
-    $glyphText = if ($Kind -eq 'Success') { '✓' } elseif ($Kind -eq 'Error') { '×' } elseif ($Kind -eq 'Warning') { '!' } else { 'i' }
-    $glyphColor = if ($Kind -eq 'Success') { [Drawing.Color]::FromArgb(104,206,141) } elseif ($Kind -eq 'Error') { $script:ColorAccent } elseif ($Kind -eq 'Warning') { $script:ColorWarning } else { $script:ColorCyan }
-    $glyph = New-Label -Text $glyphText -Font (New-Object Drawing.Font('Segoe UI', 15.0, [Drawing.FontStyle]::Bold)) -ForeColor $glyphColor -X 18 -Y 60 -Width 28 -Height 34
-    $glyph.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+    $glyph = [LenovoStatusIcon]::new([LenovoStatusKind]$Kind,24,30)
+    $glyph.Bounds = [Drawing.Rectangle]::new(18,60,30,34)
+    $glyph.AccessibleName = $Heading
+    $glyph.AccessibleDescription = $Message
     $root.Controls.Add($glyph)
 
     $headingLabel = New-Label -Text $Heading -Font (New-Object Drawing.Font('Segoe UI', 11, [Drawing.FontStyle]::Bold)) -ForeColor $script:ColorPrimary -X 56 -Y 60 -Width 380 -Height 24
@@ -9125,6 +9324,7 @@ function Show-LenovoNoticeDialog {
             $feedbackTimer.Add_Tick({
                 $feedbackTimer.Stop()
                 if (-not $copyButton.IsDisposed) {
+                    $copyButton.ClearStatusFeedback()
                     $copyButton.Text=$originalText
                     $copyButton.ForeColor=$originalColor
                     $copyButton.AccessibleDescription=''
@@ -9139,7 +9339,7 @@ function Show-LenovoNoticeDialog {
                 if ($keepOpenLocal) {
                     $confirmed=($result -eq $true)
                     $sender.Text=if ($confirmed) { $copiedText } else { $copyFailedText }
-                    $sender.ForeColor=if ($confirmed) { [Drawing.Color]::FromArgb(104,206,141) } else { [Drawing.Color]::FromArgb(236,191,68) }
+                    $sender.SetStatusFeedback($(if ($confirmed) { [LenovoStatusKind]::Success } else { [LenovoStatusKind]::Warning }))
                     $sender.AccessibleDescription=$sender.Text
                     $feedbackTimer.Stop()
                     $feedbackTimer.Start()
@@ -9150,7 +9350,7 @@ function Show-LenovoNoticeDialog {
             } catch {
                 if ($keepOpenLocal) {
                     $sender.Text=$copyFailedText
-                    $sender.ForeColor=[Drawing.Color]::FromArgb(236,191,68)
+                    $sender.SetStatusFeedback([LenovoStatusKind]::Warning)
                     $sender.AccessibleDescription=$copyFailedText
                     $feedbackTimer.Stop()
                     $feedbackTimer.Start()
@@ -9296,40 +9496,35 @@ function Show-LenovoSystemFunctionsDialog {
         $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.RemoveHeading'
         $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.RemoveBody'
         $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Remove'
-        $glyphText = '!'
-        $glyphColor = $script:ColorWarning
+        $glyphKind = 'Warning'
     }
     elseif ($Mode -eq 'Repair') {
         $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.RepairTitle'
         $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.RepairHeading'
         $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.RepairBody'
         $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Repair'
-        $glyphText = 'i'
-        $glyphColor = $script:ColorCyan
+        $glyphKind = 'Info'
     }
     elseif ($Mode -eq 'Migrate') {
         $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.RepairTitle'
         $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.MigrateHeading'
         $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.MigrateBody'
         $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Repair'
-        $glyphText = 'i'
-        $glyphColor = $script:ColorCyan
+        $glyphKind = 'Info'
     }
     elseif ($Mode -eq 'Reinitialize') {
         $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.ReinitializeTitle'
         $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.ReinitializeHeading'
         $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.ReinitializeBody'
         $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Reinitialize'
-        $glyphText = '+'
-        $glyphColor = $script:ColorCyan
+        $glyphKind = 'Info'
     }
     else {
         $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.SetupTitle'
         $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.SetupHeading'
         $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.SetupBody'
         $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Setup'
-        $glyphText = 'i'
-        $glyphColor = $script:ColorCyan
+        $glyphKind = 'Info'
     }
 
     $title = New-Label -Text $titleText -Font (New-Object Drawing.Font('Segoe UI',11,[Drawing.FontStyle]::Bold)) -ForeColor $script:ColorPrimary -X 18 -Y 12 -Width 450 -Height 24
@@ -9339,8 +9534,10 @@ function Show-LenovoSystemFunctionsDialog {
     $divider.Size = New-Object Drawing.Size(464,1)
     $divider.BackColor = $script:ColorAccent
     $root.Controls.Add($divider)
-    $glyph = New-Label -Text $glyphText -Font (New-Object Drawing.Font('Segoe UI',15.0,[Drawing.FontStyle]::Bold)) -ForeColor $glyphColor -X 18 -Y 60 -Width 28 -Height 34
-    $glyph.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+    $glyph = [LenovoStatusIcon]::new([LenovoStatusKind]$glyphKind,24,30)
+    $glyph.Bounds = [Drawing.Rectangle]::new(18,60,30,34)
+    $glyph.AccessibleName = $headingText
+    $glyph.AccessibleDescription = $bodyText
     $root.Controls.Add($glyph)
     $heading = New-Label -Text $headingText -Font (New-Object Drawing.Font('Segoe UI',11,[Drawing.FontStyle]::Bold)) -ForeColor $script:ColorPrimary -X 56 -Y 60 -Width 410 -Height 24
     $root.Controls.Add($heading)
@@ -9439,9 +9636,10 @@ function Show-LenovoRestartDialog {
     $divider.BackColor = $script:ColorAccent
     $root.Controls.Add($divider)
 
-    $glyph = New-Label -Text '!' -Font (New-Object Drawing.Font('Segoe UI', 15.0, [Drawing.FontStyle]::Bold)) `
-        -ForeColor $script:ColorWarning -X 18 -Y 58 -Width 26 -Height 34
-    $glyph.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+    $glyph = [LenovoStatusIcon]::new([LenovoStatusKind]::Warning,24,30)
+    $glyph.Bounds = [Drawing.Rectangle]::new(18,58,30,34)
+    $glyph.AccessibleName = Get-LocalizedString -Key 'Restart.Question'
+    $glyph.AccessibleDescription = $TargetName
     $root.Controls.Add($glyph)
 
     $question = New-Label -Text (Get-LocalizedString -Key 'Restart.Question') -Font (New-Object Drawing.Font('Segoe UI', 10.0, [Drawing.FontStyle]::Bold)) `
@@ -10308,10 +10506,9 @@ function New-MaintenanceStatePanel {
     $caption.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $panel.Controls.Add($caption)
 
-    $glyph = New-Label -Text '⚙' -Font (New-Object Drawing.Font('Segoe UI Symbol', 24.0, [Drawing.FontStyle]::Regular)) `
-        -ForeColor $script:ColorAccent -X 166 -Y 134 -Width 58 -Height 58
+    $glyph = [LenovoStatusIcon]::new([LenovoStatusKind]::Warning,40,58)
+    $glyph.Bounds = [Drawing.Rectangle]::new(166,134,58,58)
     $glyph.Name = 'MaintenanceGlyph'
-    $glyph.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
     $panel.Controls.Add($glyph)
 
     $heading = New-Label -Text '' -Font (New-Object Drawing.Font('Segoe UI', 11.0, [Drawing.FontStyle]::Bold)) `
@@ -10383,8 +10580,7 @@ function Update-MaintenanceUi {
             $panel.Visible = $true
             $panel.BringToFront()
             if ($state -eq 'SetupRequired') {
-                $glyph.Text = '⚙'
-                $glyph.ForeColor = $script:ColorAccent
+                $glyph.Kind = [LenovoStatusKind]::Warning
                 $heading.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHeading'
                 $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupMessage'
                 $action.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHeading'
@@ -10393,8 +10589,7 @@ function Update-MaintenanceUi {
                 $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.SetupHint'
             }
             elseif ($state -eq 'RepairRequired' -or $state -eq 'Unknown') {
-                $glyph.Text = '!'
-                $glyph.ForeColor = $script:ColorWarning
+                $glyph.Kind = if ($state -eq 'Unknown') { [LenovoStatusKind]::Unknown } else { [LenovoStatusKind]::Warning }
                 $heading.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHeading'
                 $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairMessage'
                 $action.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHeading'
@@ -10403,8 +10598,7 @@ function Update-MaintenanceUi {
                 $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.RepairHint'
             }
             elseif ($state -eq 'ReinitializeRequired') {
-                $glyph.Text = '+'
-                $glyph.ForeColor = $script:ColorCyan
+                $glyph.Kind = [LenovoStatusKind]::Info
                 if (Test-BootTargetDriftHasNewTargets) {
                     $heading.Text = Get-LocalizedString -Key 'Maintenance.Panel.NewTargetHeading'
                     $message.Text = Get-LocalizedString -Key 'Maintenance.Panel.NewTargetMessage'
@@ -10420,14 +10614,15 @@ function Update-MaintenanceUi {
             }
             else {
                 $mode = Get-MaintenanceMode
-                $glyph.Text = '…'
-                $glyph.ForeColor = $script:ColorCyan
+                $glyph.Kind = [LenovoStatusKind]::Busy
                 $heading.Text = Get-MaintenanceBusyStatusText
                 $message.Text = if ($mode -eq 'Remove') { Get-LocalizedString -Key 'Maintenance.Panel.BusyRemoveMessage' } elseif ($mode -eq 'Reinitialize') { Get-LocalizedString -Key 'Maintenance.Panel.BusyReinitializeMessage' } else { Get-LocalizedString -Key 'Maintenance.Panel.BusySetupMessage' }
                 $action.Visible = $false
                 $action.Enabled = $false
                 $hint.Text = Get-LocalizedString -Key 'Maintenance.Panel.BusyHint'
             }
+            $glyph.AccessibleName = if ($state -eq 'Unknown') { Get-LocalizedString -Key 'SystemStatus.Unknown' } else { $heading.Text }
+            $glyph.AccessibleDescription = $message.Text
         }
     }
 
@@ -15309,13 +15504,16 @@ function Add-NormalBootEntryControls {
     )
 
     $pending = [bool]($script:BootNextPendingGuid -and ([string]$entry.Guid -eq [string]$script:BootNextPendingGuid))
-    $checkText = if ($pending) { '…' } elseif ($isSelected) { '✓' } else { '' }
+    $checkText = if (-not $pending -and $isSelected) { '✓' } else { '' }
     $statusHint = if ($pending) { Get-LocalizedString -Key 'BootNext.RowPendingHint' }
         elseif ($isSelected) { Get-LocalizedString -Key 'BootNext.RowSelectedHint' }
         else { '' }
-    $check = New-Label -Text $checkText `
-        -Font (New-Object Drawing.Font('Segoe UI Symbol', 12, [Drawing.FontStyle]::Bold)) `
-        -ForeColor $(if ($script:BootNextPendingGuid -and ([string]$entry.Guid -eq [string]$script:BootNextPendingGuid)) { $script:ColorWarning } else { $script:ColorAccent }) -X 354 -Y 12 -Width 24 -Height 34
+    if ($pending) {
+        $check = [LenovoStatusIcon]::new([LenovoStatusKind]::Busy,16,24)
+        $check.Bounds = [Drawing.Rectangle]::new(354,12,24,34)
+    } else {
+        $check = New-Label -Text $checkText -Font (New-Object Drawing.Font('Segoe UI Symbol',12,[Drawing.FontStyle]::Bold)) -ForeColor $script:ColorAccent -X 354 -Y 12 -Width 24 -Height 34
+    }
     $check.Name = 'BootSelectionStatusGlyph'
     if ($statusHint) {
         $check.AccessibleRole = [Windows.Forms.AccessibleRole]::StaticText
@@ -17828,11 +18026,16 @@ function Set-SystemStatusLabelContent {
 function Set-SystemStatusSymbol {
     param($Form,[string]$Name,[string]$State)
     $label = $Form.Tag.Body.Controls['SystemStatusSymbol-'+$Name]
-    $label.Text = switch ($State) { 'good' {'✓'} 'attention' {'!'} 'busy' {'…'} default {'?'} }
-    $label.ForeColor = if ([Windows.Forms.SystemInformation]::HighContrast) { [Drawing.SystemColors]::WindowText }
-        elseif ($State -eq 'good') { [Drawing.Color]::FromArgb(129,184,149) }
-        elseif ($State -in @('attention','unknown')) { [Drawing.Color]::FromArgb(234,182,94) }
-        else { $script:ColorSecondary }
+    $label.Kind = switch ($State) {
+        'good' { [LenovoStatusKind]::Success }
+        'attention' { [LenovoStatusKind]::Warning }
+        'busy' { [LenovoStatusKind]::Busy }
+        default { [LenovoStatusKind]::Unknown }
+    }
+    $value = $Form.Tag.Body.Controls['SystemStatusValue-'+$Name]
+    $detail = $Form.Tag.Body.Controls['SystemStatusDetail-'+$Name]
+    $label.AccessibleName = $value.Text
+    $label.AccessibleDescription = $detail.Text
 }
 
 function Update-SystemStatusPopupPresentation {
@@ -17906,7 +18109,7 @@ function Set-SystemStatusContentLayout {
         $detail=$controls['SystemStatusDetail-'+$key]
         if ($detail) { $y+=Set-SystemStatusTextBounds $detail ($margin+$offset) $y ($available-$offset) $Scale }
         if ($symbol) {
-            $symbol.Bounds=[Drawing.Rectangle]::new($margin,$top,[Math]::Max(1,$offset-$gap),[Math]::Max(1,$y-$top))
+            $symbol.Bounds=[Drawing.Rectangle]::new($margin,$top,[Math]::Max(1,$offset-$gap),[Math]::Max(1,$value.Height))
         }
         $y+=$gap
     }
@@ -18003,7 +18206,10 @@ function New-SystemStatusPopup {
         Add-SystemStatusLabel $form ('SystemStatusDetail-'+$key) '' $form.Tag.Regular $secondaryInk
     }
     foreach ($key in @('Summary','Readiness','Drift')) {
-        Add-SystemStatusLabel $form ('SystemStatusSymbol-'+$key) '' $form.Tag.Bold $secondaryInk
+        $symbol = [LenovoStatusIcon]::new([LenovoStatusKind]::Unknown,16,26)
+        $symbol.Name = 'SystemStatusSymbol-'+$key
+        $symbol.BackColor = $form.Tag.Body.BackColor
+        $form.Tag.Body.Controls.Add($symbol)
     }
     foreach ($key in @('Manager','Entries','Readiness')) {
         Add-SystemStatusLabel $form ('SystemStatusTimeLabel-'+$key) (Get-LocalizedString -Key ('SystemStatus.'+$key+'Caption')) $form.Tag.Regular $secondaryInk

@@ -1547,13 +1547,16 @@ function Add-NormalBootEntryControls {
     )
 
     $pending = [bool]($script:BootNextPendingGuid -and ([string]$entry.Guid -eq [string]$script:BootNextPendingGuid))
-    $checkText = if ($pending) { '…' } elseif ($isSelected) { '✓' } else { '' }
+    $checkText = if (-not $pending -and $isSelected) { '✓' } else { '' }
     $statusHint = if ($pending) { Get-LocalizedString -Key 'BootNext.RowPendingHint' }
         elseif ($isSelected) { Get-LocalizedString -Key 'BootNext.RowSelectedHint' }
         else { '' }
-    $check = New-Label -Text $checkText `
-        -Font (New-Object Drawing.Font('Segoe UI Symbol', 12, [Drawing.FontStyle]::Bold)) `
-        -ForeColor $(if ($script:BootNextPendingGuid -and ([string]$entry.Guid -eq [string]$script:BootNextPendingGuid)) { $script:ColorWarning } else { $script:ColorAccent }) -X 354 -Y 12 -Width 24 -Height 34
+    if ($pending) {
+        $check = [LenovoStatusIcon]::new([LenovoStatusKind]::Busy,16,24)
+        $check.Bounds = [Drawing.Rectangle]::new(354,12,24,34)
+    } else {
+        $check = New-Label -Text $checkText -Font (New-Object Drawing.Font('Segoe UI Symbol',12,[Drawing.FontStyle]::Bold)) -ForeColor $script:ColorAccent -X 354 -Y 12 -Width 24 -Height 34
+    }
     $check.Name = 'BootSelectionStatusGlyph'
     if ($statusHint) {
         $check.AccessibleRole = [Windows.Forms.AccessibleRole]::StaticText

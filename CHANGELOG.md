@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.10.5.0 - Unified native semantic status symbols (LBS-274)
+
+- Introduce the approved six-state outlined status family with exact semantic colors, DPI-scaled GDI+ geometry and system-color High Contrast rendering. Use one non-action status control and three optical sizes; Busy is static and needs no timer.
+- Replace legacy status glyphs in notices, confirmation dialogs, System Status, maintenance, pending boot selection and available startup recovery. Keep native input, localized evidence and decisions, selection/action symbols and independent startup failure fallback intact.
+- Add native six-state shape/raster, bounds, palette, accessibility and maintenance state contracts, extend existing native dialog, status and row assertions, and require the new fixed test total in the Windows gate. Physical owner acceptance remains separate.
+
 ## v1.10.4.3 - Center the auxiliary popup close glyph (LBS-283)
 
 - Optically center the existing multiplication-sign glyph in the shared auxiliary close button using its actual GDI text ink at the drawing DPI. Keep the existing font, halo geometry, colors, native focus perimeter, cancel semantics and inactive-owner suppression.

@@ -165,7 +165,8 @@ function Set-LenovoRegularDialogDpiLayout {
                 if ($button.Tag -is [string[]]) { $labels+=@($button.Tag) }
                 $maxText=0
                 foreach ($label in $labels) { $maxText=[Math]::Max($maxText,[int][Math]::Ceiling($graphics.MeasureString($label,$button.Font).Width)) }
-                $buttonWidths+= [Math]::Min(($width-2*$pad),[Math]::Max((Px 110),($maxText+(Px 24))))
+                $feedbackReserve=if ($button.Tag -is [string[]]) { Px 24 } else { 0 }
+                $buttonWidths+= [Math]::Min(($width-2*$pad),[Math]::Max((Px 110),($maxText+(Px 24)+$feedbackReserve)))
             }
             $total=0
             foreach ($w in $buttonWidths) { $total+=$w }
@@ -426,10 +427,10 @@ function Show-LenovoNoticeDialog {
     $divider.BackColor = $script:ColorAccent
     $root.Controls.Add($divider)
 
-    $glyphText = if ($Kind -eq 'Success') { '✓' } elseif ($Kind -eq 'Error') { '×' } elseif ($Kind -eq 'Warning') { '!' } else { 'i' }
-    $glyphColor = if ($Kind -eq 'Success') { [Drawing.Color]::FromArgb(104,206,141) } elseif ($Kind -eq 'Error') { $script:ColorAccent } elseif ($Kind -eq 'Warning') { $script:ColorWarning } else { $script:ColorCyan }
-    $glyph = New-Label -Text $glyphText -Font (New-Object Drawing.Font('Segoe UI', 15.0, [Drawing.FontStyle]::Bold)) -ForeColor $glyphColor -X 18 -Y 60 -Width 28 -Height 34
-    $glyph.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+    $glyph = [LenovoStatusIcon]::new([LenovoStatusKind]$Kind,24,30)
+    $glyph.Bounds = [Drawing.Rectangle]::new(18,60,30,34)
+    $glyph.AccessibleName = $Heading
+    $glyph.AccessibleDescription = $Message
     $root.Controls.Add($glyph)
 
     $headingLabel = New-Label -Text $Heading -Font (New-Object Drawing.Font('Segoe UI', 11, [Drawing.FontStyle]::Bold)) -ForeColor $script:ColorPrimary -X 56 -Y 60 -Width 380 -Height 24
@@ -486,6 +487,7 @@ function Show-LenovoNoticeDialog {
             $feedbackTimer.Add_Tick({
                 $feedbackTimer.Stop()
                 if (-not $copyButton.IsDisposed) {
+                    $copyButton.ClearStatusFeedback()
                     $copyButton.Text=$originalText
                     $copyButton.ForeColor=$originalColor
                     $copyButton.AccessibleDescription=''
@@ -500,7 +502,7 @@ function Show-LenovoNoticeDialog {
                 if ($keepOpenLocal) {
                     $confirmed=($result -eq $true)
                     $sender.Text=if ($confirmed) { $copiedText } else { $copyFailedText }
-                    $sender.ForeColor=if ($confirmed) { [Drawing.Color]::FromArgb(104,206,141) } else { [Drawing.Color]::FromArgb(236,191,68) }
+                    $sender.SetStatusFeedback($(if ($confirmed) { [LenovoStatusKind]::Success } else { [LenovoStatusKind]::Warning }))
                     $sender.AccessibleDescription=$sender.Text
                     $feedbackTimer.Stop()
                     $feedbackTimer.Start()
@@ -511,7 +513,7 @@ function Show-LenovoNoticeDialog {
             } catch {
                 if ($keepOpenLocal) {
                     $sender.Text=$copyFailedText
-                    $sender.ForeColor=[Drawing.Color]::FromArgb(236,191,68)
+                    $sender.SetStatusFeedback([LenovoStatusKind]::Warning)
                     $sender.AccessibleDescription=$copyFailedText
                     $feedbackTimer.Stop()
                     $feedbackTimer.Start()
@@ -657,40 +659,35 @@ function Show-LenovoSystemFunctionsDialog {
         $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.RemoveHeading'
         $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.RemoveBody'
         $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Remove'
-        $glyphText = '!'
-        $glyphColor = $script:ColorWarning
+        $glyphKind = 'Warning'
     }
     elseif ($Mode -eq 'Repair') {
         $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.RepairTitle'
         $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.RepairHeading'
         $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.RepairBody'
         $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Repair'
-        $glyphText = 'i'
-        $glyphColor = $script:ColorCyan
+        $glyphKind = 'Info'
     }
     elseif ($Mode -eq 'Migrate') {
         $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.RepairTitle'
         $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.MigrateHeading'
         $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.MigrateBody'
         $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Repair'
-        $glyphText = 'i'
-        $glyphColor = $script:ColorCyan
+        $glyphKind = 'Info'
     }
     elseif ($Mode -eq 'Reinitialize') {
         $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.ReinitializeTitle'
         $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.ReinitializeHeading'
         $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.ReinitializeBody'
         $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Reinitialize'
-        $glyphText = '+'
-        $glyphColor = $script:ColorCyan
+        $glyphKind = 'Info'
     }
     else {
         $titleText = Get-LocalizedString -Key 'Maintenance.Dialog.SetupTitle'
         $headingText = Get-LocalizedString -Key 'Maintenance.Dialog.SetupHeading'
         $bodyText = Get-LocalizedString -Key 'Maintenance.Dialog.SetupBody'
         $primaryText = Get-LocalizedString -Key 'Maintenance.Action.Setup'
-        $glyphText = 'i'
-        $glyphColor = $script:ColorCyan
+        $glyphKind = 'Info'
     }
 
     $title = New-Label -Text $titleText -Font (New-Object Drawing.Font('Segoe UI',11,[Drawing.FontStyle]::Bold)) -ForeColor $script:ColorPrimary -X 18 -Y 12 -Width 450 -Height 24
@@ -700,8 +697,10 @@ function Show-LenovoSystemFunctionsDialog {
     $divider.Size = New-Object Drawing.Size(464,1)
     $divider.BackColor = $script:ColorAccent
     $root.Controls.Add($divider)
-    $glyph = New-Label -Text $glyphText -Font (New-Object Drawing.Font('Segoe UI',15.0,[Drawing.FontStyle]::Bold)) -ForeColor $glyphColor -X 18 -Y 60 -Width 28 -Height 34
-    $glyph.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+    $glyph = [LenovoStatusIcon]::new([LenovoStatusKind]$glyphKind,24,30)
+    $glyph.Bounds = [Drawing.Rectangle]::new(18,60,30,34)
+    $glyph.AccessibleName = $headingText
+    $glyph.AccessibleDescription = $bodyText
     $root.Controls.Add($glyph)
     $heading = New-Label -Text $headingText -Font (New-Object Drawing.Font('Segoe UI',11,[Drawing.FontStyle]::Bold)) -ForeColor $script:ColorPrimary -X 56 -Y 60 -Width 410 -Height 24
     $root.Controls.Add($heading)
@@ -800,9 +799,10 @@ function Show-LenovoRestartDialog {
     $divider.BackColor = $script:ColorAccent
     $root.Controls.Add($divider)
 
-    $glyph = New-Label -Text '!' -Font (New-Object Drawing.Font('Segoe UI', 15.0, [Drawing.FontStyle]::Bold)) `
-        -ForeColor $script:ColorWarning -X 18 -Y 58 -Width 26 -Height 34
-    $glyph.TextAlign = [Drawing.ContentAlignment]::MiddleCenter
+    $glyph = [LenovoStatusIcon]::new([LenovoStatusKind]::Warning,24,30)
+    $glyph.Bounds = [Drawing.Rectangle]::new(18,58,30,34)
+    $glyph.AccessibleName = Get-LocalizedString -Key 'Restart.Question'
+    $glyph.AccessibleDescription = $TargetName
     $root.Controls.Add($glyph)
 
     $question = New-Label -Text (Get-LocalizedString -Key 'Restart.Question') -Font (New-Object Drawing.Font('Segoe UI', 10.0, [Drawing.FontStyle]::Bold)) `

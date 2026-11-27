@@ -86,13 +86,19 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
         $accent.BackColor = [System.Drawing.Color]::FromArgb(225, 37, 27)
         $form.Controls.Add($accent)
 
-        $badge = New-Object System.Windows.Forms.Label
-        $badge.Text = '!'
+        if ('LenovoStatusIcon' -as [type]) {
+            $badgeKind = if ($isAlreadyRunning) { [LenovoStatusKind]::Info } else { [LenovoStatusKind]::Error }
+            $badge = [LenovoStatusIcon]::new($badgeKind,24,38)
+        } else {
+            # Emergency fallback: the embedded native assembly may itself have failed.
+            $badge = New-Object System.Windows.Forms.Label
+            $badge.Text = '!'
+            $badge.Font = New-Object System.Drawing.Font('Segoe UI Semibold',18.0,[Drawing.FontStyle]::Bold)
+            $badge.ForeColor = [System.Drawing.Color]::FromArgb(225,37,27)
+        }
         $badge.Location = New-Object System.Drawing.Point(24, 28)
         $badge.Size = New-Object System.Drawing.Size(38, 38)
         $badge.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
-        $badge.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 18.0, [System.Drawing.FontStyle]::Bold)
-        $badge.ForeColor = [System.Drawing.Color]::FromArgb(225, 37, 27)
         $badge.BackColor = [System.Drawing.Color]::FromArgb(40, 40, 40)
         $form.Controls.Add($badge)
 
@@ -102,6 +108,8 @@ function Show-FatalMessage([string]$Message, [bool]$AllowRestart = $true) {
         $title.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 11.0, [System.Drawing.FontStyle]::Bold)
         $title.ForeColor = [System.Drawing.Color]::White
         $title.Text = $(if ($isAlreadyRunning) { Get-LocalizedStringCore -Key 'Startup.AlreadyRunningTitle' -Locale $locale } else { Get-LocalizedStringCore -Key 'Startup.FailedTitle' -Locale $locale })
+        $badge.AccessibleRole = [Windows.Forms.AccessibleRole]::StaticText
+        $badge.AccessibleName = $title.Text
         $form.Controls.Add($title)
 
         $body = New-Object System.Windows.Forms.Label

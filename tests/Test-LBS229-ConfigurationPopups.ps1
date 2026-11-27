@@ -320,6 +320,18 @@ try {
                         $labels=@($form.Tag.Body.Controls | Where-Object Name -like 'SystemStatusValue-*')
                         Assert-Lbs229 "LBS182 $locale/$scale localized read-only labels and layout" ($labels.Count -eq 6 -and @($labels | Where-Object {$_.Width -le 0 -or $_.Right -gt $form.Tag.Body.Width -or $_.Bottom -gt $form.Tag.Body.Height -or $_.AccessibleName -ne $_.Text -or $_.Text -match '^SystemStatus\.'}).Count -eq 0 -and $form.Tag.Body.Controls['SystemStatusValue-Stored'].Text -eq 'Corporate' -and $form.Tag.Body.Controls['SystemStatusValue-Next'].Text -match 'Gaming' -and @($form.Tag.Body.Controls | Where-Object TabStop).Count -eq 0)
                         $body=$form.Tag.Body
+                        $statusKinds=[ordered]@{Summary='Success';Readiness='Success';Drift='Success'}
+                        foreach ($key in $statusKinds.Keys) {
+                            $icon=$body.Controls['SystemStatusSymbol-'+$key]
+                            $value=$body.Controls['SystemStatusValue-'+$key]
+                            if ($icon -isnot [LenovoStatusIcon] -or $icon.DesignSize -ne 16 -or $icon.Kind -ne [LenovoStatusKind]$statusKinds[$key] -or $icon.AccessibleName -ne $value.Text -or $icon.Bounds.IntersectsWith($value.Bounds) -or $icon.Bottom -gt $body.Height) { throw "LBS274 System Status icon contract: $key" }
+                        }
+                        foreach ($case in @(@('Checking','Busy'),@('RepairRequired','Warning'),@('Unknown','Unknown'),@('Ready','Success'))) {
+                            $script:SystemStatusCapabilities.State=$case[0]
+                            Update-SystemStatusPopupPresentation -Form $form
+                            $icon=$body.Controls['SystemStatusSymbol-Readiness']
+                            if ($icon.Kind -ne [LenovoStatusKind]$case[1] -or $icon.AccessibleName -ne $body.Controls['SystemStatusValue-Readiness'].Text -or $icon.Text) { throw "LBS274 readiness icon transition: $($case[0])" }
+                        }
                         $visibleText=@($body.Controls | Where-Object { $_ -is [Windows.Forms.Label] -and $_.Text })
                         $bad=@($visibleText | Where-Object { $_.Width -le 0 -or $_.Height -le 0 -or $_.Right -gt $body.Width -or $_.Bottom -gt $body.Height -or $_.BackColor -ne $body.BackColor -or $_.AutoEllipsis })
                         $overlaps=0
