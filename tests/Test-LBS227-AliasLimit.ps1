@@ -10,6 +10,7 @@ $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 . (Join-Path $root 'src\Core\EntryPreferences.ps1')
 . (Join-Path $root 'src\Infrastructure\SettingsRepository.ps1')
 . (Join-Path $root 'src\Application\SettingsService.ps1')
+. (Join-Path $root 'src\UI\BootEntryList.ps1')
 . (Join-Path $root 'src\UI\ManageEntries.ps1')
 . (Join-Path $root 'src\UI\BootEntryRows.ps1')
 Add-Type -TypeDefinition @'

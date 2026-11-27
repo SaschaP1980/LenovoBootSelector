@@ -256,30 +256,34 @@ function Start-ManageEntriesMode {
     if (-not $capabilities.CanManageEntries) { return }
     if ($script:IsManageEntriesMode) { return }
 
-    $script:ManageEntryOrder = @((Get-OrderedEntriesForUi -IncludeHidden) | ForEach-Object { $_.Guid })
-    $script:ManageHiddenEntryGuids = @($script:HiddenEntryGuids)
-    $script:ManageEntryAliases = Copy-EntryAliasMap $script:EntryAliases
-    $script:ManageBaselineEntryOrder = @($script:ManageEntryOrder)
-    $script:ManageBaselineHiddenEntryGuids = @($script:ManageHiddenEntryGuids)
-    $script:ManageBaselineEntryAliases = Copy-EntryAliasMap $script:ManageEntryAliases
-    $script:ManageAliasEditGuid = $null
-    $script:ManageDropPreview = $null
-    $script:ManageActiveDragGuid = $null
-    $script:IsManageEntriesMode = $true
-    $script:ManageUndoHistory = [System.Collections.Generic.List[object]]::new()
-    $script:ManageUndoInventory = @($script:CurrentEntries | ForEach-Object { $_.Guid })
-    $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusEditing'
-    Update-ManageEntriesUiState
-    Update-PopupRows -Reason 'manage-enter'
-    Update-ManageSaveButtonState
-    # Only explicit mode entry acquires the primary list focus. Ordinary
-    # reconciliation remains responsible for preserving the current owner.
-    if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) {
-        $anchor = $script:Popup.Controls.Find('BootRow',$true) | Where-Object {
-            $_.TabStop -and $_.CanFocus -and $_.PSObject.Properties['ManageKeyboardMode'] -and $_.ManageKeyboardMode
-        } | Sort-Object Top | Select-Object -First 1
-        if ($anchor) { Restore-ManageRowFocus -Guid ([string]$anchor.Tag) -KeyboardCue:(-not $PointerActivation.IsPresent) }
+    $visualCommit = Start-PopupVisualCommit -Reason 'manage-enter'
+    try {
+        $script:ManageEntryOrder = @((Get-OrderedEntriesForUi -IncludeHidden) | ForEach-Object { $_.Guid })
+        $script:ManageHiddenEntryGuids = @($script:HiddenEntryGuids)
+        $script:ManageEntryAliases = Copy-EntryAliasMap $script:EntryAliases
+        $script:ManageBaselineEntryOrder = @($script:ManageEntryOrder)
+        $script:ManageBaselineHiddenEntryGuids = @($script:ManageHiddenEntryGuids)
+        $script:ManageBaselineEntryAliases = Copy-EntryAliasMap $script:ManageEntryAliases
+        $script:ManageAliasEditGuid = $null
+        $script:ManageDropPreview = $null
+        $script:ManageActiveDragGuid = $null
+        $script:IsManageEntriesMode = $true
+        $script:ManageUndoHistory = [System.Collections.Generic.List[object]]::new()
+        $script:ManageUndoInventory = @($script:CurrentEntries | ForEach-Object { $_.Guid })
+        $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusEditing'
+        Update-ManageEntriesUiState
+        Update-PopupRows -Reason 'manage-enter'
+        Update-ManageSaveButtonState
+        # Only explicit mode entry acquires the primary list focus. Ordinary
+        # reconciliation remains responsible for preserving the current owner.
+        if ($script:Popup -and -not $script:Popup.IsDisposed -and $script:Popup.Visible) {
+            $anchor = $script:Popup.Controls.Find('BootRow',$true) | Where-Object {
+                $_.TabStop -and $_.CanFocus -and $_.PSObject.Properties['ManageKeyboardMode'] -and $_.ManageKeyboardMode
+            } | Sort-Object Top | Select-Object -First 1
+            if ($anchor) { Restore-ManageRowFocus -Guid ([string]$anchor.Tag) -KeyboardCue:(-not $PointerActivation.IsPresent) }
+        }
     }
+    finally { Stop-PopupVisualCommit -Commit $visualCommit }
 }
 
 function Stop-ManageEntriesMode {
@@ -301,16 +305,20 @@ function Stop-ManageEntriesMode {
         $script:LastStatusText = Get-LocalizedString -Key 'Manage.StatusDiscarded'
     }
 
-    $script:IsManageEntriesMode = $false
-    $script:ManageUndoHistory = $null
-    $script:ManageUndoInventory = @()
-    $script:ManageEntryOrder = @()
-    $script:ManageHiddenEntryGuids = @()
-    $script:ManageEntryAliases = @{}
-    $script:ManageBaselineEntryOrder = @()
-    $script:ManageBaselineHiddenEntryGuids = @()
-    $script:ManageBaselineEntryAliases = @{}
-    $script:ManageAliasEditGuid = $null
-    Update-ManageEntriesUiState
-    Update-PopupRows -Reason 'manage-exit'
+    $visualCommit = Start-PopupVisualCommit -Reason 'manage-exit'
+    try {
+        $script:IsManageEntriesMode = $false
+        $script:ManageUndoHistory = $null
+        $script:ManageUndoInventory = @()
+        $script:ManageEntryOrder = @()
+        $script:ManageHiddenEntryGuids = @()
+        $script:ManageEntryAliases = @{}
+        $script:ManageBaselineEntryOrder = @()
+        $script:ManageBaselineHiddenEntryGuids = @()
+        $script:ManageBaselineEntryAliases = @{}
+        $script:ManageAliasEditGuid = $null
+        Update-ManageEntriesUiState
+        Update-PopupRows -Reason 'manage-exit'
+    }
+    finally { Stop-PopupVisualCommit -Commit $visualCommit }
 }

@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.10.4.0 - Coherent Manage Entries transitions and keyboard reordering (LBS-279)
+
+- Hold one nonactivating client-frame cover over explicit Customize entry/exit and keyboard row moves while real WinForms rows, action states, scroll layout and focus are reconciled. Release it after synchronous final repaint, with exception-safe cleanup and ordinary-rendering fallback.
+- Preserve actual row identity where reconciliation allows, native input/focus, draft/Undo/Save/Cancel semantics, existing drag animation and all boot/update safety boundaries.
+- Record bounded visual-commit timing/fallback diagnostics and extend focused native mutation, keyboard and lifecycle regression coverage. Physical visual smoothness and capture overhead remain subject to owner acceptance.
+
 ## v1.10.3.0 - Reliable update checking and phase diagnostics (LBS-277)
 
 - Preserve the last validated newer manifest during a read-only recheck and transient check failure. Limit redundant popup-triggered checks with monotonic freshness and failure cooldowns; explicit manual checks remain available outside the single-flight gate.
