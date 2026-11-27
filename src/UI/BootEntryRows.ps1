@@ -1112,23 +1112,11 @@ function Add-BootEntryAliasEditor {
         Hide-ManageAliasFieldTooltip -Owner $sender
         if ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
             $eventArgs.SuppressKeyPress = $true
-            if (-not (Set-ManageEntryAliasDraft -Guid ([string]$sender.Tag) -Alias ([string]$sender.Text))) {
-                Show-ManageAliasLimitFeedback -Editor $sender
-                return
-            }
-            $closedGuid = [string]$sender.Tag
-            $script:ManageAliasEditGuid = $null
-            $script:LastStatusText = if ([string]::IsNullOrWhiteSpace([string]$sender.Text)) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
-            Update-PopupRows
-            Restore-ManageRowFocus -Guid $closedGuid
+            Stop-ManageRowAliasEdit -Guid ([string]$sender.Tag) -Editor $sender -Apply
         }
         elseif ($eventArgs.KeyCode -eq [System.Windows.Forms.Keys]::Escape) {
-            $closedGuid = [string]$sender.Tag
-            $script:ManageAliasEditGuid = $null
-            $script:LastStatusText = Get-LocalizedString -Key 'Manage.AliasDiscarded'
             $eventArgs.SuppressKeyPress = $true
-            Update-PopupRows
-            Restore-ManageRowFocus -Guid $closedGuid
+            Stop-ManageRowAliasEdit -Guid ([string]$sender.Tag)
         }
     })
     $editorFrame.Controls.Add($aliasEditor)
@@ -1160,16 +1148,7 @@ function Add-BootEntryAliasEditor {
         $sender.LenovoPointerPress = $false
         $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
         if ($editor) {
-            if (-not (Set-ManageEntryAliasDraft -Guid ([string]$editor.Tag) -Alias ([string]$editor.Text))) {
-                Show-ManageAliasLimitFeedback -Editor $editor
-                return
-            }
-            $empty = [string]::IsNullOrWhiteSpace([string]$editor.Text)
-            $closedGuid = [string]$editor.Tag
-            $script:ManageAliasEditGuid = $null
-            $script:LastStatusText = if ($empty) { Get-LocalizedString -Key 'Manage.AliasRemoved' } else { Get-LocalizedString -Key 'Manage.AliasChanged' }
-            Update-PopupRows
-            Restore-ManageRowFocus -Guid $closedGuid -KeyboardCue:$keyboardCue
+            Stop-ManageRowAliasEdit -Guid ([string]$editor.Tag) -Editor $editor -Apply -KeyboardCue:$keyboardCue
         }
     })
     $row.Controls.Add($applyAlias)
@@ -1194,11 +1173,7 @@ function Add-BootEntryAliasEditor {
         param($sender,$eventArgs)
         $keyboardCue = -not $sender.LenovoPointerPress
         $sender.LenovoPointerPress = $false
-        $closedGuid = [string]$sender.Tag
-        $script:ManageAliasEditGuid = $null
-        $script:LastStatusText = Get-LocalizedString -Key 'Manage.AliasDiscarded'
-        Update-PopupRows
-        Restore-ManageRowFocus -Guid $closedGuid -KeyboardCue:$keyboardCue
+        Stop-ManageRowAliasEdit -Guid ([string]$sender.Tag) -KeyboardCue:$keyboardCue
     })
     $row.Controls.Add($cancelAlias)
 
@@ -1320,28 +1295,61 @@ function Paint-LenovoManageGripGlyph {
 function Invoke-ManageRowVisibility {
     param([string]$Guid)
     if (-not $script:IsManageEntriesMode -or -not $Guid) { return }
-    if ($script:ManageAliasEditGuid -and -not (Commit-ActiveManageAliasEditor)) { return }
-    Toggle-ManageEntryVisibility -Guid $Guid
-    $script:LastStatusText = if (Test-ManageEntryHidden -Guid $Guid) { Get-LocalizedString -Key 'Manage.EntryHiddenStatus' } else { Get-LocalizedString -Key 'Manage.EntryVisibleStatus' }
-    Update-PopupRows
+    $visualCommit = Start-PopupVisualCommit -Reason 'manage-visibility'
+    try {
+        if ($script:ManageAliasEditGuid -and -not (Commit-ActiveManageAliasEditor)) { return }
+        Toggle-ManageEntryVisibility -Guid $Guid
+        $script:LastStatusText = if (Test-ManageEntryHidden -Guid $Guid) { Get-LocalizedString -Key 'Manage.EntryHiddenStatus' } else { Get-LocalizedString -Key 'Manage.EntryVisibleStatus' }
+        Update-PopupRows -Reason 'manage-visibility'
+    }
+    finally { Stop-PopupVisualCommit -Commit $visualCommit }
 }
 
 function Start-ManageRowAliasEdit {
     param([string]$Guid)
     if (-not $script:IsManageEntriesMode -or -not $Guid -or $script:ManageActiveDragGuid) { return }
     $guid = $Guid.ToLowerInvariant()
-    if ($script:ManageAliasEditGuid -and $script:ManageAliasEditGuid -ne $guid) {
-        if (-not (Commit-ActiveManageAliasEditor)) { return }
+    $visualCommit = Start-PopupVisualCommit -Reason 'manage-alias-enter'
+    try {
+        if ($script:ManageAliasEditGuid -and $script:ManageAliasEditGuid -ne $guid) {
+            if (-not (Commit-ActiveManageAliasEditor)) { return }
+        }
+        $script:ManageAliasEditGuid = $guid
+        $script:LastStatusText = Get-LocalizedString -Key 'Manage.EditAliasStatus'
+        Update-PopupRows -Reason 'manage-alias-enter'
+        $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
+        if ($editor) {
+            [void]$editor.Focus()
+            $editor.SelectAll()
+            Set-NormalBootRowVisible -Row (Get-BootRowFromControl $editor)
+        }
     }
-    $script:ManageAliasEditGuid = $guid
-    $script:LastStatusText = Get-LocalizedString -Key 'Manage.EditAliasStatus'
-    Update-PopupRows
-    $editor = $script:Popup.Controls.Find('AliasEditor', $true) | Select-Object -First 1
-    if ($editor) {
-        [void]$editor.Focus()
-        $editor.SelectAll()
-        Set-NormalBootRowVisible -Row (Get-BootRowFromControl $editor)
+    finally { Stop-PopupVisualCommit -Commit $visualCommit }
+}
+
+# One close owner for Enter, Escape, Apply and Cancel. Keep validation,
+# draft ownership and pointer/keyboard focus semantics of the original routes.
+function Stop-ManageRowAliasEdit {
+    param([string]$Guid,$Editor,[switch]$Apply,[Nullable[bool]]$KeyboardCue)
+    if (-not $script:IsManageEntriesMode -or -not $Guid -or
+        $script:ManageAliasEditGuid -ne $Guid) { return }
+    if ($Apply -and (-not $Editor -or $Editor.IsDisposed -or [string]$Editor.Tag -ne $Guid)) { return }
+    $visualCommit = Start-PopupVisualCommit -Reason 'manage-alias-exit'
+    try {
+        if ($Apply) {
+            if (-not (Set-ManageEntryAliasDraft -Guid $Guid -Alias ([string]$Editor.Text))) {
+                Show-ManageAliasLimitFeedback -Editor $Editor
+                return
+            }
+            $status = if ([string]::IsNullOrWhiteSpace([string]$Editor.Text)) { 'Manage.AliasRemoved' } else { 'Manage.AliasChanged' }
+        }
+        else { $status = 'Manage.AliasDiscarded' }
+        $script:ManageAliasEditGuid = $null
+        $script:LastStatusText = Get-LocalizedString -Key $status
+        Update-PopupRows -Reason 'manage-alias-exit'
+        Restore-ManageRowFocus -Guid $Guid -KeyboardCue:$KeyboardCue
     }
+    finally { Stop-PopupVisualCommit -Commit $visualCommit }
 }
 
 function Restore-ManageRowFocus {

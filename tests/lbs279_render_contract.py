@@ -47,6 +47,30 @@ def validate_lbs279_visual_owner_contract(s, template):
     s.c('LBS-279 visual cover stays inside the existing popup HWND hierarchy', child)
 
 
+def validate_lbs279_residual_contract(s, rows, template, popup):
+    start = function_body(rows, 'Start-ManageRowAliasEdit')
+    close = function_body(rows, 'Stop-ManageRowAliasEdit')
+    s.c('LBS-279 alias entry and editor switch use shared visual transaction', ordered(
+        start, 'Start-PopupVisualCommit', 'try {', 'Commit-ActiveManageAliasEditor',
+        '$script:ManageAliasEditGuid = $guid', 'Update-PopupRows', 'SelectAll()',
+        'finally {', 'Stop-PopupVisualCommit'))
+    s.c('LBS-279 all inline alias exits share one protected presentation owner',
+        ordered(close, 'Start-PopupVisualCommit', 'try {', 'Set-ManageEntryAliasDraft',
+        '$script:ManageAliasEditGuid = $null', 'Update-PopupRows',
+        'Restore-ManageRowFocus', 'finally {', 'Stop-PopupVisualCommit')
+        and rows.count('Stop-ManageRowAliasEdit -') == 4)
+    s.c('LBS-279 popup-only native descendant composition guards final reveal',
+        'class LenovoCompositedPopup : Form' in template
+        and 'cp.ExStyle |= 0x02000000' in template
+        and 'New-Object LenovoCompositedPopup' in popup
+        and 'RedrawWindow(parent.Handle' in template)
+    s.c('LBS-279 held frame captures only the native owner client, not DrawToBitmap replay',
+        'PrintWindow(owner.Handle, dc, 0x00000003)' in template
+        and 'graphics.ReleaseHdc(dc)' in template
+        and 'root.DrawToBitmap(cover.frame' not in template
+        and 'CopyFromScreen' not in template)
+
+
 class FocusedResult:
     def __init__(self):
         self.failed = 0
@@ -60,14 +84,20 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--owner-only', action='store_true')
+    parser.add_argument('--residual-only', action='store_true')
     args = parser.parse_args()
     result = FocusedResult()
-    if not args.owner_only:
+    if not args.owner_only and not args.residual_only:
         manage = (args.root / 'src/UI/ManageEntries.ps1').read_text(encoding='utf-8-sig')
         rows = (args.root / 'src/UI/BootEntryRows.ps1').read_text(encoding='utf-8-sig')
         validate_lbs279_render_contract(result, manage, rows)
     template = (args.root / 'src/App/LenovoBootSelector.template.ps1').read_text(encoding='utf-8-sig')
-    validate_lbs279_visual_owner_contract(result, template)
+    if not args.residual_only:
+        validate_lbs279_visual_owner_contract(result, template)
+    if not args.owner_only:
+        rows = (args.root / 'src/UI/BootEntryRows.ps1').read_text(encoding='utf-8-sig')
+        popup = (args.root / 'src/UI/Popup.ps1').read_text(encoding='utf-8-sig')
+        validate_lbs279_residual_contract(result, rows, template, popup)
     return int(bool(result.failed))
 
 
