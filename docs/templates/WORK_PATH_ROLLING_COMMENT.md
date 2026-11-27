@@ -244,7 +244,7 @@ At successful completion update this same comment to:
 
 - **Agent-State:** COMPLETED
 - **Current phase:** Release Verification complete
-- **Next action:** close #<github-issue-number> as completed
+- **Next action:** close #<github-issue-number> as completed if all required acceptance is recorded; otherwise leave the Issue open and request owner acceptance of the published version through the normal update channel. Pending owner-machine acceptance never blocks technical publication.
 
 Before Issue closure, perform the explicit Evidence audit and structural consistency pass: Chat origin is a single preserved section (a real chat-posted marker or an honest `not issued`), singleton headings occur once, numbered attempts are unique, every failure/error assertion has an observed source, validator totals remain available or are clearly marked unavailable, benchmark model/effort sources are correctly qualified, timing anchors are not conflated, no terminal section still says pending/in progress/not started, and the header/measurement/final-verification facts agree. Correct or clearly mark unsupported historical claims before completion. The terminal update of this same rolling comment is the final Work-Path implementation/release record. Do not add a second redundant completion comment unless it contains materially new information.
 ~~~

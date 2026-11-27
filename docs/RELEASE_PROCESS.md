@@ -68,9 +68,11 @@ Before implementation/release preparation:
 
 - **MAJOR / MINOR / PATCH:** relevant GitHub Issue(s) are mandatory before implementation starts. Do not create the release candidate or release branch for issue-less Major/Minor/Patch product work.
 - **HOTFIX:** an Issue is optional for a narrow defect correction. A direct Hotfix may be implemented and released without first creating an Issue when no existing Issue covers it.
-- If a Hotfix corrects a direct regression/incomplete implementation of an already completed Issue, reopen that original Issue, document the confirmed failure/root cause and Hotfix plan, reassess priority, and keep it open through successful Hotfix publication. Add the final Hotfix version/PR result, then close it again as `completed`.
+- If a Hotfix corrects a direct regression/incomplete implementation of an already completed Issue, reopen that original Issue, document the confirmed failure/root cause and Hotfix plan, reassess priority, and keep it open through successful Hotfix publication. Add the final Hotfix version/PR result, then close it again as `completed` only after any required post-publication acceptance is recorded.
 
-For Issue-backed releases, the Issue is part of the audit trail: important implementation findings belong in comments, and closure occurs only after successful publication/post-release verification.
+For Issue-backed releases, the Issue is part of the audit trail: important implementation findings belong in comments, and closure occurs only after successful publication/post-release verification and any required owner acceptance.
+
+**Mandatory publication-before-owner-acceptance rule (all release levels):** Once the required automated development, Candidate and release gates are satisfied, publish and make the implementing version available through the normal update channel without waiting for owner-machine acceptance or asking for another release authorization. The owner must be able to update before testing the actual application on their Windows machine. Pending native owner-machine, physical hardware/UEFI or visual acceptance is a post-publication Issue-closure requirement, not a Candidate-entry, publication or update-availability gate. This applies equally to corrective Hotfixes after failed acceptance of an earlier version. Mandatory automated native Windows PowerShell 5.1 tests and other technical release gates remain unchanged; their failures must be corrected and their results must not be misrepresented. Record the published version and technical verification independently, leave the Issue open for required owner acceptance, and close it only after that acceptance is recorded.
 
 ## Release level and work-branch policy
 

@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.10.4.1 - Preserve popup visibility during Manage Entries transitions (LBS-279)
+
+- Replace the temporary top-level visual cover with a nonselectable child control within the existing main popup. Preserve the normal Deactivate dismissal rule and avoid forced reactivation or a global dismissal bypass.
+- Retain the client-only frame, clipped bounds, synchronous repaint, exception cleanup and keyboard/draft semantics; extend native regression coverage through the actual popup constructor and dismissal path. Owner visual acceptance remains separate.
+
 ## v1.10.4.0 - Coherent Manage Entries transitions and keyboard reordering (LBS-279)
 
 - Hold one nonactivating client-frame cover over explicit Customize entry/exit and keyboard row moves while real WinForms rows, action states, scroll layout and focus are reconciled. Release it after synchronous final repaint, with exception-safe cleanup and ordinary-rendering fallback.

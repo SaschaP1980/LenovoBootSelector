@@ -455,7 +455,7 @@ For Issue-backed work:
 3. document materially important root-cause/scope/migration findings in concise Issue comments;
 4. keep the Issue open during implementation;
 5. after successful publication and post-release verification, ensure the Issue contains the final version/PR record; for Work-Path work, the terminal `Agent-State: COMPLETED` update of the canonical rolling comment is that record;
-6. satisfy and document any **Issue-specific** native, physical hardware, or explicit owner-acceptance requirement before closing; publication alone does not fulfill a pending acceptance gate;
+6. satisfy and document any **Issue-specific** native, physical hardware, or explicit owner-acceptance requirement before closing; publication alone does not fulfill a pending acceptance gate. Never wait for owner-machine acceptance before publishing or making a technically verified release available through the normal updater. This applies to every Major, Minor, Patch and Hotfix, including corrective releases after failed acceptance. Automated native Windows PowerShell 5.1 and all other mandatory technical gates remain required;
 7. only then close it as `completed`. Documentation-only Issues instead follow the verified direct-`main` documentation completion path without a product release.
 
 A release is not successful merely because the Issue was closed; technical release verification comes first.

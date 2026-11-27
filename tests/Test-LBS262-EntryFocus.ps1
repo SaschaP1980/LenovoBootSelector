@@ -10,7 +10,7 @@ $begin=$template.IndexOf($prefix,[StringComparison]::Ordinal)+$prefix.Length
 $end=$template.IndexOf('"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing',$begin,[StringComparison]::Ordinal)
 if ($begin -lt $prefix.Length -or $end -lt $begin) {throw 'Missing canonical WinForms types'}
 Add-Type -TypeDefinition ($template.Substring($begin,$end-$begin)) -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility
-foreach ($rel in @('src\Core\EntryPreferences.ps1','src\Core\Localization.ps1','src\Core\BootNextSelectionState.ps1','src\UI\BootEntryList.ps1','src\UI\BootEntryRows.ps1','src\UI\PopupDpiLayout.ps1','src\UI\PopupComposition.ps1','src\UI\ManageEntriesState.ps1','src\UI\ManageEntries.ps1')) {. (Join-Path $root $rel)}
+foreach ($rel in @('src\Core\EntryPreferences.ps1','src\Core\Localization.ps1','src\Core\BootNextSelectionState.ps1','src\UI\BootEntryList.ps1','src\UI\BootEntryRows.ps1','src\UI\PopupDpiLayout.ps1','src\UI\PopupComposition.ps1','src\UI\ManageEntriesState.ps1','src\UI\ManageEntries.ps1','src\UI\MenuAppearance.ps1','src\UI\MaintenancePresentation.ps1','src\UI\Popup.ps1')) {. (Join-Path $root $rel)}
 $script:checks=0
 function Check([string]$Name,[bool]$Pass) {
     if (-not $Pass) {throw "LBS262Entry FAIL: $Name"}
@@ -19,6 +19,7 @@ function Check([string]$Name,[bool]$Pass) {
 }
 function Get-LocalizedString {param([string]$Key,$Values) Get-LocalizedStringCore -Key $Key -Locale $script:Locale -Values $Values}
 function Get-CurrentSystemFunctionsCapabilities { [pscustomobject]@{State='Ready';CanManageEntries=$script:manageAllowed;CanSetBootNext=$true;CanSetDefaultTarget=$true} }
+function Get-LenovoUiCoordinateScale {param($Screen) return [pscustomobject]@{Factor=$script:FixtureScale}}
 function Test-MaintenanceBusy { return $false }
 function Test-BootTargetDriftDetected { return $false }
 function Show-ConfigurationPopup {param($Owner) $script:configurationCalls++;$script:configurationOwner=$Owner}
@@ -97,11 +98,34 @@ using System;
 using System.Runtime.InteropServices;
 public static class Lbs262EntryNative {
     [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
 }
 '@
+# Use the actual native mouse-up path when the synthetic layout is on-screen.
+# Offscreen synthetic 250% controls still exercise the real Click handler.
+function Invoke-EntryPointerAction($Control) {
+    $p=[Drawing.Point]::new([int]($Control.Width/2),[int]($Control.Height/2))
+    $screenPoint=$Control.PointToScreen($p)
+    if (-not [Windows.Forms.SystemInformation]::VirtualScreen.Contains($screenPoint) -or
+        -not $script:Popup.RectangleToScreen($script:Popup.ClientRectangle).Contains($screenPoint)) {
+        Write-Host "LBS279 clipped fixture action: $($Control.Name) PerformClick"
+        $Control.PerformClick()
+        return
+    }
+    [void]$Control.Focus()
+    [Windows.Forms.Cursor]::Position=$screenPoint
+    [Windows.Forms.Application]::DoEvents()
+    $lp=[IntPtr](($p.Y -shl 16) -bor $p.X)
+    [void][Lbs262EntryNative]::SendMessage($Control.Handle,0x201,[IntPtr]1,$lp)
+    [void][Lbs262EntryNative]::SendMessage($Control.Handle,0x202,[IntPtr]0,$lp)
+    [Windows.Forms.Application]::DoEvents()
+    Write-Host "LBS279 native mouse action: $($Control.Name)"
+}
 foreach ($locale in @('de-DE','en-US')) {
     foreach ($scale in @(1.0,2.5)) {
         $script:Locale=$locale
+        $script:FixtureScale=$scale
         $script:saveCalls=0;$script:manageAllowed=$true
         $script:bootCalls=0;$script:configurationCalls=0;$script:defaultCalls=0
         $script:SelectedGuid='';$script:BootNextPendingGuid='';$script:DefaultInteractionEnabled=$true
@@ -115,24 +139,34 @@ foreach ($locale in @('de-DE','en-US')) {
         $script:CurrentEntries=@(0..9 | ForEach-Object {
             [pscustomobject]@{Guid="boot-$_";Title="Target $_";Subtitle="Description $_";RawDescription="Target $_";Symbol='*';Accent=[Drawing.Color]::Red;TypeTooltip=''}
         })
-        $form=[Windows.Forms.Form]::new()
+        # LBS-279 corrective coverage: actual production constructor including
+        # its TopMost, Deactivate/Hide, tooltip, settings and footer ownership.
+        $form=New-PopupForm -TargetScale $scale -ScaleSource 'native-fixture'
+        $savedCursor=[Windows.Forms.Cursor]::Position
         try {
             $script:Popup=$form
-            $form.StartPosition=[Windows.Forms.FormStartPosition]::Manual
             $form.Location=[Drawing.Point]::new(5,5)
-            $form.ClientSize=[Drawing.Size]::new(390,672)
-            Initialize-PopupDpiLayout -Form $form
-            $panel=[Windows.Forms.Panel]::new();$panel.Name='PopupRoot';$panel.Size=$form.ClientSize
-            $form.Controls.Add($panel)
-            Add-PopupHeaderSection -Root $panel
-            Add-PopupBootEntryListSection -Root $panel
-            Add-PopupSettingsSection -Root $panel
-            Add-PopupManageEntriesSection -Root $panel
-            Complete-PopupDpiLayout -Form $form -Scale $scale
             $form.Show()
             [Windows.Forms.Application]::DoEvents()
             $form.Activate()
             Update-PopupRows -Reason 'initial-fixture'
+            [Windows.Forms.Application]::DoEvents()
+            $script:ownerDeactivateEvents=0; $script:ownerHiddenEvents=0; $script:ownerCoverSeen=0; $script:ownerCoverInvalid=0
+            $form.Add_Deactivate({ $script:ownerDeactivateEvents++; Write-Host "LBS279 OWNER DEACTIVATE foreground=$([Lbs262EntryNative]::GetForegroundWindow()) visible=$($this.Visible)" })
+            $form.Add_VisibleChanged({ if (-not $this.Visible) { $script:ownerHiddenEvents++; Write-Host 'LBS279 OWNER HIDDEN' } })
+            $form.Add_ControlAdded({
+                param($sender,$eventArgs)
+                if ($eventArgs.Control.Name -ne 'LenovoPopupVisualCommit') { return }
+                $eventArgs.Control.Add_VisibleChanged({
+                    param($sender,$eventArgs)
+                    if (-not $sender.Visible) { return }
+                    $script:ownerCoverSeen++
+                    if ($sender.CanSelect -or $sender.ContainsFocus -or $sender.Parent -ne $script:Popup -or
+                        [Lbs262EntryNative]::GetAncestor($sender.Handle,2) -ne $script:Popup.Handle -or
+                        [Lbs262EntryNative]::GetForegroundWindow() -ne $script:Popup.Handle -or
+                        $script:Popup.OwnedForms.Count -ne 0) { $script:ownerCoverInvalid++ }
+                })
+            })
             $button=$form.Controls.Find('ManageEntriesButton',$true)[0]
             $cancel=$form.Controls.Find('ManageCancelButton',$true)[0]
             $undo=$form.Controls.Find('ManageUndoButton',$true)[0]
@@ -146,6 +180,7 @@ foreach ($locale in @('de-DE','en-US')) {
             [void][Lbs262EntryNative]::SendMessage($button.Handle,0x202,[IntPtr]0,$lp)
             [Windows.Forms.Application]::DoEvents()
             Check "$locale/$scale mouse Customize entered" $script:IsManageEntriesMode
+            Check "$locale/$scale LBS279 production mouse Customize retains owner visibility and activation" ($form.Visible -and $form.TopMost -and $form.ContainsFocus -and $script:ownerDeactivateEvents -eq 0 -and $script:ownerHiddenEvents -eq 0 -and $script:ownerCoverSeen -gt 0 -and $script:ownerCoverInvalid -eq 0)
             $first=Get-Row 'boot-0'
             Write-Host "ENTRY FOCUS mouse focused=$($first.Focused) cue=$($first.KeyboardCueVisible)"
             Check "$locale/$scale initial mouse focus without Tab" ($first.Focused -and $first.TabStop)
@@ -160,7 +195,9 @@ foreach ($locale in @('de-DE','en-US')) {
             Check "$locale/$scale refresh preserves action focus" $cancel.Focused
             Press-Tab $cancel -Reverse
             Check "$locale/$scale reverse Tab restores second row" ((Get-Row 'boot-1').Focused)
-            $cancel.PerformClick()
+            Invoke-EntryPointerAction $cancel
+            [Windows.Forms.Application]::DoEvents()
+            Check "$locale/$scale LBS279 production Cancel retains owner visibility" ($form.Visible -and -not $script:IsManageEntriesMode -and $script:ownerDeactivateEvents -eq 0 -and $script:ownerHiddenEvents -eq 0 -and -not $form.Controls['LenovoPopupVisualCommit'])
             [Windows.Forms.Cursor]::Position=$form.PointToScreen([Drawing.Point]::new(5,5))
             [void]$button.Focus()
             [Windows.Forms.SendKeys]::SendWait(' ')
@@ -173,22 +210,48 @@ foreach ($locale in @('de-DE','en-US')) {
             Check "$locale/$scale refresh preserves alias editor" ($editor.Focused -and $script:ManageAliasEditGuid -eq 'boot-0')
             Press-Key $editor ([Windows.Forms.Keys]::Escape)
             $cancel.PerformClick()
+            $beforeSave=$script:saveCalls
+            $button.PerformClick()
+            $row=Get-Row 'boot-0'
+            [void]$row.Focus()
+            Press-Key $row ([Windows.Forms.Keys]::Control -bor [Windows.Forms.Keys]::Down)
+            Check "$locale/$scale LBS279 production keyboard reorder retains owner focus and draft" ($form.Visible -and $row.Focused -and $script:ManageEntryOrder[0] -eq 'boot-1' -and $script:saveCalls -eq $beforeSave -and $script:ownerHiddenEvents -eq 0)
+            Invoke-EntryPointerAction ($form.Controls.Find('ManageSaveButton',$true)[0])
+            [Windows.Forms.Application]::DoEvents()
+            Check "$locale/$scale LBS279 production Save retains owner and commits once" ($form.Visible -and -not $script:IsManageEntriesMode -and $script:saveCalls -eq ($beforeSave+1) -and $script:EntryOrder[0] -eq 'boot-1' -and $script:ownerDeactivateEvents -eq 0 -and $script:ownerHiddenEvents -eq 0)
+            Check "$locale/$scale LBS279 every observed cover stays a nonselectable child" ($script:ownerCoverSeen -ge 5 -and $script:ownerCoverInvalid -eq 0 -and $form.OwnedForms.Count -eq 0 -and -not $form.Controls['LenovoPopupVisualCommit'])
             $script:manageAllowed=$false
             Update-ManageEntriesUiState
             $button.PerformClick()
             Check "$locale/$scale unavailable Customize blocked" (-not $script:IsManageEntriesMode -and -not $button.Enabled)
             $script:manageAllowed=$true
+            # The preceding Save intentionally increments the fixture counter.
+            # Empty inventory must not add another persistence or boot dispatch.
+            $emptyBaselineSaveCalls=$script:saveCalls
+            $emptyBaselineBootCalls=$script:bootCalls
             $script:CurrentEntries=@()
             Update-PopupRows -Reason 'empty-fixture'
             Update-ManageEntriesUiState
             Start-ManageEntriesMode
-            Check "$locale/$scale empty entry has no row or mutation" ($script:IsManageEntriesMode -and @(Get-Row 'boot-0').Count -eq 0 -and $script:ManageUndoHistory.Count -eq 0 -and $script:saveCalls -eq 0 -and $script:bootCalls -eq 0)
+            Check "$locale/$scale empty entry has no row or mutation" ($script:IsManageEntriesMode -and $form.Visible -and @(Get-Row 'boot-0').Count -eq 0 -and $script:ManageUndoHistory.Count -eq 0 -and $script:saveCalls -eq $emptyBaselineSaveCalls -and $script:bootCalls -eq $emptyBaselineBootCalls -and $script:ownerHiddenEvents -eq 0)
             $cancel.PerformClick()
+            # An unrelated foreground window must still invoke production dismissal.
+            $outside=[Windows.Forms.Form]::new()
+            try {
+                $outside.StartPosition=[Windows.Forms.FormStartPosition]::Manual
+                $outside.Location=[Drawing.Point]::new(20,20)
+                $outside.Size=[Drawing.Size]::new(160,120)
+                $outside.TopMost=$true
+                $outside.Show()
+                $outside.Activate()
+                [Windows.Forms.Application]::DoEvents()
+                Check "$locale/$scale LBS279 external activation still dismisses the actual popup" (-not $form.Visible -and $script:ownerDeactivateEvents -ge 1 -and $script:ownerHiddenEvents -ge 1 -and [Lbs262EntryNative]::GetForegroundWindow() -eq $outside.Handle)
+            } finally { $outside.Dispose() }
         } finally {
             if ($savedCursor) { [Windows.Forms.Cursor]::Position=$savedCursor }
             $form.Dispose();$script:Popup=$null
         }
     }
 }
-Write-Host "LBS262 ENTRY FOCUS TOTAL $script:checks/48"
-if ($script:checks -ne 48) {throw "Unexpected LBS262 Entry Focus count $script:checks"}
+Write-Host "LBS262 ENTRY FOCUS TOTAL $script:checks/72"
+if ($script:checks -ne 72) {throw "Unexpected LBS262 Entry Focus count $script:checks"}

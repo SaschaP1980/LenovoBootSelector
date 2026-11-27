@@ -32,6 +32,10 @@ The Work-Path rolling recovery comment defined below is the established resilien
 
 The release path remains defined by `docs/RELEASE_PROCESS.md`. Connector/GitHub operating details remain defined by `docs/GITHUB_HOWTO.md`. The [Initial Prompt](INITIAL_PROMPT.md) owns the full canonical fresh-session bootstrap, while [DevOps Operations](DEVOPS_OPERATIONS.md) maps CI/CD, deployment and incident evidence without changing this document's Work-Path, checkpoints or Development Completion rules.
 
+## Publication before owner-machine acceptance
+
+**Mandatory publication-before-owner-acceptance rule (all release levels):** Once the required automated development, Candidate and release gates are satisfied, publish and make the implementing version available through the normal update channel without waiting for owner-machine acceptance or asking for another release authorization. The owner must be able to update before testing the actual application on their Windows machine. Pending native owner-machine, physical hardware/UEFI or visual acceptance is a post-publication Issue-closure requirement, not a Candidate-entry, publication or update-availability gate. This applies equally to corrective Hotfixes after failed acceptance of an earlier version. Mandatory automated native Windows PowerShell 5.1 tests and other technical release gates remain unchanged; their failures must be corrected and their results must not be misrepresented. Record the published version and technical verification independently, leave the Issue open for required owner acceptance, and close it only after that acceptance is recorded.
+
 ## 1. Purpose
 
 Long-running agentic development must survive chat, stream, runtime and connector interruptions without depending on transient context.
@@ -275,7 +279,7 @@ Maintain exactly **one rolling recovery comment** in the active GitHub Issue. Pr
 
 Use [`docs/templates/WORK_PATH_ROLLING_COMMENT.md`](templates/WORK_PATH_ROLLING_COMMENT.md) as the canonical default layout: a compact recovery-state header, explicit intended diff and validation plan, benchmark configuration with provenance, one cumulative measurement ledger, counters, phase-specific evidence including exact validator totals, final release verification, performance result, explicit Evidence audit, and plan-conformance assessment. Historical Issue comments are evidence, not normative templates; the tracked template and current process documents define the standard.
 
-The layout is part of the recovery standard, not merely presentation. Preserve the same major sections unless a task-specific section adds useful recovery information. At successful completion, update this **same** rolling comment to `Agent-State: COMPLETED`, record the authoritative release/PR/main/tag/artifact/cleanup facts, set the next action to Issue closure, and then close the Issue. Do not add a second redundant completion comment when the terminal rolling-comment update already contains the required final implementation/release record.
+The layout is part of the recovery standard, not merely presentation. Preserve the same major sections unless a task-specific section adds useful recovery information. At successful completion, update this **same** rolling comment to `Agent-State: COMPLETED`, record the authoritative release/PR/main/tag/artifact/cleanup facts, set the next action to Issue closure if all required acceptance is recorded, or to post-publication owner acceptance if still pending. Leave the Issue open in the latter case; do not delay publication or update availability. Do not add a second redundant completion comment when the terminal rolling-comment update already contains the required final implementation/release record.
 
 #### Canonical in-place section updates
 
@@ -628,7 +632,7 @@ Before Candidate creation, every Work-Path release must perform one deliberate *
 Development Completion has two classes of evidence:
 
 1. **mandatory Candidate-entry evidence** — absence or failure blocks Candidate creation;
-2. **best-effort development evidence** — useful additional evidence that may be unavailable without blocking Candidate when it is genuinely outside the Candidate-entry contract, such as physical Lenovo/UEFI E2E unless the Issue explicitly makes it mandatory.
+2. **best-effort development evidence** — useful additional evidence that may be unavailable without blocking Candidate when it is genuinely outside the Candidate-entry contract, such as physical Lenovo/UEFI E2E or owner-machine acceptance. Even when an Issue requires owner-machine acceptance, that requirement governs post-publication Issue closure, not Candidate entry.
 
 A tooling limitation is never `N/A`. For mandatory evidence:
 - `PASS` means the exact required check ran successfully against the exact required state;
@@ -661,7 +665,7 @@ For the exact final Work-Branch SHA, require:
 - hosted Windows PowerShell 5.1 contract-suite evidence GREEN on the exact final Work-Branch SHA;
 - zero unresolved deterministic Development Completion findings.
 
-For this contract, **relevant focused/native tests** means every active permanent suite that directly owns changed behavior, every active suite modified by the work, and every additional test explicitly required by the Issue acceptance criteria. If none exist for a category, record `N/A` with the concrete reason; lack of tooling is not a reason for `N/A`.
+For this contract, **relevant focused/native tests** means every active permanent suite that directly owns changed behavior, every active suite modified by the work, and every additional automated technical test explicitly required by the Issue acceptance criteria. Owner-performed native/physical/visual acceptance is excluded from Candidate-entry evidence and is performed after publication. If none exist for a category, record `N/A` with the concrete reason; lack of tooling is not a reason for `N/A`.
 
 Run independent validators/checks in the same Development Completion pass where technically safe so one failure does not hide other independent actionable findings.
 

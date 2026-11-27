@@ -2384,7 +2384,7 @@ public sealed class LenovoHoverGlyphButton : Button
 
 // LBS-279: keep one coherent client frame visible while the real HWND tree
 // is synchronously reconciled. This is not a second interactive popup.
-public sealed class LenovoPopupVisualCommit : Form
+public sealed class LenovoPopupVisualCommit : Control
 {
     private readonly Form parent;
     private readonly Control source;
@@ -2400,29 +2400,13 @@ public sealed class LenovoPopupVisualCommit : Form
         parent = owner;
         source = client;
         Name = "LenovoPopupVisualCommit";
-        AutoScaleMode = AutoScaleMode.None;
-        FormBorderStyle = FormBorderStyle.None;
-        ShowInTaskbar = false;
-        StartPosition = FormStartPosition.Manual;
-        // A layered, transparent-to-input surface lets the real owner retain
-        // its native visibility, focus, accessibility and child HWND state.
-        AllowTransparency = true;
-        TopMost = owner.TopMost;
+        // Never introduce another top-level HWND: even a nominally
+        // nonactivating owned Form participates in window activation.
+        Visible = false;
         TabStop = false;
         SetStyle(ControlStyles.Selectable, false);
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
             ControlStyles.OptimizedDoubleBuffer, true);
-    }
-
-    protected override bool ShowWithoutActivation { get { return true; } }
-    protected override CreateParams CreateParams
-    {
-        get
-        {
-            CreateParams cp = base.CreateParams;
-            cp.ExStyle |= 0x00000080 | 0x08000000 | 0x00000020; // TOOLWINDOW, NOACTIVATE, TRANSPARENT
-            return cp;
-        }
     }
 
     protected override void WndProc(ref Message m)
@@ -2439,11 +2423,10 @@ public sealed class LenovoPopupVisualCommit : Form
         Control root = owner.Controls["PopupRoot"];
         if (root == null || root.IsDisposed || !root.Visible ||
             !root.IsHandleCreated || root.ClientSize.Width <= 0 || root.ClientSize.Height <= 0) return null;
-        foreach (Form owned in owner.OwnedForms)
-            if (owned is LenovoPopupVisualCommit && !owned.IsDisposed) return null;
+        foreach (Control child in owner.Controls)
+            if (child is LenovoPopupVisualCommit && !child.IsDisposed) return null;
 
-        // At high DPI the design root can exceed the actual client viewport.
-        // Cover only pixels that can belong to this visible owner on screen.
+        // Clip the snapshot to the visible owner client, including high DPI.
         Rectangle rootBounds = root.RectangleToScreen(root.ClientRectangle);
         Rectangle visibleBounds = Rectangle.Intersect(rootBounds,
             owner.RectangleToScreen(owner.ClientRectangle));
@@ -2458,12 +2441,16 @@ public sealed class LenovoPopupVisualCommit : Form
             root.DrawToBitmap(cover.frame, root.ClientRectangle);
             cover.frameOffset = new Point(rootBounds.Left - visibleBounds.Left,
                 rootBounds.Top - visibleBounds.Top);
-            cover.Bounds = visibleBounds;
-            cover.Show(owner);
+            cover.Bounds = owner.RectangleToClient(visibleBounds);
+            owner.Controls.Add(cover);
+            cover.BringToFront();
+            cover.Show();
             cover.Invalidate();
             cover.Update();
-            if (!cover.Visible || cover.FramePaintCount == 0 || cover.Bounds != visibleBounds)
-                throw new InvalidOperationException("Visual commit frame was not presented at the visible client bounds.");
+            if (!cover.Visible || cover.FramePaintCount == 0 ||
+                cover.RectangleToScreen(cover.ClientRectangle) != visibleBounds ||
+                cover.TopLevelControl != owner || cover.ContainsFocus)
+                throw new InvalidOperationException("Visual commit child was not presented inside the visible owner.");
             return cover;
         }
         catch
@@ -2487,16 +2474,27 @@ public sealed class LenovoPopupVisualCommit : Form
     {
         try
         {
-            // Finish owner/child painting while the old frame still covers it.
+            // Request the underlying final paint while the snapshot is present.
             // RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW.
             if (!parent.IsDisposed && !parent.Disposing && parent.Visible &&
                 parent.IsHandleCreated && !source.IsDisposed && source.IsHandleCreated)
             {
-                if (!RedrawWindow(parent.Handle, IntPtr.Zero, IntPtr.Zero, 0x0185))
-                    parent.Invalidate(true);
+                if (!RedrawWindow(source.Handle, IntPtr.Zero, IntPtr.Zero, 0x0185))
+                    source.Invalidate(true);
             }
         }
-        finally { Dispose(); }
+        finally
+        {
+            Dispose();
+            // The child can clip underlying sibling painting. Finish exposed
+            // pixels synchronously, without activation or reopening a hidden owner.
+            if (!parent.IsDisposed && !parent.Disposing && parent.Visible &&
+                parent.IsHandleCreated && !source.IsDisposed && source.IsHandleCreated)
+            {
+                if (!RedrawWindow(source.Handle, IntPtr.Zero, IntPtr.Zero, 0x0185))
+                    source.Refresh();
+            }
+        }
     }
 
     protected override void Dispose(bool disposing)
@@ -3834,7 +3832,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.10.4.0'
+$script:AppVersion = '1.10.4.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
