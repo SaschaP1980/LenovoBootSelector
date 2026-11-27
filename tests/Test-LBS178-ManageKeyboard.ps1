@@ -58,7 +58,7 @@ function Test-RowOrder([string]$Expected) {
 # LBS-279: observe the actual native cover during real control mutations,
 # not a mocked transaction or test-side redraw suppression.
 function Get-VisualCommitCover {
-    return ($script:Popup.OwnedForms | Where-Object { $_.Name -eq 'LenovoPopupVisualCommit' -and -not $_.IsDisposed } | Select-Object -First 1)
+    return ($script:Popup.Controls | Where-Object { $_.Name -eq 'LenovoPopupVisualCommit' -and -not $_.IsDisposed } | Select-Object -First 1)
 }
 function Reset-VisualCommitProbe {
     $script:visualRowEvents=0
@@ -74,11 +74,12 @@ function Observe-VisualCommitMutation([string]$Kind) {
     $expectedBounds=[Drawing.Rectangle]::Intersect($client.RectangleToScreen($client.ClientRectangle),$script:Popup.RectangleToScreen($script:Popup.ClientRectangle))
     $expectedBounds=[Drawing.Rectangle]::Intersect($expectedBounds,[Windows.Forms.SystemInformation]::VirtualScreen)
     if (-not $cover -or -not $cover.Visible -or $cover.FramePaintCount -le 0 -or
-        $cover.ContainsFocus -or [object]::ReferenceEquals([Windows.Forms.Form]::ActiveForm,$cover) -or
+        $cover.ContainsFocus -or $cover.CanSelect -or -not [object]::ReferenceEquals($cover.TopLevelControl,$script:Popup) -or
+        $cover.Parent -ne $script:Popup -or $script:Popup.OwnedForms.Count -ne 0 -or
         -not $client.Visible -or -not $script:Popup.Visible -or
-        $cover.Bounds -ne $expectedBounds) {
+        $cover.RectangleToScreen($cover.ClientRectangle) -ne $expectedBounds) {
         if ($script:visualUncoveredEvents -eq 0) {
-            Write-Host "LBS279 COVER FAILURE kind=$Kind root=$($client.RectangleToScreen($client.ClientRectangle)) owner=$($script:Popup.RectangleToScreen($script:Popup.ClientRectangle)) expected=$expectedBounds actual=$($cover.Bounds) visible=$($cover.Visible) paints=$($cover.FramePaintCount) focus=$($cover.ContainsFocus) active=$([object]::ReferenceEquals([Windows.Forms.Form]::ActiveForm,$cover)) ownerVisible=$($script:Popup.Visible) rootVisible=$($client.Visible)"
+            Write-Host "LBS279 COVER FAILURE kind=$Kind root=$($client.RectangleToScreen($client.ClientRectangle)) owner=$($script:Popup.RectangleToScreen($script:Popup.ClientRectangle)) expected=$expectedBounds actual=$(if($cover){$cover.RectangleToScreen($cover.ClientRectangle)}) visible=$($cover.Visible) paints=$($cover.FramePaintCount) focus=$($cover.ContainsFocus) active=$([object]::ReferenceEquals([Windows.Forms.Form]::ActiveForm,$cover)) ownerVisible=$($script:Popup.Visible) rootVisible=$($client.Visible)"
         }
         $script:visualUncoveredEvents++
     }
@@ -287,7 +288,7 @@ foreach ($locale in @('de-DE','en-US')) {
             Check "$locale/$scale LBS279 consecutive moves keep row identity draft and focus" ((Test-RowOrder $savedOrder) -and [object]::ReferenceEquals($row,(Get-Row 'boot-1')) -and $row.Focused -and $script:saveCalls -eq 1 -and -not (Get-VisualCommitCover))
             $fixtureCommit=Start-PopupVisualCommit -Reason 'LBS279-exception-fixture'
             try {
-                Check "$locale/$scale LBS279 native cover is nonactivating and nested scope is no-op" ($fixtureCommit -and $fixtureCommit.Visible -and $fixtureCommit.FramePaintCount -gt 0 -and $row.Focused -and -not (Start-PopupVisualCommit -Reason 'LBS279-nested-fixture'))
+                Check "$locale/$scale LBS279 native cover is nonactivating and nested scope is no-op" ($fixtureCommit -and $fixtureCommit.Visible -and $fixtureCommit.FramePaintCount -gt 0 -and $fixtureCommit.Parent -eq $form -and $fixtureCommit.TopLevelControl -eq $form -and -not $fixtureCommit.CanSelect -and $form.OwnedForms.Count -eq 0 -and $row.Focused -and -not (Start-PopupVisualCommit -Reason 'LBS279-nested-fixture'))
                 throw 'LBS279 controlled exception'
             }
             catch {

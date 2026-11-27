@@ -39,6 +39,14 @@ def validate_lbs279_render_contract(s, manage, rows):
         'finally {', 'Stop-PopupVisualCommit'))
 
 
+def validate_lbs279_visual_owner_contract(s, template):
+    match = re.search(r'(?ms)^public sealed class LenovoPopupVisualCommit : (\w+)\n\{\n(.*?)^\}', template)
+    child = bool(match and match.group(1) == 'Control' and ordered(
+        match.group(2), 'owner.Controls.Add(cover);', 'cover.BringToFront();', 'cover.Show();')
+        and 'cover.Show(owner)' not in match.group(2))
+    s.c('LBS-279 visual cover stays inside the existing popup HWND hierarchy', child)
+
+
 class FocusedResult:
     def __init__(self):
         self.failed = 0
@@ -51,11 +59,15 @@ class FocusedResult:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=Path, required=True)
+    parser.add_argument('--owner-only', action='store_true')
     args = parser.parse_args()
     result = FocusedResult()
-    manage = (args.root / 'src/UI/ManageEntries.ps1').read_text(encoding='utf-8-sig')
-    rows = (args.root / 'src/UI/BootEntryRows.ps1').read_text(encoding='utf-8-sig')
-    validate_lbs279_render_contract(result, manage, rows)
+    if not args.owner_only:
+        manage = (args.root / 'src/UI/ManageEntries.ps1').read_text(encoding='utf-8-sig')
+        rows = (args.root / 'src/UI/BootEntryRows.ps1').read_text(encoding='utf-8-sig')
+        validate_lbs279_render_contract(result, manage, rows)
+    template = (args.root / 'src/App/LenovoBootSelector.template.ps1').read_text(encoding='utf-8-sig')
+    validate_lbs279_visual_owner_contract(result, template)
     return int(bool(result.failed))
 
 
