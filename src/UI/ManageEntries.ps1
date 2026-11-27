@@ -56,22 +56,26 @@ function Undo-ManageEntryDraft {
         Update-PopupRows -Reason 'manage-undo-empty'
         return
     }
-    $index = $script:ManageUndoHistory.Count - 1
-    $previous = $script:ManageUndoHistory[$index]
-    $script:ManageUndoHistory.RemoveAt($index)
-    # Copy again so subsequent edits cannot mutate retained snapshots.
-    $restored = New-ManageDraftSnapshotCore -Order $previous.Order -Hidden $previous.Hidden -Aliases $previous.Aliases
-    $script:ManageEntryOrder = @($restored.Order)
-    $script:ManageHiddenEntryGuids = @($restored.Hidden)
-    $script:ManageEntryAliases = $restored.Aliases
-    $script:LastStatusText = Get-LocalizedString -Key 'Manage.UndoDone'
-    $undo = if ($script:Popup -and -not $script:Popup.IsDisposed) { $script:Popup.Controls.Find('ManageUndoButton',$true) | Select-Object -First 1 }
-    $hadFocus = $undo -and $undo.Focused
-    Update-PopupRows -Reason 'manage-undo'
-    if ($hadFocus -and -not $undo.Enabled) {
-        $cancel = $script:Popup.Controls.Find('ManageCancelButton',$true) | Select-Object -First 1
-        if ($cancel -and $cancel.CanFocus) { [void]$cancel.Focus() }
+    $visualCommit = Start-PopupVisualCommit -Reason 'manage-undo'
+    try {
+        $index = $script:ManageUndoHistory.Count - 1
+        $previous = $script:ManageUndoHistory[$index]
+        $script:ManageUndoHistory.RemoveAt($index)
+        # Copy again so subsequent edits cannot mutate retained snapshots.
+        $restored = New-ManageDraftSnapshotCore -Order $previous.Order -Hidden $previous.Hidden -Aliases $previous.Aliases
+        $script:ManageEntryOrder = @($restored.Order)
+        $script:ManageHiddenEntryGuids = @($restored.Hidden)
+        $script:ManageEntryAliases = $restored.Aliases
+        $script:LastStatusText = Get-LocalizedString -Key 'Manage.UndoDone'
+        $undo = if ($script:Popup -and -not $script:Popup.IsDisposed) { $script:Popup.Controls.Find('ManageUndoButton',$true) | Select-Object -First 1 }
+        $hadFocus = $undo -and $undo.Focused
+        Update-PopupRows -Reason 'manage-undo'
+        if ($hadFocus -and -not $undo.Enabled) {
+            $cancel = $script:Popup.Controls.Find('ManageCancelButton',$true) | Select-Object -First 1
+            if ($cancel -and $cancel.CanFocus) { [void]$cancel.Focus() }
+        }
     }
+    finally { Stop-PopupVisualCommit -Commit $visualCommit }
 }
 
 function Set-ManageEntryAliasDraft {

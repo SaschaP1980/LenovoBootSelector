@@ -373,6 +373,23 @@ public sealed class LenovoHoverGlyphButton : Button
     }
 }
 
+// LBS-279: compose the main popup's native child HWNDs together, including
+// the temporary cover's final reveal. Do not apply this style to dialogs,
+// menus or other windows. Establish it at construction, not by recreating
+// or modifying an active window's handle.
+public sealed class LenovoCompositedPopup : Form
+{
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            CreateParams cp = base.CreateParams;
+            cp.ExStyle |= 0x02000000; // WS_EX_COMPOSITED
+            return cp;
+        }
+    }
+}
+
 // LBS-279: keep one coherent client frame visible while the real HWND tree
 // is synchronously reconciled. This is not a second interactive popup.
 public sealed class LenovoPopupVisualCommit : Control
@@ -385,6 +402,9 @@ public sealed class LenovoPopupVisualCommit : Control
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool RedrawWindow(IntPtr hwnd, IntPtr rect, IntPtr region, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool PrintWindow(IntPtr hwnd, IntPtr dc, uint flags);
 
     private LenovoPopupVisualCommit(Form owner, Control client)
     {
@@ -427,11 +447,25 @@ public sealed class LenovoPopupVisualCommit : Control
         var cover = new LenovoPopupVisualCommit(owner, root);
         try
         {
-            // Capture only the owner's client controls, never desktop pixels.
-            cover.frame = new Bitmap(root.ClientSize.Width, root.ClientSize.Height);
-            root.DrawToBitmap(cover.frame, root.ClientRectangle);
-            cover.frameOffset = new Point(rootBounds.Left - visibleBounds.Left,
-                rootBounds.Top - visibleBounds.Top);
+            // DrawToBitmap replays overlapping WinForms children in an order
+            // that can differ from the visible native surface. Request the
+            // composed client of this exact HWND instead; never read the desktop.
+            // PW_CLIENTONLY | PW_RENDERFULLCONTENT; RGB avoids GDI alpha artifacts.
+            cover.frame = new Bitmap(owner.ClientSize.Width, owner.ClientSize.Height,
+                System.Drawing.Imaging.PixelFormat.Format32bppRgb);
+            using (Graphics graphics = Graphics.FromImage(cover.frame))
+            {
+                IntPtr dc = graphics.GetHdc();
+                try
+                {
+                    if (!PrintWindow(owner.Handle, dc, 0x00000003))
+                        throw new InvalidOperationException("Native owner client capture unavailable.");
+                }
+                finally { graphics.ReleaseHdc(dc); }
+            }
+            Rectangle clientBounds = owner.RectangleToScreen(owner.ClientRectangle);
+            cover.frameOffset = new Point(clientBounds.Left - visibleBounds.Left,
+                clientBounds.Top - visibleBounds.Top);
             cover.Bounds = owner.RectangleToClient(visibleBounds);
             owner.Controls.Add(cover);
             cover.BringToFront();
@@ -463,27 +497,18 @@ public sealed class LenovoPopupVisualCommit : Control
 
     public void Complete()
     {
-        try
-        {
-            // Request the underlying final paint while the snapshot is present.
-            // RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW.
-            if (!parent.IsDisposed && !parent.Disposing && parent.Visible &&
-                parent.IsHandleCreated && !source.IsDisposed && source.IsHandleCreated)
-            {
-                if (!RedrawWindow(source.Handle, IntPtr.Zero, IntPtr.Zero, 0x0185))
-                    source.Invalidate(true);
-            }
-        }
+        // Do not request a redundant clipped source repaint behind the cover.
+        // Release the child and compose the entire exposed owner subtree in one
+        // native redraw. The owner is never hidden or activated by this scope.
+        try { Dispose(); }
         finally
         {
-            Dispose();
-            // The child can clip underlying sibling painting. Finish exposed
-            // pixels synchronously, without activation or reopening a hidden owner.
             if (!parent.IsDisposed && !parent.Disposing && parent.Visible &&
                 parent.IsHandleCreated && !source.IsDisposed && source.IsHandleCreated)
             {
-                if (!RedrawWindow(source.Handle, IntPtr.Zero, IntPtr.Zero, 0x0185))
-                    source.Refresh();
+                // RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW.
+                if (!RedrawWindow(parent.Handle, IntPtr.Zero, IntPtr.Zero, 0x0185))
+                    parent.Refresh();
             }
         }
     }

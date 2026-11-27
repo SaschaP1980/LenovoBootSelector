@@ -556,7 +556,11 @@ def main():
     update_popup_rows=fn(boot_entry_ui,'Update-PopupRows')
     s.c('LBS-29 Update-PopupRows is orchestration-sized',len((update_popup_rows or '').splitlines()) <= 100,len((update_popup_rows or '').splitlines()))
     s.has('LBS-29 drag/drop presentation still delegates ordering to canonical manage operation',boot_entry_surface,'Move-ManageEntry -MovedGuid $movedGuid -TargetGuid ([string]$targetRow.Tag) -After:$after')
-    s.has('LBS-29 alias apply still updates the canonical manage alias draft',boot_entry_surface,'Set-ManageEntryAliasDraft -Guid ([string]$editor.Tag) -Alias ([string]$editor.Text)')
+    alias_editor=fn(boot_entry_surface,'Add-BootEntryAliasEditor')
+    alias_close=fn(boot_entry_surface,'Stop-ManageRowAliasEdit')
+    s.c('LBS-29 alias apply still updates the canonical manage alias draft',
+        'Stop-ManageRowAliasEdit -Guid ([string]$editor.Tag) -Editor $editor -Apply' in alias_editor
+        and 'Set-ManageEntryAliasDraft -Guid $Guid -Alias ([string]$Editor.Text)' in alias_close)
     s.no('LBS-29 popup decomposition introduces no generic New-Control factory',popup_surface,'function New-Control')
     s.no('LBS-29 boot-entry decomposition introduces no generic New-Control factory',boot_entry_surface,'function New-Control')
     update_runtime=txt(root/'src/Application/UpdateRuntime.ps1')

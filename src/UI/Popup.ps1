@@ -25,7 +25,7 @@ function Invoke-PopupEscapeDismissal {
 
 function New-PopupForm {
     param([double]$TargetScale = 1.0, [string]$ScaleSource = 'initial')
-    $form = New-Object System.Windows.Forms.Form
+    $form = New-Object LenovoCompositedPopup
     if (-not $script:BootTypeToolTip) {
         $script:BootTypeToolTip = New-LenovoDarkTooltip -Animate
         $form.Add_Disposed({

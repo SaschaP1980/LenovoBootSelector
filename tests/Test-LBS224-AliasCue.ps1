@@ -86,6 +86,8 @@ foreach ($locale in @('en-US','de-DE')) {
         $form.ClientSize=[Drawing.Size]::new(1030,300)
         $form.TopMost=$true
         $script:Popup=$form
+        $script:IsManageEntriesMode=$true
+        $script:ManageAliasEditGuid=$entry.Guid
         $row=New-Object Windows.Forms.Panel
         $row.Name='BootRow'; $row.Tag=$entry.Guid
         $row.Size=[Drawing.Size]::new(390,92); $row.BackColor=$script:ColorRow
@@ -178,13 +180,17 @@ foreach ($locale in @('en-US','de-DE')) {
             $ev=[Windows.Forms.KeyEventArgs]::new([Windows.Forms.Keys]::Enter)
             [void]$key.Invoke($editor,@($ev))
             Assert-AliasCue "$prefix Enter commits empty draft only, never cue" ($ev.SuppressKeyPress -and $script:DraftCalls -eq 1 -and $script:LastAlias -eq '' -and $script:LastGuid -eq $entry.Guid -and $script:RefreshCalls -eq 1)
+            # This isolated fixture stubs row reconstruction; each next action models a new editor session.
+            $script:ManageAliasEditGuid=$entry.Guid
             $editor.Text='Discard me'
             $ev=[Windows.Forms.KeyEventArgs]::new([Windows.Forms.Keys]::Escape)
             [void]$key.Invoke($editor,@($ev))
             Assert-AliasCue "$prefix Escape discards without another draft commit" ($ev.SuppressKeyPress -and $script:DraftCalls -eq 1 -and $script:RefreshCalls -eq 2)
+            $script:ManageAliasEditGuid=$entry.Guid
             $editor.Text='Applied alias'
             [void]$click.Invoke($apply,@([EventArgs]::Empty))
             Assert-AliasCue "$prefix Apply uses only real entered text" ($script:DraftCalls -eq 2 -and $script:LastAlias -eq 'Applied alias' -and $script:RefreshCalls -eq 3)
+            $script:ManageAliasEditGuid=$entry.Guid
             [void]$click.Invoke($cancel,@([EventArgs]::Empty))
             Assert-AliasCue "$prefix Cancel leaves draft unchanged" ($script:DraftCalls -eq 2 -and $script:RefreshCalls -eq 4)
             $editor.Text=''

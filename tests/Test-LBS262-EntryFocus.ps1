@@ -100,8 +100,63 @@ public static class Lbs262EntryNative {
     [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+    [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr hwnd, int index);
+    [StructLayout(LayoutKind.Sequential)] public struct Point { public int X, Y; }
+    [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(Point point);
+    public static bool OwnsPoint(IntPtr owner, int x, int y) {
+        Point p = new Point { X=x, Y=y };
+        IntPtr hit = WindowFromPoint(p);
+        return hit != IntPtr.Zero && GetAncestor(hit,2) == owner && GetForegroundWindow() == owner;
+    }
 }
 '@
+# One controlled native pixel witness, not a proof of every production frame.
+# Acquisition validates foreground and hit ancestry before reading screen pixels.
+function Get-EntryOwnedPixel($Form,[Drawing.Point]$Point) {
+    [Windows.Forms.Application]::DoEvents()
+    if (-not [Lbs262EntryNative]::OwnsPoint($Form.Handle,$Point.X,$Point.Y)) { throw 'LBS279 raster probe has no valid owner surface' }
+    $bitmap=[Drawing.Bitmap]::new(1,1)
+    $graphics=[Drawing.Graphics]::FromImage($bitmap)
+    try {
+        $graphics.CopyFromScreen($Point,[Drawing.Point]::Empty,[Drawing.Size]::new(1,1))
+        if (-not [Lbs262EntryNative]::OwnsPoint($Form.Handle,$Point.X,$Point.Y)) { throw 'LBS279 raster probe lost owner surface' }
+        return $bitmap.GetPixel(0,0).ToArgb()
+    }
+    finally { $graphics.Dispose();$bitmap.Dispose() }
+}
+function Test-EntryVisualRaster($Form) {
+    $rootPanel=$Form.Controls['PopupRoot']
+    $patch=[Windows.Forms.Panel]::new()
+    $patch.Bounds=[Drawing.Rectangle]::new(8,8,24,24)
+    $oldColor=[Drawing.Color]::FromArgb(19,113,179)
+    $newColor=[Drawing.Color]::FromArgb(186,47,83)
+    $patch.BackColor=$oldColor
+    $rootPanel.Controls.Add($patch);$patch.BringToFront()
+    $commit=$null
+    try {
+        [Windows.Forms.Cursor]::Position=$Form.PointToScreen([Drawing.Point]::new(45,5))
+        $patch.Refresh()
+        $point=$patch.PointToScreen([Drawing.Point]::new(12,12))
+        $before=Get-EntryOwnedPixel $Form $point
+        $commit=Start-PopupVisualCommit -Reason 'LBS279-raster-fixture'
+        if (-not $commit) { throw 'LBS279 raster fixture could not present visual commit' }
+        $held=Get-EntryOwnedPixel $Form $point
+        $patch.BackColor=$newColor
+        $patch.Refresh()
+        $during=Get-EntryOwnedPixel $Form $point
+        Stop-PopupVisualCommit -Commit $commit
+        $commit=$null
+        $after=Get-EntryOwnedPixel $Form $point
+        Write-Host "LBS279 native raster before=$before held=$held during=$during after=$after expectedOld=$($oldColor.ToArgb()) expectedNew=$($newColor.ToArgb())"
+        return ($before -eq $oldColor.ToArgb() -and $held -eq $before -and $during -eq $before -and $after -eq $newColor.ToArgb())
+    }
+    finally {
+        if ($commit) { Stop-PopupVisualCommit -Commit $commit }
+        $patch.Dispose()
+        $rootPanel.Refresh()
+    }
+}
+
 # Use the actual native mouse-up path when the synthetic layout is on-screen.
 # Offscreen synthetic 250% controls still exercise the real Click handler.
 function Invoke-EntryPointerAction($Control) {
@@ -151,6 +206,8 @@ foreach ($locale in @('de-DE','en-US')) {
             $form.Activate()
             Update-PopupRows -Reason 'initial-fixture'
             [Windows.Forms.Application]::DoEvents()
+            Check "$locale/$scale LBS279 production popup has native descendant composition" (([Lbs262EntryNative]::GetWindowLong($form.Handle,-20) -band 0x02000000) -ne 0)
+            Check "$locale/$scale LBS279 native raster retains old pixels and reveals final pixels" (Test-EntryVisualRaster $form)
             $script:ownerDeactivateEvents=0; $script:ownerHiddenEvents=0; $script:ownerCoverSeen=0; $script:ownerCoverInvalid=0
             $form.Add_Deactivate({ $script:ownerDeactivateEvents++; Write-Host "LBS279 OWNER DEACTIVATE foreground=$([Lbs262EntryNative]::GetForegroundWindow()) visible=$($this.Visible)" })
             $form.Add_VisibleChanged({ if (-not $this.Visible) { $script:ownerHiddenEvents++; Write-Host 'LBS279 OWNER HIDDEN' } })
@@ -208,7 +265,13 @@ foreach ($locale in @('de-DE','en-US')) {
             $editor=$form.Controls.Find('AliasEditor',$true)[0]
             Update-PopupRows -Reason 'refresh'
             Check "$locale/$scale refresh preserves alias editor" ($editor.Focused -and $script:ManageAliasEditGuid -eq 'boot-0')
-            Press-Key $editor ([Windows.Forms.Keys]::Escape)
+            $switchBaseline=$script:ownerCoverSeen
+            $unaffected=Get-Row 'boot-2'
+            $editor.Text='Alias switch fixture'
+            Start-ManageRowAliasEdit -Guid 'boot-1'
+            $switched=$form.Controls.Find('AliasEditor',$true)[0]
+            Check "$locale/$scale LBS279 editor switch commits draft once and retains owner and unaffected row" ($switched -and $switched.Focused -and $script:ManageAliasEditGuid -eq 'boot-1' -and $script:ManageEntryAliases['boot-0'] -ceq 'Alias switch fixture' -and $script:ManageUndoHistory.Count -eq 1 -and $script:saveCalls -eq 0 -and $script:ownerCoverSeen -eq ($switchBaseline+1) -and $form.Visible -and [object]::ReferenceEquals($unaffected,(Get-Row 'boot-2')))
+            Press-Key $switched ([Windows.Forms.Keys]::Escape)
             $cancel.PerformClick()
             $beforeSave=$script:saveCalls
             $button.PerformClick()
@@ -253,5 +316,5 @@ foreach ($locale in @('de-DE','en-US')) {
         }
     }
 }
-Write-Host "LBS262 ENTRY FOCUS TOTAL $script:checks/72"
-if ($script:checks -ne 72) {throw "Unexpected LBS262 Entry Focus count $script:checks"}
+Write-Host "LBS262 ENTRY FOCUS TOTAL $script:checks/84"
+if ($script:checks -ne 84) {throw "Unexpected LBS262 Entry Focus count $script:checks"}
