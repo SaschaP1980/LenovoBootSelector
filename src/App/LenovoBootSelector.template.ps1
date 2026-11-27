@@ -373,6 +373,93 @@ public sealed class LenovoHoverGlyphButton : Button
     }
 }
 
+// LBS-283: only the shared auxiliary close button opts into optical ink
+// centering. Keep the existing font, native Button input and focus perimeter.
+public sealed class LenovoAuxiliaryCloseButton : Button
+{
+    public bool SuppressNativeFocusOutline { get; set; }
+    private bool measured;
+    private Size measuredSize;
+    private float measuredDpiX, measuredDpiY;
+    private Point glyphOffset;
+    private const TextFormatFlags GlyphFlags = TextFormatFlags.HorizontalCenter |
+        TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
+        TextFormatFlags.NoPrefix | TextFormatFlags.PreserveGraphicsClipping;
+
+    protected override void OnFontChanged(EventArgs e) {
+        measured=false; base.OnFontChanged(e);
+    }
+    protected override void OnTextChanged(EventArgs e) {
+        measured=false; base.OnTextChanged(e);
+    }
+
+    private Point GetGlyphOffset(Graphics target)
+    {
+        Size size=ClientSize;
+        if (measured && measuredSize==size && measuredDpiX==target.DpiX &&
+            measuredDpiY==target.DpiY) return glyphOffset;
+        glyphOffset=Point.Empty;
+        if (size.Width<=0 || size.Height<=0) return glyphOffset;
+        // Measure the actual GDI text ink at the drawing DPI, rather than the
+        // font's line box. Cache only the offset, not a colored bitmap.
+        using (Bitmap sample=new Bitmap(size.Width,size.Height)) {
+            sample.SetResolution(target.DpiX,target.DpiY);
+            using (Graphics g=Graphics.FromImage(sample)) {
+                g.Clear(Color.Black);
+                TextRenderer.DrawText(g,Text,Font,new Rectangle(Point.Empty,size),
+                    Color.White,GlyphFlags);
+            }
+            int x0=size.Width,y0=size.Height,x1=-1,y1=-1;
+            for (int y=0;y<size.Height;y++) for (int x=0;x<size.Width;x++) {
+                Color pixel=sample.GetPixel(x,y);
+                if (pixel.R<180 || pixel.G<180 || pixel.B<180) continue;
+                x0=Math.Min(x0,x); x1=Math.Max(x1,x);
+                y0=Math.Min(y0,y); y1=Math.Max(y1,y);
+            }
+            if (x1>=x0 && y1>=y0) {
+                // Same integer-centered circle geometry as DrawIconHalo.
+                int side=Math.Min(size.Width,size.Height);
+                side-=2*Math.Max(2,side/10);
+                if (side>0) {
+                    double cx=(size.Width-side)/2+side/2.0;
+                    double cy=(size.Height-side)/2+side/2.0;
+                    glyphOffset=new Point(
+                        (int)Math.Round(cx-(x0+x1)/2.0,MidpointRounding.AwayFromZero),
+                        (int)Math.Round(cy-(y0+y1)/2.0,MidpointRounding.AwayFromZero));
+                }
+            }
+        }
+        measured=true; measuredSize=size;
+        measuredDpiX=target.DpiX; measuredDpiY=target.DpiY;
+        return glyphOffset;
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        // The native Paint event updates the modal-owner suppression flag.
+        base.OnPaint(e);
+        if (SystemInformation.HighContrast || ClientSize.Width<=0 ||
+            ClientSize.Height<=0) return;
+        Rectangle erase=ClientRectangle;
+        if (!SuppressNativeFocusOutline) {
+            // Keep the native focused/default perimeter; clear only the old
+            // central text. The existing halo still uses the original bounds.
+            int edge=Math.Max(3,(int)Math.Round(3*e.Graphics.DpiX/96f));
+            erase.Inflate(-edge,-edge);
+        }
+        if (erase.Width>0 && erase.Height>0) {
+            using (Brush brush=new SolidBrush(BackColor))
+                e.Graphics.FillRectangle(brush,erase);
+        }
+        if (Enabled && ForeColor.ToArgb()==LenovoInteractionPalette.Hover.ToArgb() &&
+            (Control.MouseButtons & System.Windows.Forms.MouseButtons.Left)==0)
+            LenovoInteractionPalette.DrawIconHalo(e.Graphics,ClientRectangle);
+        Rectangle textBounds=ClientRectangle;
+        textBounds.Offset(GetGlyphOffset(e.Graphics));
+        TextRenderer.DrawText(e.Graphics,Text,Font,textBounds,ForeColor,GlyphFlags);
+    }
+}
+
 // LBS-279: compose the main popup's native child HWNDs together, including
 // the temporary cover's final reveal. Do not apply this style to dialogs,
 // menus or other windows. Establish it at construction, not by recreating

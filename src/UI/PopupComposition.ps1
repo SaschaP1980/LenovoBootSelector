@@ -650,7 +650,7 @@ function New-AuxiliaryPopupForm {
     $tip.SetToolTip($subtitleLabel,$Subtitle)
     $header.Controls.Add($titleLabel)
     $header.Controls.Add($subtitleLabel)
-    $close = New-Object LenovoHoverGlyphButton
+    $close = New-Object LenovoAuxiliaryCloseButton
     $close.Name = 'AuxiliaryClose'
     $close.Text = '×'
     $close.AccessibleName = Get-LocalizedString -Key 'Common.Close'
@@ -669,15 +669,8 @@ function New-AuxiliaryPopupForm {
     # Native default/focus ink must not survive on an inactive modal owner.
     $close.Add_Paint({
         param($sender,$eventArgs)
-        if ([Windows.Forms.SystemInformation]::HighContrast) { return }
         $form = $sender.FindForm()
-        if (-not $form) { return }
-        if ($sender.Focused -and $form.ContainsFocus -and -not $script:ActiveOwnedDialog) { return }
-        $background = New-Object Drawing.SolidBrush($sender.BackColor)
-        try { $eventArgs.Graphics.FillRectangle($background,$sender.ClientRectangle) }
-        finally { $background.Dispose() }
-        $flags = [Windows.Forms.TextFormatFlags]::HorizontalCenter -bor [Windows.Forms.TextFormatFlags]::VerticalCenter -bor [Windows.Forms.TextFormatFlags]::SingleLine -bor [Windows.Forms.TextFormatFlags]::NoPrefix -bor [Windows.Forms.TextFormatFlags]::PreserveGraphicsClipping
-        [Windows.Forms.TextRenderer]::DrawText($eventArgs.Graphics,$sender.Text,$sender.Font,$sender.ClientRectangle,$sender.ForeColor,$flags)
+        $sender.SuppressNativeFocusOutline = -not ($form -and $sender.Focused -and $form.ContainsFocus -and -not $script:ActiveOwnedDialog)
     })
     $close.Add_GotFocus({ $this.Invalidate() })
     $close.Add_LostFocus({ $this.Invalidate() })

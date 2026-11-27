@@ -1,5 +1,10 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.10.4.3 - Center the auxiliary popup close glyph (LBS-283)
+
+- Optically center the existing multiplication-sign glyph in the shared auxiliary close button using its actual GDI text ink at the drawing DPI. Keep the existing font, halo geometry, colors, native focus perimeter, cancel semantics and inactive-owner suppression.
+- Add a focused native raster regression across all three auxiliary header consumers, both locales and 100%/250% synthetic layout geometry. The unfixed basis reproduces the vertical displacement; the corrected renderer retains the measured glyph and halo sizes. Physical owner acceptance remains separate.
+
 ## v1.10.4.2 - Coherent popup composition and inline alias transitions (LBS-279)
 
 - Use native descendant composition only for the main popup, retaining the nonselectable in-owner visual cover and existing dismissal policy. Capture the native owner client rather than replaying overlapping child controls via DrawToBitmap; use an owner-wide final redraw.

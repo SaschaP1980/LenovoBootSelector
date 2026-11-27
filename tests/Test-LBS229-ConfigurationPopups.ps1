@@ -1,5 +1,5 @@
 ﻿#requires -version 5.1
-param([switch]$CorrectionProbeOnly,[switch]$SettingsCorrectionProbeOnly,[switch]$InitialFocusProbeOnly,[switch]$FocusOutlineProbeOnly,[switch]$DefaultInitialFocusProbeOnly,[switch]$Lbs182StatusProbeOnly)
+param([switch]$CorrectionProbeOnly,[switch]$SettingsCorrectionProbeOnly,[switch]$InitialFocusProbeOnly,[switch]$FocusOutlineProbeOnly,[switch]$DefaultInitialFocusProbeOnly,[switch]$Lbs182StatusProbeOnly,[switch]$Lbs283CloseProbeOnly)
 # LBS-229: actual native owned forms, no live firmware or privileged actions.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -138,6 +138,93 @@ $area=[Drawing.Rectangle]::new(-1000,-100,3000,1700)
 $anchor=[Drawing.Rectangle]::new(0,0,390,672)
 $size=[Drawing.Size]::new(390,514)
 try {
+
+    # LBS-283: measure the actual production shared auxiliary Close control,
+    # including the native Paint event and derived hover paint, not text metrics.
+    function Test-Lbs283CloseGlyph {
+        if ([Windows.Forms.SystemInformation]::HighContrast) { throw 'LBS283 raster fixture requires the normal palette' }
+        $savedLocale=$script:Locale
+        $savedScale=$script:Scale
+        $failures=[Collections.Generic.List[string]]::new()
+        $cases=0
+        $flags=[Reflection.BindingFlags]::Instance -bor [Reflection.BindingFlags]::NonPublic
+        function Get-Lbs283InkBounds($Button,[bool]$Hover) {
+            $bitmap=[Drawing.Bitmap]::new($Button.Width,$Button.Height)
+            $gx0=$bitmap.Width; $gy0=$bitmap.Height; $gx1=-1; $gy1=-1
+            $hx0=$bitmap.Width; $hy0=$bitmap.Height; $hx1=-1; $hy1=-1
+            try {
+                $Button.DrawToBitmap($bitmap,$Button.ClientRectangle)
+                for ($y=0;$y -lt $bitmap.Height;$y++) {
+                    for ($x=0;$x -lt $bitmap.Width;$x++) {
+                        $p=$bitmap.GetPixel($x,$y)
+                        $glyph=if ($Hover) { $p.R -ge 180 -and ($p.R-$p.G) -ge 60 } else { $p.R -ge 180 -and $p.G -ge 180 -and $p.B -ge 180 }
+                        if ($glyph) {
+                            $gx0=[Math]::Min($gx0,$x); $gx1=[Math]::Max($gx1,$x)
+                            $gy0=[Math]::Min($gy0,$y); $gy1=[Math]::Max($gy1,$y)
+                        }
+                        # The 12% red halo is deliberately distinguished from
+                        # the bright glyph ink and the black idle background.
+                        if ($Hover -and $p.R -ge 10 -and $p.R -le 55 -and ($p.R-$p.G) -ge 5) {
+                            $hx0=[Math]::Min($hx0,$x); $hx1=[Math]::Max($hx1,$x)
+                            $hy0=[Math]::Min($hy0,$y); $hy1=[Math]::Max($hy1,$y)
+                        }
+                    }
+                }
+                if ($gx1 -lt $gx0 -or $gy1 -lt $gy0) { throw 'LBS283 invalid capture: no close-glyph ink' }
+                if ($Hover -and ($hx1 -le $hx0 -or $hy1 -le $hy0)) { throw 'LBS283 invalid capture: no halo raster' }
+                return [pscustomobject]@{
+                    X=($gx0+$gx1)/2.0; Y=($gy0+$gy1)/2.0; Width=$gx1-$gx0+1; Height=$gy1-$gy0+1
+                    HaloX=($hx0+$hx1)/2.0; HaloY=($hy0+$hy1)/2.0; HaloWidth=$hx1-$hx0+1; HaloHeight=$hy1-$hy0+1
+                }
+            } finally { $bitmap.Dispose() }
+        }
+        try {
+            foreach ($locale in @('de-DE','en-US')) {
+                $script:Locale=$locale
+                foreach ($scale in @(1.0,2.5)) {
+                    $script:Scale=$scale
+                    foreach ($kind in @('LenovoDefaultTargetPicker','LenovoConfigurationPopup','LenovoSystemStatusPopup')) {
+                        $surface=New-AuxiliaryPopupForm -Name $kind -Title (Get-LocalizedString -Key 'Common.Close') -Subtitle '' -ContentHeight 100
+                        try {
+                            Set-AuxiliaryControlBounds -Control $surface -Scale $scale
+                            $close=$surface.Tag.Close
+                            if ($close -isnot [Windows.Forms.Button] -or $surface.CancelButton -ne $close -or
+                                $close.DialogResult -ne [Windows.Forms.DialogResult]::Cancel -or -not $close.TabStop -or
+                                $close.AccessibleName -ne (Get-LocalizedString -Key 'Common.Close') -or -not $surface.Tag.Tip.GetToolTip($close)) {
+                                throw 'LBS283 invalid fixture: native close contract missing'
+                            }
+                            [void]$close.GetType().GetMethod('OnMouseLeave',$flags).Invoke($close,@([EventArgs]::Empty))
+                            $idle=Get-Lbs283InkBounds $close $false
+                            [void]$close.GetType().GetMethod('OnMouseEnter',$flags).Invoke($close,@([EventArgs]::Empty))
+                            $hover=Get-Lbs283InkBounds $close $true
+                            [void]$close.GetType().GetMethod('OnMouseLeave',$flags).Invoke($close,@([EventArgs]::Empty))
+                            $restored=Get-Lbs283InkBounds $close $false
+                            $tol=[Math]::Max(1.0,0.5*$scale)
+                            $dx=[Math]::Abs($hover.X-$hover.HaloX); $dy=[Math]::Abs($hover.Y-$hover.HaloY)
+                            $ix=[Math]::Abs($idle.X-$hover.HaloX); $iy=[Math]::Abs($idle.Y-$hover.HaloY)
+                            $expectedSide=[Math]::Min($close.Width,$close.Height)
+                            $expectedSide-=2*[Math]::Max(2,[Math]::Floor($expectedSide/10))
+                            $sizeOk=([Math]::Abs($hover.HaloWidth-$expectedSide) -le 2 -and [Math]::Abs($hover.HaloHeight-$expectedSide) -le 2)
+                            $stable=([Math]::Abs($idle.X-$hover.X) -le 1 -and [Math]::Abs($idle.Y-$hover.Y) -le 1 -and
+                                [Math]::Abs($idle.Width-$hover.Width) -le 2 -and [Math]::Abs($idle.Height-$hover.Height) -le 2 -and
+                                $restored.X -eq $idle.X -and $restored.Y -eq $idle.Y -and $restored.Width -eq $idle.Width -and $restored.Height -eq $idle.Height)
+                            $case="$kind/$locale/$scale"
+                            Write-Host "LBS283 RASTER $case idle=$($idle.X),$($idle.Y) hover=$($hover.X),$($hover.Y) halo=$($hover.HaloX),$($hover.HaloY) delta=$dx,$dy idleDelta=$ix,$iy tolerance=$tol glyph=$($idle.Width)x$($idle.Height) haloSize=$($hover.HaloWidth)x$($hover.HaloHeight)"
+                            $cases++
+                            if ($dx -gt $tol -or $dy -gt $tol -or $ix -gt $tol -or $iy -gt $tol -or -not $stable -or -not $sizeOk) {
+                                $failures.Add("$case glyph/halo center or raster parity: hover=$dx,$dy idle=$ix,$iy stable=$stable haloSize=$sizeOk")
+                            }
+                        } finally { $surface.Dispose() }
+                    }
+                }
+            }
+        } finally { $script:Locale=$savedLocale; $script:Scale=$savedScale }
+        if ($cases -ne 12) { throw "LBS283 invalid coverage: $cases/12" }
+        if ($failures.Count) { throw ("LBS283 CENTER REGRESSION: " + ($failures -join '; ')) }
+        Write-Host 'PASS LBS283 12 production auxiliary-close raster cases'
+    }
+    if ($Lbs283CloseProbeOnly -or -not ($CorrectionProbeOnly -or $SettingsCorrectionProbeOnly -or $InitialFocusProbeOnly -or $FocusOutlineProbeOnly -or $DefaultInitialFocusProbeOnly -or $Lbs182StatusProbeOnly)) { Test-Lbs283CloseGlyph }
+    if ($Lbs283CloseProbeOnly) { return }
     function Test-Lbs182StatusOverview {
         $startChecks=$script:Checks
         $savedLocale=$script:Locale
