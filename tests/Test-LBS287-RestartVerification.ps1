@@ -1,7 +1,7 @@
 #requires -version 5.1
 # LBS-287: actual restart entry, controller, read-only worker and native
 # completion timers. Every task call and shutdown dispatch is intercepted.
-param([switch]$MismatchProbeOnly)
+param([switch]$MismatchProbeOnly,[switch]$PopupRefreshProbeOnly)
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -23,6 +23,9 @@ $ast=[Management.Automation.Language.Parser]::ParseInput($template,[ref]$tokens,
 $entry=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Restart-Windows'},$true)
 if (-not $entry -or @($errors).Count) { throw 'Canonical restart entry point unavailable.' }
 . ([scriptblock]::Create($entry.Extent.Text))
+$footer=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Update-RestartTargetUi'},$true)
+if (-not $footer) { throw 'Canonical restart footer unavailable.' }
+. ([scriptblock]::Create($footer.Extent.Text.Replace('function Update-RestartTargetUi','function Update-Lbs287ProductionRestartTargetUi')))
 $script:A='{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}'
 $script:B='{bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb}'
 $script:C='{cccccccc-cccc-cccc-cccc-cccccccccccc}'
@@ -36,9 +39,12 @@ $script:Meta=[pscustomobject]@{
     targets=@([pscustomobject]@{guid=$script:A},[pscustomobject]@{guid=$script:B})
 }
 $script:RestartButton=New-Object Windows.Forms.Button
+$script:RestartButton.Add_Click({ Restart-Windows })
 $script:RestartUseDefaultButton=New-Object Windows.Forms.Button
 $script:RestartTargetLabel=New-Object Windows.Forms.Label
+$script:ColorSecondary=[Drawing.Color]::Gray
 $script:RestartMenuItem=New-Object Windows.Forms.ToolStripMenuItem
+$script:RestartMenuItem.Add_Click({ Restart-Windows })
 $script:ScriptPath='mock-runtime.ps1'
 $script:RuntimeSessionId='lbs287-native'
 $script:BackgroundRefreshState=New-BackgroundRefreshRuntimeState
@@ -84,18 +90,25 @@ function Write-RuntimeDiagnosticEvent {
 }
 function New-RuntimeDiagnosticData { param($Data) return $Data }
 function Update-PopupRows { param($Reason) }
-function Update-RestartTargetUi { Update-BootNextRestartInterlock }
+function Update-RestartTargetUi { if ($script:RestartVerification) { Update-Lbs287ProductionRestartTargetUi } else { Update-BootNextRestartInterlock } }
 function Update-TaskBrokerUiState { param([switch]$Fast) $script:RestartMenuItem.Enabled=-not [bool]$script:RestartVerification; return $true }
 function New-Lbs287Process {
     param([bool]$Exited=$false,[int]$ExitCode=0)
     $p=[pscustomobject]@{HasExited=$Exited;ExitCode=$ExitCode;Killed=$false;Disposed=$false}
+    $p | Add-Member ScriptMethod Refresh { }
     $p | Add-Member ScriptMethod Kill { $this.Killed=$true;$this.HasExited=$true }
     $p | Add-Member ScriptMethod Dispose { $this.Disposed=$true }
     return $p
 }
 function Start-BackgroundRefreshWorkerProcess {
     param($ScriptPath,$ResultPath,[bool]$RefreshStorage,[bool]$RefreshFirmware,$RuntimeSessionId,[switch]$VerifyRestart)
-    if (-not $VerifyRestart -or $RefreshStorage -or -not $RefreshFirmware) { throw 'Wrong worker admission.' }
+    if (-not $VerifyRestart) {
+        $script:OrdinaryWorkerStarts++
+        $p=New-Lbs287Process
+        $p | Add-Member NoteProperty Id 12345
+        return $p
+    }
+    if ($RefreshStorage -or -not $RefreshFirmware) { throw 'Wrong worker admission.' }
     $script:WorkerStarts++
     return (New-Lbs287Process)
 }
@@ -172,6 +185,7 @@ function Complete-Lbs287Readback {
 }
 function Reset-Lbs287 {
     if ($script:RestartVerification) { Stop-RestartVerification -Shutdown }
+    if ($script:BackgroundRefreshState.Process) { Stop-BackgroundBootRefreshForMaintenance -Reason 'fixture-reset' }
     $script:SelectedGuid=$script:A
     $script:Expected=$script:A
     $script:Observed=$script:A
@@ -195,6 +209,12 @@ function Reset-Lbs287 {
     $script:NoticeCalls=0
     $script:DispatchCalls=0
     $script:WorkerStarts=0
+    $script:OrdinaryWorkerStarts=0
+    $script:RefreshResultSuccess=$true
+    $script:RefreshObserved=$script:A
+    $script:RefreshApplyThrows=$false
+    $script:RefreshExitCode=0
+    $script:RefreshVerified=$true
     $script:WriterReads=0
     $script:ReadOrder=@()
     $script:Events=@()
@@ -217,6 +237,99 @@ function Reset-Lbs287 {
     [IO.File]::WriteAllText($script:Meta.firmwareFile,(New-Lbs287EntriesText))
     [IO.File]::WriteAllText($script:Meta.bootNextOriginFile,'stable-provenance')
 }
+# Production refresh lifecycle is exercised; only read-only result application
+# is simulated, because the fixture has no installed SYSTEM tasks or firmware.
+function Get-TaskBrokerInteractiveReady { return $true }
+function Apply-BackgroundRefreshResult {
+    param($Result,$Request)
+    if ($script:RefreshApplyThrows) { throw 'Mock ordinary refresh application failed.' }
+    if (-not $Result.Success) { return $false }
+    $script:SelectedGuid=$script:RefreshObserved
+    $script:NextBootFirmwareReadVerified=$script:RefreshVerified
+    return $true
+}
+function Start-Lbs287PopupRefresh {
+    $script:ScriptPath=$PSCommandPath
+    $script:FirmwareCacheUtc=[datetime]::MinValue
+    $script:FirmwareCacheText=''
+    Start-BackgroundBootRefresh -RefreshStorage -Origin Popup
+    if (-not $script:BackgroundRefreshState.Process) { throw 'Ordinary popup worker fixture not started.' }
+}
+function Complete-Lbs287PopupRefresh {
+    $state=$script:BackgroundRefreshState
+    [IO.File]::WriteAllText($state.ResultPath,(@{Success=$script:RefreshResultSuccess;Stage='complete'} | ConvertTo-Json))
+    $state.Process.ExitCode=$script:RefreshExitCode
+    $state.Process.HasExited=$true
+    Complete-BackgroundBootRefresh
+}
+function Invoke-Lbs287PopupRefreshProbe {
+    Reset-Lbs287
+    Start-Lbs287PopupRefresh
+    $script:RestartButton.PerformClick()
+    Assert-Lbs287 'popup refresh click defers without rejection, confirmation or readback overlap' ($script:RestartVerification -and $script:RestartVerification.Stage -eq 'waiting-refresh' -and $script:NoticeCalls -eq 0 -and $script:ConfirmationCalls -eq 0 -and $script:WorkerStarts -eq 0 -and -not $script:RestartButton.Enabled)
+    Complete-Lbs287PopupRefresh
+    Assert-Lbs287 'successful popup refresh hands off to independent first restart readback' ($script:RestartVerification.Stage -eq 'pre-confirmation' -and $script:WorkerStarts -eq 1 -and $script:ConfirmationCalls -eq 0 -and -not $script:BackgroundRefreshState.Process)
+    Complete-Lbs287Readback
+    Assert-Lbs287 'one click reaches original confirmation, No cancels safely' ($script:ConfirmationCalls -eq 1 -and $script:DispatchCalls -eq 0 -and -not $script:RestartVerification -and $script:NoticeCalls -eq 0)
+}
+function Test-Lbs287PopupRefreshLifecycle {
+    param([string]$Locale)
+    Invoke-Lbs287PopupRefreshProbe
+    Reset-Lbs287
+    Start-Lbs287PopupRefresh
+    $script:Choice=[Windows.Forms.DialogResult]::Yes
+    $script:RestartMenuItem.PerformClick()
+    $ctx=$script:RestartVerification
+    $ordinary=$script:BackgroundRefreshState.Process
+    Assert-Lbs287 "$Locale tray entry reserves identical intent and native waiting footer" ($ctx.Stage -eq 'waiting-refresh' -and $ctx.ExpectedGuid -eq $script:A -and $ctx.Timer.Enabled -and $script:RestartTargetLabel.Text -eq (Get-LocalizedString -Key 'Restart.WaitingRefreshStatus') -and -not $script:RestartMenuItem.Enabled)
+    Restart-Windows;Start-BootNextSelection -Guid $script:B;Start-DefaultTargetChange -Guid $script:B;Start-BackgroundBootRefresh -Origin Manual
+    Assert-Lbs287 "$Locale reservation rejects duplicate and competing work without stopping ordinary refresh" ($script:RestartVerification.Id -eq $ctx.Id -and $script:OrdinaryWorkerStarts -eq 1 -and $script:WorkerStarts -eq 0 -and -not $ordinary.Killed -and -not $script:BootNextPendingGuid -and -not $script:DefaultTargetChangePending)
+    Complete-RestartVerification
+    Assert-Lbs287 "$Locale waiting timer cannot start a second worker before completion" ($script:WorkerStarts -eq 0 -and $script:RestartVerification.Stage -eq 'waiting-refresh')
+    Complete-Lbs287PopupRefresh
+    Assert-Lbs287 "$Locale applied and disposed ordinary worker precedes independent readback" ($ordinary.Disposed -and $script:RestartVerification.Stage -eq 'pre-confirmation' -and $script:RestartTargetLabel.Text -eq (Get-LocalizedString -Key 'Restart.VerifyingStatus') -and $script:WorkerStarts -eq 1)
+    Complete-Lbs287Readback
+    Assert-Lbs287 "$Locale one click reaches explicit Yes then starts second independent readback" ($script:ConfirmationCalls -eq 1 -and $script:WorkerStarts -eq 2 -and $script:DispatchCalls -eq 0)
+    Complete-Lbs287Readback
+    Assert-Lbs287 "$Locale verified deferred request dispatches once; ordinary refresh not counted" ($script:DispatchCalls -eq 1 -and ($script:ReadOrder -join ',') -eq 'entries,manager,entries,manager' -and $script:OrdinaryWorkerStarts -eq 1)
+    foreach ($case in @('result-failed','apply-failed','exit-failed','changed-intent','unknown-intent','maintenance','new-pending')) {
+        Reset-Lbs287;Start-Lbs287PopupRefresh;Restart-Windows
+        switch ($case) {
+            'result-failed' { $script:RefreshResultSuccess=$false }
+            'apply-failed' { $script:RefreshApplyThrows=$true }
+            'exit-failed' { $script:RefreshExitCode=5 }
+            'changed-intent' { $script:RefreshObserved=$script:B }
+            'unknown-intent' { $script:RefreshVerified=$false }
+            'maintenance' { $script:Capability='Busy' }
+            'new-pending' { $script:BackgroundRefreshState.PendingRequest=New-BackgroundRefreshRequest -RefreshFirmware $true -RefreshStorage $true -Origin Manual }
+        }
+        Complete-Lbs287PopupRefresh
+        Assert-Lbs287 "$Locale $case during waiting fails closed" ($script:ConfirmationCalls -eq 0 -and $script:DispatchCalls -eq 0 -and $script:WorkerStarts -eq 0 -and -not $script:RestartVerification -and $script:NoticeCalls -eq 1)
+        if ($case -eq 'changed-intent') {
+            Assert-Lbs287 "$Locale observed changed target remains visible without retargeting request" ($script:SelectedGuid -eq $script:B -and $script:NextBootFirmwareReadVerified -and $script:NoticeMessage.Contains($script:A) -and $script:NoticeMessage.Contains($script:B))
+        }
+    }
+    Reset-Lbs287;Start-Lbs287PopupRefresh;Restart-Windows
+    $ordinary=$script:BackgroundRefreshState.Process
+    $script:RestartVerification.StartedUtc=[datetime]::UtcNow.AddSeconds(-46)
+    Complete-RestartVerification
+    Assert-Lbs287 "$Locale bounded wait timeout releases request without killing refresh" (-not $script:RestartVerification -and $script:BackgroundRefreshState.Process -eq $ordinary -and -not $ordinary.Killed -and $script:NoticeCalls -eq 1)
+    Complete-Lbs287PopupRefresh
+    Assert-Lbs287 "$Locale late successful refresh cannot revive timed-out request" ($script:WorkerStarts -eq 0 -and $script:ConfirmationCalls -eq 0 -and $script:DispatchCalls -eq 0)
+    Reset-Lbs287;Start-Lbs287PopupRefresh;Restart-Windows
+    $ordinary=$script:BackgroundRefreshState.Process
+    Stop-RestartVerification -Shutdown
+    Complete-Lbs287PopupRefresh
+    Assert-Lbs287 "$Locale stopped request cannot revive on late completion" (-not $script:RestartVerification -and $script:WorkerStarts -eq 0 -and $script:DispatchCalls -eq 0 -and $ordinary.Disposed)
+    Reset-Lbs287;Start-Lbs287PopupRefresh
+    $script:BackgroundRefreshState.ActiveRequest.Origin='Startup'
+    Restart-Windows
+    Assert-Lbs287 "$Locale startup refresh is not admitted for ordinary handoff" (-not $script:RestartVerification -and $script:NoticeCalls -eq 1 -and $script:WorkerStarts -eq 0)
+    Reset-Lbs287;Start-Lbs287PopupRefresh
+    $script:BackgroundRefreshState.PendingRequest=New-BackgroundRefreshRequest -RefreshFirmware $true -Origin Manual
+    Restart-Windows
+    Assert-Lbs287 "$Locale preexisting queued refresh escalation blocks reservation" (-not $script:RestartVerification -and $script:NoticeCalls -eq 1 -and $script:WorkerStarts -eq 0 -and $script:BackgroundRefreshState.PendingRequest)
+}
 function Invoke-Lbs287MismatchProbe {
     Reset-Lbs287
     $script:Observed=$script:B
@@ -230,11 +343,13 @@ function Test-Lbs287Blocked {
 }
 try {
     $script:Locale='en-US'
+    if ($PopupRefreshProbeOnly) { Invoke-Lbs287PopupRefreshProbe; Write-Host 'LBS287 POPUP REFRESH TOTAL 3/3'; return }
     Invoke-Lbs287MismatchProbe
     if ($MismatchProbeOnly) { Write-Host 'LBS287 MISMATCH TOTAL 1/1';return }
     Assert-Lbs287 'mismatch reflects observed B without dispatch or default mutation' ($script:SelectedGuid -eq $script:B -and $script:DefaultGuid -eq $script:B -and $script:NextBootFirmwareReadVerified)
     foreach ($locale in @('de-DE','en-US')) {
         $script:Locale=$locale
+        Test-Lbs287PopupRefreshLifecycle -Locale $locale
         Reset-Lbs287
         $valid=ConvertFrom-RestartFirmwareEvidence (New-Lbs287ManagerText -Guid $script:A.ToUpperInvariant())
         Assert-Lbs287 "$locale canonical GUID and full order parsed" ($valid.SelectedGuid -eq $script:A -and $valid.ExplicitTarget -and $valid.DisplayOrder.Count -eq 2)
@@ -346,8 +461,8 @@ try {
         Complete-RestartVerification
         Assert-Lbs287 "$locale nonzero shutdown exit is a failure, not boot success" ($script:DispatchCalls -eq 1 -and $script:NoticeCalls -eq 1 -and -not $script:RestartVerification -and @($script:Events | Where-Object {$_.Event -eq 'RESTART_REQUEST' -and $_.Success -eq $false}).Count -eq 1)
     }
-    Write-Host "LBS287 RESTART TOTAL $script:checks/82"
-    if ($script:checks -ne 82) { throw "Unexpected LBS287 total: $script:checks" }
+    Write-Host "LBS287 RESTART TOTAL $script:checks/126"
+    if ($script:checks -ne 126) { throw "Unexpected LBS287 total: $script:checks" }
 }
 finally {
     if ($script:RestartVerification) { Stop-RestartVerification -Shutdown }

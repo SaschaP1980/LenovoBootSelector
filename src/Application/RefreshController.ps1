@@ -121,9 +121,13 @@ function Complete-BackgroundBootRefresh {
     Update-RefreshButtonVisual
 
     $continuePending = $true
+    $restartRefreshSucceeded = $false
     try {
         $result = Get-BackgroundRefreshResult -ResultPath ([string]$context.ResultPath)
         $continuePending = Apply-BackgroundRefreshResult -Result $result -Request $context.Request
+        if ($script:RestartVerification -and $script:RestartVerification.Stage -eq 'waiting-refresh') {
+            $restartRefreshSucceeded = [bool]($continuePending -and $result.Success -is [bool] -and $result.Success -and $context.Process.ExitCode -eq 0)
+        }
     }
     catch {
         Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_COMPLETED' -Stage 'background-refresh' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ requestedStorage = [bool]$context.Request.RefreshStorage }) -Level error
@@ -136,6 +140,9 @@ function Complete-BackgroundBootRefresh {
         try { $context.Process.Dispose() } catch { }
     }
 
+    if ($script:RestartVerification -and $script:RestartVerification.Stage -eq 'waiting-refresh') {
+        Complete-RestartRefreshWait -Process $context.Process -Succeeded $restartRefreshSucceeded
+    }
     if (-not $continuePending) { return }
 
     $pending = Take-BackgroundRefreshPendingRequest -State $script:BackgroundRefreshState
@@ -186,6 +193,7 @@ function Start-BackgroundBootRefresh {
         }
         catch { }
         Complete-BackgroundBootRefresh
+        if ($script:RestartVerification) { return }
     }
 
     if (-not $script:ScriptPath -or -not (Test-Path -LiteralPath $script:ScriptPath)) { return }
