@@ -1,8 +1,9 @@
 {
   "schemaVersion": 2,
-  "version": "1.10.6.0",
+  "version": "1.10.6.1",
   "releaseProfile": "patch",
   "protectedFragmentIntent": [
+    "ps:Complete-BackgroundBootRefresh",
     "ps:Start-BackgroundBootRefresh"
   ],
   "repositoryDeleteIntent": []
