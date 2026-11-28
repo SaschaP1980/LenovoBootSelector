@@ -2511,7 +2511,7 @@ function Update-RestartTargetUi {
     # may be presented as newly confirmed until both readbacks complete.
     if (-not $script:RestartTargetLabel -or $script:RestartTargetLabel.IsDisposed) { return }
     if ($script:RestartVerification) {
-        $label=Get-LocalizedString -Key $(if ($script:RestartVerification.Stage -in @('dispatching','requested')) { 'Restart.RequestedStatus' } else { 'Restart.VerifyingStatus' })
+        $label=Get-LocalizedString -Key $(if ($script:RestartVerification.Stage -eq 'waiting-refresh') { 'Restart.WaitingRefreshStatus' } elseif ($script:RestartVerification.Stage -in @('dispatching','requested')) { 'Restart.RequestedStatus' } else { 'Restart.VerifyingStatus' })
         $script:RestartTargetLabel.Text=$label
         $script:RestartTargetLabel.ForeColor=$script:ColorSecondary
         $script:RestartTargetLabel.AccessibleName=$label

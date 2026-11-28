@@ -32,6 +32,8 @@ The existing unelevated Windows restart route uses an immutable expected next-bo
 
 The read-only worker binds its observations to newly written protected snapshots using exact UTC timestamps and content hashes. It observes the existing exact installed reader/writer task states and writer provenance before and after the read; the parent rechecks provenance and bounded evidence age before dispatch. The existing SYSTEM-only writer lock and privileged operations are unchanged. The tray interlock rejects competing LBS actions; independent external writers and a late startup trigger cannot be made atomic with the unelevated restart request. A successful shutdown request is not proof of subsequent firmware or OS boot success.
 
+A ready session may reserve restart admission during an existing ordinary Popup, Background or Manual read-only refresh, provided no queued escalation is pending. This reservation retains the original verified intent, rejects competing LBS actions and waits up to 45 seconds. The exact ordinary process must complete successfully and its result must be applied and retired before handing off to the two independent restart readbacks. Changed or unknown intent, a failed/expired refresh, startup readiness or conflicting work cannot authorize restart. Expiring or stopping the reservation never cancels the existing ordinary reader merely to accelerate restart, and a late completion cannot revive it.
+
 ## Fixed task naming
 
 Static tasks have exact names:

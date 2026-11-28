@@ -1,5 +1,5 @@
 {
-  "version": "1.10.6.0",
+  "version": "1.10.6.1",
   "scope": "Inline empty/best-effort catch blocks in modular runtime source; generated runtime excluded.",
   "policy": "Every silent catch must be classified. Product-affecting failures must use explicit handling/diagnostics rather than this allowlist.",
   "allowed_categories": [
@@ -410,14 +410,14 @@
     },
     {
       "source": "src/Application/RefreshController.ps1",
-      "line": 136,
+      "line": 140,
       "category": "cleanup_best_effort",
       "reason": "Cleanup/dispose failure must not replace the primary operation result.",
       "code": "try { $context.Process.Dispose() } catch { }"
     },
     {
       "source": "src/Application/RefreshController.ps1",
-      "line": 187,
+      "line": 194,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "catch { }"
@@ -473,7 +473,7 @@
     },
     {
       "source": "src/Core/Localization.ps1",
-      "line": 1112,
+      "line": 1116,
       "category": "lifecycle_race_best_effort",
       "reason": "Expected lifecycle/race cleanup failure is tolerated; primary path owns status/diagnostics.",
       "code": "try { $text = $text -f @($Arguments) } catch { }"

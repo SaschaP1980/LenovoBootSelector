@@ -529,6 +529,8 @@ function Get-LocalizationCatalogCore {
             'Restart.FailedTitle' = 'Restart not possible'
             'Restart.FailedHeading' = 'Windows could not be restarted.'
             'Restart.FailedMessage' = 'Please try again or restart Windows from the Start menu.'
+            'Restart.WaitingRefreshStatus' = 'Waiting for the current refresh …'
+            'Restart.RefreshNotCompleted' = 'The current refresh did not complete successfully in time. No restart was started. Refresh the boot targets and try again.'
             'Restart.VerifyingStatus' = 'Verifying next boot before restart …'
             'Restart.RequestedStatus' = 'Windows restart requested …'
             'Restart.BlockedStatus' = 'Restart blocked'
@@ -1047,6 +1049,8 @@ function Get-LocalizationCatalogCore {
             'Restart.FailedTitle' = 'Neustart nicht möglich'
             'Restart.FailedHeading' = 'Windows konnte nicht neu gestartet werden.'
             'Restart.FailedMessage' = 'Bitte versuche es erneut oder starte Windows über das Startmenü neu.'
+            'Restart.WaitingRefreshStatus' = 'Laufende Aktualisierung wird abgewartet …'
+            'Restart.RefreshNotCompleted' = 'Die laufende Aktualisierung wurde nicht rechtzeitig erfolgreich abgeschlossen. Es wurde kein Neustart ausgelöst. Aktualisiere die Startziele und versuche es erneut.'
             'Restart.VerifyingStatus' = 'Nächstes Startziel wird geprüft …'
             'Restart.RequestedStatus' = 'Windows-Neustart angefordert …'
             'Restart.BlockedStatus' = 'Neustart blockiert'
@@ -4161,7 +4165,7 @@ if (-not $BootNextWorker -and -not $BackgroundRefresh -and -not $UpdateCheck -an
     $activationEvent = New-LbsActivationEvent
 }
 
-$script:AppVersion = '1.10.6.0'
+$script:AppVersion = '1.10.6.1'
 $script:Popup = $null
 $script:TrayIcon = $null
 $script:CurrentEntries = @()
@@ -10725,7 +10729,7 @@ function Update-RestartTargetUi {
     # may be presented as newly confirmed until both readbacks complete.
     if (-not $script:RestartTargetLabel -or $script:RestartTargetLabel.IsDisposed) { return }
     if ($script:RestartVerification) {
-        $label=Get-LocalizedString -Key $(if ($script:RestartVerification.Stage -in @('dispatching','requested')) { 'Restart.RequestedStatus' } else { 'Restart.VerifyingStatus' })
+        $label=Get-LocalizedString -Key $(if ($script:RestartVerification.Stage -eq 'waiting-refresh') { 'Restart.WaitingRefreshStatus' } elseif ($script:RestartVerification.Stage -in @('dispatching','requested')) { 'Restart.RequestedStatus' } else { 'Restart.VerifyingStatus' })
         $script:RestartTargetLabel.Text=$label
         $script:RestartTargetLabel.ForeColor=$script:ColorSecondary
         $script:RestartTargetLabel.AccessibleName=$label
@@ -10823,13 +10827,28 @@ function Restart-Windows {
 # protected readbacks; never use the observed selection as the expected intent.
 # Existing background worker/timer infrastructure is reused only while active.
 
-function Test-RestartAdmission {
-    if ($script:ExitRequested -or $script:BootNextPendingGuid -or $script:DefaultTargetChangePending -or
-        $script:IsManageEntriesMode -or $script:PreferencesUiActive -or $script:ActiveOwnedDialog -or $script:ActiveAuxiliaryPopup -or
-        $script:TaskBrokerInstallInProgress -or $script:TaskBrokerRemoveInProgress -or (Test-MaintenanceBusy)) { return $false }
-    if ($script:BackgroundRefreshState -and (Test-BackgroundRefreshActive -State $script:BackgroundRefreshState)) { return $false }
+# A normal read-only refresh can finish under a reserved restart request.
+# Other operations, cold readiness and queued refresh escalations still block.
+function Get-RestartAdmissionBlocker {
+    param([switch]$AllowRefreshWait)
+    if ($script:ExitRequested) { return 'exiting' }
+    if ($script:BootNextPendingGuid) { return 'bootnext-pending' }
+    if ($script:DefaultTargetChangePending) { return 'default-pending' }
+    if ($script:IsManageEntriesMode) { return 'manage-mode' }
+    if ($script:PreferencesUiActive -or $script:ActiveOwnedDialog -or $script:ActiveAuxiliaryPopup) { return 'modal-active' }
+    if ($script:TaskBrokerInstallInProgress -or $script:TaskBrokerRemoveInProgress -or (Test-MaintenanceBusy)) { return 'maintenance' }
     $caps=Get-CurrentSystemFunctionsCapabilities
-    return [bool]($caps.CanRestart -and [string]$caps.State -eq 'Ready')
+    if (-not $caps.CanRestart -or [string]$caps.State -ne 'Ready') { return ('readiness-'+[string]$caps.State) }
+    if ($script:BackgroundRefreshState -and (Test-BackgroundRefreshActive -State $script:BackgroundRefreshState)) {
+        if (-not $AllowRefreshWait -or
+            $script:BackgroundRefreshState.ActiveRequest.Origin -notin @('Popup','Background','Manual') -or
+            $script:BackgroundRefreshState.PendingRequest) { return 'refresh-active' }
+    }
+    return ''
+}
+
+function Test-RestartAdmission {
+    return (-not (Get-RestartAdmissionBlocker))
 }
 
 function Get-RestartIntentDisplayName {
@@ -10846,7 +10865,7 @@ function Write-RestartVerificationEvent {
         requestId=[string]$Context.Id; expectedGuid=[string]$Context.ExpectedGuid
         observedGuid=if ($Evidence) { [string]$Evidence.Guid } else { $null }
         observedUtc=if ($Evidence) { $Evidence.ObservedUtc } else { $null }
-        outcome=$Outcome; confirmed=[bool]$Context.Confirmed; dispatched=$Dispatched
+        outcome=$Outcome; blocker=[string]$Context.Blocker; confirmed=[bool]$Context.Confirmed; dispatched=$Dispatched
     })
 }
 
@@ -10909,15 +10928,17 @@ function Fail-RestartVerification {
     param($Context,[string]$Outcome,$Evidence=$null,$Failure=$null)
     Write-RestartVerificationEvent -Context $Context -Outcome $Outcome -Success $false -Evidence $Evidence -Failure $Failure
     $message=Get-LocalizedString -Key 'Restart.VerificationFailed'
-    if ($Outcome -eq 'mismatch' -and [string]$Context.ExpectedGuid -ne [string]$Evidence.Guid) {
+    if ($Outcome -in @('mismatch','refresh-intent-changed') -and $Evidence -and [string]$Context.ExpectedGuid -ne [string]$Evidence.Guid) {
         $message=Get-LocalizedString -Key 'Restart.TargetChanged' -Values @{
             Expected=$Context.TargetName; Observed=(Get-RestartIntentDisplayName -Guid $Evidence.Guid)
         }
     } elseif ($Outcome -eq 'admission-changed') {
         $message=Get-LocalizedString -Key 'Restart.Busy'
+    } elseif ($Outcome -in @('refresh-failed','refresh-timeout')) {
+        $message=Get-LocalizedString -Key 'Restart.RefreshNotCompleted'
     }
     if ($Outcome -eq 'mismatch') { Set-RestartObservedState -Evidence $Evidence }
-    elseif ($Outcome -ne 'admission-changed') { Set-RestartObservedState -Evidence $null }
+    elseif ($Outcome -notin @('admission-changed','refresh-intent-changed','refresh-timeout')) { Set-RestartObservedState -Evidence $null }
     $script:LastStatusText=Get-LocalizedString -Key 'Restart.BlockedStatus'
     Stop-RestartVerification
     if (-not $script:ExitRequested -and -not $script:ActiveOwnedDialog -and -not $script:ActiveAuxiliaryPopup -and -not $script:PreferencesUiActive) {
@@ -10945,9 +10966,10 @@ function Start-VerifiedRestart {
     $context=[pscustomobject]@{
         Id=[guid]::NewGuid().ToString('N');ExpectedGuid=$ExpectedGuid;TargetName=''
         Stage='admission';Confirmed=$false;Baseline=$null;ConfirmedOrder=$null;StartedUtc=[datetime]::MinValue
-        Process=$null;Timer=$null;ResultPath=$null;DispatchUtc=$null
+        Process=$null;Timer=$null;ResultPath=$null;DispatchUtc=$null;WaitingProcess=$null;Blocker=''
     }
-    if (-not (Test-RestartAdmission)) {
+    $context.Blocker=Get-RestartAdmissionBlocker -AllowRefreshWait
+    if ($context.Blocker) {
         Write-RestartVerificationEvent -Context $context -Outcome 'admission-changed' -Success $false
         if (-not $script:ActiveOwnedDialog -and -not $script:ActiveAuxiliaryPopup -and -not $script:PreferencesUiActive) {
             Show-LenovoNoticeDialog -Title (Get-LocalizedString -Key 'Restart.FailedTitle') -Heading (Get-LocalizedString -Key 'Restart.BlockedStatus') -Message (Get-LocalizedString -Key 'Restart.Busy') -Kind Warning
@@ -10968,11 +10990,68 @@ function Start-VerifiedRestart {
     $context.TargetName=Get-RestartIntentDisplayName -Guid $normalized
     $script:RestartVerification=$context
     try {
-        $context.Stage='pre-confirmation'
+        $waiting=[bool]($script:BackgroundRefreshState -and (Test-BackgroundRefreshActive -State $script:BackgroundRefreshState))
+        $context.Stage=if ($waiting) { 'waiting-refresh' } else { 'pre-confirmation' }
+        if ($waiting) {
+            $context.WaitingProcess=$script:BackgroundRefreshState.Process
+            $context.StartedUtc=[datetime]::UtcNow
+        }
         Update-PopupRows -Reason 'restart-verification'
         Update-RestartTargetUi
         Update-TaskBrokerUiState -Fast | Out-Null
+        if ($waiting) {
+            Write-RestartVerificationEvent -Context $context -Outcome 'deferred-for-refresh' -Success $true
+            $context.Timer=New-BackgroundRefreshCompletionTimer -TickAction { Complete-RestartVerification }
+            $context.Timer.Start()
+        } else {
+            Start-RestartVerificationPhase -Context $context -Stage 'pre-confirmation'
+        }
+    } catch { Fail-RestartVerification -Context $context -Outcome 'read-failed' -Failure $_ }
+}
+
+# Called on the UI thread after the exact ordinary refresh has finished,
+# its result has been applied, and its process/result file are retired.
+# Ordinary refresh never counts as either independent restart readback.
+function Complete-RestartRefreshWait {
+    param($Process,[bool]$Succeeded)
+    $context=$script:RestartVerification
+    if (-not $context -or $context.Stage -ne 'waiting-refresh' -or
+        -not [object]::ReferenceEquals($context.WaitingProcess,$Process)) { return }
+    try {
+        if (([datetime]::UtcNow-$context.StartedUtc).TotalSeconds -ge 45) {
+            $context.Blocker='refresh-timeout'
+            Fail-RestartVerification -Context $context -Outcome 'refresh-timeout'
+            return
+        }
+        if (-not $Succeeded) {
+            $context.Blocker='refresh-failed'
+            Fail-RestartVerification -Context $context -Outcome 'refresh-failed'
+            return
+        }
+        $context.Blocker=Get-RestartAdmissionBlocker
+        if ($script:BackgroundRefreshState.PendingRequest) { $context.Blocker='refresh-pending' }
+        if ($context.Blocker) {
+            Fail-RestartVerification -Context $context -Outcome 'admission-changed'
+            return
+        }
+        if (-not $script:NextBootFirmwareReadVerified -or [string]$script:SelectedGuid -ne [string]$context.ExpectedGuid) {
+            $context.Blocker='intent-changed-during-refresh'
+            $observed=if ($script:NextBootFirmwareReadVerified) {
+                [pscustomobject]@{Guid=$script:SelectedGuid;ObservedUtc=$script:SystemStatusNextObservedUtc}
+            } else { $null }
+            Fail-RestartVerification -Context $context -Outcome 'refresh-intent-changed' -Evidence $observed
+            return
+        }
+        if ($context.ExpectedGuid -and (-not (Get-EntryByGuid $context.ExpectedGuid) -or -not (Get-TaskBrokerTarget -Guid $context.ExpectedGuid))) {
+            $context.Blocker='target-unavailable-after-refresh'
+            Fail-RestartVerification -Context $context -Outcome 'admission-changed'
+            return
+        }
+        Clear-RestartVerificationWorker -Context $context
+        $context.WaitingProcess=$null
+        Write-RestartVerificationEvent -Context $context -Outcome 'refresh-handoff' -Success $true
         Start-RestartVerificationPhase -Context $context -Stage 'pre-confirmation'
+        Update-RestartTargetUi
     } catch { Fail-RestartVerification -Context $context -Outcome 'read-failed' -Failure $_ }
 }
 
@@ -11019,6 +11098,15 @@ function Complete-RestartDispatch {
 function Complete-RestartVerification {
     $context=$script:RestartVerification
     if (-not $context) { return }
+    if ($context.Stage -eq 'waiting-refresh') {
+        # Existing timer bounds only the reservation. Never kill the ordinary
+        # refresh or start a competing firmware read on timeout.
+        if (([datetime]::UtcNow-$context.StartedUtc).TotalSeconds -ge 45) {
+            $context.Blocker='refresh-timeout'
+            Fail-RestartVerification -Context $context -Outcome 'refresh-timeout'
+        }
+        return
+    }
     if ($context.Stage -in @('dispatching','requested')) { Complete-RestartDispatch -Context $context; return }
     if ($context.Stage -notin @('pre-confirmation','post-confirmation')) { return }
     $phase=$context.Stage
@@ -11028,7 +11116,9 @@ function Complete-RestartVerification {
         if (([datetime]::UtcNow-$context.StartedUtc).TotalSeconds -ge 45) { throw 'Restart verification timed out.' }
         if (-not $context.Process.HasExited) { return }
         if ($context.Process.ExitCode -ne 0) { throw 'Restart verification worker failed.' }
-        if (-not (Test-RestartAdmission) -or -not $script:NextBootFirmwareReadVerified -or [string]$script:SelectedGuid -ne [string]$context.ExpectedGuid) {
+        $context.Blocker=Get-RestartAdmissionBlocker
+        if ($context.Blocker -or -not $script:NextBootFirmwareReadVerified -or [string]$script:SelectedGuid -ne [string]$context.ExpectedGuid) {
+            if (-not $context.Blocker) { $context.Blocker='intent-changed' }
             Fail-RestartVerification -Context $context -Outcome 'admission-changed'
             return
         }
@@ -11053,7 +11143,9 @@ function Complete-RestartVerification {
                 return
             }
             $context.Confirmed=$true
-            if (-not (Test-RestartAdmission) -or -not $script:NextBootFirmwareReadVerified -or [string]$script:SelectedGuid -ne [string]$context.ExpectedGuid) {
+            $context.Blocker=Get-RestartAdmissionBlocker
+            if ($context.Blocker -or -not $script:NextBootFirmwareReadVerified -or [string]$script:SelectedGuid -ne [string]$context.ExpectedGuid) {
+                if (-not $context.Blocker) { $context.Blocker='intent-changed' }
                 Fail-RestartVerification -Context $context -Outcome 'admission-changed'
                 return
             }
@@ -13881,9 +13973,13 @@ function Complete-BackgroundBootRefresh {
     Update-RefreshButtonVisual
 
     $continuePending = $true
+    $restartRefreshSucceeded = $false
     try {
         $result = Get-BackgroundRefreshResult -ResultPath ([string]$context.ResultPath)
         $continuePending = Apply-BackgroundRefreshResult -Result $result -Request $context.Request
+        if ($script:RestartVerification -and $script:RestartVerification.Stage -eq 'waiting-refresh') {
+            $restartRefreshSucceeded = [bool]($continuePending -and $result.Success -is [bool] -and $result.Success -and $context.Process.ExitCode -eq 0)
+        }
     }
     catch {
         Write-RuntimeDiagnosticEvent -Event 'BACKGROUND_REFRESH_COMPLETED' -Stage 'background-refresh' -Success $false -ErrorRecord $_ -Data (New-RuntimeDiagnosticData @{ requestedStorage = [bool]$context.Request.RefreshStorage }) -Level error
@@ -13896,6 +13992,9 @@ function Complete-BackgroundBootRefresh {
         try { $context.Process.Dispose() } catch { }
     }
 
+    if ($script:RestartVerification -and $script:RestartVerification.Stage -eq 'waiting-refresh') {
+        Complete-RestartRefreshWait -Process $context.Process -Succeeded $restartRefreshSucceeded
+    }
     if (-not $continuePending) { return }
 
     $pending = Take-BackgroundRefreshPendingRequest -State $script:BackgroundRefreshState
@@ -13946,6 +14045,7 @@ function Start-BackgroundBootRefresh {
         }
         catch { }
         Complete-BackgroundBootRefresh
+        if ($script:RestartVerification) { return }
     }
 
     if (-not $script:ScriptPath -or -not (Test-Path -LiteralPath $script:ScriptPath)) { return }

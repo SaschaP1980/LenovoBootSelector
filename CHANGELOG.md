@@ -1,5 +1,11 @@
 ﻿# Lenovo Boot Selector – Changelog
 
+## v1.10.6.1 - Coordinate restart with popup refresh (LBS-287)
+
+- Retain the explicitly selected next-boot intent when Restart Windows is clicked during an already active ordinary refresh in a ready session. Wait asynchronously for successful refresh completion, then perform both independent fresh restart readbacks with the existing explicit confirmation.
+- Show a localized waiting status and reserve restart admission against duplicate and competing operations. Fail closed on refresh failure, timeout, changed or unknown intent, or conflicting work. Never count the ordinary refresh as restart verification, stop it to accelerate restart, or weaken firmware evidence requirements.
+- Extend the native restart suite from 82 to 126 assertions with real refresh lifecycle, native button and tray entry points, handoff, competing work, and timeout/late-completion coverage. The ordinary result application and external firmware operations are simulated; physical acceptance remains separate.
+
 ## v1.10.6.0 - Verified restart admission (LBS-287)
 
 - Capture the confirmed next-boot intent before reading firmware. Require a fresh, matching readback before confirmation and a second independent readback after consent immediately before requesting Windows restart.
